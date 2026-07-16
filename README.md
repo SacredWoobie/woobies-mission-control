@@ -250,6 +250,55 @@ shown on your computer.
 - Exact compatibility ranges will remain provisional until the version table
   above is completed and the release is tested from a clean installation.
 
+## Maintainer release process
+
+The repository includes `tools/Publish-Release.ps1` for assembling and checking
+the complete Windows release package. It does not build the three kRPC service
+DLLs; run the separate service builder and its release verification first.
+
+The default folder arrangement is:
+
+```text
+Documents\
+|-- woobies-mission-control\
+`-- Woobies-KRPC-Service-Builder\
+```
+
+With that arrangement, the script finds the verified DLLs under the sibling
+builder's `dist\GameData` folder. A different location can be supplied with
+`-GameDataPath`.
+
+From a clean, up-to-date `main` checkout, first create and audit the package
+without changing anything on GitHub:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.1
+```
+
+The script writes the ZIP, SHA-256 checksum, and generated release notes to the
+ignored `release-output` folder. Inspect and test that ZIP before continuing.
+
+To let the script create the tag and a **draft** GitHub Release, use a Git clone
+of this repository and install [Git for Windows](https://git-scm.com/download/win)
+and [GitHub CLI](https://cli.github.com/). They can also be installed from
+PowerShell with:
+
+```powershell
+winget install --id Git.Git -e
+winget install --id GitHub.cli -e
+```
+
+Open a new PowerShell window after installation, authenticate once with
+`gh auth login`, and then rerun:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.1 -CreateDraftRelease
+```
+
+The release remains private as a draft until it is reviewed and published on
+GitHub. Credentials are managed by GitHub CLI and are never stored in the
+repository.
+
 ## Contributing and issue reports
 
 When reporting a problem, include the KSP version, installed mod versions,
