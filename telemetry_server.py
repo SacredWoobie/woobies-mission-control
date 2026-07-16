@@ -53,6 +53,11 @@ _tgt_last_poll = 0.0
 _stage_cache = {}
 _stage_last_poll = 0.0
 
+# Current-stage resource ownership is inferred only when one decouple group
+# contains multiple engine stages. Cache the part assignment until the vessel
+# or KSP stage changes; resource amounts themselves are still polled live.
+_stage_partition_cache = None
+
 # kRPC builds differ in whether vessel.control.current_stage is available. Probe
 # it once at runtime and retain the result.
 #   None  = not probed yet
@@ -89,8 +94,235 @@ def _is_consumable_resource(name):
     return _normalized_resource_name(name) not in _HIDDEN_RESOURCE_NAMES
 
 
+def _resource_values(resources):
+    """Return visible resource amounts and capacities from a kRPC container."""
+    values = {}
+    try:
+        names = resources.names
+    except Exception:
+        return values
+    for name in names:
+        if not _is_consumable_resource(name):
+            continue
+        try:
+            maximum = resources.max(name)
+            if maximum > 0:
+                values[name] = (resources.amount(name), maximum)
+        except Exception:
+            pass
+    return values
+
+
+def _part_index(parts, wanted):
+    """Find a kRPC Part proxy without assuming remote objects are hashable."""
+    if wanted is None:
+        return -1
+    for index, part in enumerate(parts):
+        try:
+            if part == wanted:
+                return index
+        except Exception:
+            if part is wanted:
+                return index
+    return -1
+
+
+def _tree_distance(first, second, parent_indexes):
+    """Number of attachment edges between two indexes in the vessel part tree."""
+    first_path = {}
+    index = first
+    distance = 0
+    while index >= 0 and index not in first_path:
+        first_path[index] = distance
+        index = parent_indexes[index]
+        distance += 1
+
+    index = second
+    distance = 0
+    visited = set()
+    while index >= 0 and index not in visited:
+        if index in first_path:
+            return distance + first_path[index]
+        visited.add(index)
+        index = parent_indexes[index]
+        distance += 1
+    return 1000000
+
+
+def _stage_partition_parts(vessel, decouple_stage, current_stage):
+    """Assign a shared decouple group to its operational engine stages.
+
+    KSP has no direct concept of resource ownership when several burn stages
+    remain permanently attached (all report decouple_stage=-1). Resource types
+    provide the strongest signal: a LiquidFuel tank belongs to a LiquidFuel
+    engine stage and an LqdHydrogen tank to an LqdHydrogen stage. Shared or
+    stage-neutral stores such as Oxidizer, ElectricCharge, uranium, and depleted
+    fuel are assigned to the closest engine stage in the vessel attachment tree.
+    """
+    global _stage_partition_cache
+
+    cached = _stage_partition_cache
+    if cached is not None:
+        try:
+            if (cached["vessel"] == vessel
+                    and cached["decouple_stage"] == decouple_stage
+                    and cached["current_stage"] == current_stage):
+                return cached["activation_stage"], cached["parts"]
+        except Exception:
+            _stage_partition_cache = None
+
+    try:
+        parts = list(vessel.parts.all)
+        engines = list(vessel.parts.engines)
+    except Exception:
+        return None, None
+
+    part_stages = []
+    part_decouple_stages = []
+    part_resource_names = []
+    for part in parts:
+        try:
+            part_stages.append(int(part.stage))
+        except Exception:
+            part_stages.append(-1)
+        try:
+            part_decouple_stages.append(int(part.decouple_stage))
+        except Exception:
+            part_decouple_stages.append(-999999)
+        try:
+            names = {
+                name for name in part.resources.names
+                if _is_consumable_resource(name)
+            }
+        except Exception:
+            names = set()
+        part_resource_names.append(names)
+
+    anchors = []
+    propellants_by_stage = {}
+    for engine in engines:
+        try:
+            part_index = _part_index(parts, engine.part)
+            if part_index < 0:
+                continue
+            if part_decouple_stages[part_index] != decouple_stage:
+                continue
+            activation_stage = part_stages[part_index]
+            if activation_stage < 0:
+                continue
+            propellants = {
+                name for name in engine.propellant_names
+                if _is_consumable_resource(name)
+            }
+            anchors.append((activation_stage, part_index))
+            propellants_by_stage.setdefault(activation_stage, set()).update(
+                propellants
+            )
+        except Exception:
+            pass
+
+    anchor_stages = sorted(propellants_by_stage)
+    eligible_stages = [
+        stage for stage in anchor_stages if stage <= current_stage
+    ]
+    if len(anchor_stages) < 2 or not eligible_stages:
+        result = (None, None)
+        _stage_partition_cache = {
+            "vessel": vessel,
+            "decouple_stage": decouple_stage,
+            "current_stage": current_stage,
+            "activation_stage": result[0],
+            "parts": result[1],
+        }
+        return result
+
+    target_stage = max(eligible_stages)
+
+    resource_users = {}
+    for stage, names in propellants_by_stage.items():
+        for name in names:
+            resource_users.setdefault(name, set()).add(stage)
+
+    parent_indexes = []
+    for part in parts:
+        try:
+            parent_indexes.append(_part_index(parts, part.parent))
+        except Exception:
+            parent_indexes.append(-1)
+
+    assigned_parts = []
+    for part_index, names in enumerate(part_resource_names):
+        if (part_decouple_stages[part_index] != decouple_stage or not names):
+            continue
+
+        # An engine part's own stored resources belong to its activation stage.
+        staged_part = part_stages[part_index]
+        if staged_part in propellants_by_stage:
+            assigned_stage = staged_part
+        else:
+            scores = {}
+            for stage, propellants in propellants_by_stage.items():
+                score = 0
+                for name in names:
+                    if name not in propellants:
+                        continue
+                    # A resource unique to one engine stage is much stronger
+                    # evidence than a shared resource such as Oxidizer.
+                    score += 4 if len(resource_users[name]) == 1 else 1
+                scores[stage] = score
+
+            best_score = max(scores.values())
+            candidates = [
+                stage for stage, score in scores.items()
+                if score == best_score
+            ]
+            if best_score > 0 and len(candidates) == 1:
+                assigned_stage = candidates[0]
+            else:
+                # Neutral resources (EC, uranium, depleted fuel) and ties are
+                # owned by the structurally closest engine stage.
+                assigned_stage = min(
+                    anchors,
+                    key=lambda anchor: (
+                        _tree_distance(
+                            part_index, anchor[1], parent_indexes
+                        ),
+                        anchor[0],
+                    ),
+                )[0]
+
+        if assigned_stage == target_stage:
+            assigned_parts.append(parts[part_index])
+
+    _stage_partition_cache = {
+        "vessel": vessel,
+        "decouple_stage": decouple_stage,
+        "current_stage": current_stage,
+        "activation_stage": target_stage,
+        "parts": assigned_parts,
+    }
+    return target_stage, assigned_parts
+
+
+def _resource_values_for_parts(parts):
+    """Aggregate all visible resources stored on the supplied vessel parts."""
+    values = {}
+    for part in parts:
+        try:
+            part_values = _resource_values(part.resources)
+        except Exception:
+            continue
+        for name, (amount, maximum) in part_values.items():
+            previous_amount, previous_maximum = values.get(name, (0.0, 0.0))
+            values[name] = (
+                previous_amount + amount,
+                previous_maximum + maximum,
+            )
+    return values
+
+
 def _current_stage_resource_values(vessel, current_stage):
-    """Return the first resource-bearing decouple group below the active stage."""
+    """Return the current operational stage's resource values."""
     # resources_in_decouple_stage groups parts by when they are discarded, not
     # by the stage that activated their engines. Pure separator/fairing stages
     # can therefore be empty, and parts that are never discarded use stage -1.
@@ -103,21 +335,23 @@ def _current_stage_resource_values(vessel, current_stage):
                 stage=decouple_stage,
                 cumulative=False,
             )
-            values = {}
-            for name in resources.names:
-                if not _is_consumable_resource(name):
-                    continue
-                try:
-                    maximum = resources.max(name)
-                    if maximum > 0:
-                        values[name] = (resources.amount(name), maximum)
-                except Exception:
-                    pass
-            if values:
-                return decouple_stage, values
+            values = _resource_values(resources)
+            if not values:
+                continue
+
+            activation_stage, parts = _stage_partition_parts(
+                vessel, decouple_stage, current_stage
+            )
+            if parts is not None:
+                return (
+                    decouple_stage,
+                    activation_stage,
+                    _resource_values_for_parts(parts),
+                )
+            return decouple_stage, None, values
         except Exception:
             pass
-    return None, {}
+    return None, None, {}
 
 
 def _current_stage(vessel):
@@ -163,9 +397,13 @@ def _gather_resources(vessel):
     # Distinguish an unavailable stage index from a valid stage with no resources.
     out["res.stageKnown"] = (stage is not None)
     if stage is not None:
-        resource_stage, stage_values = _current_stage_resource_values(vessel, stage)
+        resource_stage, activation_stage, stage_values = (
+            _current_stage_resource_values(vessel, stage)
+        )
         if resource_stage is not None:
             out["res.stageResourceStage"] = resource_stage
+        if activation_stage is not None:
+            out["res.stageActivationStage"] = activation_stage
         for name, (amount, maximum) in stage_values.items():
             out[f"r.resourceCurrent[{name}]"] = amount
             out[f"r.resourceCurrentMax[{name}]"] = maximum
