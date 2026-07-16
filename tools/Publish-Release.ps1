@@ -184,12 +184,11 @@ if ($CreateDraftRelease) {
         throw "A GitHub Release for v$Version already exists."
     }
 
-    $remoteTag = [string](& git -C $repoRoot ls-remote --tags origin "refs/tags/v$Version")
-    $remoteTag = $remoteTag.Trim()
+    $remoteTag = @(& git -C $repoRoot ls-remote --tags origin "refs/tags/v$Version")
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to check the remote release tag.'
     }
-    if ($remoteTag) {
+    if ($remoteTag.Count -gt 0) {
         throw "The tag v$Version already exists on the remote."
     }
 }
