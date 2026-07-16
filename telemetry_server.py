@@ -31,6 +31,15 @@ RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 
+# KSP Recall exposes these internal refund-bookkeeping resources through kRPC.
+# They are implementation details, not vessel consumables. Match normalized
+# names so case and punctuation differences across mod versions do not matter.
+_HIDDEN_RESOURCE_NAMES = frozenset({
+    "stealback",
+    "stealbackmyfunds",
+    "refundingforksp111x",
+})
+
 _sci_cache = {}
 _sci_last_poll = 0.0
 _heat_cache = {}
@@ -72,6 +81,14 @@ def _mag(v):
     return math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
 
 
+def _normalized_resource_name(name):
+    return "".join(ch for ch in str(name).casefold() if ch.isalnum())
+
+
+def _is_consumable_resource(name):
+    return _normalized_resource_name(name) not in _HIDDEN_RESOURCE_NAMES
+
+
 def _current_stage(vessel):
     """Current stage index, or None if this kRPC build doesn't expose it."""
     global _HAS_CURRENT_STAGE
@@ -99,12 +116,7 @@ def _gather_resources(vessel):
     out = {}
     try:
         res = vessel.resources
-        # KSP Recall uses StealBack as an internal bookkeeping resource. It is
-        # not a consumable and should never become a dashboard row.
-        names = [
-            name for name in res.names
-            if "".join(ch for ch in name.lower() if ch.isalnum()) != "stealback"
-        ]
+        names = [name for name in res.names if _is_consumable_resource(name)]
     except Exception:
         return {}
 
@@ -125,6 +137,8 @@ def _gather_resources(vessel):
             # stage through all later stages, including never-decoupled parts.
             sres = vessel.resources_in_decouple_stage(stage=stage - 1, cumulative=True)
             for n in sres.names:
+                if not _is_consumable_resource(n):
+                    continue
                 try:
                     out[f"r.resourceCurrent[{n}]"] = sres.amount(n)
                     out[f"r.resourceCurrentMax[{n}]"] = sres.max(n)
