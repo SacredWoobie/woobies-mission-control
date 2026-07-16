@@ -2,6 +2,18 @@
 
 All notable public changes will be recorded here.
 
+## v0.1.4 - Multi-burn consumables partition
+
+- Split current-stage resources when multiple engine stages remain permanently
+  attached and therefore share kRPC's decouple stage `-1`.
+- Used stage-specific propellants to assign fuel tanks to their operational
+  engine stage, preventing S2 and S0 stores from being combined.
+- Assigned shared and stage-neutral stores by attachment-tree proximity so
+  ElectricCharge, EnrichedUranium, DepletedFuel, and other non-propellants stay
+  visible on the stage they physically belong to.
+- Cached the inferred part ownership until the vessel or KSP stage changes to
+  avoid repeating the topology walk on every resource poll.
+
 ## v0.1.3 - Current-stage consumables fix
 
 - Corrected current-stage resource tracking after pure decoupler, separator, or
