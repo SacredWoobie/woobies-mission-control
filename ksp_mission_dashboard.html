@@ -225,12 +225,12 @@
   .hdg-readout{font-size:11px;color:var(--cyan);letter-spacing:.1em}
   .throttle-col{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;width:52px}
   /* left column: enlarged SAS on top, prominent Altitude readout beneath */
-  .asc-left{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;width:184px}
+  .asc-left{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;width:204px}
   .sas-box,.alt-box{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:9px 11px;display:flex;flex-direction:column;gap:3px}
   .sas-box .label,.alt-box .label{font-size:9px}
   .sas-val{font-size:18px;line-height:1.15;color:var(--cyan);letter-spacing:.02em;word-break:break-word}
   .alt-box{border-color:var(--rule-bright);background:linear-gradient(180deg,#101826,var(--panel-2))}
-  .alt-val{font-size:31px;line-height:1;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .alt-val{font-size:28px;line-height:1;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap}
   .thr-track{flex:0 0 auto;width:22px;height:150px;background:#05080c;border:1px solid var(--rule-bright);border-radius:3px;position:relative;overflow:hidden}
   .thr-fill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,var(--amber-dim),var(--amber));transition:height .12s linear}
   .thr-pct{font-size:14px;color:var(--amber);font-variant-numeric:tabular-nums}
@@ -1205,11 +1205,12 @@ function updateStaging(d){
   // Propulsive stages only, for the readout + table.
   const rows = stages.filter(s => num(dvOf(s)) && dvOf(s) > 0.5);
 
-  // Current stage: the row matching stage.currentKsp; fall back to the highest
-  // KSP number present if that key is momentarily absent.
+  // Current stage: the row matching stage.currentKsp. Only fall back to the
+  // highest KSP number when the current-stage key itself is absent; a known
+  // zero-dV stage should remain selected and show blank propulsion values.
   const curKsp = num(d["stage.currentKsp"]) ? Math.round(d["stage.currentKsp"]) : null;
   let cur = curKsp!=null ? rows.find(s=>s.ksp===curKsp) : null;
-  if(!cur) cur = rows.length ? rows.reduce((a,b)=>b.ksp>a.ksp?b:a) : null;
+  if(curKsp==null && !cur) cur = rows.length ? rows.reduce((a,b)=>b.ksp>a.ksp?b:a) : null;
 
   if(cur){
     set("stageNum", cur.ksp);
