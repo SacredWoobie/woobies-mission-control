@@ -2,6 +2,15 @@
 
 All notable public changes will be recorded here.
 
+## v0.1.3 - Current-stage consumables fix
+
+- Corrected current-stage resource tracking after pure decoupler, separator, or
+  fairing stages.
+- Walked through empty decouple-stage groups and included resources on parts
+  that remain attached through the final stage.
+- Avoided kRPC's cumulative decouple-stage behavior, which excludes the
+  never-decoupled stage `-1` resource group.
+
 ## v0.1.2 - KSP Recall consumables fix
 
 - Restored filtering for KSP Recall's internal `StealBackMyFunds`,
