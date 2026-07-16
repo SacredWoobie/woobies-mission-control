@@ -1,6 +1,6 @@
 # Woobie's Mission Control
 
-Current release: **v0.1.3**
+Current release: **v0.1.4**
 
 A modular mission dashboard and optional ESP32 control-pad bridge for Kerbal
 Space Program 1, powered by [kRPC](https://krpc.github.io/krpc/).
@@ -102,7 +102,7 @@ still need confirmation before release.
 | MechJeb 2 | `2.14.3.0` |
 | KRPC.MechJeb | `0.7.1` |
 | KRPC.SystemHeat service | `0.2.0` |
-| KRPC.StageStats service | `0.1.0` |
+| KRPC.StageStats service | `0.1.1` |
 | KRPC.VesselScience service | `0.1.0` |
 | System Heat | `0.9.1` |
 | Near Future Electrical | `2.0.8` |
@@ -272,7 +272,7 @@ From a clean, up-to-date `main` checkout, first create and audit the package
 without changing anything on GitHub:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.3
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.4
 ```
 
 The script writes the ZIP, SHA-256 checksum, and generated release notes to the
@@ -292,7 +292,7 @@ Open a new PowerShell window after installation, authenticate once with
 `gh auth login`, and then rerun:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.3 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.4 -CreateDraftRelease
 ```
 
 The release remains private as a draft until it is reviewed and published on
