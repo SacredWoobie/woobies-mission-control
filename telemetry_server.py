@@ -30,6 +30,7 @@ ELEC_POLL_SECONDS = 1     # per-reactor + solar + RTG
 RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
+STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
 
 # KSP Recall exposes these internal refund-bookkeeping resources through kRPC.
 # They are implementation details, not vessel consumables. Match normalized
@@ -523,19 +524,39 @@ def _gather_target(conn, vessel):
 # ---------------------------------------------------------------------------
 # Per-stage delta-V via the custom KRPC.StageStats service (MechJeb's sim).
 #
-# The service indexes stages by ARRAY INDEX: index 0 is the final/upper stage,
-# the last index is the stage burning now -- the reverse of KSP's countdown
-# numbering. We map each row back to its KSP stage number here so the dashboard
-# can label stages the way they show in-game.
+# The service indexes stages by ARRAY INDEX: index 0 is the final/upper stage.
+# A complete MechJeb result includes the zero-thrust staging slots and maps
+# contiguously to KSP's countdown numbering. During an incomplete/older result,
+# however, MechJeb can expose only propulsive rows. In that case we map the rows
+# to the vessel's actual engine activation stages instead of inventing adjacent
+# stage numbers and losing S0.
 #
 #   ksp_number(index) = current_ksp - ((count - 1) - index)
 #                     = index + (current_ksp - (count - 1))
 #
 # atmo (current-pressure) and vac are both emitted per row; the dashboard picks.
-# Every per-stage read pumps MechJeb's async sim inside the DLL, so no
-# RequestUpdate handling is needed on this side.
+# The custom service pumps MechJeb's async sim on every read. Prime it, allow
+# MechJeb's 100 ms flight refresh window to complete, then take one snapshot.
 # ---------------------------------------------------------------------------
-def _gather_stages(conn):
+def _stage_ksp_numbers(vessel, current_ksp, count):
+    """Return KSP labels for a full or propulsive-only MechJeb result."""
+    offset = (current_ksp - (count - 1)) if count > 0 else 0
+    contiguous = [index + offset for index in range(count)]
+
+    try:
+        engine_stages = sorted({
+            int(engine.part.stage)
+            for engine in vessel.parts.engines
+            if 0 <= int(engine.part.stage) <= current_ksp
+        })
+        if len(engine_stages) == count:
+            return engine_stages, "engine-activation"
+    except Exception:
+        pass
+    return contiguous, "contiguous"
+
+
+def _gather_stages(conn, vessel):
     try:
         ss = conn.stage_stats
     except Exception:
@@ -549,12 +570,21 @@ def _gather_stages(conn):
 
     out = {"stage.available": True}
     try:
+        # The first call collects the previous completed result and requests a
+        # new asynchronous simulation. Waiting past MechJeb's 100 ms refresh
+        # interval lets the second call collect that new result before we read
+        # its individual fields.
+        ss.stage_count()
+        time.sleep(STAGE_SETTLE_SECONDS)
         count = ss.stage_count()
         current_ksp = ss.current_stage()
         out["stage.count"] = count
         out["stage.currentKsp"] = current_ksp
 
-        offset = (current_ksp - (count - 1)) if count > 0 else 0
+        ksp_numbers, mapping = _stage_ksp_numbers(
+            vessel, current_ksp, count
+        )
+        out["stage.mapping"] = mapping
         stages = []
         total_atmo = total_vac = 0.0
         for i in range(count):
@@ -564,7 +594,7 @@ def _gather_stages(conn):
             total_vac += dv_vac
             stages.append({
                 "index": i,
-                "ksp": i + offset,
+                "ksp": ksp_numbers[i],
                 "dvAtmo": round(dv_atmo, 1),
                 "dvVac": round(dv_vac, 1),
                 "twr": round(ss.stage_twr(i, False), 2),
@@ -574,7 +604,7 @@ def _gather_stages(conn):
         out["stage.totalDvAtmo"] = round(total_atmo, 1)
         out["stage.totalDvVac"] = round(total_vac, 1)
     except Exception:
-        pass  # mid-scene-change / sim not ready -- keep whatever we got
+        return {}  # mid-scene-change / sim not ready; retain last good cache
 
     return out
 
@@ -813,8 +843,9 @@ def gather_telemetry(conn):
     if now - _stage_last_poll >= STAGE_POLL_SECONDS:
         _stage_last_poll = now
         try:
-            result = _gather_stages(conn)
-            _stage_cache = result if result else {}
+            result = _gather_stages(conn, vessel)
+            if result:
+                _stage_cache = result
         except Exception:
             pass  # keep last good cache through scene changes
     d.update(_stage_cache)
