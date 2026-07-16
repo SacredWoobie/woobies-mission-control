@@ -1,0 +1,2 @@
+krpc==0.5.4
+websockets==16.0

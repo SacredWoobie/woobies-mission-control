@@ -1,0 +1,21 @@
+# Changelog
+
+All notable public changes will be recorded here.
+
+## v0.1.0 - Initial public test release
+
+- Prepared the project for its first public release.
+- Separated dashboard telemetry from the ESP32 control-pad bridge.
+- Added component discovery to the launcher.
+- Added stored-science support through the VesselScience service.
+- Corrected System Heat electricity, RTG, and transient generator reporting.
+- Corrected MechJeb stage TWR reporting.
+- Filtered KSP Recall's internal `StealBack` resource from consumables.
+- Added adaptive altitude, apoapsis, and periapsis precision with exact-meter
+  hover values.
+- Added a compact reactor summary and a collapsed, scrollable per-reactor
+  detail list with temperature and integrity alerts.
+- Added `KSP_control.ino` firmware for the ESP32-WROOM-32 DevKit V1, with
+  debounced inputs and safe fire-button startup behavior.
+- Clarified that complete-release Python setup must be run from its `Dashboard`
+  folder so the launcher can use the project-local virtual environment.

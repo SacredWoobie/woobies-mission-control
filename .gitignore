@@ -1,0 +1,31 @@
+# Python runtime and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local logs and diagnostics
+*.log
+launcher_error.log
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# C# build workspaces and KSP/mod reference assemblies
+bin/
+obj/
+lib/
+*.user
+*.suo
+*.csproj.user
+*.pdb
+*.mdb
+*.dll
+
+# Release archives are attached to GitHub Releases, not committed to source
+*.zip
+*.7z
+*.rar

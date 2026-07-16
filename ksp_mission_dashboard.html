@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MISSION CONTROL — kRPC</title>
+<style>
+  /* =========================================================================
+     ORBITAL TELEMETRY — flight-computer MFD aesthetic
+     Palette: amber phosphor primary, cyan live accents, slate labels,
+     on a deep blue-black. Built for a narrow vertical secondary monitor.
+     ========================================================================= */
+  :root{
+    --bg:#080b11;
+    --panel:#0f151f;
+    --panel-2:#0b1019;
+    --rule:#1c2735;
+    --rule-bright:#2a3a4e;
+    --amber:#ffb454;      /* primary numeric data */
+    --amber-dim:#a9762f;
+    --cyan:#4ec9e0;       /* live / active accent */
+    --slate:#7d8ba0;      /* labels */
+    --slate-dim:#4a5568;
+    --green:#7ee787;      /* nominal fill */
+    --warn:#ff6b5b;       /* caution */
+    --sky:#2f5c94;        /* navball sky */
+    --ground:#5a3d24;     /* navball ground */
+    --mono: ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #0d1420 0%, var(--bg) 60%),
+      var(--bg);
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:13px;
+    line-height:1.3;
+    -webkit-font-smoothing:antialiased;
+    padding:10px;
+    background-blend-mode:normal;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.16) 2px 3px);
+    mix-blend-mode:multiply;opacity:.5;
+  }
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
+
+  .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .deck > .panel{break-inside:avoid;margin-bottom:12px;width:100%}
+  @media (min-width:980px){
+    .deck{column-count:2;column-gap:12px}
+    .deck > .panel{display:inline-block}   /* helps Firefox keep panels intact */
+  }
+
+  /* ---- generic panel ---- */
+  .panel{
+    background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    position:relative;
+  }
+  .panel > h2{
+    margin:0;padding:6px 10px;
+    font-size:10px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--slate);font-weight:600;
+    border-bottom:1px solid var(--rule);
+    display:flex;justify-content:space-between;align-items:center;
+    background:rgba(255,255,255,.015);
+  }
+  .panel > h2 .tag{color:var(--slate-dim);letter-spacing:.1em}
+  .panel .body{padding:10px}
+
+  .label{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--slate)}
+  .val{color:var(--amber);font-variant-numeric:tabular-nums}
+  .unit{color:var(--slate-dim);font-size:.82em;margin-left:2px}
+  .live{color:var(--cyan)}
+
+  /* ---- connection bar ---- */
+  #conn .body{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  #conn input{
+    background:#060a0f;border:1px solid var(--rule-bright);color:var(--amber);
+    font-family:var(--mono);font-size:12px;padding:5px 7px;border-radius:3px;
+  }
+  #conn input#host,#conn input#hostK{width:130px}
+  #conn input#port,#conn input#portK{width:64px}
+  #conn select{
+    background:#060a0f;border:1px solid var(--rule-bright);color:var(--amber);
+    font-family:var(--mono);font-size:12px;padding:5px 6px;border-radius:3px;
+  }
+  button{
+    font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    background:#12202c;color:var(--cyan);border:1px solid #24485a;padding:6px 12px;
+    border-radius:3px;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  button:hover{background:#173040;border-color:#3a6f86}
+  button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  button.danger{color:var(--warn);border-color:#5a2b28;background:#1e1210}
+  button.danger:hover{background:#2a1815}
+  .status{display:flex;align-items:center;gap:7px;margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
+  .led{width:9px;height:9px;border-radius:50%;background:#333;box-shadow:0 0 0 1px #000 inset}
+  .led.ok{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s ease-in-out infinite}
+  .led.bad{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .led.wait{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .linknote{width:100%;font-size:9px;letter-spacing:.06em;color:var(--slate-dim);margin-top:-2px}
+
+  /* ---- clock strip ---- */
+  #clock .body{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);padding:0}
+  .clockcell{background:var(--panel);padding:10px 12px}
+  .clockcell .label{margin-bottom:5px}
+  .clockcell .big{font-size:22px;letter-spacing:.04em;color:var(--amber);font-variant-numeric:tabular-nums}
+  .clockcell .sub{font-size:10px;color:var(--slate-dim);margin-top:3px;letter-spacing:.06em}
+  #metCell .big{color:var(--cyan)}
+
+  /* ---- ascension: navball + throttle + stats ---- */
+  #asc .body{display:flex;flex-direction:column;gap:12px}
+  /* full-width panel: spread the SAS / navball / throttle columns across the
+     width rather than bunching them centered with empty flanks. Capped so they
+     don't drift absurdly far apart on very wide screens. */
+  .asc-top{display:flex;gap:22px;align-items:center;justify-content:center}
+  @media (min-width:980px){
+    /* 3-col grid with equal side columns guarantees the navball (the center
+       'auto' column) sits dead-center in the panel, regardless of the differing
+       widths of the SAS/altitude stack on the left and the throttle on the
+       right. space-around balanced the gaps, not the middle element, so the
+       navball drifted once the left column grew. */
+    .asc-top{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;
+             align-items:center;max-width:900px;margin:0 auto;width:100%}
+    .asc-left{justify-self:center}
+    .throttle-col{justify-self:center}
+  }
+  .navwrap{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .heading-tape{width:150px;height:20px;overflow:hidden;border:1px solid var(--rule-bright);border-radius:2px;position:relative;background:#05080c}
+  .heading-tape svg{position:absolute;left:0;top:0}
+  .hdg-readout{font-size:11px;color:var(--cyan);letter-spacing:.1em}
+  .throttle-col{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;width:52px}
+  /* left column: enlarged SAS on top, prominent Altitude readout beneath */
+  .asc-left{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:8px;width:184px}
+  .sas-box,.alt-box{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:9px 11px;display:flex;flex-direction:column;gap:3px}
+  .sas-box .label,.alt-box .label{font-size:9px}
+  .sas-val{font-size:18px;line-height:1.15;color:var(--cyan);letter-spacing:.02em;word-break:break-word}
+  .alt-box{border-color:var(--rule-bright);background:linear-gradient(180deg,#101826,var(--panel-2))}
+  .alt-val{font-size:31px;line-height:1;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .thr-track{flex:0 0 auto;width:22px;height:150px;background:#05080c;border:1px solid var(--rule-bright);border-radius:3px;position:relative;overflow:hidden}
+  .thr-fill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,var(--amber-dim),var(--amber));transition:height .12s linear}
+  .thr-pct{font-size:14px;color:var(--amber);font-variant-numeric:tabular-nums}
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  @media (min-width:980px){ .stats-grid{grid-template-columns:repeat(5,1fr)} }
+  .stat{background:var(--panel);padding:9px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .stat .label{font-size:9px}
+  .stat .v{font-size:20px;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .spark{width:100%;height:44px;display:block;background:#05080c;border:1px solid var(--rule);border-radius:3px}
+  .spark-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .spark-lab{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin:0 0 3px 2px}
+
+  /* ---- consumables ---- */
+  .res-row{display:grid;grid-template-columns:78px 1fr 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--rule)}
+  .res-row:last-child{border-bottom:none}
+  .res-name{font-size:10px;letter-spacing:.06em;color:var(--slate);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res-name.empty{color:var(--slate-dim)}
+  .meter{position:relative}
+  .meter .track{height:16px;background:#05080c;border:1px solid var(--rule-bright);border-radius:2px;overflow:hidden}
+  .meter .fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green),#4fae5c);transition:width .18s linear}
+  .meter .fill.low{background:linear-gradient(90deg,var(--warn),#c24a3f)}
+  .meter .fill.mid{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .meter .cap{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 5px;font-size:9px;color:#eef3f8;text-shadow:0 0 2px #000,0 0 3px #000,0 1px 2px #000;font-variant-numeric:tabular-nums;pointer-events:none;font-weight:500}
+  .meter .cap .k{color:#c2ccd8}
+  .col-heads{display:grid;grid-template-columns:78px 1fr 1fr;gap:8px;margin-bottom:4px}
+  .col-heads span{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate-dim)}
+  .col-heads span:first-child{visibility:hidden}
+  .res-note{font-size:9px;color:var(--slate-dim);margin-top:6px;font-style:italic}
+  .res-note.hidden{display:none}
+
+  /* ---- staging ---- */
+  #stage .body{display:flex;flex-direction:column;gap:10px}
+  .stage-top{display:flex;gap:14px;align-items:center}
+  .stage-num{display:flex;flex-direction:column;gap:2px}
+  .stage-num .v{font-size:26px;color:var(--cyan);font-variant-numeric:tabular-nums;line-height:1}
+  .thr-inline{flex:1}
+  .thr-inline .track{height:14px;background:#05080c;border:1px solid var(--rule-bright);border-radius:2px;overflow:hidden}
+  .thr-inline .fill{height:100%;width:0%;background:linear-gradient(90deg,var(--amber-dim),var(--amber));transition:width .12s linear}
+  /* Δv values ("10,549.5 m/s") need far more room than TWR ("0.57"), so the
+     columns are weighted rather than equal -- equal 1fr columns clipped the
+     Δv text mid-unit. */
+  .dv-grid{display:grid;grid-template-columns:1.25fr 1.25fr 0.7fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .dv-grid .stat{align-items:flex-start;padding:9px 10px}
+  .dv-grid .stat .v{font-size:17px}
+  .stage-table{margin-top:2px;display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .st-row{display:grid;grid-template-columns:60px 1fr 1fr 1fr;gap:1px;background:var(--rule)}
+  .st-row > span{background:var(--panel);padding:4px 8px;font-variant-numeric:tabular-nums;font-size:11px;color:var(--amber)}
+  .st-head > span{color:var(--slate-dim);font-size:8px;letter-spacing:.14em;text-transform:uppercase}
+  .st-row .sname{color:var(--slate)}
+  .st-row.cur > span{background:#0e2029;color:var(--cyan)}
+  .st-row.cur .sname{color:var(--cyan)}
+
+  /* ---- comms strip (under the clocks) ---- */
+  .comms-strip{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border-top:1px solid var(--rule)}
+  .cs-cell{background:var(--panel);padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+  .cs-cell .label{margin-bottom:1px}
+  .cs-status{display:flex;align-items:center;gap:7px;font-size:15px;letter-spacing:.04em}
+  .led2{width:9px;height:9px;border-radius:50%;background:#333;flex:0 0 auto}
+  .led2.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .led2.warn{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .led2.bad{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .cs-val{font-size:16px;color:var(--cyan);font-variant-numeric:tabular-nums}
+
+  /* ---- science ---- */
+  #sci .sci-total{display:flex;flex-direction:column;gap:5px}
+  .sci-sub{font-size:11px;color:var(--slate);font-variant-numeric:tabular-nums}
+  .sci-loc{margin-top:8px;padding-top:8px;border-top:1px solid var(--rule);font-size:12px;color:var(--amber);letter-spacing:.05em;min-height:14px}
+  .sci-loc:empty{display:none}
+  .sci-value{font-size:22px;color:var(--cyan);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .sci-value.blocked{color:var(--slate-dim);font-size:10px;letter-spacing:.02em;line-height:1.4}
+  .sci-list{margin-top:8px;display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden;max-height:180px;overflow-y:auto}
+  .sci-list:empty{display:none}
+  .sci-details{margin-top:8px}
+  .sci-details summary{cursor:pointer;font-size:10px;color:var(--slate);letter-spacing:.1em;text-transform:uppercase;user-select:none}
+  .sci-details summary:hover{color:var(--cyan)}
+  .sci-details[open] summary{color:var(--cyan)}
+  .sl-row{display:grid;grid-template-columns:1fr auto;gap:8px;background:var(--panel);padding:4px 9px;font-size:10px}
+  .sl-row .t{color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sl-row .v{color:var(--amber);font-variant-numeric:tabular-nums}
+
+  /* ---- heat ---- */
+  .heat-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .heat-loops{margin-top:8px;display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .heat-loops:empty{display:none}
+  .hl-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;background:var(--panel);padding:4px 9px;font-size:10px}
+  .hl-row .t{color:var(--slate)}
+  .hl-row .v{color:var(--amber);font-variant-numeric:tabular-nums}
+
+  /* ---- electricity ---- */
+  .rx-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;margin-top:8px;
+              background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .rx-summary.hidden,.rx-details.hidden{display:none}
+  .rx-summary .cs-cell{min-width:0;padding:7px 9px}
+  .rx-summary .cs-val{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rx-summary-sub{font-size:10px;line-height:1.25;color:#a8b3c4;font-variant-numeric:tabular-nums;
+                  letter-spacing:.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rx-condition.ok{color:var(--green)}
+  .rx-condition.warn{color:#f87171}
+  .rx-condition.unknown{color:var(--amber)}
+  .rx-details{margin-top:8px;border:1px solid var(--rule);border-radius:3px;background:var(--panel-2)}
+  .rx-details summary{display:flex;align-items:center;justify-content:space-between;gap:10px;
+                      cursor:pointer;padding:6px 9px;font-size:10px;color:var(--slate);
+                      letter-spacing:.1em;text-transform:uppercase;user-select:none;list-style:none}
+  .rx-details summary::-webkit-details-marker{display:none}
+  .rx-details summary::before{content:"▸";color:var(--cyan);flex:0 0 auto}
+  .rx-details[open] summary::before{content:"▾"}
+  .rx-details summary > span:first-of-type{flex:1 1 auto}
+  .rx-details summary:hover,.rx-details[open] summary{color:var(--cyan)}
+  .rx-details.warn summary{color:#f87171}
+  .rx-detail-count{font-variant-numeric:tabular-nums;letter-spacing:.04em}
+  .rx-scroll{max-height:min(270px,35vh);overflow-y:auto;overscroll-behavior:contain;
+             border-top:1px solid var(--rule);padding:7px}
+  .rx-list{display:flex;flex-direction:column;gap:6px}
+  .rx-list:empty{display:none}
+  .rx-card{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:7px 9px}
+  .rx-head{display:flex;align-items:center;gap:8px;min-width:0}
+  /* name can be long ("MX-2C 'Hyperion' Fission Reactor") -> ellipsis, never wrap/overflow */
+  .rx-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+           font-size:11px;color:var(--slate);letter-spacing:.02em}
+  .rx-state{flex:0 0 auto;font-size:9px;letter-spacing:.1em;padding:1px 6px;border-radius:2px;
+            text-transform:uppercase;font-weight:600}
+  .rx-state.on{background:rgba(74,222,128,.14);color:#4ade80}
+  .rx-state.off{background:rgba(120,130,145,.14);color:var(--slate-dim)}
+  .rx-stats{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin-top:6px}
+  .rx-stat{display:flex;justify-content:space-between;gap:8px;font-size:10px;min-width:0}
+  .rx-stat label{color:var(--slate-dim);flex:0 0 auto}
+  /* value column: numeric or an arbitrary status/fuel string -> clip with ellipsis */
+  .rx-stat .rv{color:var(--amber);font-variant-numeric:tabular-nums;
+               overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;min-width:0}
+  .rx-stat .rv.warn{color:#f87171}
+  .rx-empty{font-size:11px;color:var(--slate-dim);font-style:italic;padding:2px 0}
+  .solar-strip{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:1px;margin-top:8px;
+               background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .solar-strip.hidden{display:none}
+  .cs-cell.hidden{display:none}
+
+  /* ---- target ---- */
+  #target{display:none}
+  #target.active{display:block}
+  .tgt-name{font-size:14px;color:var(--cyan);letter-spacing:.04em;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tgt-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .dock-wrap{margin-top:10px;display:none}
+  .dock-wrap.active{display:block}
+  .dock-svg{width:100%;max-width:220px;display:block;margin:0 auto;background:#05080c;border:1px solid var(--rule);border-radius:4px}
+
+  a{color:var(--cyan)}
+
+  /* =========================================================================
+     MODAL OVERLAYS — disconnected / no-flight. A dimmed, slightly blurred
+     scrim over the whole dashboard with a centered industrial "pop-out".
+     ========================================================================= */
+  .scrim{
+    position:fixed;inset:0;z-index:200;
+    display:none;align-items:center;justify-content:center;padding:20px;
+    background:rgba(4,7,11,.72);
+    backdrop-filter:blur(3px) saturate(.6);
+    -webkit-backdrop-filter:blur(3px) saturate(.6);
+  }
+  .scrim.show{display:flex;animation:scrimIn .18s ease-out}
+  @keyframes scrimIn{from{opacity:0}to{opacity:1}}
+
+  /* The hazard-striped frame: diagonal blue/gray warning bars via a repeating
+     gradient on a padded wrapper; the inner panel sits on top. */
+  .popout{
+    position:relative;max-width:440px;width:100%;
+    padding:10px;                       /* thickness of the hazard border */
+    border-radius:6px;
+    background:repeating-linear-gradient(
+      -45deg,
+      var(--rule-bright) 0 14px,
+      #0d1622 14px 28px
+    );
+    box-shadow:0 18px 60px rgba(0,0,0,.6), 0 0 0 1px #000;
+  }
+  .popout.alert{
+    /* no-flight uses a warmer slate/blue mix but stays in-palette */
+    background:repeating-linear-gradient(
+      -45deg,
+      #35506e 0 14px,
+      #0d1622 14px 28px
+    );
+    animation:hazPulse 2.6s ease-in-out infinite;
+  }
+  @keyframes hazPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.28)}}
+
+  .popout-inner{
+    background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+    border:1px solid var(--rule-bright);
+    border-radius:3px;
+    padding:22px 22px 20px;
+  }
+  .popout h3{
+    margin:0 0 4px;
+    font-size:13px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--cyan);font-weight:600;
+    display:flex;align-items:center;gap:9px;
+  }
+  .popout .sub{
+    font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--slate);margin-bottom:16px;
+  }
+  .popout .big-status{
+    font-size:19px;letter-spacing:.06em;color:var(--amber);
+    margin:6px 0 4px;font-variant-numeric:tabular-nums;
+  }
+  /* connect form inside the pop-out */
+  .popout .form-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+  .popout .form-row label{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--slate)}
+  .popout input{
+    background:#060a0f;border:1px solid var(--rule-bright);color:var(--amber);
+    font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:3px;
+  }
+  .popout input#hostK2{width:120px}
+  .popout input#portK2{width:64px}
+  .popout .connect-btn{
+    width:100%;margin-top:14px;padding:11px;
+    font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    background:#12202c;color:var(--cyan);border:1px solid #24485a;border-radius:3px;cursor:pointer;
+    transition:background .15s,border-color .15s;
+  }
+  .popout .connect-btn:hover{background:#173040;border-color:#3a6f86}
+  .popout .connect-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .popout .statusline{
+    display:flex;align-items:center;gap:8px;margin-top:12px;
+    font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);
+  }
+  /* rotating/blinking hazard glyph */
+  .haz-badge{
+    width:34px;height:34px;flex:0 0 auto;border-radius:4px;
+    background:repeating-linear-gradient(-45deg,var(--amber) 0 5px,#1a1206 5px 10px);
+    box-shadow:0 0 0 1px #000 inset;opacity:.9;
+  }
+  .popout.alert .haz-badge{
+    background:repeating-linear-gradient(-45deg,var(--cyan) 0 5px,#06131a 5px 10px);
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  /* dashboard content dims/locks out behind a scrim */
+  body.modal-open .wrap{filter:saturate(.5) brightness(.55);pointer-events:none;user-select:none}
+</style>
+</head>
+<body>
+
+<!-- ============ DISCONNECTED OVERLAY (centered pop-out, dims dashboard) ============ -->
+<div class="scrim" id="scrimConnect">
+  <div class="popout">
+    <div class="popout-inner">
+      <h3><span class="haz-badge"></span> Datalink Offline</h3>
+      <div class="sub">kRPC bridge not connected</div>
+      <div class="form-row">
+        <label>Host</label>
+        <input id="hostK2" value="127.0.0.1" spellcheck="false" autocomplete="off">
+        <label>Port</label>
+        <input id="portK2" value="8090" spellcheck="false" autocomplete="off">
+      </div>
+      <button class="connect-btn" id="connectBtnK2">Establish Link</button>
+      <div class="statusline"><span class="led" id="ledK2"></span><span id="statusTxtK2">Offline</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ NO-FLIGHT OVERLAY ============ -->
+<div class="scrim" id="scrimNoFlight">
+  <div class="popout alert">
+    <div class="popout-inner">
+      <h3><span class="haz-badge"></span> No Flight in Progress</h3>
+      <div class="sub">Telemetry linked · awaiting active vessel</div>
+      <div class="big-status">STANDBY</div>
+      <div class="statusline"><span class="led wait"></span><span>Enter a flight scene to resume telemetry</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ CONNECTION (slim status bar; controls live in the overlay) ============ -->
+  <section class="panel" id="conn">
+    <h2>DATALINK
+      <span class="status" style="margin-left:auto"><span class="led" id="ledK"></span><span id="statusTxtK">Offline</span></span>
+    </h2>
+    <div class="body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="label" style="color:var(--cyan)">KRPC BRIDGE</span>
+      <span class="label" id="connHostLabel">127.0.0.1:8090</span>
+      <button id="connectBtnK">Disconnect</button>
+      <div class="linknote" style="width:100%">single link — clocks · navball · flight · orbit · consumables · comms · science · heat · electricity · target · staging Δv</div>
+    </div>
+  </section>
+
+  <!-- ============ CLOCKS ============ (full width) -->
+  <section class="panel" id="clock">
+    <div class="body">
+      <div class="clockcell">
+        <div class="label">Universal Time <span id="calToggle" style="cursor:pointer;color:var(--slate-dim)">[KERBIN]</span></div>
+        <div class="big" id="utBig">—</div>
+        <div class="sub" id="utSub">awaiting link</div>
+      </div>
+      <div class="clockcell" id="metCell">
+        <div class="label">Mission Elapsed</div>
+        <div class="big" id="metBig">T+ —</div>
+        <div class="sub" id="metSub">not launched</div>
+      </div>
+    </div>
+    <div class="comms-strip">
+      <div class="cs-cell">
+        <span class="label">Comms link</span>
+        <span class="cs-status"><span class="led2" id="commLed"></span><span id="commTxt">—</span></span>
+      </div>
+      <div class="cs-cell">
+        <span class="label">Signal delay <span style="color:var(--slate-dim)">(RemoteTech via kRPC)</span></span>
+        <span class="cs-val" id="sigDelayTxt">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ASCENSION ============ (full width) -->
+  <section class="panel" id="asc">
+    <h2>Ascension <span class="tag">attitude · throttle · flight</span></h2>
+    <div class="body">
+      <div class="asc-top">
+        <div class="asc-left">
+          <div class="sas-box">
+            <span class="label">SAS (MJ)</span>
+            <span class="sas-val" id="sasMode">—</span>
+          </div>
+          <div class="alt-box">
+            <span class="label">Altitude</span>
+            <span class="alt-val" id="s_alt">—</span>
+          </div>
+        </div>
+        <div class="navwrap">
+          <div class="heading-tape"><svg id="hdgTape" width="150" height="20" viewBox="0 0 150 20"></svg></div>
+          <svg id="navball" width="168" height="168" viewBox="0 0 168 168" role="img" aria-label="Attitude indicator"></svg>
+          <div class="hdg-readout">HDG <span id="hdgNum">---</span>° · PIT <span id="pitNum">--</span>° · ROL <span id="rolNum">--</span>°</div>
+        </div>
+        <div class="throttle-col">
+          <span class="label">THR</span>
+          <div class="thr-track"><div class="thr-fill" id="thrFill" style="height:0%"></div></div>
+          <span class="thr-pct" id="thrPct">0%</span>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat"><span class="label">Apoapsis</span><span class="v" id="s_apa">—</span></div>
+        <div class="stat"><span class="label">T→Ap</span><span class="v" id="s_tap">—</span></div>
+        <div class="stat"><span class="label">Periapsis</span><span class="v" id="s_pea">—</span></div>
+        <div class="stat"><span class="label">T→Pe</span><span class="v" id="s_tpe">—</span></div>
+        <div class="stat"><span class="label">Vert Spd</span><span class="v" id="s_vspd">—</span></div>
+        <div class="stat"><span class="label">Surf Spd</span><span class="v" id="s_sspd">—</span></div>
+        <div class="stat"><span class="label">Orb Vel</span><span class="v" id="s_ovel">—</span></div>
+        <div class="stat"><span class="label">Inclination</span><span class="v" id="s_inc">—</span></div>
+        <div class="stat"><span class="label">Eccentricity</span><span class="v" id="s_ecc">—</span></div>
+        <div class="stat"><span class="label">Period</span><span class="v" id="s_per">—</span></div>
+      </div>
+      <div class="spark-row">
+        <div><div class="spark-lab">Altitude</div><canvas class="spark" id="sparkAlt" width="240" height="44"></canvas></div>
+        <div><div class="spark-lab">Vertical speed</div><canvas class="spark" id="sparkV" width="240" height="44"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="deck">
+
+  <!-- ============ CONSUMABLES ============ -->
+  <section class="panel" id="cons">
+    <h2>Consumables <span class="tag">vessel total · current stage</span></h2>
+    <div class="body">
+      <div class="col-heads"><span></span><span>Vessel total</span><span>Current stage</span></div>
+      <div id="resRows"><!-- rows injected from the bridge's res.names --></div>
+      <div class="res-note hidden" id="resNote">current-stage column unavailable — kRPC build doesn't expose vessel.control.current_stage</div>
+    </div>
+  </section>
+
+  <!-- ============ HEAT MANAGEMENT ============ -->
+  <section class="panel" id="heat">
+    <h2>Heat Management <span class="tag">System Heat via kRPC</span></h2>
+    <div class="body">
+      <div class="heat-strip" id="heatStrip">
+        <div class="cs-cell">
+          <span class="label">Generated</span>
+          <span class="cs-val" id="heatGen">—</span>
+        </div>
+        <div class="cs-cell">
+          <span class="label">Removed</span>
+          <span class="cs-val" id="heatRem">—</span>
+        </div>
+        <div class="cs-cell">
+          <span class="label">Net</span>
+          <span class="cs-val" id="heatNet">—</span>
+        </div>
+      </div>
+      <div class="heat-loops" id="heatLoops"></div>
+    </div>
+  </section>
+
+  <!-- ============ ELECTRICITY ============ -->
+  <section class="panel" id="elec">
+    <h2>Electricity <span class="tag">by source</span></h2>
+    <div class="body">
+      <div class="heat-strip" id="ecTotalStrip">
+        <div class="cs-cell" style="grid-column:1/-1">
+          <span class="label">Total generation</span>
+          <span class="cs-val" id="ecTotal">—</span>
+        </div>
+      </div>
+      <div class="rx-summary hidden" id="reactorSummary">
+        <div class="cs-cell">
+          <span class="label">Reactors</span>
+          <span class="cs-val" id="rxCount">—</span>
+          <span class="rx-summary-sub" id="rxOnline">—</span>
+        </div>
+        <div class="cs-cell">
+          <span class="label">Reactor output</span>
+          <span class="cs-val" id="rxOutput">—</span>
+          <span class="rx-summary-sub" id="rxCapacity">—</span>
+        </div>
+        <div class="cs-cell">
+          <span class="label">Condition</span>
+          <span class="cs-val rx-condition unknown" id="rxCondition">—</span>
+          <span class="rx-summary-sub" id="rxConditionSub">—</span>
+        </div>
+      </div>
+      <details class="rx-details hidden" id="reactorDetails">
+        <summary><span>Reactor detail</span><span class="rx-detail-count" id="reactorDetailCount">—</span></summary>
+        <div class="rx-scroll"><div class="rx-list" id="reactorList"></div></div>
+      </details>
+      <div class="rx-empty" id="reactorEmpty">No reactors aboard</div>
+      <div class="solar-strip" id="solarStrip">
+        <div class="cs-cell">
+          <span class="label">Solar output</span>
+          <span class="cs-val" id="solarOut">—</span>
+        </div>
+        <div class="cs-cell">
+          <span class="label">Solar efficiency</span>
+          <span class="cs-val" id="solarEff">—</span>
+        </div>
+        <div class="cs-cell" id="rtgCell">
+          <span class="label">RTG output</span>
+          <span class="cs-val" id="rtgOut">—</span>
+        </div>
+        <div class="cs-cell" id="otherCell">
+          <span class="label">All other <span style="color:var(--slate-dim)">(cells, alternators…)</span></span>
+          <span class="cs-val" id="otherOut">—</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCIENCE ============ -->
+  <section class="panel" id="sci">
+    <h2>Science <span class="tag">stored aboard</span></h2>
+    <div class="body">
+      <div class="sci-total">
+        <span class="label">Science recoverable</span>
+        <span class="sci-value blocked" id="sciValue">awaiting kRPC link</span>
+        <span class="sci-sub" id="sciSub"></span>
+      </div>
+      <div class="sci-loc" id="sciLoc"></div>
+      <details class="sci-details" id="sciDetails">
+        <summary>Experiment detail <span id="sciDetCount"></span></summary>
+        <div class="sci-list" id="sciList"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ STAGING ============ -->
+  <section class="panel" id="stage">
+    <h2>Staging analysis <span class="tag">throttle · Δv (kRPC · MechJeb)
+      <span id="dvModeToggle" style="cursor:pointer;color:var(--cyan);margin-left:6px">[ATMO]</span></span></h2>
+    <div class="body">
+      <div class="stage-top">
+        <div class="stage-num"><span class="label">Stage</span><span class="v" id="stageNum">—</span></div>
+        <div class="thr-inline">
+          <span class="label">Throttle <span id="thrPct2" class="live">0%</span></span>
+          <div class="track"><div class="fill" id="thrFill2" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="dv-grid">
+        <div class="stat"><span class="label">Stage Δv</span><span class="v" id="dv_stage">—</span></div>
+        <div class="stat"><span class="label">Total Δv</span><span class="v" id="dv_total">—</span></div>
+        <div class="stat"><span class="label">TWR</span><span class="v" id="dv_twr">—</span></div>
+        <div class="stat"><span class="label">Burn time</span><span class="v" id="dv_burn">—</span></div>
+      </div>
+      <div class="stage-table" id="stageTable"></div>
+    </div>
+  </section>
+
+  <!-- ============ TARGET (conditional) ============ -->
+  <section class="panel" id="target">
+    <h2>Target <span class="tag" id="tgtType">—</span></h2>
+    <div class="body">
+      <div class="tgt-name" id="tgtName">—</div>
+      <div class="tgt-grid">
+        <div class="stat"><span class="label">Distance</span><span class="v" id="t_dist">—</span></div>
+        <div class="stat"><span class="label">Rel Vel</span><span class="v" id="t_rvel">—</span></div>
+        <div class="stat"><span class="label">Inclination</span><span class="v" id="t_inc">—</span></div>
+        <div class="stat"><span class="label">Apoapsis</span><span class="v" id="t_apa">—</span></div>
+        <div class="stat"><span class="label">Periapsis</span><span class="v" id="t_pea">—</span></div>
+        <div class="stat"><span class="label">Orb Vel</span><span class="v" id="t_rspd">—</span></div>
+      </div>
+      <div class="dock-wrap" id="dockWrap">
+        <svg class="dock-svg" id="dockSvg" width="220" height="160" viewBox="0 0 220 160" aria-label="Docking alignment"></svg>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- /deck -->
+</div>
+
+<script>
+/* ==========================================================================
+   ARCHITECTURE
+   --------------------------------------------------------------------------
+   The kRPC telemetry server on port 8090 is the dashboard's only data source.
+   Everything shown, including per-stage delta-V, arrives on this link.
+
+   Per-stage Δv comes from the custom KRPC.StageStats service (MechJeb's own
+   fuel-flow sim -- the numbers Kerbal Engineer shows in the VAB), delivered by
+   the bridge as a stage.stages[] array. See updateStaging().
+
+   Some telemetry keys retain compact historical names such as "o.ApA" and
+   "n.pitch". They are produced entirely by telemetry_server.py. The dashboard
+   is self-contained and may be opened directly from file://.
+   ========================================================================== */
+
+/* Preferred display ORDER only. The actual row set is whatever the bridge says
+   is aboard (res.names); anything not listed here gets appended. */
+const RES_ORDER = [
+  "ElectricCharge","MonoPropellant","LiquidFuel","Oxidizer","SolidFuel",
+  "XenonGas","ArgonGas","LqdHydrogen","LqdOxygen","Lithium",
+  "EnrichedUranium","DepletedFuel","Ablator","Ore","IntakeAir"
+];
+let RESOURCES = [];          // live, driven by the bridge
+let lastResSig = "";
+
+// Stage-Δv display mode: false = atmosphere (current pressure), true = vacuum.
+// MechJeb computes both; the header [ATMO]/[VAC] toggle flips this. Atmo is the
+// default (matches ascent) but vac is what matters once you're out of the soup.
+let stageVac = false;
+
+// Stage table order: false = lowest stage number (final/upper stage) on top,
+// launch/booster stages toward the bottom. Set true to invert.
+const STAGE_DESC = false;
+
+/* ==========================================================================
+   FORMATTING HELPERS
+   ========================================================================== */
+const $ = id => document.getElementById(id);
+const num = v => (typeof v==="number"&&isFinite(v));
+function si(v,dp=1){
+  if(!num(v)) return "—";
+  const a=Math.abs(v);
+  if(a>=1e9) return (v/1e9).toFixed(dp)+" G";
+  if(a>=1e6) return (v/1e6).toFixed(dp)+" M";
+  if(a>=1e3) return (v/1e3).toFixed(dp)+" k";
+  return v.toFixed(a<10?1:0);
+}
+function meters(v){
+  if(!num(v)) return "—";
+  const a=Math.abs(v);
+  if(a>=1e6) return (v/1e6).toFixed(2)+"\u2009Mm";
+  if(a>=1e3) return (v/1e3).toFixed(a>=1e4?1:2)+"\u2009km";
+  return v.toFixed(0)+"\u2009m";
+}
+// Ascension distances favor orbital-tuning fidelity without filling the panel
+// with low-value decimals at interplanetary scales. This is deliberately
+// separate from meters(), which also formats close-range target distance.
+function ascensionDistance(v){
+  if(!num(v)) return "—";
+  const a=Math.abs(v);
+  if(a<1e3) return v.toFixed(0)+"\u2009m";
+  if(a<1e6){
+    const decimals = a<1e5 ? 3 : 2;
+    return (v/1e3).toFixed(decimals)+"\u2009km";
+  }
+  if(a<1e9){
+    const decimals = a<1e7 ? 4 : (a<1e8 ? 2 : 1);
+    return (v/1e6).toFixed(decimals)+"\u2009Mm";
+  }
+  const decimals = a<1e10 ? 3 : (a<1e11 ? 2 : 1);
+  return (v/1e9).toFixed(decimals)+"\u2009Gm";
+}
+function setAscensionDistance(id,v){
+  const el=$(id); if(!el) return;
+  el.textContent=ascensionDistance(v);
+  el.title=num(v)
+    ? "Exact: "+v.toLocaleString("en-US",{maximumFractionDigits:1})+" m"
+    : "";
+}
+function speed(v){ if(!num(v))return "—"; return v.toFixed(1)+"\u2009m/s"; }
+function deg(v){ if(!num(v))return "—"; return v.toFixed(2)+"°"; }
+// Shared number formatter (Δv in m/s, and science values). Above 1000, the
+// decimal is noise and just eats column width -- it was clipping
+// "10,549.5 m/s" mid-unit -- so round to whole numbers there.
+function dvfmt(v){
+  if(!num(v)) return "—";
+  const digits = Math.abs(v) >= 1000 ? 0 : 1;
+  return v.toLocaleString('en-US',{maximumFractionDigits:digits});
+}
+function pad(n){ return String(Math.floor(n)).padStart(2,"0"); }
+// Day length follows the same [KERBIN]/[EARTH] toggle the UT clock uses, so MET
+// and all time-to readouts agree with the in-game clock. KSP's MET is raw
+// seconds; the game shows it in 6-hour Kerbin days, so 86400s here would read
+// ~4x too few days (the Duna-MET discrepancy). useKerbin is declared below.
+function secPerDay(){ return useKerbin ? 21600 : 86400; }
+function hms(sec){
+  if(!num(sec)) return "—";
+  sec=Math.max(0,sec);
+  const SEC_DAY=secPerDay();
+  const d=Math.floor(sec/SEC_DAY); sec-=d*SEC_DAY;
+  const h=Math.floor(sec/3600); sec-=h*3600;
+  const m=Math.floor(sec/60); const s=Math.floor(sec-m*60);
+  return (d>0?d+"d ":"")+pad(h)+":"+pad(m)+":"+pad(s);
+}
+function countdownAdaptive(sec){
+  if(!num(sec)) return "—";
+  if(sec>=1e6) return "\u221e";        // effectively never (near-escape)
+  return hms(sec);
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sciFmt(v){ return (typeof v==="number") ? v.toLocaleString('en-US',{maximumFractionDigits:1}) : "—"; }
+function set(id,txt){ const el=$(id); if(el) el.textContent=txt; }
+
+// Kerbin calendar: 6h day, 426d year. UT=0 -> Y1 D1 00:00:00
+let useKerbin=true;
+function fmtUT(ut){
+  if(!num(ut)) return {big:"—",sub:""};
+  if(useKerbin){
+    const SEC_DAY=21600, SEC_YEAR=SEC_DAY*426;
+    let r=ut;
+    const y=Math.floor(r/SEC_YEAR); r-=y*SEC_YEAR;
+    const d=Math.floor(r/SEC_DAY);  r-=d*SEC_DAY;
+    const h=Math.floor(r/3600); r-=h*3600;
+    const m=Math.floor(r/60); const s=Math.floor(r-m*60);
+    return {big:`Y${y+1} · D${d+1}`, sub:`${pad(h)}:${pad(m)}:${pad(s)}  ·  UT ${Math.floor(ut).toLocaleString()}`};
+  }else{
+    const SEC_DAY=86400, SEC_YEAR=SEC_DAY*365;
+    let r=ut;
+    const y=Math.floor(r/SEC_YEAR); r-=y*SEC_YEAR;
+    const d=Math.floor(r/SEC_DAY);  r-=d*SEC_DAY;
+    return {big:`Y${y+1} · D${d+1}`, sub:hms(r)+"  ·  UT "+Math.floor(ut).toLocaleString()};
+  }
+}
+document.getElementById("calToggle").addEventListener("click",e=>{
+  useKerbin=!useKerbin;
+  e.target.textContent = useKerbin ? "[KERBIN]" : "[EARTH]";
+});
+
+/* ==========================================================================
+   KRPC TELEMETRY LINK
+   ========================================================================== */
+let wsK=null, connectedK=false, wantConnectK=false, reconnectTimerK=null;
+// status reflected in BOTH the slim top bar and the connect pop-out
+const ledK=$("ledK"), statusTxtK=$("statusTxtK");
+const ledK2=$("ledK2"), statusTxtK2=$("statusTxtK2");
+const connectBtnK=$("connectBtnK"), connectBtnK2=$("connectBtnK2");
+
+function setStatusK(state,txt){
+  const cls="led"+(state?" "+state:"");
+  if(ledK) ledK.className=cls;
+  if(ledK2) ledK2.className=cls;
+  if(statusTxtK) statusTxtK.textContent=txt;
+  if(statusTxtK2) statusTxtK2.textContent=txt;
+  updateOverlays();
+}
+function connectK(){
+  // inputs live in the pop-out now (hostK2/portK2)
+  const host=($("hostK2")?.value.trim())||"127.0.0.1";
+  const port=($("portK2")?.value.trim())||"8090";
+  const label=$("connHostLabel"); if(label) label.textContent=host+":"+port;
+  wantConnectK=true;
+  setStatusK("wait","Linking…");
+  try{ wsK=new WebSocket(`ws://${host}:${port}`); }
+  catch(e){ setStatusK("bad","Bad address"); return; }
+
+  wsK.onopen=()=>{
+    connectedK=true;
+    setStatusK("ok","Linked");
+    connectBtnK.textContent="Disconnect";
+    connectBtnK.classList.add("danger");
+  };
+  wsK.onclose=()=>{
+    connectedK=false;
+    hasFlight=false;          // stale once the link drops
+    connectBtnK.textContent="Connect";
+    connectBtnK.classList.remove("danger");
+    if(wantConnectK){
+      setStatusK("bad","Dropped — retrying");
+      reconnectTimerK=setTimeout(connectK,2000);
+    }else{
+      setStatusK("","Offline");
+    }
+  };
+  wsK.onerror=()=>{ setStatusK("bad","Link error"); };
+  wsK.onmessage=ev=>{ try{ onDataKrpc(JSON.parse(ev.data)); }catch(_){/* ignore */} };
+}
+function disconnectK(){
+  wantConnectK=false;
+  clearTimeout(reconnectTimerK);
+  if(wsK){ wsK.close(); wsK=null; }
+  hasFlight=false;
+  setStatusK("","Offline");
+}
+function toggleK(){ (connectedK||wantConnectK) ? disconnectK() : connectK(); }
+connectBtnK.addEventListener("click", toggleK);
+if(connectBtnK2) connectBtnK2.addEventListener("click", toggleK);
+
+/* ---- overlay control ------------------------------------------------------
+   Two mutually-exclusive centered pop-outs over a dimmed dashboard:
+     * not linked            -> connect pop-out
+     * linked, but no vessel -> "No Flight in Progress"
+   Linked WITH a vessel -> no overlay, live dashboard. */
+let hasFlight=false;
+const scrimConnect=$("scrimConnect"), scrimNoFlight=$("scrimNoFlight");
+function updateOverlays(){
+  const linked = connectedK;
+  const showConnect  = !linked;
+  const showNoFlight = linked && !hasFlight;
+  if(scrimConnect)  scrimConnect.classList.toggle("show", showConnect);
+  if(scrimNoFlight) scrimNoFlight.classList.toggle("show", showNoFlight);
+  document.body.classList.toggle("modal-open", showConnect || showNoFlight);
+}
+updateOverlays();  // show the connect pop-out immediately on load
+
+// Optional auto-connect: the launcher opens this page with ?autoconnect=1 so you
+// do not have to click Connect. Opening the file manually waits for a click.
+if(/[?&]autoconnect=1/.test(location.search)){
+  setTimeout(()=>{ if(!connectedK && !wantConnectK) connectK(); }, 600);
+}
+
+/* The bridge pushes everything on every frame, so this is just a fan-out. */
+let lastKrpcData=null;   // kept so the Δv atmo/vac toggle can repaint on click
+function onDataKrpc(d){
+  // Bridge sends flight.active=false when connected but no vessel is loaded.
+  // Treat an explicit false as "no flight"; missing key (older bridge) is
+  // assumed to be a flight so the dashboard still works.
+  hasFlight = (d["flight.active"] !== false);
+  updateOverlays();
+  if(!hasFlight){
+    // Don't paint stale numbers behind the overlay -- blank the dashboard so a
+    // glance behind the dimmed pop-out doesn't show frozen values.
+    if(!onDataKrpc._blanked){ nullOutDashboard(); onDataKrpc._blanked=true; }
+    lastKrpcData=d;
+    return;
+  }
+  onDataKrpc._blanked=false;
+
+  lastKrpcData=d;
+  updateClocks(d);
+  updateThrottle(d);
+  updateAscension(d);
+  updateResources(d);
+  updateComms(d);
+  updateSasMode(d);
+  updateScience(d);
+  renderHeat(d);
+  renderElec(d);
+  updateTarget(d);
+  updateStaging(d);
+}
+
+// Δv atmo/vac toggle in the staging panel header.
+$("dvModeToggle").addEventListener("click",e=>{
+  stageVac=!stageVac;
+  e.target.textContent = stageVac ? "[VAC]" : "[ATMO]";
+  if(lastKrpcData) updateStaging(lastKrpcData);   // repaint immediately
+});
+
+/* Blank every panel to a "no data" state for the no-flight overlay. Renderers
+   early-return on missing keys (leaving stale text), so we reset the value
+   elements directly rather than feeding {} through them. */
+function nullOutDashboard(){
+  const dash=[
+    "s_alt","s_apa","s_tap","s_pea","s_tpe","s_vspd","s_sspd","s_ovel",
+    "s_inc","s_ecc","s_per",
+    "hdgNum","pitNum","rolNum","sasMode",
+    "commTxt","sigDelayTxt",
+    "heatGen","heatRem","heatNet",
+    "ecTotal","solarOut","solarEff","rtgOut","otherOut",
+    "dv_total","dv_stage","dv_twr","dv_burn","stageNum",
+    "sciSub","sciLoc"
+  ];
+  dash.forEach(id=>set(id,"—"));
+
+  set("utBig","—"); set("utSub","standby");
+  set("metBig","T+ —"); set("metSub","no flight");
+  set("thrPct","0%"); set("thrPct2","0%");
+  const tf=$("thrFill"); if(tf) tf.style.height="0%";
+  const tf2=$("thrFill2"); if(tf2) tf2.style.width="0%";
+
+  const sv=$("sciValue"); if(sv){ sv.className="sci-value blocked"; sv.textContent="no flight"; }
+
+  // clear list/table containers and per-vessel panels
+  ["resRows","reactorList","heatLoops","sciList","stageTable"].forEach(id=>{
+    const el=$(id); if(el) el.innerHTML="";
+  });
+  const rxSummary=$("reactorSummary"); if(rxSummary) rxSummary.classList.add("hidden");
+  const rxDetails=$("reactorDetails"); if(rxDetails) rxDetails.classList.add("hidden");
+  const rxEmpty=$("reactorEmpty"); if(rxEmpty) rxEmpty.style.display="none";
+  const tgt=$("target"); if(tgt) tgt.classList.remove("active");
+  if(typeof initNavballEmpty==="function") initNavballEmpty();
+  const ht=$("hdgTape"); if(ht) ht.innerHTML="";
+}
+
+/* ==========================================================================
+   RENDERERS — all fed from the single kRPC bridge link
+   ========================================================================== */
+
+function updateClocks(d){
+  const ut=fmtUT(d["t.universalTime"]);
+  set("utBig",ut.big); set("utSub",ut.sub);
+  const met=d["v.missionTime"];
+  if(num(met)){
+    set("metBig","T+ "+hms(met));
+    set("metSub", met<1 ? "on pad" : "in flight");
+  }
+}
+
+function updateThrottle(d){
+  const thr=d["krpc.throttle"];
+  if(!num(thr)) return;
+  const p=Math.round(thr*100);
+  $("thrFill").style.height=p+"%"; set("thrPct",p+"%");
+  $("thrFill2").style.width=p+"%"; set("thrPct2",p+"%");
+}
+
+function updateAscension(d){
+  setAscensionDistance("s_alt", d["v.altitude"]);
+  setAscensionDistance("s_apa", d["o.ApA"]);
+  setAscensionDistance("s_pea", d["o.PeA"]);
+  set("s_tap", countdownAdaptive(d["o.timeToAp"]));
+  set("s_tpe", countdownAdaptive(d["o.timeToPe"]));
+  set("s_vspd", speed(d["v.verticalSpeed"]));
+  set("s_sspd", speed(d["v.surfaceSpeed"]));
+  set("s_ovel", speed(d["v.orbitalVelocity"]));
+  set("s_inc", deg(d["o.inclination"]));           // bridge converts rad -> deg
+  set("s_ecc", num(d["o.eccentricity"])?d["o.eccentricity"].toFixed(4):"—");
+  set("s_per", countdownAdaptive(d["o.period"]));
+
+  drawNavball(d["n.pitch"], d["n.roll"], d["n.heading"]);
+  drawHeadingTape(d["n.heading"]);
+  if(num(d["n.heading"])) set("hdgNum", String(Math.round(((d["n.heading"]%360)+360)%360)).padStart(3,"0"));
+  if(num(d["n.pitch"]))   set("pitNum", (d["n.pitch"]>=0?"+":"")+Math.round(d["n.pitch"]));
+  if(num(d["n.roll"]))    set("rolNum", Math.round(d["n.roll"]));
+
+  pushSpark(sparkAlt, d["v.altitude"]);
+  pushSpark(sparkV,  d["v.verticalSpeed"], true);
+}
+
+/* ---- consumables: rows are built from res.names reported by the server ---- */
+function resId(r){ return r.replace(/[^A-Za-z0-9_-]/g,'_'); } // safe DOM id for odd mod resource names
+function buildResRows(){
+  const host=$("resRows");
+  host.innerHTML="";
+  for(const r of RESOURCES){
+    const id=resId(r);
+    const row=document.createElement("div");
+    row.className="res-row"; row.id="row_"+id;
+    row.innerHTML=`
+      <div class="res-name" id="rn_${id}">${escapeHtml(r.replace(/([a-z])([A-Z])/g,'$1 $2'))}</div>
+      <div class="meter"><div class="track"><div class="fill" id="rtf_${id}"></div></div>
+        <div class="cap"><span id="rtv_${id}">—</span><span class="k" id="rtm_${id}"></span></div></div>
+      <div class="meter"><div class="track"><div class="fill" id="rsf_${id}"></div></div>
+        <div class="cap"><span id="rsv_${id}">—</span><span class="k" id="rsm_${id}"></span></div></div>`;
+    host.appendChild(row);
+  }
+}
+function fillClass(frac){ return frac<=0.15?"fill low":(frac<=0.4?"fill mid":"fill"); }
+
+function updateResources(d){
+  const names = Array.isArray(d["res.names"]) ? d["res.names"] : null;
+  if(names){
+    // Curated order first, then anything modded/unexpected the vessel carries.
+    const ordered = RES_ORDER.filter(n=>names.includes(n))
+                             .concat(names.filter(n=>!RES_ORDER.includes(n)));
+    const sig = ordered.join("|");
+    if(sig !== lastResSig){
+      lastResSig = sig;
+      RESOURCES = ordered;
+      buildResRows();
+    }
+  }
+  for(const r of RESOURCES){
+    updateResource(r,d);
+  }
+  // An empty valid stage is different from an unavailable stage index.
+  const note=$("resNote");
+  if(note) note.classList.toggle("hidden", d["res.stageKnown"] !== false);
+}
+
+function updateResource(r,d){
+  const id=resId(r);
+  const cur=d[`r.resource[${r}]`], max=d[`r.resourceMax[${r}]`];
+  const scur=d[`r.resourceCurrent[${r}]`], smax=d[`r.resourceCurrentMax[${r}]`];
+  const row=$("row_"+id); if(!row) return false;   // resource list may have just changed
+  const present = num(max)&&max>0;
+  row.style.display = present ? "" : "none";       // only show what's aboard
+  $("rn_"+id).classList.toggle("empty", !present);
+
+  if(present){
+    const f=Math.max(0,Math.min(1,cur/max));
+    const el=$("rtf_"+id); el.style.width=(f*100)+"%"; el.className=fillClass(f);
+    set("rtv_"+id, si(cur,0)); set("rtm_"+id, "/ "+si(max,0));
+  }else{
+    $("rtf_"+id).style.width="0%"; set("rtv_"+id,"—"); set("rtm_"+id,"");
+  }
+
+  if(num(smax)&&smax>0){
+    const f=Math.max(0,Math.min(1,scur/smax));
+    const el=$("rsf_"+id); el.style.width=(f*100)+"%"; el.className=fillClass(f);
+    set("rsv_"+id, si(scur,0)); set("rsm_"+id, "/ "+si(smax,0));
+    return true;
+  }
+  $("rsf_"+id).style.width="0%"; set("rsv_"+id,"—"); set("rsm_"+id,"");
+  return false;
+}
+
+/* ---- staging / delta-V — fed by KRPC.StageStats (MechJeb) via the bridge ----
+   The bridge sends stage.stages[] with each row carrying BOTH its array index
+   and its mapped KSP stage number (row.ksp), plus atmo and vac Δv. We label by
+   KSP number (what shows in-game) and pick atmo/vac per the header toggle.
+
+   The current-burning stage is the one whose KSP number equals stage.currentKsp
+   (equivalently, the highest array index). Zero-Δv rows (pure decouplers, which
+   MechJeb still lists) are filtered out of the display -- they're real stages
+   but carry no propulsion info. */
+function blankStaging(){
+  set("dv_total","—"); set("stageNum","—");
+  set("dv_stage","—"); set("dv_twr","—"); set("dv_burn","—");
+  const t=$("stageTable"); if(t) t.innerHTML="";
+}
+function updateStaging(d){
+  // stage.available is explicitly false when MechJeb isn't on the vessel;
+  // undefined means we simply haven't heard yet (leave the panel as-is).
+  if(d["stage.available"]===false){ blankStaging(); return; }
+  const stages = Array.isArray(d["stage.stages"]) ? d["stage.stages"] : null;
+  if(!stages){ if(d["stage.available"]===true) blankStaging(); return; }
+
+  const dvOf = s => stageVac ? s.dvVac : s.dvAtmo;
+  const total = stageVac ? d["stage.totalDvVac"] : d["stage.totalDvAtmo"];
+  set("dv_total", num(total)?dvfmt(total)+" m/s":"—");
+
+  // Propulsive stages only, for the readout + table.
+  const rows = stages.filter(s => num(dvOf(s)) && dvOf(s) > 0.5);
+
+  // Current stage: the row matching stage.currentKsp; fall back to the highest
+  // KSP number present if that key is momentarily absent.
+  const curKsp = num(d["stage.currentKsp"]) ? Math.round(d["stage.currentKsp"]) : null;
+  let cur = curKsp!=null ? rows.find(s=>s.ksp===curKsp) : null;
+  if(!cur) cur = rows.length ? rows.reduce((a,b)=>b.ksp>a.ksp?b:a) : null;
+
+  if(cur){
+    set("stageNum", cur.ksp);
+    set("dv_stage", dvfmt(dvOf(cur))+" m/s");
+    set("dv_twr",   num(cur.twr)?cur.twr.toFixed(2):"—");
+    set("dv_burn",  num(cur.burn)?hms(cur.burn):"—");
+  }else if(curKsp!=null){
+    // current stage carries no propulsion (e.g. a payload/coast stage)
+    set("stageNum", curKsp);
+    set("dv_stage","—"); set("dv_twr","—"); set("dv_burn","—");
+  }else{
+    set("stageNum","—"); set("dv_stage","—"); set("dv_twr","—"); set("dv_burn","—");
+  }
+
+  const t=$("stageTable");
+  if(!rows.length){ t.innerHTML=""; return; }
+  let html=`<div class="st-row st-head"><span>Stage</span><span>Δv m/s</span><span>TWR</span><span>Burn</span></div>`;
+  rows.sort((a,b)=> STAGE_DESC ? b.ksp-a.ksp : a.ksp-b.ksp);
+  for(const r of rows){
+    const isCur=cur&&r.ksp===cur.ksp;
+    html+=`<div class="st-row${isCur?' cur':''}"><span class="sname">${isCur?'▶ ':''}S${r.ksp}</span>`+
+          `<span>${dvfmt(dvOf(r))}</span>`+
+          `<span>${num(r.twr)?r.twr.toFixed(2):'—'}</span>`+
+          `<span>${num(r.burn)?hms(r.burn):'—'}</span></div>`;
+  }
+  t.innerHTML=html;
+}
+
+/* ---- SAS (MechJeb) ---- */
+function updateSasMode(d){
+  const m=d["mj.sasMode"];
+  if(!m){ set("sasMode","—"); return; }
+  // kRPC's enum prints like "SmartASSAutopilotMode.orbit_prograde" -- keep the mode.
+  set("sasMode", String(m).split(".").pop().replace(/_/g,' ').toUpperCase());
+}
+
+/* ---- comms: RemoteTech is authoritative (its delay is what actually bites);
+   stock CommNet via kRPC is the fallback when RT isn't installed. ---- */
+function fmtDelay(sec){
+  if(sec==null || !isFinite(sec)) return "—";
+  if(sec<1) return Math.round(sec*1000)+" ms";
+  const m=Math.floor(sec/60), s=Math.floor(sec%60);
+  return m>0 ? `${m}m ${s}s` : `${s}s`;
+}
+function updateComms(d){
+  const rtOn = d["rt.available"]===true;
+  let state="", txt="—";
+
+  if(rtOn){
+    const c = d["rt.hasConnection"];
+    if(c===true){ state="ok";  txt="CONNECTED"; }
+    else if(c===false){ state="bad"; txt="NO SIGNAL"; }
+  }else if(typeof d["comm.krpc.canCommunicate"]==="boolean"){
+    const c=d["comm.krpc.canCommunicate"];
+    state=c?"ok":"bad"; txt=c?"CONNECTED":"NO SIGNAL";
+    const sig=d["comm.krpc.signalStrength"];
+    if(c && num(sig) && sig>0) txt += " · "+Math.round(sig*100)+"%";
+  }
+  const l=$("commLed"); if(l) l.className="led2"+(state?" "+state:"");
+  set("commTxt", txt);
+
+  const el=$("sigDelayTxt");
+  if(el){
+    if(d["rt.available"]===false) el.textContent="RemoteTech not installed";
+    else if(d["rt.hasConnection"]===false) el.textContent="NO CONNECTION";
+    else el.textContent=fmtDelay(d["rt.signalDelay"]);
+  }
+}
+
+/* ---- science: KSP's OWN computed values, straight from kRPC. No estimation,
+   no calibration constants -- diminishing returns are already baked in. ---- */
+function updateScience(d){
+  if(typeof d["sci.krpc.total"] !== "number") return;
+  const n = d["sci.krpc.count"] || 0;
+
+  const v=$("sciValue");
+  if(v){
+    v.className="sci-value";
+    v.textContent = n
+      ? `${sciFmt(d["sci.krpc.total"])} science recoverable · ${sciFmt(d["sci.krpc.transmitTotal"])} by transmit`
+      : "no science aboard";
+  }
+
+  const sub=$("sciSub");
+  if(sub){
+    const parts=[];
+    parts.push(n+" experiment"+(n===1?"":"s")+" aboard");
+    if(num(d["career.science"])) parts.push(dvfmt(d["career.science"])+" science banked at KSC");
+    sub.textContent=parts.join("   ·   ");
+  }
+
+  const loc=$("sciLoc");
+  if(loc){
+    loc.textContent = [d["v.body"], d["v.situationString"], d["v.biome"]]
+      .filter(x=>typeof x==="string" && x.trim() && x!=="null")
+      .join("   ·   ");
+  }
+
+  set("sciDetCount", n ? `(${n})` : "");
+  const list=$("sciList");
+  if(list){
+    const rows=Array.isArray(d["sci.krpc.experiments"])? d["sci.krpc.experiments"] : [];
+    list.innerHTML = rows.map(r=>
+      `<div class="sl-row"><span class="t">${escapeHtml(r.title)}</span>`
+      +`<span class="v">${sciFmt(r.value)} <span style="color:var(--slate-dim)">/ ${sciFmt(r.transmit)} tx</span></span></div>`
+    ).join("");
+  }
+}
+
+/* ---- heat (System Heat via the custom kRPC service) ---- */
+function fmtKw(v){ return (v==null || !isFinite(v)) ? "—" : sciFmt(v)+" kW"; }
+function fmtHeatK(v){ return (v==null || !isFinite(v)) ? "—" : Math.round(v)+" K"; }
+function renderHeat(d){
+  const loops = Array.isArray(d["heat.loops"]) ? d["heat.loops"] : null;
+  const gen=$("heatGen"), rem=$("heatRem"), net=$("heatNet"), list=$("heatLoops");
+  if(!loops || loops.length===0){
+    // No System Heat parts this session (or first poll hasn't landed) -- blank
+    // gracefully rather than pretend to have data.
+    if(gen) gen.textContent="—";
+    if(rem) rem.textContent="—";
+    if(net) net.textContent="—";
+    if(list) list.innerHTML="";
+    return;
+  }
+  if(gen) gen.textContent=fmtKw(d["heat.generatedKw"]);
+  if(rem) rem.textContent=fmtKw(d["heat.removedKw"]);
+  if(net) net.textContent=fmtKw(d["heat.netKw"]);
+  if(list){
+    list.innerHTML = loops.map(l=>
+      `<div class="hl-row"><span class="t">Loop ${escapeHtml(String(l.id))}</span>`
+      +`<span class="v">${fmtHeatK(l.tempK)}</span>`
+      +`<span class="v">${fmtKw(l.genKw)} / ${fmtKw(l.remKw)}</span></div>`
+    ).join("");
+  }
+}
+
+/* ---- electricity: per-reactor rows + solar + RTG ---- */
+function ecPerSecFmt(v){
+  if(v==null || !isFinite(v)) return "—";
+  return sciFmt(v) + " EC/s";
+}
+// Any status/fuel string is escaped AND ellipsis-clipped in CSS. This just
+// guarantees a non-empty, safe display value for every possible case
+// (empty, null, "Offline", "Exhausted", "Meltdown", localized time strings).
+function safeStr(s){
+  const t = (s==null ? "" : String(s)).trim();
+  return t.length ? escapeHtml(t) : "—";
+}
+function renderElec(d){
+  const listEl=$("reactorList"), emptyEl=$("reactorEmpty");
+  const summaryEl=$("reactorSummary"), detailsEl=$("reactorDetails");
+  const reactors = Array.isArray(d["elec.reactors"]) ? d["elec.reactors"] : null;
+
+  if(listEl){
+    if(!reactors || reactors.length===0){
+      listEl.innerHTML="";
+      if(summaryEl) summaryEl.classList.add("hidden");
+      if(detailsEl){
+        detailsEl.classList.add("hidden");
+        detailsEl.classList.remove("warn");
+      }
+      // reactors===null means no data yet (hide the "none aboard" note);
+      // reactors===[] means confirmed zero reactors (show it).
+      if(emptyEl) emptyEl.style.display = (reactors && reactors.length===0) ? "block" : "none";
+    } else {
+      if(emptyEl) emptyEl.style.display="none";
+      if(summaryEl) summaryEl.classList.remove("hidden");
+      if(detailsEl) detailsEl.classList.remove("hidden");
+
+      const online = reactors.filter(r=>!!r.on).length;
+      const output = reactors.reduce((sum,r)=>sum+(num(r.ecPerSec)?r.ecPerSec:0),0);
+      const capacity = reactors.reduce((sum,r)=>sum+(num(r.ecMax)?r.ecMax:0),0);
+      set("rxCount", reactors.length+" aboard");
+      set("rxOnline", online+" online");
+      set("rxOutput", ecPerSecFmt(output));
+      set("rxCapacity", capacity>0 ? "max "+ecPerSecFmt(capacity) : "capacity unavailable");
+
+      let hotCount=0, damagedCount=0, maxTempRatio=null, readableTemps=0;
+      let alertCount=0;
+      for(const r of reactors){
+        const hasTemp=num(r.coreTemp)&&num(r.nominalTemp)&&r.nominalTemp>0;
+        const tempRatio=hasTemp ? r.coreTemp/r.nominalTemp : null;
+        const hot=tempRatio!=null && tempRatio>1.05;
+        const damaged=num(r.integrity) && r.integrity<90;
+        if(hasTemp){
+          readableTemps++;
+          maxTempRatio=maxTempRatio==null ? tempRatio : Math.max(maxTempRatio,tempRatio);
+        }
+        if(hot) hotCount++;
+        if(damaged) damagedCount++;
+        if(hot||damaged) alertCount++;
+      }
+
+      const conditionEl=$("rxCondition");
+      let condition="UNKNOWN", conditionSub="temperature unavailable", conditionClass="unknown";
+      if(alertCount>0){
+        conditionClass="warn";
+        if(hotCount>0 && damagedCount>0) condition=alertCount+" ALERT"+(alertCount===1?"":"S");
+        else if(hotCount>0) condition=hotCount===1 ? "HIGH TEMP" : hotCount+" HIGH TEMP";
+        else condition=damagedCount===1 ? "DAMAGED" : damagedCount+" DAMAGED";
+        const notes=[];
+        if(hotCount) notes.push(hotCount+" above temp band");
+        if(damagedCount) notes.push(damagedCount+" below 90% integrity");
+        conditionSub=notes.join(" · ");
+      }else if(readableTemps===reactors.length){
+        condition="NOMINAL";
+        conditionClass="ok";
+        conditionSub="max "+Math.round(maxTempRatio*100)+"% nominal temp";
+      }else if(readableTemps>0){
+        conditionSub=readableTemps+" of "+reactors.length+" temperatures available";
+      }
+      if(conditionEl){
+        conditionEl.textContent=condition;
+        conditionEl.className="cs-val rx-condition "+conditionClass;
+      }
+      set("rxConditionSub", conditionSub);
+      if(detailsEl) detailsEl.classList.toggle("warn",alertCount>0);
+      set("reactorDetailCount", alertCount>0
+        ? reactors.length+" · "+alertCount+" ALERT"+(alertCount===1?"":"S")
+        : String(reactors.length));
+
+      listEl.innerHTML = reactors.map(r=>{
+        const on = !!r.on;
+        const integrity = (typeof r.integrity==="number") ? r.integrity : null;
+        const integWarn = (integrity!=null && integrity < 90) ? " warn" : "";
+        const coreTemp = (typeof r.coreTemp==="number") ? Math.round(r.coreTemp) : null;
+        const nominal = (typeof r.nominalTemp==="number") ? r.nominalTemp : null;
+        const tempWarn = (coreTemp!=null && nominal!=null && coreTemp > nominal*1.05) ? " warn" : "";
+        return `<div class="rx-card">
+          <div class="rx-head">
+            <span class="rx-name" title="${safeStr(r.name)}">${safeStr(r.name)}</span>
+            <span class="rx-state ${on?'on':'off'}">${on?'On':'Off'}</span>
+          </div>
+          <div class="rx-stats">
+            <div class="rx-stat"><label>Output</label><span class="rv">${ecPerSecFmt(r.ecPerSec)}</span></div>
+            <div class="rx-stat"><label>Core</label><span class="rv${tempWarn}">${coreTemp!=null?coreTemp+' K':'—'}</span></div>
+            <div class="rx-stat"><label>Integrity</label><span class="rv${integWarn}">${integrity!=null?integrity+'%':'—'}</span></div>
+            <div class="rx-stat"><label>Life</label><span class="rv" title="${safeStr(r.fuel)}">${safeStr(r.fuel)}</span></div>
+          </div>
+        </div>`;
+      }).join("");
+    }
+  }
+
+  // Total generation header (reactors + solar + RTG + everything else the
+  // service could read). Shown whenever the bridge reports it.
+  const totalStrip=$("ecTotalStrip"), totalEl=$("ecTotal");
+  const totalGen = d["elec.totalGenEcPerSec"];
+  const hasTotal = (typeof totalGen==="number");
+  if(totalStrip) totalStrip.classList.toggle("hidden", !hasTotal);
+  if(hasTotal && totalEl) totalEl.textContent = ecPerSecFmt(totalGen);
+
+  // Source strip: solar, RTG and "all other" cells appear independently, so a
+  // craft with only some of them doesn't show empty columns.
+  const strip=$("solarStrip");
+  const solarCells=[$("solarOut")?.closest(".cs-cell"), $("solarEff")?.closest(".cs-cell")];
+  const rtgCell=$("rtgCell");
+  const otherCell=$("otherCell");
+  const out=$("solarOut"), eff=$("solarEff"), rtgOut=$("rtgOut"), otherOut=$("otherOut");
+
+  const solarCount = d["solar.count"];
+  const rtgCount   = d["rtg.count"];
+  const otherEc    = d["elec.otherEcPerSec"];
+  const hasSolar = (typeof solarCount==="number" && solarCount>0);
+  const hasRtg   = (typeof rtgCount==="number"   && rtgCount>0);
+  // Show "all other" only when it's a meaningful positive number (fuel cells /
+  // alternators actually producing). Tiny/zero values stay hidden to avoid a
+  // permanent "0 EC/s" cell on craft that have none.
+  const hasOther = (typeof otherEc==="number" && otherEc > 0.05);
+
+  solarCells.forEach(c=>{ if(c) c.classList.toggle("hidden", !hasSolar); });
+  if(rtgCell) rtgCell.classList.toggle("hidden", !hasRtg);
+  if(otherCell) otherCell.classList.toggle("hidden", !hasOther);
+
+  if(hasSolar){
+    if(out) out.textContent = ecPerSecFmt(d["solar.outputEcPerSec"]);
+    if(eff){
+      const e = d["solar.efficiency"];
+      eff.textContent = (typeof e==="number") ? Math.round(e*100)+"%" : "—";
+    }
+  }
+  if(hasRtg && rtgOut) rtgOut.textContent = ecPerSecFmt(d["rtg.outputEcPerSec"]);
+  if(hasOther && otherOut) otherOut.textContent = ecPerSecFmt(otherEc);
+
+  if(strip){
+    // Only hide once we've actually heard from the bridge (undefined = no data
+    // yet -> leave as-is rather than flicker).
+    const known = (typeof solarCount==="number" && typeof rtgCount==="number");
+    if(known) strip.classList.toggle("hidden", !hasSolar && !hasRtg && !hasOther);
+  }
+}
+
+/* ---- target ---- */
+function updateTarget(d){
+  const name=d["tar.name"];
+  const has = typeof name==="string" && name.trim()!=="";
+  const panel=$("target");
+  panel.classList.toggle("active",has);
+  if(!has) return;
+  set("tgtName", name);
+  set("tgtType", (d["tar.type"]||"").toString().toLowerCase());
+  set("t_dist", meters(d["tar.distance"]));
+  set("t_rvel", speed(d["tar.o.relativeVelocity"]));
+  set("t_rspd", speed(d["tar.o.velocity"]));
+  set("t_inc", deg(d["tar.o.inclination"]));
+  set("t_apa", meters(d["tar.o.ApA"]));
+  set("t_pea", meters(d["tar.o.PeA"]));
+  // Docking alignment appears only when a docking port is targeted and the
+  // bridge could resolve OUR controlling port too.
+  const ax=d["dock.ax"], ay=d["dock.ay"], x=d["dock.x"], y=d["dock.y"];
+  const dockActive = num(ax)||num(ay)||num(x)||num(y);
+  $("dockWrap").classList.toggle("active", dockActive);
+  if(dockActive) drawDock(ax,ay,x,y);
+}
+
+/* ==========================================================================
+   INSTRUMENTS — navball, heading tape, docking, sparklines
+   ========================================================================== */
+const NB=$("navball"), NBc={cx:84,cy:84,r:72};
+function drawNavball(pitch,roll,heading){
+  if(!num(pitch)||!num(roll)){ if(!NB.dataset.init) initNavballEmpty(); return; }
+  const {cx,cy,r}=NBc;
+  const pxPerDeg=r/90;
+  const off=pitch*pxPerDeg;              // horizon offset
+  NB.innerHTML=`
+   <defs>
+     <clipPath id="ball"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>
+     <radialGradient id="shade" cx="38%" cy="34%" r="75%">
+       <stop offset="0%" stop-color="#ffffff" stop-opacity=".14"/>
+       <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+       <stop offset="100%" stop-color="#000000" stop-opacity=".45"/>
+     </radialGradient>
+   </defs>
+   <g clip-path="url(#ball)">
+     <g transform="rotate(${-roll} ${cx} ${cy})">
+       <g transform="translate(0 ${off})">
+         <rect x="${cx-r}" y="${cy-r*3}" width="${r*2}" height="${r*3}" fill="var(--sky)"/>
+         <rect x="${cx-r}" y="${cy}" width="${r*2}" height="${r*3}" fill="var(--ground)"/>
+         <line x1="${cx-r}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="#dfe7f0" stroke-width="1.5"/>
+         ${pitchLadder(cx,cy,pxPerDeg)}
+       </g>
+     </g>
+     <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#shade)"/>
+   </g>
+   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--rule-bright)" stroke-width="2"/>
+   <!-- fixed aircraft reference (symmetric waterline) -->
+   <g stroke="var(--amber)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+     <path d="M${cx-30} ${cy} h20 v6"/>
+     <path d="M${cx+30} ${cy} h-20 v6"/>
+   </g>
+   <circle cx="${cx}" cy="${cy}" r="2.4" fill="var(--amber)"/>
+   <!-- roll pointer -->
+   <path d="M${cx} ${cy-r+2} l-5 -8 h10 z" fill="var(--cyan)" transform="rotate(${-roll} ${cx} ${cy})"/>`;
+  NB.dataset.init="1";
+}
+function pitchLadder(cx,cy,pxPerDeg){
+  let s="";
+  for(let p=-60;p<=60;p+=10){
+    if(p===0) continue;
+    const y=cy - p*pxPerDeg;
+    const w=(p%30===0)?26:15;
+    const col=p>0?"#cdd7e3":"#e8d9c8";
+    s+=`<line x1="${cx-w}" y1="${y}" x2="${cx+w}" y2="${y}" stroke="${col}" stroke-width="1" opacity=".8"/>`;
+    if(p%30===0) s+=`<text x="${cx+w+3}" y="${y+3}" fill="${col}" font-size="7" font-family="var(--mono)">${Math.abs(p)}</text>`;
+  }
+  return s;
+}
+function initNavballEmpty(){
+  const {cx,cy,r}=NBc;
+  NB.innerHTML=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#0a0f16" stroke="var(--rule-bright)" stroke-width="2"/>
+    <text x="${cx}" y="${cy+3}" fill="var(--slate-dim)" font-size="9" text-anchor="middle" font-family="var(--mono)">NO DATA</text>`;
+  NB.dataset.init="1";
+}
+initNavballEmpty();
+
+const HT=$("hdgTape");
+function drawHeadingTape(h){
+  if(!num(h)){ HT.innerHTML=""; return; }
+  h=((h%360)+360)%360;
+  const W=150, cx=W/2, pxPerDeg=2;
+  let s=`<rect width="${W}" height="20" fill="#05080c"/>`;
+  for(let dh=-40;dh<=40;dh+=10){
+    let mark=Math.round((h+dh)/10)*10;
+    const x=cx + (mark-h)*pxPerDeg;
+    if(x<0||x>W) continue;
+    const lab=((mark%360)+360)%360;
+    const card={0:"N",90:"E",180:"S",270:"W"}[lab];
+    s+=`<line x1="${x}" y1="12" x2="${x}" y2="20" stroke="var(--slate-dim)" stroke-width="1"/>`;
+    s+=`<text x="${x}" y="9" fill="${card?'var(--cyan)':'var(--slate)'}" font-size="7" text-anchor="middle" font-family="var(--mono)">${card||lab}</text>`;
+  }
+  s+=`<path d="M${cx} 20 l-4 -5 h8 z" fill="var(--amber)"/>`;
+  HT.innerHTML=s;
+}
+
+const dockSvg=$("dockSvg");
+function drawDock(ax,ay,x,y){
+  // ax/ay = alignment angles (deg), x/y = lateral offset (m). Center = aligned.
+  const W=220,H=160,cx=W/2,cy=H/2,R=70;
+  const angScale=3; // px per degree of misalignment
+  let px=cx + (num(ay)?ay:0)*angScale;
+  let py=cy - (num(ax)?ax:0)*angScale;
+  px=Math.max(cx-R,Math.min(cx+R,px)); py=Math.max(cy-R,Math.min(cy+R,py));
+  const aligned = num(ax)&&num(ay)&&Math.abs(ax)<1.5&&Math.abs(ay)<1.5;
+  const col=aligned?"var(--green)":"var(--amber)";
+  dockSvg.innerHTML=`
+   <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--rule)" stroke-width="1"/>
+   <circle cx="${cx}" cy="${cy}" r="${R*0.55}" fill="none" stroke="var(--rule)" stroke-width="1"/>
+   <circle cx="${cx}" cy="${cy}" r="6" fill="none" stroke="var(--rule-bright)" stroke-width="1"/>
+   <line x1="${cx-R}" y1="${cy}" x2="${cx+R}" y2="${cy}" stroke="var(--rule)" stroke-width=".5"/>
+   <line x1="${cx}" y1="${cy-R}" x2="${cx}" y2="${cy+R}" stroke="var(--rule)" stroke-width=".5"/>
+   <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="${col}" stroke-width="1" opacity=".5"/>
+   <circle cx="${px}" cy="${py}" r="7" fill="none" stroke="${col}" stroke-width="2"/>
+   <circle cx="${px}" cy="${py}" r="1.5" fill="${col}"/>
+   <text x="6" y="14" fill="var(--slate)" font-size="8" font-family="var(--mono)">X ${num(x)?x.toFixed(1):'—'}m  Y ${num(y)?y.toFixed(1):'—'}m</text>
+   <text x="6" y="${H-6}" fill="${col}" font-size="8" font-family="var(--mono)">${aligned?'ALIGNED':'ALIGN: '+(num(ax)?ax.toFixed(1):'—')+'°/'+(num(ay)?ay.toFixed(1):'—')+'°'}</text>`;
+}
+
+/* ---- sparklines (rolling buffers) ---- */
+function makeSpark(id){
+  const c=$(id), ctx=c.getContext("2d");
+  return {c,ctx,buf:new Array(120).fill(null)};
+}
+const sparkAlt=makeSpark("sparkAlt");
+const sparkV=makeSpark("sparkV");
+function pushSpark(s,v,signed=false){
+  if(num(v)) s.buf.push(v); else s.buf.push(null);
+  if(s.buf.length>120) s.buf.shift();
+  s.dirty=true; s.signed=signed;
+}
+function drawSpark(s){
+  if(!s.dirty) return; s.dirty=false;
+  const {c,ctx,buf}=s, W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  const vals=buf.filter(num);
+  if(vals.length<2) return;
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(s.signed){ const m=Math.max(Math.abs(lo),Math.abs(hi),1); lo=-m; hi=m; }
+  if(hi-lo<1e-6) hi=lo+1;
+  const x=i=>i/(buf.length-1)*W;
+  const y=v=>H-4-((v-lo)/(hi-lo))*(H-8);
+  if(s.signed){ ctx.strokeStyle="rgba(125,139,160,.3)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,y(0)); ctx.lineTo(W,y(0)); ctx.stroke(); }
+  ctx.beginPath(); let started=false;
+  for(let i=0;i<buf.length;i++){
+    const v=buf[i]; if(!num(v)){started=false;continue;}
+    const pxx=x(i),pyy=y(v);
+    if(!started){ctx.moveTo(pxx,pyy);started=true;} else ctx.lineTo(pxx,pyy);
+  }
+  ctx.strokeStyle="#4ec9e0"; ctx.lineWidth=1.5; ctx.shadowColor="#4ec9e0"; ctx.shadowBlur=4;
+  ctx.stroke(); ctx.shadowBlur=0;
+  const li=[...buf].map((v,i)=>num(v)?i:-1).filter(i=>i>=0).pop();
+  if(li!=null){ ctx.fillStyle="#ffb454"; ctx.beginPath(); ctx.arc(x(li),y(buf[li]),2,0,7); ctx.fill(); }
+}
+(function raf(){ drawSpark(sparkAlt); drawSpark(sparkV); requestAnimationFrame(raf); })();
+
+</script>
+</body>
+</html>

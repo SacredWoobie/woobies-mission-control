@@ -1,0 +1,2 @@
+-r requirements-dashboard.txt
+-r requirements-panel.txt
