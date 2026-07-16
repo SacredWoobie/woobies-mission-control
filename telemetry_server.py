@@ -89,6 +89,37 @@ def _is_consumable_resource(name):
     return _normalized_resource_name(name) not in _HIDDEN_RESOURCE_NAMES
 
 
+def _current_stage_resource_values(vessel, current_stage):
+    """Return the first resource-bearing decouple group below the active stage."""
+    # resources_in_decouple_stage groups parts by when they are discarded, not
+    # by the stage that activated their engines. Pure separator/fairing stages
+    # can therefore be empty, and parts that are never discarded use stage -1.
+    # Walk downward through those gaps instead of assuming current_stage - 1 is
+    # always the resource-bearing group. cumulative=False is deliberate: kRPC's
+    # cumulative direction does not include the never-decoupled -1 group.
+    for decouple_stage in range(current_stage - 1, -2, -1):
+        try:
+            resources = vessel.resources_in_decouple_stage(
+                stage=decouple_stage,
+                cumulative=False,
+            )
+            values = {}
+            for name in resources.names:
+                if not _is_consumable_resource(name):
+                    continue
+                try:
+                    maximum = resources.max(name)
+                    if maximum > 0:
+                        values[name] = (resources.amount(name), maximum)
+                except Exception:
+                    pass
+            if values:
+                return decouple_stage, values
+        except Exception:
+            pass
+    return None, {}
+
+
 def _current_stage(vessel):
     """Current stage index, or None if this kRPC build doesn't expose it."""
     global _HAS_CURRENT_STAGE
@@ -132,20 +163,12 @@ def _gather_resources(vessel):
     # Distinguish an unavailable stage index from a valid stage with no resources.
     out["res.stageKnown"] = (stage is not None)
     if stage is not None:
-        try:
-            # cumulative=True represents resources available from the current
-            # stage through all later stages, including never-decoupled parts.
-            sres = vessel.resources_in_decouple_stage(stage=stage - 1, cumulative=True)
-            for n in sres.names:
-                if not _is_consumable_resource(n):
-                    continue
-                try:
-                    out[f"r.resourceCurrent[{n}]"] = sres.amount(n)
-                    out[f"r.resourceCurrentMax[{n}]"] = sres.max(n)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        resource_stage, stage_values = _current_stage_resource_values(vessel, stage)
+        if resource_stage is not None:
+            out["res.stageResourceStage"] = resource_stage
+        for name, (amount, maximum) in stage_values.items():
+            out[f"r.resourceCurrent[{name}]"] = amount
+            out[f"r.resourceCurrentMax[{name}]"] = maximum
 
     return out
 
