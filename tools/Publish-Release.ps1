@@ -139,7 +139,7 @@ $stageStatsVersion = [System.Reflection.AssemblyName]::GetAssemblyName(
 ).Version
 $requiredStageStatsVersion = [Version]'0.1.1.0'
 if ($stageStatsVersion -ne $requiredStageStatsVersion) {
-    throw "KRPC.StageStats.dll must be version $requiredStageStatsVersion for v$Version; found $stageStatsVersion. Rebuild KRPC.StageStats/KRPC.StageStats.csproj in Release mode and update the builder dist/GameData copy."
+    throw "KRPC.StageStats.dll must be version $requiredStageStatsVersion for v$Version; found $stageStatsVersion. Rebuild the service in Woobies-KRPC-Service-Builder and update its dist/GameData copy."
 }
 
 $readme = Get-Content -LiteralPath (Join-Path $repoRoot 'README.md') -Raw
