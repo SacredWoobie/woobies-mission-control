@@ -129,15 +129,15 @@ foreach ($file in $dllFiles) {
     Assert-RequiredFile (Join-Path $GameDataPath $file.Source)
 }
 
-# v0.1.4 requires the StageStats keep-warm service. Older release DLLs expose
-# the same RPC surface but leave MechJeb's asynchronous simulation idle, which
-# produces frozen delta-v and incomplete stage rows. Fail before packaging
-# instead of silently reusing the v0.1.0 binary.
+# v0.1.5 requires the StageStats revert-safe service. Older release DLLs expose
+# the same RPC surface but can retain a destroyed MechJeb module after reverting
+# to launch, producing frozen delta-v and incomplete stage rows. Fail before
+# packaging instead of silently reusing the v0.1.1 binary.
 $stageStatsDll = Join-Path $GameDataPath 'KRPC.StageStats/KRPC.StageStats.dll'
 $stageStatsVersion = [System.Reflection.AssemblyName]::GetAssemblyName(
     $stageStatsDll
 ).Version
-$requiredStageStatsVersion = [Version]'0.1.1.0'
+$requiredStageStatsVersion = [Version]'0.1.2.0'
 if ($stageStatsVersion -ne $requiredStageStatsVersion) {
     throw "KRPC.StageStats.dll must be version $requiredStageStatsVersion for v$Version; found $stageStatsVersion. Rebuild the service in Woobies-KRPC-Service-Builder and update its dist/GameData copy."
 }
