@@ -2,6 +2,16 @@
 
 All notable public changes will be recorded here.
 
+## v0.1.1 - Widescreen layout
+
+- Added a responsive layout for horizontal displays at 1440 pixels and wider.
+- Simplified the Datalink panel by removing its redundant telemetry-source list.
+- Combined Datalink, time, and communications into a five-cell widescreen strip.
+- Added stable three-column mission stacks at 1600 pixels and wider.
+- Used the space below Ascension for Consumables to reduce wasted height.
+- Kept Staging and Target together so docking information remains in view.
+- Preserved the v0.1.0 layout on narrower and vertical displays.
+
 ## v0.1.0 - Initial public test release
 
 - Prepared the project for its first public release.

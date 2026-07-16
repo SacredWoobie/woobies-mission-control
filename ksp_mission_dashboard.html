@@ -10,7 +10,7 @@
   /* =========================================================================
      ORBITAL TELEMETRY — flight-computer MFD aesthetic
      Palette: amber phosphor primary, cyan live accents, slate labels,
-     on a deep blue-black. Built for a narrow vertical secondary monitor.
+     on a deep blue-black. Responsive for vertical and widescreen displays.
      ========================================================================= */
   :root{
     --bg:#080b11;
@@ -51,6 +51,8 @@
   @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
 
   .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .status-strip{display:contents}
+  .flight-grid{display:contents}
   .project-footer{
     max-width:1180px;margin:12px auto 2px;padding:10px 4px 2px;
     border-top:1px solid var(--rule);color:var(--slate-dim);
@@ -60,10 +62,86 @@
   .project-footer a{color:var(--slate);text-decoration:none}
   .project-footer a:hover{color:var(--cyan);text-decoration:underline}
   .project-footer a:focus-visible{outline:1px solid var(--cyan);outline-offset:2px}
-  .deck > .panel{break-inside:avoid;margin-bottom:12px;width:100%}
+  .wide-column{display:contents}
+  .deck .panel{break-inside:avoid;margin-bottom:12px;width:100%}
   @media (min-width:980px){
     .deck{column-count:2;column-gap:12px}
-    .deck > .panel{display:inline-block}   /* helps Firefox keep panels intact */
+    .deck .panel{display:inline-block}   /* helps Firefox keep panels intact */
+  }
+  /* Widescreen mission-control layout. The released two-column/vertical
+     arrangement remains unchanged below this breakpoint. */
+  @media (min-width:1440px){
+    .wrap,.project-footer{max-width:1800px}
+    .flight-grid{
+      display:grid;
+      grid-template-columns:minmax(560px,.85fr) minmax(720px,1.15fr);
+      gap:12px;
+      align-items:start;
+    }
+    .flight-grid > #asc,.flight-grid > .deck{min-width:0;width:100%}
+    .flight-grid > .deck{column-count:2;column-gap:12px}
+  }
+  @media (min-width:1600px){
+    /* One compact operational strip replaces the separate Datalink and
+       two-row Time/Comms panels on horizontal displays. */
+    .status-strip{
+      display:grid;
+      grid-template-columns:minmax(210px,240px) repeat(4,minmax(0,1fr));
+      gap:1px;
+      background:var(--rule);
+      border:1px solid var(--rule);
+      border-radius:4px;
+      overflow:hidden;
+    }
+    .status-strip > .panel{
+      min-width:0;
+      border:0;
+      border-radius:0;
+      background:var(--panel);
+    }
+    .status-strip #conn{display:flex;flex-direction:column}
+    .status-strip #conn > h2{padding:5px 8px;font-size:9px}
+    .status-strip #conn .body{
+      display:grid !important;
+      grid-template-columns:1fr;
+      align-content:start;
+      align-items:start !important;
+      gap:3px !important;
+      padding:6px 9px;
+    }
+    .status-strip #conn .body button{
+      justify-self:start;
+      margin-top:2px;
+      padding:4px 10px;
+      font-size:10px;
+    }
+    .status-strip #clock{display:contents}
+    .status-strip #clock > .body,
+    .status-strip #clock > .comms-strip{display:contents}
+    .status-strip .clockcell,
+    .status-strip .cs-cell{min-width:0;padding:9px 11px;background:var(--panel)}
+    .status-strip .clockcell .big{font-size:20px}
+    .status-strip .cs-cell{justify-content:center}
+
+    /* Stable mission stacks use the space below Ascension instead of forcing
+       the docking display beneath every panel in the former right column. */
+    .flight-grid{
+      grid-template-columns:minmax(560px,1.1fr) minmax(460px,1fr) minmax(460px,1fr);
+      grid-template-rows:auto auto;
+    }
+    .flight-grid > #asc{grid-column:1;grid-row:1}
+    .flight-grid > .deck{display:contents}
+    .wide-column{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      min-width:0;
+      align-self:start;
+    }
+    .wide-column > .panel{display:block;margin-bottom:0;width:100%}
+    .wide-left{grid-column:1;grid-row:2}
+    .wide-systems{grid-column:2;grid-row:1 / span 2}
+    .wide-mission{grid-column:3;grid-row:1 / span 2}
   }
 
   /* ---- generic panel ---- */
@@ -116,8 +194,6 @@
   .led.bad{background:var(--warn);box-shadow:0 0 8px var(--warn)}
   .led.wait{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 1s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-  .linknote{width:100%;font-size:9px;letter-spacing:.06em;color:var(--slate-dim);margin-top:-2px}
-
   /* ---- clock strip ---- */
   #clock .body{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);padding:0}
   .clockcell{background:var(--panel);padding:10px 12px}
@@ -166,6 +242,13 @@
   .spark{width:100%;height:44px;display:block;background:#05080c;border:1px solid var(--rule);border-radius:3px}
   .spark-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .spark-lab{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin:0 0 3px 2px}
+  @media (min-width:1440px){
+    /* Ascension keeps its vertical instrument/stats/trends stack inside the
+       left workspace column. Slightly tighter stats protect long values in
+       the narrower container without adding another row. */
+    .flight-grid #asc .stat{padding:8px}
+    .flight-grid #asc .stat .v{font-size:17px}
+  }
 
   /* ---- consumables ---- */
   .res-row{display:grid;grid-template-columns:78px 1fr 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--rule)}
@@ -429,6 +512,8 @@
 
 <div class="wrap">
 
+  <div class="status-strip">
+
   <!-- ============ CONNECTION (slim status bar; controls live in the overlay) ============ -->
   <section class="panel" id="conn">
     <h2>DATALINK
@@ -438,7 +523,6 @@
       <span class="label" style="color:var(--cyan)">KRPC BRIDGE</span>
       <span class="label" id="connHostLabel">127.0.0.1:8090</span>
       <button id="connectBtnK">Disconnect</button>
-      <div class="linknote" style="width:100%">single link — clocks · navball · flight · orbit · consumables · comms · science · heat · electricity · target · staging Δv</div>
     </div>
   </section>
 
@@ -468,7 +552,11 @@
     </div>
   </section>
 
-  <!-- ============ ASCENSION ============ (full width) -->
+  </div><!-- /status-strip -->
+
+  <div class="flight-grid">
+
+  <!-- ============ ASCENSION ============ -->
   <section class="panel" id="asc">
     <h2>Ascension <span class="tag">attitude · throttle · flight</span></h2>
     <div class="body">
@@ -515,6 +603,8 @@
 
   <div class="deck">
 
+  <div class="wide-column wide-left">
+
   <!-- ============ CONSUMABLES ============ -->
   <section class="panel" id="cons">
     <h2>Consumables <span class="tag">vessel total · current stage</span></h2>
@@ -524,6 +614,10 @@
       <div class="res-note hidden" id="resNote">current-stage column unavailable — kRPC build doesn't expose vessel.control.current_stage</div>
     </div>
   </section>
+
+  </div><!-- /wide-left -->
+
+  <div class="wide-column wide-systems">
 
   <!-- ============ HEAT MANAGEMENT ============ -->
   <section class="panel" id="heat">
@@ -617,6 +711,10 @@
     </div>
   </section>
 
+  </div><!-- /wide-systems -->
+
+  <div class="wide-column wide-mission">
+
   <!-- ============ STAGING ============ -->
   <section class="panel" id="stage">
     <h2>Staging analysis <span class="tag">throttle · Δv (kRPC · MechJeb)
@@ -658,11 +756,14 @@
     </div>
   </section>
 
+  </div><!-- /wide-mission -->
+
   </div><!-- /deck -->
+  </div><!-- /flight-grid -->
 </div>
 
 <footer class="project-footer" aria-label="Project information">
-  <span>Woobie's Mission Control v0.1.0</span><span class="sep">·</span>
+  <span>Woobie's Mission Control v0.1.1</span><span class="sep">·</span>
   <span>by SacredWoobie</span><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control" target="_blank" rel="noopener noreferrer">GitHub</a><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
