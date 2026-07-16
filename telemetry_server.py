@@ -53,6 +53,7 @@ _tgt_cache = {}
 _tgt_last_poll = 0.0
 _stage_cache = {}
 _stage_last_poll = 0.0
+_stage_last_ut = None
 
 # Current-stage resource ownership is inferred only when one decouple group
 # contains multiple engine stages. Cache the part assignment until the vessel
@@ -525,11 +526,11 @@ def _gather_target(conn, vessel):
 # Per-stage delta-V via the custom KRPC.StageStats service (MechJeb's sim).
 #
 # The service indexes stages by ARRAY INDEX: index 0 is the final/upper stage.
-# A complete MechJeb result includes the zero-thrust staging slots and maps
-# contiguously to KSP's countdown numbering. During an incomplete/older result,
-# however, MechJeb can expose only propulsive rows. In that case we map the rows
-# to the vessel's actual engine activation stages instead of inventing adjacent
-# stage numbers and losing S0.
+# A complete MechJeb result includes every KSP staging slot, including
+# zero-thrust decoupler/fairing stages. Therefore a vessel at currentStage N
+# must have N+1 result rows, indexed S0 through SN. A shorter result is an async
+# partial (or a stale module after a scene change), not a propulsive-only table.
+# Reject it so the dashboard never disguises missing stages as S0/S4, etc.
 #
 #   ksp_number(index) = current_ksp - ((count - 1) - index)
 #                     = index + (current_ksp - (count - 1))
@@ -538,26 +539,7 @@ def _gather_target(conn, vessel):
 # The custom service pumps MechJeb's async sim on every read. Prime it, allow
 # MechJeb's 100 ms flight refresh window to complete, then take one snapshot.
 # ---------------------------------------------------------------------------
-def _stage_ksp_numbers(vessel, current_ksp, count):
-    """Return KSP labels for a full or propulsive-only MechJeb result."""
-    offset = (current_ksp - (count - 1)) if count > 0 else 0
-    contiguous = [index + offset for index in range(count)]
-
-    try:
-        engine_stages = set()
-        for engine in vessel.parts.engines:
-            stage = int(engine.part.stage)
-            if 0 <= stage <= current_ksp:
-                engine_stages.add(stage)
-        engine_stages = sorted(engine_stages)
-        if len(engine_stages) == count:
-            return engine_stages, "engine-activation"
-    except Exception:
-        pass
-    return contiguous, "contiguous"
-
-
-def _gather_stages(conn, vessel):
+def _gather_stages(conn):
     try:
         ss = conn.stage_stats
     except Exception:
@@ -577,15 +559,27 @@ def _gather_stages(conn, vessel):
         # its individual fields.
         ss.stage_count()
         time.sleep(STAGE_SETTLE_SECONDS)
-        count = ss.stage_count()
-        current_ksp = ss.current_stage()
+        count = int(ss.stage_count())
+        current_ksp = int(ss.current_stage())
+
+        # The MechJeb table is indexed S0..S(current). A smaller table is a
+        # transient/incomplete simulation. Publish an explicitly empty snapshot
+        # rather than relabeling two surviving rows as non-contiguous stages or
+        # continuing to show rows from the previous staging state.
+        expected_count = max(0, current_ksp + 1)
+        if count != expected_count:
+            return {
+                "stage.available": True,
+                "stage.complete": False,
+                "stage.count": count,
+                "stage.currentKsp": current_ksp,
+                "stage.stages": [],
+            }
+
         out["stage.count"] = count
         out["stage.currentKsp"] = current_ksp
-
-        ksp_numbers, mapping = _stage_ksp_numbers(
-            vessel, current_ksp, count
-        )
-        out["stage.mapping"] = mapping
+        out["stage.complete"] = True
+        out["stage.mapping"] = "complete"
         stages = []
         total_atmo = total_vac = 0.0
         for i in range(count):
@@ -595,7 +589,7 @@ def _gather_stages(conn, vessel):
             total_vac += dv_vac
             stages.append({
                 "index": i,
-                "ksp": ksp_numbers[i],
+                "ksp": i,
                 "dvAtmo": round(dv_atmo, 1),
                 "dvVac": round(dv_vac, 1),
                 "twr": round(ss.stage_twr(i, False), 2),
@@ -604,6 +598,15 @@ def _gather_stages(conn, vessel):
         out["stage.stages"] = stages
         out["stage.totalDvAtmo"] = round(total_atmo, 1)
         out["stage.totalDvVac"] = round(total_vac, 1)
+
+        # If staging or a scene change happened while the individual RPCs were
+        # being read, discard the mixed snapshot and retry on the next poll.
+        if int(ss.stage_count()) != count or int(ss.current_stage()) != current_ksp:
+            return {
+                "stage.available": True,
+                "stage.complete": False,
+                "stage.stages": [],
+            }
     except Exception:
         return {}  # mid-scene-change / sim not ready; retain last good cache
 
@@ -721,6 +724,7 @@ def _gather_science(conn, vessel):
 # Telemetry gathering
 # ---------------------------------------------------------------------------
 def gather_telemetry(conn):
+    global _stage_cache, _stage_last_poll, _stage_last_ut
     d = {}
 
     # The game scene is the authoritative signal. A vessel handle may remain
@@ -745,8 +749,10 @@ def gather_telemetry(conn):
     now = time.time()
 
     # ---- clocks (every tick) ----
+    universal_time = None
     try:
-        d["t.universalTime"] = sc.ut
+        universal_time = sc.ut
+        d["t.universalTime"] = universal_time
         d["v.missionTime"] = vessel.met
     except Exception:
         pass
@@ -840,11 +846,19 @@ def gather_telemetry(conn):
     d.update(_tgt_cache)
 
     # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
-    global _stage_cache, _stage_last_poll
+    # Revert-to-launch rewinds universal time while the process and kRPC
+    # connection can remain alive. Never carry the previous flight's last good
+    # stage snapshot across that boundary.
+    if universal_time is not None:
+        if _stage_last_ut is not None and universal_time < _stage_last_ut:
+            _stage_cache = {}
+            _stage_last_poll = 0.0
+        _stage_last_ut = universal_time
+
     if now - _stage_last_poll >= STAGE_POLL_SECONDS:
         _stage_last_poll = now
         try:
-            result = _gather_stages(conn, vessel)
+            result = _gather_stages(conn)
             if result:
                 _stage_cache = result
         except Exception:
