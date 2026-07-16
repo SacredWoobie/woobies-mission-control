@@ -544,11 +544,12 @@ def _stage_ksp_numbers(vessel, current_ksp, count):
     contiguous = [index + offset for index in range(count)]
 
     try:
-        engine_stages = sorted({
-            int(engine.part.stage)
-            for engine in vessel.parts.engines
-            if 0 <= int(engine.part.stage) <= current_ksp
-        })
+        engine_stages = set()
+        for engine in vessel.parts.engines:
+            stage = int(engine.part.stage)
+            if 0 <= stage <= current_ksp:
+                engine_stages.add(stage)
+        engine_stages = sorted(engine_stages)
         if len(engine_stages) == count:
             return engine_stages, "engine-activation"
     except Exception:
