@@ -13,6 +13,13 @@ All notable public changes will be recorded here.
   visible on the stage they physically belong to.
 - Cached the inferred part ownership until the vessel or KSP stage changes to
   avoid repeating the topology walk on every resource poll.
+- Prevented the Ascension altitude value and unit from wrapping onto separate
+  lines by widening the readout and slightly reducing its type size.
+- Refreshed MechJeb's asynchronous stage simulation before reading a complete
+  delta-v snapshot, and retained the last valid snapshot through transient
+  simulation updates.
+- Mapped propulsive-only MechJeb results to the vessel's actual engine stages so
+  non-contiguous stages such as S0, S2, and S4 keep their correct labels.
 
 ## v0.1.3 - Current-stage consumables fix
 
