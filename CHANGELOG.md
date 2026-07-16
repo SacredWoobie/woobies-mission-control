@@ -19,3 +19,5 @@ All notable public changes will be recorded here.
   debounced inputs and safe fire-button startup behavior.
 - Clarified that complete-release Python setup must be run from its `Dashboard`
   folder so the launcher can use the project-local virtual environment.
+- Added project, version, author, GitHub, and license information to the
+  launcher and dashboard.
