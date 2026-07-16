@@ -129,6 +129,19 @@ foreach ($file in $dllFiles) {
     Assert-RequiredFile (Join-Path $GameDataPath $file.Source)
 }
 
+# v0.1.4 requires the StageStats keep-warm service. Older release DLLs expose
+# the same RPC surface but leave MechJeb's asynchronous simulation idle, which
+# produces frozen delta-v and incomplete stage rows. Fail before packaging
+# instead of silently reusing the v0.1.0 binary.
+$stageStatsDll = Join-Path $GameDataPath 'KRPC.StageStats/KRPC.StageStats.dll'
+$stageStatsVersion = [System.Reflection.AssemblyName]::GetAssemblyName(
+    $stageStatsDll
+).Version
+$requiredStageStatsVersion = [Version]'0.1.1.0'
+if ($stageStatsVersion -ne $requiredStageStatsVersion) {
+    throw "KRPC.StageStats.dll must be version $requiredStageStatsVersion for v$Version; found $stageStatsVersion. Rebuild KRPC.StageStats/KRPC.StageStats.csproj in Release mode and update the builder dist/GameData copy."
+}
+
 $readme = Get-Content -LiteralPath (Join-Path $repoRoot 'README.md') -Raw
 $dashboardApp = Get-Content -LiteralPath (Join-Path $repoRoot 'ksp_dashboard_app.py') -Raw
 $dashboardHtml = Get-Content -LiteralPath (Join-Path $repoRoot 'ksp_mission_dashboard.html') -Raw
