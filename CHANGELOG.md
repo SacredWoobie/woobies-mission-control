@@ -6,8 +6,9 @@ All notable public changes will be recorded here.
 
 - Added a responsive layout for horizontal displays at 1440 pixels and wider.
 - Simplified the Datalink panel by removing its redundant telemetry-source list.
-- Placed Ascension in a dedicated left column with its orbital stats and trends.
-- Balanced the remaining telemetry panels across two columns on the right.
+- Added stable three-column mission stacks at 1600 pixels and wider.
+- Used the space below Ascension for Consumables to reduce wasted height.
+- Kept Staging and Target together so docking information remains in view.
 - Preserved the v0.1.0 layout on narrower and vertical displays.
 
 ## v0.1.0 - Initial public test release

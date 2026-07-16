@@ -61,10 +61,11 @@
   .project-footer a{color:var(--slate);text-decoration:none}
   .project-footer a:hover{color:var(--cyan);text-decoration:underline}
   .project-footer a:focus-visible{outline:1px solid var(--cyan);outline-offset:2px}
-  .deck > .panel{break-inside:avoid;margin-bottom:12px;width:100%}
+  .wide-column{display:contents}
+  .deck .panel{break-inside:avoid;margin-bottom:12px;width:100%}
   @media (min-width:980px){
     .deck{column-count:2;column-gap:12px}
-    .deck > .panel{display:inline-block}   /* helps Firefox keep panels intact */
+    .deck .panel{display:inline-block}   /* helps Firefox keep panels intact */
   }
   /* Widescreen mission-control layout. The released two-column/vertical
      arrangement remains unchanged below this breakpoint. */
@@ -78,6 +79,27 @@
     }
     .flight-grid > #asc,.flight-grid > .deck{min-width:0;width:100%}
     .flight-grid > .deck{column-count:2;column-gap:12px}
+  }
+  @media (min-width:1600px){
+    /* Stable mission stacks use the space below Ascension instead of forcing
+       the docking display beneath every panel in the former right column. */
+    .flight-grid{
+      grid-template-columns:minmax(560px,1.1fr) minmax(460px,1fr) minmax(460px,1fr);
+      grid-template-rows:auto auto;
+    }
+    .flight-grid > #asc{grid-column:1;grid-row:1}
+    .flight-grid > .deck{display:contents}
+    .wide-column{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      min-width:0;
+      align-self:start;
+    }
+    .wide-column > .panel{display:block;margin-bottom:0;width:100%}
+    .wide-left{grid-column:1;grid-row:2}
+    .wide-systems{grid-column:2;grid-row:1 / span 2}
+    .wide-mission{grid-column:3;grid-row:1 / span 2}
   }
 
   /* ---- generic panel ---- */
@@ -535,6 +557,8 @@
 
   <div class="deck">
 
+  <div class="wide-column wide-left">
+
   <!-- ============ CONSUMABLES ============ -->
   <section class="panel" id="cons">
     <h2>Consumables <span class="tag">vessel total · current stage</span></h2>
@@ -544,6 +568,10 @@
       <div class="res-note hidden" id="resNote">current-stage column unavailable — kRPC build doesn't expose vessel.control.current_stage</div>
     </div>
   </section>
+
+  </div><!-- /wide-left -->
+
+  <div class="wide-column wide-systems">
 
   <!-- ============ HEAT MANAGEMENT ============ -->
   <section class="panel" id="heat">
@@ -637,6 +665,10 @@
     </div>
   </section>
 
+  </div><!-- /wide-systems -->
+
+  <div class="wide-column wide-mission">
+
   <!-- ============ STAGING ============ -->
   <section class="panel" id="stage">
     <h2>Staging analysis <span class="tag">throttle · Δv (kRPC · MechJeb)
@@ -677,6 +709,8 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /wide-mission -->
 
   </div><!-- /deck -->
   </div><!-- /flight-grid -->
