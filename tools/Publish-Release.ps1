@@ -175,8 +175,12 @@ if ($CreateDraftRelease) {
 
     Invoke-CheckedCommand -Command 'gh' -Arguments @('auth', 'status', '--hostname', 'github.com')
 
-    & gh release view "v$Version" --repo $Repository *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $releaseListJson = & gh release list --repo $Repository --limit 1000 --json tagName
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to check existing GitHub Releases.'
+    }
+    $existingReleaseTags = @($releaseListJson | ConvertFrom-Json | ForEach-Object { $_.tagName })
+    if ($existingReleaseTags -contains "v$Version") {
         throw "A GitHub Release for v$Version already exists."
     }
 
