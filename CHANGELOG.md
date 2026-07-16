@@ -21,3 +21,5 @@ All notable public changes will be recorded here.
   folder so the launcher can use the project-local virtual environment.
 - Added project, version, author, GitHub, and license information to the
   launcher and dashboard.
+- Added a screenshot-based README feature tour covering science, staging,
+  thermal/electrical management, targeting, and docking alignment.
