@@ -39,11 +39,9 @@
 
     Install the built DLL to [KSP]/GameData/KRPC.StageStats/
 
-    BUILD NOTE: this project now compiles the SERVICE (StageStatsService.cs).
-    The diagnostic (StageStatsDump.cs) has done its job and should be removed
-    from the project directory, or MSBuild will try to compile both. If you want
-    to keep the dumper around for future MechJeb versions, move it out of this
-    folder rather than leaving it beside the service.
+    BUILD NOTE: this project explicitly compiles only StageStatsService.cs.
+    A diagnostic such as StageStatsDump.cs may remain beside it without being
+    included in the release service assembly.
   -->
   <ItemGroup>
     <Compile Include="StageStatsService.cs" />
