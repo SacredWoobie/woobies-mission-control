@@ -13,6 +13,7 @@ All notable public changes will be recorded here.
 - Preserved the v0.1.0 layout on narrower and vertical displays.
 - Added an audited PowerShell release packager with optional draft GitHub
   Release creation.
+- Fixed the unused-version check under Windows PowerShell 5.1.
 
 ## v0.1.0 - Initial public test release
 
