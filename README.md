@@ -111,24 +111,6 @@ still need confirmation before release.
 | Dynamic Battery Storage | `2.3.7.0` |
 | RemoteTech | Optional; exposed by base kRPC `0.5.4` |
 
-### Rebuilding the StageStats service
-
-v0.1.4 requires `KRPC.StageStats.dll` version `0.1.1.0`. That build keeps
-MechJeb's asynchronous stage simulation active every flight frame; the older
-`0.1.0.0` DLL can return frozen delta-v values and omit an intermediate burn
-stage.
-
-Place the compile-time reference assemblies listed in
-`KRPC.StageStats/KRPC.StageStats.csproj` under `KRPC.StageStats/lib`, then run:
-
-```powershell
-dotnet build .\KRPC.StageStats\KRPC.StageStats.csproj -c Release
-```
-
-Copy the resulting `KRPC.StageStats.dll` into the service builder's
-`dist/GameData/KRPC.StageStats` folder before running `Publish-Release.ps1`.
-The release tool rejects an older StageStats assembly instead of packaging it.
-
 ## Installation
 
 ### 1. Install the KSP-side dependencies
