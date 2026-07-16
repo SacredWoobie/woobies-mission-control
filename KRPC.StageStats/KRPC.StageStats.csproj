@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 4.7.2: the KSP-safe target KRPC.MechJeb uses, same as KRPC.SystemHeat.
+         We do NOT reference MechJeb2.dll at compile time. MechJeb is pinned to
+         2.14.3.0 to match KRPC.MechJeb 0.7.1; hard-binding a THIRD assembly to
+         that pin would make the version lock strictly worse, and MechJeb has
+         renamed its stage-stats internals across releases. Its types are
+         reached by reflection at runtime instead.
+
+         NOTE TO FUTURE EDITORS: XML comments cannot contain a double hyphen,
+         and cannot end with a hyphen. Use commas or semicolons for asides, not
+         the dash separators used elsewhere in this project. MSBuild rejects the
+         whole project file with MSB4025 otherwise. -->
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>KRPC.StageStats</AssemblyName>
+    <RootNamespace>KRPC.StageStatsService</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>0.1.1</Version>
+  </PropertyGroup>
+
+  <!--
+    Copy these DLLs into lib/ before building (compile time references only;
+    MechJeb2.dll is NOT needed, its types are reached by reflection):
+
+    From [KSP]/KSP_x64_Data/Managed/:
+      Assembly-CSharp.dll
+      UnityEngine.dll
+      UnityEngine.CoreModule.dll
+    From [KSP]/GameData/kRPC/:
+      KRPC.dll, KRPC.Core.dll
+
+    The service has no hotkeys, so UnityEngine.InputLegacyModule (needed only by
+    the diagnostic dumper) is NOT required here.
+
+    Install the built DLL to [KSP]/GameData/KRPC.StageStats/
+
+    BUILD NOTE: this project now compiles the SERVICE (StageStatsService.cs).
+    The diagnostic (StageStatsDump.cs) has done its job and should be removed
+    from the project directory, or MSBuild will try to compile both. If you want
+    to keep the dumper around for future MechJeb versions, move it out of this
+    folder rather than leaving it beside the service.
+  -->
+  <ItemGroup>
+    <Compile Include="StageStatsService.cs" />
+
+    <Reference Include="Assembly-CSharp">
+      <HintPath>lib\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>lib\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="KRPC">
+      <HintPath>lib\KRPC.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="KRPC.Core">
+      <HintPath>lib\KRPC.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
