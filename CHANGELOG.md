@@ -6,6 +6,7 @@ All notable public changes will be recorded here.
 
 - Added a responsive layout for horizontal displays at 1440 pixels and wider.
 - Simplified the Datalink panel by removing its redundant telemetry-source list.
+- Combined Datalink, time, and communications into a five-cell widescreen strip.
 - Added stable three-column mission stacks at 1600 pixels and wider.
 - Used the space below Ascension for Consumables to reduce wasted height.
 - Kept Staging and Target together so docking information remains in view.

@@ -51,6 +51,7 @@
   @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
 
   .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .status-strip{display:contents}
   .flight-grid{display:contents}
   .project-footer{
     max-width:1180px;margin:12px auto 2px;padding:10px 4px 2px;
@@ -81,6 +82,47 @@
     .flight-grid > .deck{column-count:2;column-gap:12px}
   }
   @media (min-width:1600px){
+    /* One compact operational strip replaces the separate Datalink and
+       two-row Time/Comms panels on horizontal displays. */
+    .status-strip{
+      display:grid;
+      grid-template-columns:minmax(210px,240px) repeat(4,minmax(0,1fr));
+      gap:1px;
+      background:var(--rule);
+      border:1px solid var(--rule);
+      border-radius:4px;
+      overflow:hidden;
+    }
+    .status-strip > .panel{
+      min-width:0;
+      border:0;
+      border-radius:0;
+      background:var(--panel);
+    }
+    .status-strip #conn{display:flex;flex-direction:column}
+    .status-strip #conn > h2{padding:5px 8px;font-size:9px}
+    .status-strip #conn .body{
+      display:grid !important;
+      grid-template-columns:1fr;
+      align-content:start;
+      align-items:start !important;
+      gap:3px !important;
+      padding:6px 9px;
+    }
+    .status-strip #conn .body button{
+      justify-self:start;
+      margin-top:2px;
+      padding:4px 10px;
+      font-size:10px;
+    }
+    .status-strip #clock{display:contents}
+    .status-strip #clock > .body,
+    .status-strip #clock > .comms-strip{display:contents}
+    .status-strip .clockcell,
+    .status-strip .cs-cell{min-width:0;padding:9px 11px;background:var(--panel)}
+    .status-strip .clockcell .big{font-size:20px}
+    .status-strip .cs-cell{justify-content:center}
+
     /* Stable mission stacks use the space below Ascension instead of forcing
        the docking display beneath every panel in the former right column. */
     .flight-grid{
@@ -470,6 +512,8 @@
 
 <div class="wrap">
 
+  <div class="status-strip">
+
   <!-- ============ CONNECTION (slim status bar; controls live in the overlay) ============ -->
   <section class="panel" id="conn">
     <h2>DATALINK
@@ -507,6 +551,8 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /status-strip -->
 
   <div class="flight-grid">
 
