@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MISSION CONTROL — kRPC</title>
+<meta name="author" content="SacredWoobie">
+<meta name="application-name" content="Woobie's Mission Control">
+<title>Woobie's Mission Control — kRPC</title>
 <style>
   /* =========================================================================
      ORBITAL TELEMETRY — flight-computer MFD aesthetic
@@ -49,6 +51,15 @@
   @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
 
   .wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .project-footer{
+    max-width:1180px;margin:12px auto 2px;padding:10px 4px 2px;
+    border-top:1px solid var(--rule);color:var(--slate-dim);
+    font-size:9px;letter-spacing:.08em;text-align:center;text-transform:uppercase;
+  }
+  .project-footer .sep{margin:0 7px;color:var(--rule-bright)}
+  .project-footer a{color:var(--slate);text-decoration:none}
+  .project-footer a:hover{color:var(--cyan);text-decoration:underline}
+  .project-footer a:focus-visible{outline:1px solid var(--cyan);outline-offset:2px}
   .deck > .panel{break-inside:avoid;margin-bottom:12px;width:100%}
   @media (min-width:980px){
     .deck{column-count:2;column-gap:12px}
@@ -649,6 +660,13 @@
 
   </div><!-- /deck -->
 </div>
+
+<footer class="project-footer" aria-label="Project information">
+  <span>Woobie's Mission Control v0.1.0</span><span class="sep">·</span>
+  <span>by SacredWoobie</span><span class="sep">·</span>
+  <a href="https://github.com/SacredWoobie/woobies-mission-control" target="_blank" rel="noopener noreferrer">GitHub</a><span class="sep">·</span>
+  <a href="https://github.com/SacredWoobie/woobies-mission-control/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+</footer>
 
 <script>
 /* ==========================================================================

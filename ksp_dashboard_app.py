@@ -29,6 +29,10 @@ from tkinter import scrolledtext
 HERE = Path(__file__).resolve().parent
 DASHBOARD = HERE / "ksp_mission_dashboard.html"
 PYTHON = sys.executable
+APP_NAME = "Woobie's Mission Control"
+APP_VERSION = "0.1.0"
+APP_AUTHOR = "SacredWoobie"
+PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 
 # Add future optional programs here. The GUI will expose a component only when
 # its script is present beside this launcher.
@@ -140,9 +144,21 @@ class App:
         self.backends = []
         self.backend_rows = []
 
-        root.title("KSP Components")
+        root.title(f"{APP_NAME} v{APP_VERSION}")
         root.minsize(600, 360)
         root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        header = tk.Frame(root)
+        header.pack(fill="x", padx=10, pady=(10, 2))
+        tk.Label(
+            header,
+            text=f"{APP_NAME}  v{APP_VERSION}",
+            anchor="w",
+            font=("TkDefaultFont", 11, "bold"),
+        ).pack(side="left")
+        tk.Button(header, text="About", width=8, command=self._show_about).pack(
+            side="right"
+        )
 
         components = discover_components()
         if components:
@@ -254,6 +270,58 @@ class App:
             webbrowser.open(DASHBOARD.as_uri() + "?autoconnect=1")
         except Exception as exc:
             self._enqueue("launcher", f"couldn't open browser: {exc}")
+
+    def _open_project_page(self):
+        try:
+            webbrowser.open(PROJECT_URL)
+        except Exception as exc:
+            self._enqueue("launcher", f"couldn't open GitHub: {exc}")
+
+    def _show_about(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"About {APP_NAME}")
+        dialog.transient(self.root)
+        dialog.resizable(False, False)
+
+        body = tk.Frame(dialog, padx=18, pady=16)
+        body.pack(fill="both", expand=True)
+        tk.Label(
+            body,
+            text=APP_NAME,
+            font=("TkDefaultFont", 13, "bold"),
+        ).pack(anchor="w")
+        tk.Label(body, text=f"Version {APP_VERSION}").pack(anchor="w", pady=(2, 10))
+        tk.Label(body, text=f"Created by {APP_AUTHOR}").pack(anchor="w")
+        tk.Label(body, text="Released under the MIT License").pack(anchor="w")
+
+        link = tk.Label(
+            body,
+            text=PROJECT_URL,
+            fg="#1a5fb4",
+            cursor="hand2",
+        )
+        link.pack(anchor="w", pady=(10, 12))
+        link.bind("<Button-1>", lambda _event: self._open_project_page())
+
+        buttons = tk.Frame(body)
+        buttons.pack(fill="x")
+        tk.Button(buttons, text="Open GitHub", command=self._open_project_page).pack(
+            side="left"
+        )
+        tk.Button(buttons, text="Close", width=8, command=dialog.destroy).pack(
+            side="right"
+        )
+
+        dialog.update_idletasks()
+        x = self.root.winfo_rootx() + max(
+            0, (self.root.winfo_width() - dialog.winfo_width()) // 2
+        )
+        y = self.root.winfo_rooty() + max(
+            0, (self.root.winfo_height() - dialog.winfo_height()) // 2
+        )
+        dialog.geometry(f"+{x}+{y}")
+        dialog.grab_set()
+        dialog.focus_set()
 
     def _refresh(self):
         for backend, status, button in self.backend_rows:
