@@ -2,6 +2,13 @@
 
 All notable public changes will be recorded here.
 
+## v0.1.1 - Widescreen layout
+
+- Added a responsive layout for horizontal displays at 1440 pixels and wider.
+- Reorganized Ascension telemetry to use horizontal space more efficiently.
+- Expanded the lower dashboard from two columns to three on wide screens.
+- Preserved the v0.1.0 layout on narrower and vertical displays.
+
 ## v0.1.0 - Initial public test release
 
 - Prepared the project for its first public release.

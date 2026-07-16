@@ -1,6 +1,6 @@
 # Woobie's Mission Control
 
-Current release: **v0.1.0**
+Current release: **v0.1.1**
 
 A modular mission dashboard and optional ESP32 control-pad bridge for Kerbal
 Space Program 1, powered by [kRPC](https://krpc.github.io/krpc/).

@@ -10,7 +10,7 @@
   /* =========================================================================
      ORBITAL TELEMETRY — flight-computer MFD aesthetic
      Palette: amber phosphor primary, cyan live accents, slate labels,
-     on a deep blue-black. Built for a narrow vertical secondary monitor.
+     on a deep blue-black. Responsive for vertical and widescreen displays.
      ========================================================================= */
   :root{
     --bg:#080b11;
@@ -64,6 +64,12 @@
   @media (min-width:980px){
     .deck{column-count:2;column-gap:12px}
     .deck > .panel{display:inline-block}   /* helps Firefox keep panels intact */
+  }
+  /* Widescreen mission-control layout. The released two-column/vertical
+     arrangement remains unchanged below this breakpoint. */
+  @media (min-width:1440px){
+    .wrap,.project-footer{max-width:1800px}
+    .deck{column-count:3}
   }
 
   /* ---- generic panel ---- */
@@ -166,6 +172,22 @@
   .spark{width:100%;height:44px;display:block;background:#05080c;border:1px solid var(--rule);border-radius:3px}
   .spark-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .spark-lab{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);margin:0 0 3px 2px}
+  @media (min-width:1440px){
+    /* Keep the attitude instruments together on the left while orbital
+       figures and trends use the extra horizontal room on the right. */
+    #asc .body{
+      display:grid;
+      grid-template-columns:minmax(500px,.85fr) minmax(700px,1.15fr);
+      grid-template-areas:
+        "attitude stats"
+        "attitude trends";
+      gap:12px;
+      align-items:start;
+    }
+    #asc .asc-top{grid-area:attitude;align-self:center}
+    #asc .stats-grid{grid-area:stats}
+    #asc .spark-row{grid-area:trends;align-self:end}
+  }
 
   /* ---- consumables ---- */
   .res-row{display:grid;grid-template-columns:78px 1fr 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--rule)}
@@ -662,7 +684,7 @@
 </div>
 
 <footer class="project-footer" aria-label="Project information">
-  <span>Woobie's Mission Control v0.1.0</span><span class="sep">·</span>
+  <span>Woobie's Mission Control v0.1.1</span><span class="sep">·</span>
   <span>by SacredWoobie</span><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control" target="_blank" rel="noopener noreferrer">GitHub</a><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
