@@ -11,6 +11,8 @@ All notable public changes will be recorded here.
 - Used the space below Ascension for Consumables to reduce wasted height.
 - Kept Staging and Target together so docking information remains in view.
 - Preserved the v0.1.0 layout on narrower and vertical displays.
+- Added an audited PowerShell release packager with optional draft GitHub
+  Release creation.
 
 ## v0.1.0 - Initial public test release
 
