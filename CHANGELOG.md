@@ -2,6 +2,14 @@
 
 All notable public changes will be recorded here.
 
+## v0.1.2 - KSP Recall consumables fix
+
+- Restored filtering for KSP Recall's internal `StealBackMyFunds`,
+  `RefundingForKSP111x`, and shorter `StealBack` bookkeeping resources.
+- Normalized resource names before filtering so case and punctuation variations
+  do not expose internal resources in the Consumables panel.
+- Applied the filter consistently to vessel-total and current-stage telemetry.
+
 ## v0.1.1 - Widescreen layout
 
 - Added a responsive layout for horizontal displays at 1440 pixels and wider.
