@@ -2,6 +2,18 @@
 
 All notable public changes will be recorded here.
 
+## v0.1.5 - Revert-safe staging analysis
+
+- Invalidated the private `KRPC.StageStats` MechJeb-module cache when KSP
+  replaces the active vessel or `MechJebCore`, including after Revert to Launch.
+- Updated `KRPC.StageStats` to `0.1.2` and made the release tool reject older
+  DLLs so a v0.1.5 package cannot silently reuse the revert-unsafe service.
+- Rejected incomplete MechJeb stage arrays instead of relabeling the surviving
+  rows by engine activation stage, which had disguised missing stages as S0/S4.
+- Cleared the last staging snapshot when universal time rewinds and verified
+  the stage count again after each multi-call snapshot to avoid cross-flight or
+  mid-staging data mixes.
+
 ## v0.1.4 - Multi-burn consumables partition
 
 - Split current-stage resources when multiple engine stages remain permanently
