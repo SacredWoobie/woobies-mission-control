@@ -13,6 +13,16 @@ dashboard.
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
 
+## Dashboard preview
+
+<p align="center">
+  <img src="docs/images/dashboard-overview.png" width="760" alt="Woobie's Mission Control dashboard showing orbital telemetry, resources, science, staging, thermal management, electrical generation, and target information">
+</p>
+
+The dashboard is designed for a secondary display and keeps flight, vessel,
+and mission-support data visible in one browser window. Sections whose optional
+KSP integrations are not installed remain unobtrusive or show unavailable data.
+
 ## Components
 
 | Component | Files | Purpose |
@@ -37,6 +47,44 @@ a control-pad start button.
 - Electrical output by reactor, solar, RTG, and other generation sources
 - Target-vessel and docking-alignment information
 - Optional ESP32 stage/abort control with local arm/safe gates
+
+## Feature tour
+
+### Science and staging
+
+![Science tracking and MechJeb staging analysis](docs/images/science-and-staging.png)
+
+The science panel totals recoverable and transmittable science aboard the active
+vessel, including experiments moved into stock science containers. It also
+reports experiment count, biome, situation, and career science already banked
+at the KSC. The staging panel presents atmospheric or vacuum delta-v, TWR, burn
+time, throttle, and a per-stage breakdown using MechJeb simulation data.
+
+Stored-science reporting uses `KRPC.VesselScience`. Full staging analysis uses
+MechJeb 2, KRPC.MechJeb, and `KRPC.StageStats`.
+
+### Thermal and electrical management
+
+![System Heat and electrical-generation monitoring](docs/images/thermal-and-electricity.png)
+
+Monitor System Heat generation, rejection, net load, and individual loop
+temperature. Electrical reporting separates reactors, solar panels, RTGs, and
+other producers such as alternators and fuel cells. The compact reactor summary
+shows fleet status at a glance, while its collapsed detail list provides
+per-reactor temperature, output, integrity, and fuel information when needed.
+
+These panels use `KRPC.SystemHeat`; the values available depend on the installed
+System Heat and electrical-part mods.
+
+### Target and docking alignment
+
+![Target information and docking-port alignment display](docs/images/docking-alignment.png)
+
+With a vessel or docking port selected as the in-game target, the dashboard
+shows distance, relative motion, target orbit, and inclination. For docking-port
+targets, the alignment display plots lateral and angular error around a centered
+reference so corrections are easy to judge. Confirm the intended target and
+controlling docking port in KSP before relying on the display for final contact.
 
 ## Compatibility status
 
