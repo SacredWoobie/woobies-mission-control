@@ -18,8 +18,12 @@ All notable public changes will be recorded here.
 - Refreshed MechJeb's asynchronous stage simulation before reading a complete
   delta-v snapshot, and retained the last valid snapshot through transient
   simulation updates.
+- Updated `KRPC.StageStats` to `0.1.1`, with an every-frame keep-warm driver so
+  MechJeb continues recomputing delta-v during burns and returns all stages.
 - Mapped propulsive-only MechJeb results to the vessel's actual engine stages so
   non-contiguous stages such as S0, S2, and S4 keep their correct labels.
+- Made the release tool reject the frozen `KRPC.StageStats` `0.1.0.0` binary so
+  v0.1.4 cannot accidentally ship with the old service again.
 
 ## v0.1.3 - Current-stage consumables fix
 
