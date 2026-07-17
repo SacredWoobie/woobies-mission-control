@@ -24,6 +24,8 @@
       try {
         const dashboard = frame.contentWindow;
         const document = frame.contentDocument;
+        assert(document.querySelector("#scrimNoFlight h3").textContent.includes("Awaiting Flight or Editor"),
+          "inactive overlay does not describe flight/editor support");
         const stages = [
           {index:0,ksp:0,dvAtmo:500,dvVac:650,twr:0.8,twrAtmo:0.8,twrVac:1.0,burn:42},
           {index:1,ksp:1,dvAtmo:0,dvVac:0,twr:0,twrAtmo:0,twrVac:0,burn:0},

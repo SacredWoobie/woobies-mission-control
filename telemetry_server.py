@@ -997,10 +997,10 @@ def gather_telemetry(conn):
         sc = conn.space_center
         vessel = sc.active_vessel
     except Exception:
-        # Connected to kRPC, but no active vessel -- not in flight (in the
-        # tracking station, VAB, main menu, or a scene load). The dashboard uses
-        # this flag to show its "No Flight in Progress" overlay instead of
-        # guessing from absent keys.
+        # Connected to kRPC, but no active vessel in a supported context (for
+        # example, the tracking station, space center, main menu, or a scene
+        # load). The dashboard uses this mode to show its inactive-scene overlay
+        # instead of guessing from absent keys.
         return {
             "context.mode": "inactive",
             "flight.active": False,

@@ -548,14 +548,14 @@
   </div>
 </div>
 
-<!-- ============ NO-FLIGHT OVERLAY ============ -->
+<!-- ============ INACTIVE-SCENE OVERLAY ============ -->
 <div class="scrim" id="scrimNoFlight">
   <div class="popout alert">
     <div class="popout-inner">
-      <h3><span class="haz-badge"></span> No Flight in Progress</h3>
-      <div class="sub">Telemetry linked · awaiting active vessel</div>
+      <h3><span class="haz-badge"></span> Awaiting Flight or Editor</h3>
+      <div class="sub">Telemetry linked · open a vessel in Flight, VAB, or SPH</div>
       <div class="big-status">STANDBY</div>
-      <div class="statusline"><span class="led wait"></span><span>Enter a flight scene to resume telemetry</span></div>
+      <div class="statusline"><span class="led wait"></span><span>Flight, VAB, and SPH scenes are supported</span></div>
     </div>
   </div>
 </div>
@@ -1062,9 +1062,9 @@ if(connectBtnK2) connectBtnK2.addEventListener("click", toggleK);
 
 /* ---- overlay control ------------------------------------------------------
    Two mutually-exclusive centered pop-outs over a dimmed dashboard:
-     * not linked            -> connect pop-out
-     * linked, but no vessel -> "No Flight in Progress"
-   Linked WITH a vessel -> no overlay, live dashboard. */
+     * not linked                 -> connect pop-out
+     * linked, but inactive scene -> "Awaiting Flight or Editor"
+   Linked in Flight, VAB, or SPH -> no overlay, live dashboard. */
 let hasFlight=false, contextMode="inactive";
 const scrimConnect=$("scrimConnect"), scrimNoFlight=$("scrimNoFlight");
 function updateOverlays(){
