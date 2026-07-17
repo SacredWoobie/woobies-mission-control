@@ -106,8 +106,8 @@ controlling docking port in KSP before relying on the display for final contact.
 
 ## Compatibility status
 
-The versions below are either known from the current development instance or
-still need confirmation before release.
+The versions below were used for the v0.2.0 release acceptance pass. Other
+versions may work but have not necessarily received the same test coverage.
 
 | Software/mod | Status |
 | --- | --- |
@@ -265,8 +265,8 @@ shown on your computer.
   run on other platforms, but equivalent launch instructions are not yet tested.
 - Docking alignment depends on the vessel's controlling docking port and should
   be validated against the navball before relying on it.
-- Exact compatibility ranges will remain provisional until the version table
-  above is completed and the release is tested from a clean installation.
+- Compatibility outside the versions listed above remains provisional until it
+  receives equivalent clean-package and in-game testing.
 
 ## Maintainer release process
 
