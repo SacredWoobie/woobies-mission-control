@@ -46,6 +46,7 @@ a control-pad start button.
 - System Heat loop temperatures, generation, rejection, and net heat
 - Electrical output by reactor, solar, RTG, and other generation sources
 - Target-vessel and docking-alignment information
+- Notes panel showing recent files from the Notes mod (zer0Kerbal/Notes)
 - Optional ESP32 stage/abort control with local arm/safe gates
 
 ## Feature tour
@@ -234,6 +235,13 @@ no other program is using port 8090.
 Optional sections require their corresponding KSP mod and service DLL. Missing
 optional integrations should leave the relevant section blank without stopping
 the rest of the dashboard.
+
+### Notes panel says folder not found
+
+The Notes panel reads text files from
+`GameData/Notes/Plugins/PluginData/notes`.
+
+This integration assumes the dashboard is started from `KSP_ROOT/Dashboard`.
 
 ### The ESP32 is not found
 

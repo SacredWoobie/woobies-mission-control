@@ -17,6 +17,8 @@ Optional args: telemetry_server.py [host] [port]
 import math
 import sys
 import time
+from pathlib import Path
+
 import krpc
 
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
@@ -31,6 +33,9 @@ RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
+NOTES_POLL_SECONDS = 2.0
+NOTES_MAX_FILES = 16
+NOTES_MAX_CHARS = 1200
 
 # KSP Recall exposes these internal refund-bookkeeping resources through kRPC.
 # They are implementation details, not vessel consumables. Match normalized
@@ -54,6 +59,10 @@ _tgt_last_poll = 0.0
 _stage_cache = {}
 _stage_last_poll = 0.0
 _stage_last_ut = None
+_notes_cache = {}
+_notes_last_poll = 0.0
+
+_NOTES_RELATIVE_DIR = Path("GameData") / "Notes" / "Plugins" / "PluginData" / "notes"
 
 # Current-stage resource ownership is inferred only when one decouple group
 # contains multiple engine stages. Cache the part assignment until the vessel
@@ -321,6 +330,103 @@ def _resource_values_for_parts(parts):
                 previous_maximum + maximum,
             )
     return values
+
+
+# ---------------------------------------------------------------------------
+# Notes mod compatibility (zer0Kerbal/Notes)
+# ---------------------------------------------------------------------------
+def _resolve_notes_dir():
+    """Return the expected Notes directory from the KSP_ROOT/Dashboard layout."""
+    candidates = []
+
+    candidates.append(Path.cwd().parent / _NOTES_RELATIVE_DIR)
+    candidates.append(Path.cwd() / _NOTES_RELATIVE_DIR)
+    candidates.append(Path(__file__).resolve().parent.parent / _NOTES_RELATIVE_DIR)
+    candidates.append(Path(__file__).resolve().parent / _NOTES_RELATIVE_DIR)
+
+    checked = []
+    seen = set()
+    for candidate in candidates:
+        try:
+            candidate = candidate.resolve(strict=False)
+        except Exception:
+            continue
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        checked.append(candidate)
+        try:
+            if candidate.is_dir():
+                return candidate, True
+        except Exception:
+            pass
+
+    return (checked[0] if checked else None), False
+
+
+def _clip_note_text(text, limit=NOTES_MAX_CHARS):
+    clean = text.replace("\r\n", "\n").replace("\r", "\n")
+    if len(clean) <= limit:
+        return clean
+    return clean[:limit].rstrip() + "\n\n[...truncated...]"
+
+
+def _gather_notes(vessel_name):
+    """Read recent Notes-mod files from disk for dashboard display."""
+    notes_dir, exists = _resolve_notes_dir()
+    if not exists or notes_dir is None:
+        return {
+            "notes.available": False,
+            "notes.message": "Notes folder not found.",
+            "notes.path": str(notes_dir) if notes_dir is not None else "",
+            "notes.count": 0,
+            "notes.files": [],
+        }
+
+    files = []
+    try:
+        txt_files = sorted(
+            (path for path in notes_dir.rglob("*.txt") if path.is_file()),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except Exception:
+        txt_files = []
+
+    for path in txt_files[:NOTES_MAX_FILES]:
+        try:
+            stat = path.stat()
+            body = path.read_text(encoding="utf-8", errors="replace")
+            rel = path.relative_to(notes_dir).as_posix()
+            name = path.stem
+            is_log = name.startswith("log_")
+            is_active = bool(vessel_name) and name == f"log_{vessel_name}"
+            preview = (
+                body.replace("\r\n", "\n").replace("\r", "\n")
+                if is_active
+                else _clip_note_text(body, NOTES_MAX_CHARS)
+            )
+            files.append(
+                {
+                    "name": name,
+                    "path": rel,
+                    "modified": stat.st_mtime,
+                    "size": stat.st_size,
+                    "preview": preview,
+                    "isLog": is_log,
+                    "isActiveLog": is_active,
+                }
+            )
+        except Exception:
+            pass
+
+    return {
+        "notes.available": True,
+        "notes.path": str(notes_dir),
+        "notes.count": len(txt_files),
+        "notes.files": files,
+    }
 
 
 def _current_stage_resource_values(vessel, current_stage):
@@ -751,6 +857,11 @@ def gather_telemetry(conn):
     # ---- clocks (every tick) ----
     universal_time = None
     try:
+        d["v.name"] = vessel.name
+    except Exception:
+        d["v.name"] = ""
+
+    try:
         universal_time = sc.ut
         d["t.universalTime"] = universal_time
         d["v.missionTime"] = vessel.met
@@ -993,6 +1104,16 @@ def gather_telemetry(conn):
             _elec_cache = elec
     d.update(_elec_cache)
 
+    # ---- Notes mod text files (GameData/Notes/Plugins/PluginData/notes) ----
+    global _notes_cache, _notes_last_poll
+    if now - _notes_last_poll >= NOTES_POLL_SECONDS:
+        _notes_last_poll = now
+        try:
+            _notes_cache = _gather_notes(d.get("v.name", ""))
+        except Exception:
+            pass
+    d.update(_notes_cache)
+
     return d
 
 
@@ -1029,14 +1150,13 @@ def run_telemetry_server(host, port):
             print(f"[telemetry] waiting for kRPC server... ({e})")
             time.sleep(2)
 
-    print(f"[telemetry] serving dashboard on ws://{host}:{port}  ({TELEMETRY_HZ} Hz)")
     clients = set()
 
     async def handler(ws, *args):  # *args tolerates old & new websockets signatures
         clients.add(ws)
         try:
             async for _ in ws:
-                pass  # ignore the dashboard's subscription msg; we push everything
+                pass
         except Exception:
             pass
         finally:
@@ -1060,10 +1180,26 @@ def run_telemetry_server(host, port):
 
     async def serve():
         async with websockets.serve(handler, host, port):
+            print(
+                f"[telemetry] serving dashboard on ws://{host}:{port}  "
+                f"({TELEMETRY_HZ} Hz)"
+            )
             await broadcaster()
 
     try:
         asyncio.run(serve())
+    except OSError as e:
+        if getattr(e, "errno", None) == 10048 or "10048" in str(e):
+            print(
+                "[telemetry] failed to bind websocket port "
+                f"{host}:{port} (WinError 10048)."
+            )
+            print(
+                "[telemetry] another process is already using this address. "
+                "Stop the other telemetry instance or choose a different port."
+            )
+        else:
+            print(f"[telemetry] server stopped: {e}")
     except Exception as e:
         print(f"[telemetry] server stopped: {e}")
 

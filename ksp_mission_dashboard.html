@@ -318,6 +318,18 @@
   .sl-row .t{color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sl-row .v{color:var(--amber);font-variant-numeric:tabular-nums}
 
+  /* ---- notes ---- */
+  .notes-status{font-size:10px;color:var(--slate);margin-bottom:8px;line-height:1.35}
+  .notes-meta{font-size:9px;color:var(--slate-dim)}
+  .notes-list{display:flex;flex-direction:column;gap:7px;max-height:min(320px,42vh);overflow-y:auto}
+  .notes-card{border:1px solid var(--rule);border-radius:3px;background:var(--panel);padding:7px 9px}
+  .notes-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+  .notes-name{font-size:11px;color:var(--cyan);letter-spacing:.02em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .notes-tag{font-size:8px;letter-spacing:.1em;text-transform:uppercase;padding:1px 5px;border-radius:2px;border:1px solid var(--rule-bright);color:var(--slate)}
+  .notes-tag.live{color:var(--green);border-color:#2f6c42;background:rgba(56,139,73,.14)}
+  .notes-preview{margin:0;font-size:10px;line-height:1.35;color:var(--amber);white-space:pre-wrap;word-break:break-word}
+  .notes-empty{font-size:11px;color:var(--slate-dim);font-style:italic;padding:2px 0}
+
   /* ---- heat ---- */
   .heat-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
   .heat-loops{margin-top:8px;display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
@@ -756,6 +768,17 @@
     </div>
   </section>
 
+  <!-- ============ NOTES (zer0Kerbal/Notes compatibility) ============ -->
+  <section class="panel" id="notesPanel" style="display:none">
+    <h2>Notes <span class="tag">zer0Kerbal/Notes</span></h2>
+    <div class="body">
+      <div class="notes-status" id="notesStatus">awaiting kRPC link</div>
+      <div class="notes-meta" id="notesMeta"></div>
+      <div class="notes-list" id="notesList"></div>
+      <div class="notes-empty" id="notesEmpty">No note files found</div>
+    </div>
+  </section>
+
   </div><!-- /wide-mission -->
 
   </div><!-- /deck -->
@@ -1015,6 +1038,7 @@ function onDataKrpc(d){
   updateComms(d);
   updateSasMode(d);
   updateScience(d);
+  updateNotes(d);
   renderHeat(d);
   renderElec(d);
   updateTarget(d);
@@ -1040,7 +1064,7 @@ function nullOutDashboard(){
     "heatGen","heatRem","heatNet",
     "ecTotal","solarOut","solarEff","rtgOut","otherOut",
     "dv_total","dv_stage","dv_twr","dv_burn","stageNum",
-    "sciSub","sciLoc"
+    "sciSub","sciLoc","notesStatus","notesMeta"
   ];
   dash.forEach(id=>set(id,"—"));
 
@@ -1053,13 +1077,15 @@ function nullOutDashboard(){
   const sv=$("sciValue"); if(sv){ sv.className="sci-value blocked"; sv.textContent="no flight"; }
 
   // clear list/table containers and per-vessel panels
-  ["resRows","reactorList","heatLoops","sciList","stageTable"].forEach(id=>{
+  ["resRows","reactorList","heatLoops","sciList","stageTable","notesList"].forEach(id=>{
     const el=$(id); if(el) el.innerHTML="";
   });
   const rxSummary=$("reactorSummary"); if(rxSummary) rxSummary.classList.add("hidden");
   const rxDetails=$("reactorDetails"); if(rxDetails) rxDetails.classList.add("hidden");
   const rxEmpty=$("reactorEmpty"); if(rxEmpty) rxEmpty.style.display="none";
   const tgt=$("target"); if(tgt) tgt.classList.remove("active");
+  const notesEmpty=$("notesEmpty"); if(notesEmpty) notesEmpty.style.display="none";
+  const notesPanel=$("notesPanel"); if(notesPanel) notesPanel.style.display="none";
   if(typeof initNavballEmpty==="function") initNavballEmpty();
   const ht=$("hdgTape"); if(ht) ht.innerHTML="";
 }
@@ -1318,6 +1344,74 @@ function updateScience(d){
       +`<span class="v">${sciFmt(r.value)} <span style="color:var(--slate-dim)">/ ${sciFmt(r.transmit)} tx</span></span></div>`
     ).join("");
   }
+}
+
+/* ---- notes (zer0Kerbal/Notes files exposed by telemetry_server.py) ---- */
+function fmtLocalTime(epochSeconds){
+  if(!num(epochSeconds)) return "unknown time";
+  const date = new Date(epochSeconds*1000);
+  return date.toLocaleString();
+}
+function updateNotes(d){
+  const panelEl=$("notesPanel");
+  const statusEl=$("notesStatus");
+  const metaEl=$("notesMeta");
+  const listEl=$("notesList");
+  const emptyEl=$("notesEmpty");
+  if(!panelEl || !statusEl || !metaEl || !listEl || !emptyEl) return;
+
+  if(d["notes.available"]===false){
+    panelEl.style.display = "none";
+    statusEl.textContent = d["notes.message"] || "Notes folder unavailable";
+    metaEl.textContent = d["notes.path"] ? "Path: "+d["notes.path"] : "";
+    listEl.innerHTML = "";
+    emptyEl.style.display = "none";
+    return;
+  }
+
+  if(d["notes.available"]!==true){
+    panelEl.style.display = "none";
+    statusEl.textContent = "awaiting notes scan";
+    return;
+  }
+
+  panelEl.style.display = "block";
+  const files = Array.isArray(d["notes.files"]) ? d["notes.files"] : [];
+  const totalCount = num(d["notes.count"]) ? Math.round(d["notes.count"]) : files.length;
+  const displayed = files.length;
+  statusEl.textContent = totalCount>0
+    ? `showing ${displayed} of ${totalCount} note files`
+    : "notes folder found · no notes created yet";
+
+  const path = (typeof d["notes.path"]==="string") ? d["notes.path"] : "";
+  metaEl.textContent = path ? "Path: "+path : "";
+
+  if(!files.length){
+    listEl.innerHTML = "";
+    emptyEl.textContent = "No note files yet. Create your first note in the Notes mod.";
+    emptyEl.style.display = "block";
+    return;
+  }
+
+  emptyEl.style.display = "none";
+  listEl.innerHTML = files.map(file=>{
+    const name = escapeHtml(file.name || "untitled");
+    const rel = escapeHtml(file.path || "");
+    const modified = fmtLocalTime(file.modified);
+    const size = num(file.size) ? `${Math.round(file.size).toLocaleString()} B` : "—";
+    const tag = file.isActiveLog
+      ? '<span class="notes-tag live">active vessel log</span>'
+      : (file.isLog ? '<span class="notes-tag">ship log</span>' : '');
+    const preview = escapeHtml(file.preview || "").trim() || "(empty note)";
+    return `<article class="notes-card">
+      <div class="notes-head">
+        <div class="notes-name" title="${name}">${name}</div>
+        ${tag}
+      </div>
+      <div class="notes-meta" title="${rel}">${rel} · ${size} · ${modified}</div>
+      <pre class="notes-preview">${preview}</pre>
+    </article>`;
+  }).join("");
 }
 
 /* ---- heat (System Heat via the custom kRPC service) ---- */
