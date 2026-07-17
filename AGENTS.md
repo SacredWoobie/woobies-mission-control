@@ -46,7 +46,9 @@ Start with `Start KSP Dashboard.bat`, or run telemetry directly while debugging:
 - Keep unavailable, pending, empty, and stale states distinguishable. Do not hide backend failures with front-end defaults.
 - Preserve modded resources and planet packs. Never hard-code the stock body list or stock-only resources.
 - Editor analysis must support VAB and SPH. Preserve Hangar Extender compatibility by relying on editor/craft state, not window geometry.
-- Do not update scattered release versions until v0.2.0 scope is accepted and the feature branch is stable.
+- Keep release versions coordinated across the launcher, dashboard footer,
+  README, changelog, and packaging checks; update them only when the next
+  release scope is accepted and its feature branch is stable.
 - Preserve unrelated changes in a dirty worktree.
 
 ## Validation
@@ -77,7 +79,8 @@ State which tests were automated and which require the user's KSP installation. 
 - The service builder must produce and verify all three DLLs before packaging.
 - Run `tools\Publish-Release.ps1` without release creation first, then inspect and test the ZIP.
 - Pushing a branch, opening a PR, creating a release, or publishing it requires explicit user direction.
-- Do not publish v0.2.0 while a known revert regression remains unresolved unless the user explicitly accepts and documents it.
+- Do not publish a release with a known lifecycle regression unless the user
+  explicitly accepts and documents the limitation.
 
 ## Review guidance
 
