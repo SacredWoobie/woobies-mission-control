@@ -129,15 +129,14 @@ foreach ($file in $dllFiles) {
     Assert-RequiredFile (Join-Path $GameDataPath $file.Source)
 }
 
-# v0.1.5 requires the StageStats revert-safe service. Older release DLLs expose
-# the same RPC surface but can retain a destroyed MechJeb module after reverting
-# to launch, producing frozen delta-v and incomplete stage rows. Fail before
-# packaging instead of silently reusing the v0.1.1 binary.
+# v0.2.0 requires the editor-capable StageStats service. Older release DLLs do
+# not expose the VAB/SPH planning API or the corrected initial-TWR calculation.
+# Fail before packaging instead of silently producing a flight-only release.
 $stageStatsDll = Join-Path $GameDataPath 'KRPC.StageStats/KRPC.StageStats.dll'
 $stageStatsVersion = [System.Reflection.AssemblyName]::GetAssemblyName(
     $stageStatsDll
 ).Version
-$requiredStageStatsVersion = [Version]'0.1.2.0'
+$requiredStageStatsVersion = [Version]'0.2.0.0'
 if ($stageStatsVersion -ne $requiredStageStatsVersion) {
     throw "KRPC.StageStats.dll must be version $requiredStageStatsVersion for v$Version; found $stageStatsVersion. Rebuild the service in Woobies-KRPC-Service-Builder and update its dist/GameData copy."
 }

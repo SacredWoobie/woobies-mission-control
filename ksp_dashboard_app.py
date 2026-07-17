@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 DASHBOARD = HERE / "ksp_mission_dashboard.html"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.1.5"
+APP_VERSION = "0.2.0"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 

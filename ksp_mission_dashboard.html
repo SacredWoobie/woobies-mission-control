@@ -282,6 +282,7 @@
   .dv-grid{display:grid;grid-template-columns:1.25fr 1.25fr 0.7fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
   .dv-grid .stat{align-items:flex-start;padding:9px 10px}
   .dv-grid .stat .v{font-size:17px}
+  .editor-dv-grid{display:none}
   .stage-table{margin-top:2px;display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
   .st-row{display:grid;grid-template-columns:60px 1fr 1fr 1fr;gap:1px;background:var(--rule)}
   .st-row > span{background:var(--panel);padding:4px 8px;font-variant-numeric:tabular-nums;font-size:11px;color:var(--amber)}
@@ -476,6 +477,55 @@
   }
   /* dashboard content dims/locks out behind a scrim */
   body.modal-open .wrap{filter:saturate(.5) brightness(.55);pointer-events:none;user-select:none}
+
+  /* ---- VAB / SPH craft analysis ---- */
+  #editorContext{display:none}
+  #editorContext .body{display:flex;flex-direction:column;gap:10px}
+  .editor-head{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+  .editor-craft{font-size:20px;color:var(--cyan);letter-spacing:.03em;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .editor-facility{font-size:11px;color:var(--amber);letter-spacing:.14em;text-transform:uppercase}
+  .editor-controls{display:grid;grid-template-columns:minmax(150px,1.5fr) 1fr 1fr auto;
+                   gap:8px;align-items:end}
+  .editor-control{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .editor-control select,.editor-control input{
+    width:100%;min-width:0;background:#060a0f;border:1px solid var(--rule-bright);
+    color:var(--amber);font-family:var(--mono);font-size:12px;padding:7px 8px;
+    border-radius:3px;
+  }
+  .editor-control select:focus-visible,.editor-control input:focus-visible{
+    outline:2px solid var(--cyan);outline-offset:1px;
+  }
+  .editor-state{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
+  .editor-state.wait{color:var(--amber)}
+  .editor-state.ok{color:var(--green)}
+  .editor-state.bad{color:var(--warn)}
+
+  body.editor-mode #editorContext{display:block}
+  body.editor-mode .status-strip{display:block!important;background:none;border:0;overflow:visible}
+  body.editor-mode .status-strip #conn{display:block}
+  body.editor-mode .status-strip #conn .body{display:flex!important;align-items:center!important}
+  body.editor-mode .status-strip #clock{display:none!important}
+  body.editor-mode .flight-grid{display:block!important}
+  body.editor-mode .flight-grid > #asc{display:none!important}
+  body.editor-mode .flight-grid > .deck{display:block!important;column-count:1!important}
+  body.editor-mode .wide-left,body.editor-mode .wide-systems{display:none!important}
+  body.editor-mode .wide-mission{display:block!important}
+  body.editor-mode #target{display:none!important}
+  body.editor-mode #stage{display:block;max-width:900px;margin-left:auto;margin-right:auto}
+  body.editor-mode #stageThrottle{display:none}
+  body.editor-mode #dvModeToggle{display:none}
+  body.editor-mode .flight-dv-grid{display:none}
+  body.editor-mode .editor-dv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+  body.editor-mode .editor-dv-grid .stat:last-child{grid-column:3/5}
+  body.editor-mode .st-row{grid-template-columns:56px 1.35fr 1.35fr .85fr .85fr 1fr}
+  @media (max-width:640px){
+    .editor-head{grid-template-columns:1fr}
+    .editor-controls{grid-template-columns:1fr 1fr}
+    .editor-control:first-child{grid-column:1/-1}
+    body.editor-mode .editor-dv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    body.editor-mode .editor-dv-grid .stat:last-child{grid-column:1/-1}
+  }
 </style>
 </head>
 <body>
@@ -498,14 +548,14 @@
   </div>
 </div>
 
-<!-- ============ NO-FLIGHT OVERLAY ============ -->
+<!-- ============ INACTIVE-SCENE OVERLAY ============ -->
 <div class="scrim" id="scrimNoFlight">
   <div class="popout alert">
     <div class="popout-inner">
-      <h3><span class="haz-badge"></span> No Flight in Progress</h3>
-      <div class="sub">Telemetry linked · awaiting active vessel</div>
+      <h3><span class="haz-badge"></span> Awaiting Flight or Editor</h3>
+      <div class="sub">Telemetry linked · open a vessel in Flight, VAB, or SPH</div>
       <div class="big-status">STANDBY</div>
-      <div class="statusline"><span class="led wait"></span><span>Enter a flight scene to resume telemetry</span></div>
+      <div class="statusline"><span class="led wait"></span><span>Flight, VAB, and SPH scenes are supported</span></div>
     </div>
   </div>
 </div>
@@ -553,6 +603,36 @@
   </section>
 
   </div><!-- /status-strip -->
+
+  <!-- ============ EDITOR CRAFT ANALYSIS (VAB / SPH only) ============ -->
+  <section class="panel" id="editorContext">
+    <h2>Craft analysis <span class="tag">VAB · SPH · MechJeb simulation</span></h2>
+    <div class="body">
+      <div class="editor-head">
+        <div>
+          <div class="label">Craft</div>
+          <div class="editor-craft" id="editorCraftName">—</div>
+        </div>
+        <div class="editor-facility" id="editorFacility">EDITOR</div>
+      </div>
+      <div class="editor-controls">
+        <label class="editor-control">
+          <span class="label">Reference body</span>
+          <select id="editorBody"></select>
+        </label>
+        <label class="editor-control">
+          <span class="label">Altitude ASL (m)</span>
+          <input id="editorAltitude" type="number" min="0" step="100" value="0">
+        </label>
+        <label class="editor-control">
+          <span class="label">Mach</span>
+          <input id="editorMach" type="number" min="0" step="0.1" value="0">
+        </label>
+        <button id="editorApply" type="button">Recalculate</button>
+      </div>
+      <div class="editor-state wait" id="editorState">Awaiting editor simulation</div>
+    </div>
+  </section>
 
   <div class="flight-grid">
 
@@ -717,21 +797,30 @@
 
   <!-- ============ STAGING ============ -->
   <section class="panel" id="stage">
-    <h2>Staging analysis <span class="tag">throttle · Δv (kRPC · MechJeb)
+    <h2><span id="stageHeading">Staging analysis</span> <span class="tag"><span id="stageHeaderText">throttle · Δv (kRPC · MechJeb)</span>
       <span id="dvModeToggle" style="cursor:pointer;color:var(--cyan);margin-left:6px">[ATMO]</span></span></h2>
     <div class="body">
       <div class="stage-top">
-        <div class="stage-num"><span class="label">Stage</span><span class="v" id="stageNum">—</span></div>
-        <div class="thr-inline">
+        <div class="stage-num"><span class="label" id="stagePrimaryLabel">Stage</span><span class="v" id="stageNum">—</span></div>
+        <div class="thr-inline" id="stageThrottle">
           <span class="label">Throttle <span id="thrPct2" class="live">0%</span></span>
           <div class="track"><div class="fill" id="thrFill2" style="width:0%"></div></div>
         </div>
       </div>
-      <div class="dv-grid">
+      <div class="dv-grid flight-dv-grid">
         <div class="stat"><span class="label">Stage Δv</span><span class="v" id="dv_stage">—</span></div>
         <div class="stat"><span class="label">Total Δv</span><span class="v" id="dv_total">—</span></div>
         <div class="stat"><span class="label">TWR</span><span class="v" id="dv_twr">—</span></div>
         <div class="stat"><span class="label">Burn time</span><span class="v" id="dv_burn">—</span></div>
+      </div>
+      <div class="dv-grid editor-dv-grid">
+        <div class="stat"><span class="label">Stage Δv · Atmo</span><span class="v" id="ed_dv_stage_atmo">—</span></div>
+        <div class="stat"><span class="label">Stage Δv · Vac</span><span class="v" id="ed_dv_stage_vac">—</span></div>
+        <div class="stat"><span class="label">Total Δv · Atmo</span><span class="v" id="ed_dv_total_atmo">—</span></div>
+        <div class="stat"><span class="label">Total Δv · Vac</span><span class="v" id="ed_dv_total_vac">—</span></div>
+        <div class="stat"><span class="label">Initial TWR · Atmo</span><span class="v" id="ed_twr_atmo">—</span></div>
+        <div class="stat"><span class="label">Initial TWR · Vac</span><span class="v" id="ed_twr_vac">—</span></div>
+        <div class="stat"><span class="label">Burn time</span><span class="v" id="ed_dv_burn">—</span></div>
       </div>
       <div class="stage-table" id="stageTable"></div>
     </div>
@@ -763,7 +852,7 @@
 </div>
 
 <footer class="project-footer" aria-label="Project information">
-  <span>Woobie's Mission Control v0.1.5</span><span class="sep">·</span>
+  <span>Woobie's Mission Control v0.2.0</span><span class="sep">·</span>
   <span>by SacredWoobie</span><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control" target="_blank" rel="noopener noreferrer">GitHub</a><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
@@ -944,6 +1033,8 @@ function connectK(){
   wsK.onclose=()=>{
     connectedK=false;
     hasFlight=false;          // stale once the link drops
+    contextMode="inactive";
+    document.body.classList.remove("editor-mode");
     connectBtnK.textContent="Connect";
     connectBtnK.classList.remove("danger");
     if(wantConnectK){
@@ -961,6 +1052,8 @@ function disconnectK(){
   clearTimeout(reconnectTimerK);
   if(wsK){ wsK.close(); wsK=null; }
   hasFlight=false;
+  contextMode="inactive";
+  document.body.classList.remove("editor-mode");
   setStatusK("","Offline");
 }
 function toggleK(){ (connectedK||wantConnectK) ? disconnectK() : connectK(); }
@@ -969,15 +1062,15 @@ if(connectBtnK2) connectBtnK2.addEventListener("click", toggleK);
 
 /* ---- overlay control ------------------------------------------------------
    Two mutually-exclusive centered pop-outs over a dimmed dashboard:
-     * not linked            -> connect pop-out
-     * linked, but no vessel -> "No Flight in Progress"
-   Linked WITH a vessel -> no overlay, live dashboard. */
-let hasFlight=false;
+     * not linked                 -> connect pop-out
+     * linked, but inactive scene -> "Awaiting Flight or Editor"
+   Linked in Flight, VAB, or SPH -> no overlay, live dashboard. */
+let hasFlight=false, contextMode="inactive";
 const scrimConnect=$("scrimConnect"), scrimNoFlight=$("scrimNoFlight");
 function updateOverlays(){
   const linked = connectedK;
   const showConnect  = !linked;
-  const showNoFlight = linked && !hasFlight;
+  const showNoFlight = linked && contextMode==="inactive";
   if(scrimConnect)  scrimConnect.classList.toggle("show", showConnect);
   if(scrimNoFlight) scrimNoFlight.classList.toggle("show", showNoFlight);
   document.body.classList.toggle("modal-open", showConnect || showNoFlight);
@@ -993,19 +1086,36 @@ if(/[?&]autoconnect=1/.test(location.search)){
 /* The bridge pushes everything on every frame, so this is just a fan-out. */
 let lastKrpcData=null;   // kept so the Δv atmo/vac toggle can repaint on click
 function onDataKrpc(d){
-  // Bridge sends flight.active=false when connected but no vessel is loaded.
-  // Treat an explicit false as "no flight"; missing key (older bridge) is
-  // assumed to be a flight so the dashboard still works.
-  hasFlight = (d["flight.active"] !== false);
+  // New servers name the active context explicitly. Preserve compatibility
+  // with released servers that only publish flight.active.
+  const suppliedMode=d["context.mode"];
+  contextMode = suppliedMode || (d["flight.active"]===false ? "inactive" : "flight");
+  hasFlight = contextMode==="flight";
+  const editorActive = contextMode==="editor";
+  document.body.classList.toggle("editor-mode",editorActive);
   updateOverlays();
+  if(editorActive){
+    if(onDataKrpc._paintedMode!=="editor") nullOutDashboard();
+    onDataKrpc._blanked=false;
+    onDataKrpc._paintedMode="editor";
+    lastKrpcData=d;
+    updateEditorContext(d);
+    updateStaging(d);
+    return;
+  }
   if(!hasFlight){
     // Don't paint stale numbers behind the overlay -- blank the dashboard so a
     // glance behind the dimmed pop-out doesn't show frozen values.
     if(!onDataKrpc._blanked){ nullOutDashboard(); onDataKrpc._blanked=true; }
     lastKrpcData=d;
+    onDataKrpc._paintedMode="inactive";
     return;
   }
   onDataKrpc._blanked=false;
+  onDataKrpc._paintedMode="flight";
+  set("stageHeading","Staging analysis");
+  set("stageHeaderText","throttle · Δv (kRPC · MechJeb) ");
+  set("stagePrimaryLabel","Stage");
 
   lastKrpcData=d;
   updateClocks(d);
@@ -1020,6 +1130,70 @@ function onDataKrpc(d){
   updateTarget(d);
   updateStaging(d);
 }
+
+let lastEditorBodiesSig="";
+function updateEditorContext(d){
+  set("editorCraftName",d["editor.craftName"]||"Untitled Space Craft");
+  set("editorFacility",d["editor.facility"]||"EDITOR");
+  set("stageHeading","Editor staging analysis");
+  set("stageHeaderText","selected conditions · Δv (kRPC · MechJeb) ");
+  set("stagePrimaryLabel","Launch stage");
+
+  const bodies=Array.isArray(d["editor.bodies"])?d["editor.bodies"]:[];
+  const signature=bodies.join("\u0000");
+  const bodySelect=$("editorBody");
+  if(bodySelect && signature!==lastEditorBodiesSig){
+    const options=bodies.map(name=>{
+      const option=document.createElement("option");
+      option.value=name;
+      option.textContent=name;
+      return option;
+    });
+    bodySelect.replaceChildren(...options);
+    lastEditorBodiesSig=signature;
+  }
+  if(bodySelect && d["editor.body"] && document.activeElement!==bodySelect){
+    bodySelect.value=d["editor.body"];
+  }
+
+  const altitude=$("editorAltitude"),mach=$("editorMach");
+  if(altitude && num(d["editor.altitude"]) && document.activeElement!==altitude)
+    altitude.value=String(Math.round(d["editor.altitude"]));
+  if(mach && num(d["editor.mach"]) && document.activeElement!==mach)
+    mach.value=String(Number(d["editor.mach"].toFixed(2)));
+
+  const state=$("editorState");
+  if(!state) return;
+  if(d["stage.available"]===false){
+    state.className="editor-state bad";
+    state.textContent="MechJeb core required on this craft";
+  }else if(d["stage.pending"]===true || d["editor.stable"]===false){
+    state.className="editor-state wait";
+    state.textContent="Calculating · waiting for two matching simulations";
+  }else{
+    state.className="editor-state ok";
+    const revision=num(d["editor.revision"])?` · revision ${d["editor.revision"]}`:"";
+    state.textContent=`Settled${revision}`;
+  }
+}
+
+function sendEditorConditions(){
+  if(!wsK || wsK.readyState!==WebSocket.OPEN || contextMode!=="editor") return;
+  const altitude=Number($("editorAltitude")?.value);
+  const mach=Number($("editorMach")?.value);
+  const command={type:"editor.conditions",body:$("editorBody")?.value};
+  if(Number.isFinite(altitude)) command.altitude=altitude;
+  if(Number.isFinite(mach)) command.mach=mach;
+  wsK.send(JSON.stringify(command));
+  const state=$("editorState");
+  if(state){state.className="editor-state wait";state.textContent="Recalculation requested";}
+}
+$("editorApply").addEventListener("click",sendEditorConditions);
+[$("editorBody"),$("editorAltitude"),$("editorMach")].forEach(control=>{
+  control?.addEventListener("keydown",event=>{
+    if(event.key==="Enter"){event.preventDefault();sendEditorConditions();}
+  });
+});
 
 // Δv atmo/vac toggle in the staging panel header.
 $("dvModeToggle").addEventListener("click",e=>{
@@ -1040,6 +1214,8 @@ function nullOutDashboard(){
     "heatGen","heatRem","heatNet",
     "ecTotal","solarOut","solarEff","rtgOut","otherOut",
     "dv_total","dv_stage","dv_twr","dv_burn","stageNum",
+    "ed_dv_stage_atmo","ed_dv_stage_vac","ed_dv_total_atmo","ed_dv_total_vac",
+    "ed_twr_atmo","ed_twr_vac","ed_dv_burn",
     "sciSub","sciLoc"
   ];
   dash.forEach(id=>set(id,"—"));
@@ -1052,8 +1228,14 @@ function nullOutDashboard(){
 
   const sv=$("sciValue"); if(sv){ sv.className="sci-value blocked"; sv.textContent="no flight"; }
 
-  // clear list/table containers and per-vessel panels
-  ["resRows","reactorList","heatLoops","sciList","stageTable"].forEach(id=>{
+  // Resource rows are generated from res.names. Invalidate the matching
+  // renderer caches with the DOM so a same-craft flight rebuilds its rows.
+  const resRows=$("resRows"); if(resRows) resRows.innerHTML="";
+  RESOURCES=[];
+  lastResSig="";
+
+  // clear the remaining list/table containers and per-vessel panels
+  ["reactorList","heatLoops","sciList","stageTable"].forEach(id=>{
     const el=$(id); if(el) el.innerHTML="";
   });
   const rxSummary=$("reactorSummary"); if(rxSummary) rxSummary.classList.add("hidden");
@@ -1179,8 +1361,9 @@ function updateResource(r,d){
 
 /* ---- staging / delta-V — fed by KRPC.StageStats (MechJeb) via the bridge ----
    The bridge sends stage.stages[] with each row carrying BOTH its array index
-   and its mapped KSP stage number (row.ksp), plus atmo and vac Δv. We label by
-   KSP number (what shows in-game) and pick atmo/vac per the header toggle.
+   and its mapped KSP stage number (row.ksp), plus atmo and vac Δv/TWR. We label
+   by KSP number (what shows in-game). Flight picks one condition with the header
+   toggle; editor planning shows both conditions side by side.
 
    The current-burning stage is the one whose KSP number equals stage.currentKsp
    (equivalently, the highest array index). Zero-Δv rows (pure decouplers, which
@@ -1189,21 +1372,35 @@ function updateResource(r,d){
 function blankStaging(){
   set("dv_total","—"); set("stageNum","—");
   set("dv_stage","—"); set("dv_twr","—"); set("dv_burn","—");
+  ["ed_dv_stage_atmo","ed_dv_stage_vac","ed_dv_total_atmo","ed_dv_total_vac",
+   "ed_twr_atmo","ed_twr_vac","ed_dv_burn"].forEach(id=>set(id,"—"));
   const t=$("stageTable"); if(t) t.innerHTML="";
 }
 function updateStaging(d){
   // stage.available is explicitly false when MechJeb isn't on the vessel;
   // undefined means we simply haven't heard yet (leave the panel as-is).
+  if(d["stage.pending"]===true){ blankStaging(); return; }
   if(d["stage.available"]===false){ blankStaging(); return; }
   const stages = Array.isArray(d["stage.stages"]) ? d["stage.stages"] : null;
   if(!stages){ if(d["stage.available"]===true) blankStaging(); return; }
 
+  const editorDual = contextMode==="editor";
+  const atmoTwrOf = s => num(s.twrAtmo) ? s.twrAtmo : s.twr;
+  const vacTwrOf = s => num(s.twrVac) ? s.twrVac : s.twr;
   const dvOf = s => stageVac ? s.dvVac : s.dvAtmo;
-  const total = stageVac ? d["stage.totalDvVac"] : d["stage.totalDvAtmo"];
-  set("dv_total", num(total)?dvfmt(total)+" m/s":"—");
+  const twrOf = s => stageVac ? vacTwrOf(s) : atmoTwrOf(s);
+  if(!editorDual){
+    const total = stageVac ? d["stage.totalDvVac"] : d["stage.totalDvAtmo"];
+    set("dv_total",num(total)?dvfmt(total)+" m/s":"—");
+  }else{
+    set("ed_dv_total_atmo",num(d["stage.totalDvAtmo"])?dvfmt(d["stage.totalDvAtmo"])+" m/s":"—");
+    set("ed_dv_total_vac",num(d["stage.totalDvVac"])?dvfmt(d["stage.totalDvVac"])+" m/s":"—");
+  }
 
   // Propulsive stages only, for the readout + table.
-  const rows = stages.filter(s => num(dvOf(s)) && dvOf(s) > 0.5);
+  const rows = stages.filter(s => editorDual
+    ? (num(s.dvAtmo) && s.dvAtmo > 0.5) || (num(s.dvVac) && s.dvVac > 0.5)
+    : num(dvOf(s)) && dvOf(s) > 0.5);
 
   // Current stage: the row matching stage.currentKsp. Only fall back to the
   // highest KSP number when the current-stage key itself is absent; a known
@@ -1214,27 +1411,48 @@ function updateStaging(d){
 
   if(cur){
     set("stageNum", cur.ksp);
-    set("dv_stage", dvfmt(dvOf(cur))+" m/s");
-    set("dv_twr",   num(cur.twr)?cur.twr.toFixed(2):"—");
-    set("dv_burn",  num(cur.burn)?hms(cur.burn):"—");
+    if(editorDual){
+      set("ed_dv_stage_atmo",num(cur.dvAtmo)?dvfmt(cur.dvAtmo)+" m/s":"—");
+      set("ed_dv_stage_vac",num(cur.dvVac)?dvfmt(cur.dvVac)+" m/s":"—");
+      set("ed_twr_atmo",num(atmoTwrOf(cur))?atmoTwrOf(cur).toFixed(2):"—");
+      set("ed_twr_vac",num(vacTwrOf(cur))?vacTwrOf(cur).toFixed(2):"—");
+      set("ed_dv_burn",num(cur.burn)?hms(cur.burn):"—");
+    }else{
+      set("dv_stage",dvfmt(dvOf(cur))+" m/s");
+      set("dv_twr",num(twrOf(cur))?twrOf(cur).toFixed(2):"—");
+      set("dv_burn",num(cur.burn)?hms(cur.burn):"—");
+    }
   }else if(curKsp!=null){
     // current stage carries no propulsion (e.g. a payload/coast stage)
     set("stageNum", curKsp);
     set("dv_stage","—"); set("dv_twr","—"); set("dv_burn","—");
+    set("ed_dv_stage_atmo","—"); set("ed_dv_stage_vac","—");
+    set("ed_twr_atmo","—"); set("ed_twr_vac","—"); set("ed_dv_burn","—");
   }else{
     set("stageNum","—"); set("dv_stage","—"); set("dv_twr","—"); set("dv_burn","—");
+    set("ed_dv_stage_atmo","—"); set("ed_dv_stage_vac","—");
+    set("ed_twr_atmo","—"); set("ed_twr_vac","—"); set("ed_dv_burn","—");
   }
 
   const t=$("stageTable");
   if(!rows.length){ t.innerHTML=""; return; }
-  let html=`<div class="st-row st-head"><span>Stage</span><span>Δv m/s</span><span>TWR</span><span>Burn</span></div>`;
+  let html=editorDual
+    ? `<div class="st-row st-head"><span>Stage</span><span>Δv atmo</span><span>Δv vac</span><span>TWR atmo</span><span>TWR vac</span><span>Burn</span></div>`
+    : `<div class="st-row st-head"><span>Stage</span><span>Δv m/s</span><span>TWR</span><span>Burn</span></div>`;
   rows.sort((a,b)=> STAGE_DESC ? b.ksp-a.ksp : a.ksp-b.ksp);
   for(const r of rows){
     const isCur=cur&&r.ksp===cur.ksp;
-    html+=`<div class="st-row${isCur?' cur':''}"><span class="sname">${isCur?'▶ ':''}S${r.ksp}</span>`+
-          `<span>${dvfmt(dvOf(r))}</span>`+
-          `<span>${num(r.twr)?r.twr.toFixed(2):'—'}</span>`+
-          `<span>${num(r.burn)?hms(r.burn):'—'}</span></div>`;
+    html+=`<div class="st-row${isCur?' cur':''}"><span class="sname">${isCur?'▶ ':''}S${r.ksp}</span>`;
+    if(editorDual){
+      html+=`<span>${num(r.dvAtmo)?dvfmt(r.dvAtmo):'—'}</span>`+
+            `<span>${num(r.dvVac)?dvfmt(r.dvVac):'—'}</span>`+
+            `<span>${num(atmoTwrOf(r))?atmoTwrOf(r).toFixed(2):'—'}</span>`+
+            `<span>${num(vacTwrOf(r))?vacTwrOf(r).toFixed(2):'—'}</span>`;
+    }else{
+      html+=`<span>${dvfmt(dvOf(r))}</span>`+
+            `<span>${num(twrOf(r))?twrOf(r).toFixed(2):'—'}</span>`;
+    }
+    html+=`<span>${num(r.burn)?hms(r.burn):'—'}</span></div>`;
   }
   t.innerHTML=html;
 }
