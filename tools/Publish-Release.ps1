@@ -106,6 +106,7 @@ $sourceFiles = @(
     @{ Source = 'requirements.txt'; Destination = 'Dashboard/requirements.txt' },
     @{ Source = 'telemetry_server.py'; Destination = 'Dashboard/telemetry_server.py' },
     @{ Source = 'LICENSE'; Destination = 'LICENSE' },
+    @{ Source = 'QUICKSTART.txt'; Destination = 'QUICKSTART.txt' },
     @{ Source = 'README.md'; Destination = 'README.md' },
     @{ Source = 'docs/CONTROL_PAD_PROTOCOL.md'; Destination = 'docs/CONTROL_PAD_PROTOCOL.md' },
     @{ Source = 'docs/images/dashboard-overview.png'; Destination = 'docs/images/dashboard-overview.png' },
@@ -129,7 +130,7 @@ foreach ($file in $dllFiles) {
     Assert-RequiredFile (Join-Path $GameDataPath $file.Source)
 }
 
-# v0.2.0 requires the editor-capable StageStats service. Older release DLLs do
+# v0.2.x requires the editor-capable StageStats service. Older release DLLs do
 # not expose the VAB/SPH planning API or the corrected initial-TWR calculation.
 # Fail before packaging instead of silently producing a flight-only release.
 $stageStatsDll = Join-Path $GameDataPath 'KRPC.StageStats/KRPC.StageStats.dll'

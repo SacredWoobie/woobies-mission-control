@@ -2,6 +2,17 @@
 
 All notable public changes will be recorded here.
 
+## v0.2.1 - Simplified Windows setup
+
+- Added automatic first-run creation and repair of the isolated Python
+  environment, removing the normal need to copy setup commands from the README.
+- Added a non-blocking, cached GitHub release check to the launcher with manual
+  refresh, a release-page link, and a control for disabling automatic checks.
+- Added a packaged `QUICKSTART.txt` and made the automatic setup path primary in
+  the README while retaining manual commands as a troubleshooting fallback.
+- Continued to package the v0.2.0 KSP service DLLs without changing telemetry,
+  dashboard schema, or in-game behavior.
+
 ## v0.2.0 - Editor craft planning
 
 - Added MechJeb-backed stage analysis in the VAB and SPH with selectable

@@ -14,11 +14,16 @@ The launcher itself uses only the Python standard library. Each optional script
 is responsible for its own dependencies.
 """
 
+import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
+import time
+import urllib.parse
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -30,9 +35,26 @@ HERE = Path(__file__).resolve().parent
 DASHBOARD = HERE / "ksp_mission_dashboard.html"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.2.1"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
+LATEST_RELEASE_API = (
+    "https://api.github.com/repos/SacredWoobie/"
+    "woobies-mission-control/releases/latest"
+)
+UPDATE_CACHE_SECONDS = 24 * 60 * 60
+UPDATE_TIMEOUT_SECONDS = 4
+_VERSION_TAG = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+
+
+def _default_update_state_path():
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data) / "WoobiesMissionControl" / "update_state.json"
+    return Path.home() / ".woobies-mission-control" / "update_state.json"
+
+
+UPDATE_STATE_PATH = _default_update_state_path()
 
 # Add future optional programs here. The GUI will expose a component only when
 # its script is present beside this launcher.
@@ -55,6 +77,109 @@ COMPONENTS = (
 
 # Prevent child processes from opening extra console windows on Windows.
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+
+
+def parse_version_tag(tag):
+    """Return a comparable three-part version tuple, or ``None``."""
+    if not isinstance(tag, str):
+        return None
+    match = _VERSION_TAG.fullmatch(tag.strip())
+    if not match:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def classify_release(current_version, latest_tag):
+    """Classify *latest_tag* as current, available, or behind this build."""
+    current = parse_version_tag(current_version)
+    latest = parse_version_tag(latest_tag)
+    if current is None or latest is None:
+        raise ValueError("release versions must use vMAJOR.MINOR.PATCH")
+    if latest > current:
+        return "available"
+    if latest < current:
+        return "development"
+    return "current"
+
+
+def validate_release_payload(payload):
+    """Validate and return the update fields used from a GitHub response."""
+    if not isinstance(payload, dict):
+        raise ValueError("GitHub returned an invalid release response")
+
+    tag_name = payload.get("tag_name")
+    html_url = payload.get("html_url")
+    if parse_version_tag(tag_name) is None:
+        raise ValueError("the latest release tag is not vMAJOR.MINOR.PATCH")
+    if not isinstance(html_url, str):
+        raise ValueError("the latest release does not have a web address")
+
+    parsed = urllib.parse.urlparse(html_url)
+    expected_path = "/sacredwoobie/woobies-mission-control/releases/"
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc.lower() != "github.com"
+        or not parsed.path.lower().startswith(expected_path)
+    ):
+        raise ValueError("the latest release has an unexpected web address")
+
+    return {"tag_name": tag_name.strip(), "html_url": html_url}
+
+
+def fetch_latest_release(opener=urllib.request.urlopen, timeout=UPDATE_TIMEOUT_SECONDS):
+    """Fetch and validate the latest stable public GitHub release."""
+    request = urllib.request.Request(
+        LATEST_RELEASE_API,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"Woobies-Mission-Control/{APP_VERSION}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    with opener(request, timeout=timeout) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    return validate_release_payload(payload)
+
+
+def load_update_state(path=UPDATE_STATE_PATH):
+    """Load cached update state, returning an empty state on any error."""
+    try:
+        state = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return state if isinstance(state, dict) else {}
+
+
+def save_update_state(state, path=UPDATE_STATE_PATH):
+    """Atomically save update preferences and the last successful result."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(state, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def get_fresh_cached_release(state, now=None, max_age=UPDATE_CACHE_SECONDS):
+    """Return a validated cached release if it is recent enough."""
+    if not isinstance(state, dict):
+        return None
+    if state.get("app_version") != APP_VERSION:
+        return None
+    checked_at = state.get("last_checked")
+    if not isinstance(checked_at, (int, float)):
+        return None
+    if now is None:
+        now = time.time()
+    age = now - checked_at
+    if age < 0 or age > max_age:
+        return None
+    try:
+        return validate_release_payload(state)
+    except ValueError:
+        return None
 
 
 def discover_components(directory=HERE):
@@ -138,11 +263,17 @@ class Backend:
 
 
 class App:
-    def __init__(self, root):
+    def __init__(self, root, update_state_path=UPDATE_STATE_PATH):
         self.root = root
         self.log_queue = queue.Queue()
+        self.update_queue = queue.Queue()
         self.backends = []
         self.backend_rows = []
+        self.update_state_path = Path(update_state_path)
+        self.update_state = load_update_state(self.update_state_path)
+        self.update_generation = 0
+        self.update_checking = False
+        self.latest_release_url = None
 
         root.title(f"{APP_NAME} v{APP_VERSION}")
         root.minsize(600, 360)
@@ -159,6 +290,38 @@ class App:
         tk.Button(header, text="About", width=8, command=self._show_about).pack(
             side="right"
         )
+
+        update_bar = tk.Frame(root)
+        update_bar.pack(fill="x", padx=10, pady=(2, 4))
+        self.update_status = tk.Label(
+            update_bar,
+            text="Update status: waiting",
+            fg="#666",
+            anchor="w",
+        )
+        self.update_status.pack(side="left", fill="x", expand=True)
+        self.view_release_button = tk.Button(
+            update_bar,
+            text="View release",
+            state="disabled",
+            command=self._open_latest_release,
+        )
+        self.view_release_button.pack(side="right", padx=(4, 0))
+        self.check_updates_button = tk.Button(
+            update_bar,
+            text="Check now",
+            command=lambda: self._start_update_check(use_cache=False),
+        )
+        self.check_updates_button.pack(side="right", padx=(4, 0))
+        self.check_updates_var = tk.BooleanVar(
+            value=self.update_state.get("check_enabled", True) is not False
+        )
+        tk.Checkbutton(
+            update_bar,
+            text="Check automatically",
+            variable=self.check_updates_var,
+            command=self._toggle_automatic_updates,
+        ).pack(side="right", padx=(4, 0))
 
         components = discover_components()
         if components:
@@ -189,7 +352,12 @@ class App:
             self._enqueue("launcher", f"available components: {names}")
 
         self._drain_log()
+        self._drain_update_queue()
         self._refresh()
+        if self.check_updates_var.get():
+            self.root.after(300, lambda: self._start_update_check(use_cache=True))
+        else:
+            self.update_status.config(text="Automatic update checks are off")
 
     def _add_component(self, component):
         script = HERE / component["script"]
@@ -252,6 +420,112 @@ class App:
         except queue.Empty:
             pass
         self.root.after(100, self._drain_log)
+
+    def _start_update_check(self, use_cache):
+        if self.update_checking:
+            return
+
+        if use_cache:
+            cached = get_fresh_cached_release(self.update_state)
+            if cached is not None:
+                self._apply_release_status(cached)
+                return
+
+        self.update_generation += 1
+        generation = self.update_generation
+        self.update_checking = True
+        self.update_status.config(text="Checking GitHub for updates…", fg="#666")
+        self.check_updates_button.config(state="disabled")
+
+        def worker():
+            try:
+                release = fetch_latest_release()
+            except Exception as exc:
+                self.update_queue.put((generation, "error", str(exc)))
+            else:
+                self.update_queue.put((generation, "release", release))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _drain_update_queue(self):
+        try:
+            while True:
+                generation, result_type, result = self.update_queue.get_nowait()
+                if generation != self.update_generation:
+                    continue
+
+                self.update_checking = False
+                self.check_updates_button.config(state="normal")
+                if result_type == "release":
+                    self.update_state.update(result)
+                    self.update_state["app_version"] = APP_VERSION
+                    self.update_state["last_checked"] = time.time()
+                    self.update_state["check_enabled"] = self.check_updates_var.get()
+                    self._save_update_state()
+                    self._apply_release_status(result)
+                else:
+                    self.update_status.config(
+                        text="Couldn’t check for updates (offline is OK)",
+                        fg="#666",
+                    )
+                    self._enqueue("updates", f"update check unavailable: {result}")
+        except queue.Empty:
+            pass
+        self.root.after(100, self._drain_update_queue)
+
+    def _apply_release_status(self, release):
+        tag_name = release["tag_name"]
+        self.latest_release_url = release["html_url"]
+        self.view_release_button.config(state="normal")
+
+        status = classify_release(APP_VERSION, tag_name)
+        if status == "available":
+            self.update_status.config(
+                text=f"Update available: {tag_name}",
+                fg="#1a5fb4",
+            )
+            self._enqueue(
+                "updates",
+                f"{tag_name} is available; use View release to review it.",
+            )
+        elif status == "development":
+            self.update_status.config(
+                text=f"Development build—newer than published {tag_name}",
+                fg="#8a6d1d",
+            )
+        else:
+            self.update_status.config(
+                text=f"Mission Control is up to date ({tag_name})",
+                fg="#2a8a3a",
+            )
+
+    def _toggle_automatic_updates(self):
+        enabled = self.check_updates_var.get()
+        self.update_state["check_enabled"] = enabled
+        self._save_update_state()
+
+        if enabled:
+            self._start_update_check(use_cache=True)
+            return
+
+        self.update_generation += 1
+        self.update_checking = False
+        self.check_updates_button.config(state="normal")
+        self.update_status.config(text="Automatic update checks are off", fg="#666")
+
+    def _save_update_state(self):
+        try:
+            save_update_state(self.update_state, self.update_state_path)
+        except OSError as exc:
+            self._enqueue("updates", f"couldn't save update preferences: {exc}")
+
+    def _open_latest_release(self):
+        if not self.latest_release_url:
+            return
+        try:
+            webbrowser.open(self.latest_release_url)
+        except Exception as exc:
+            self._enqueue("updates", f"couldn't open the release page: {exc}")
 
     def _toggle(self, backend, open_dashboard):
         if backend.running():

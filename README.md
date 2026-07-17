@@ -1,6 +1,11 @@
 # Woobie's Mission Control
 
-Current release: **v0.2.0**
+Current release: **v0.2.1**
+
+For the fastest Windows release setup, start with
+[`QUICKSTART.txt`](QUICKSTART.txt). It covers the `GameData` copy and automatic
+first-run dashboard setup; the full component, compatibility, and
+troubleshooting details remain below.
 
 A modular mission dashboard and optional ESP32 control-pad bridge for Kerbal
 Space Program 1, powered by [kRPC](https://krpc.github.io/krpc/).
@@ -167,36 +172,41 @@ For the ESP32 control pad, also keep:
 - `panel_bridge.py`
 - `firmware/KSP_control.ino` when programming or modifying the panel
 
-### 3. Create a Python environment
+### 3. Run the automatic first-time setup
 
-Choose the folder that contains `Start KSP Dashboard.bat` and the requirements
-files:
+Python 3.14 is required for the current release. Open the folder that contains
+`Start KSP Dashboard.bat`:
 
 - In the complete release ZIP, this is the extracted `Dashboard` folder—not the
   package's top-level folder.
 - In a source checkout, this is the repository root.
 
-Open Command Prompt or PowerShell in that folder and run:
+Double-click `Start KSP Dashboard.bat`. On the first run, approve the setup
+prompt. The launcher creates `.venv`, installs all dashboard and control-pad
+dependencies into that isolated folder, verifies them, and then opens Mission
+Control. It does not install, upgrade, or remove packages in the system Python
+environment.
+
+If setup is interrupted, run the launcher again. It will reuse and repair the
+local environment without requiring Python to be reinstalled. Setup details are
+written to `mission_control_setup.log`; review that file before sharing it
+because it can contain local paths.
+
+For a read-only diagnostic from Command Prompt, run:
+
+```bat
+"Start KSP Dashboard.bat" --check
+```
+
+For source development or manual troubleshooting, the equivalent commands are:
 
 ```bat
 py -3.14 -m venv .venv
-```
-
-Install only the dependencies for the component you want:
-
-```bat
-rem Dashboard only
-.venv\Scripts\python.exe -m pip install -r requirements-dashboard.txt
-
-rem ESP32 panel only
-.venv\Scripts\python.exe -m pip install -r requirements-panel.txt
-
-rem Everything
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-The launcher automatically uses `.venv` when that folder is beside
-`Start KSP Dashboard.bat`.
+The component-specific requirements files remain available to developers who
+do not want the complete environment.
 
 ### 4. Start KSP and the tools
 
@@ -224,6 +234,12 @@ in Arduino IDE.
 
 ## Network and safety notes
 
+- By default, the launcher makes one cached HTTPS request per day to GitHub's
+  public Releases API to report whether a newer stable release is available.
+  It sends no authentication token or Mission Control telemetry. Automatic
+  checks can be disabled in the launcher, and `Check now` remains available.
+  The preference and last successful result are stored under
+  `%LOCALAPPDATA%\WoobiesMissionControl` on Windows.
 - Keep the telemetry server bound to `127.0.0.1` unless you intentionally need
   another device on your trusted local network to view it.
 - The WebSocket feed is read-only but has no authentication or encryption. Do
@@ -241,6 +257,12 @@ in Arduino IDE.
 
 Make sure `telemetry_server.py` and/or `panel_bridge.py` is in the same folder as
 `ksp_dashboard_app.py`. Only installed components are displayed.
+
+### The launcher could not check for updates
+
+Update checks require internet access to `api.github.com`. A failed check does
+not affect Mission Control or its local KSP connection; use `Check now` later or
+open the project page from the About dialog.
 
 ### The dashboard says it is offline
 
@@ -290,7 +312,7 @@ From a clean, up-to-date `main` checkout, first create and audit the package
 without changing anything on GitHub:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.1
 ```
 
 The script writes the ZIP, SHA-256 checksum, and generated release notes to the
@@ -310,7 +332,7 @@ Open a new PowerShell window after installation, authenticate once with
 `gh auth login`, and then rerun:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.0 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.1 -CreateDraftRelease
 ```
 
 The release remains private as a draft until it is reviewed and published on
