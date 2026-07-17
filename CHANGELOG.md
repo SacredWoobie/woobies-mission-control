@@ -2,6 +2,19 @@
 
 All notable public changes will be recorded here.
 
+## v0.2.0 - Editor craft planning
+
+- Added MechJeb-backed stage analysis in the VAB and SPH with selectable
+  reference body, altitude above sea level, and Mach.
+- Displayed atmospheric and vacuum delta-v and initial TWR side by side in
+  editor planning while preserving the compact flight condition toggle.
+- Updated `KRPC.StageStats` to `0.2.0`, including corrected initial-TWR values
+  and editor simulation lifecycle support.
+- Rebuilt consumable rows and stage snapshots across launches, scene changes,
+  dashboard reconnects, and reverts without showing stale pre-revert values.
+- Added opt-in StageStats lifecycle tracing, a raw service probe, and browser
+  and telemetry regression coverage for the diagnosed failure paths.
+
 ## v0.1.5 - Revert-safe staging analysis
 
 - Invalidated the private `KRPC.StageStats` MechJeb-module cache when KSP

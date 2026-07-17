@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard consumables lifecycle regression</title>
+</head>
+<body>
+  <h1>Dashboard consumables lifecycle regression</h1>
+  <pre id="result">Running…</pre>
+  <iframe id="dashboard" src="../ksp_mission_dashboard.html" hidden></iframe>
+  <script>
+    const result = document.getElementById("result");
+    const frame = document.getElementById("dashboard");
+
+    function assert(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+
+    frame.addEventListener("load", () => {
+      try {
+        const dashboard = frame.contentWindow;
+        const document = frame.contentDocument;
+        const payload = {
+          "res.names": ["LiquidFuel", "Oxidizer"],
+          "r.resource[LiquidFuel]": 90,
+          "r.resourceMax[LiquidFuel]": 100,
+          "r.resourceCurrent[LiquidFuel]": 45,
+          "r.resourceCurrentMax[LiquidFuel]": 50,
+          "r.resource[Oxidizer]": 110,
+          "r.resourceMax[Oxidizer]": 120,
+          "r.resourceCurrent[Oxidizer]": 55,
+          "r.resourceCurrentMax[Oxidizer]": 60,
+          "res.stageKnown": true
+        };
+
+        dashboard.updateResources(payload);
+        assert(document.querySelectorAll("#resRows .res-row").length === 2,
+          "initial flight did not build consumable rows");
+
+        // Exercise the failure sequence: flight -> inactive/editor DOM reset
+        // -> same-craft flight with an unchanged res.names signature.
+        dashboard.nullOutDashboard();
+        assert(document.querySelectorAll("#resRows .res-row").length === 0,
+          "lifecycle reset did not clear consumable rows");
+
+        dashboard.updateResources(payload);
+        assert(document.querySelectorAll("#resRows .res-row").length === 2,
+          "same-craft flight did not rebuild consumable rows");
+        assert(document.getElementById("rtv_LiquidFuel").textContent !== "—",
+          "rebuilt LiquidFuel row did not receive values");
+
+        result.textContent = "PASS: consumables rebuild after a lifecycle reset with unchanged resource names.";
+        result.dataset.status = "pass";
+      } catch (error) {
+        result.textContent = `FAIL: ${error.stack || error}`;
+        result.dataset.status = "fail";
+      }
+    });
+  </script>
+</body>
+</html>

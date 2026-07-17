@@ -1,6 +1,6 @@
 # Woobie's Mission Control
 
-Current release: **v0.1.5**
+Current release: **v0.2.0**
 
 A modular mission dashboard and optional ESP32 control-pad bridge for Kerbal
 Space Program 1, powered by [kRPC](https://krpc.github.io/krpc/).
@@ -41,6 +41,7 @@ a control-pad start button.
 - Flight and orbit instruments, navball, throttle, clocks, and sparklines
 - Vessel-total and current-stage resources
 - MechJeb atmospheric/vacuum delta-v, TWR, and burn-time staging analysis
+- VAB/SPH craft planning with selectable body, altitude, and Mach conditions
 - Stock CommNet data with optional RemoteTech signal delay
 - Recoverable and transmittable science, including science-container contents
 - System Heat loop temperatures, generation, rejection, and net heat
@@ -57,8 +58,9 @@ a control-pad start button.
 The science panel totals recoverable and transmittable science aboard the active
 vessel, including experiments moved into stock science containers. It also
 reports experiment count, biome, situation, and career science already banked
-at the KSC. The staging panel presents atmospheric or vacuum delta-v, TWR, burn
-time, throttle, and a per-stage breakdown using MechJeb simulation data.
+at the KSC. In flight, the staging panel presents a compact atmospheric/vacuum
+toggle for delta-v and TWR. In the VAB and SPH, the planning view shows both
+conditions side by side and can simulate a selected body, altitude, and Mach.
 
 Stored-science reporting uses `KRPC.VesselScience`. Full staging analysis uses
 MechJeb 2, KRPC.MechJeb, and `KRPC.StageStats`.
@@ -102,7 +104,7 @@ still need confirmation before release.
 | MechJeb 2 | `2.14.3.0` |
 | KRPC.MechJeb | `0.7.1` |
 | KRPC.SystemHeat service | `0.2.0` |
-| KRPC.StageStats service | `0.1.2` |
+| KRPC.StageStats service | `0.2.0` |
 | KRPC.VesselScience service | `0.1.0` |
 | System Heat | `0.9.1` |
 | Near Future Electrical | `2.0.8` |
@@ -272,7 +274,7 @@ From a clean, up-to-date `main` checkout, first create and audit the package
 without changing anything on GitHub:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.5
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.0
 ```
 
 The script writes the ZIP, SHA-256 checksum, and generated release notes to the
@@ -292,7 +294,7 @@ Open a new PowerShell window after installation, authenticate once with
 `gh auth login`, and then rerun:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.1.5 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.0 -CreateDraftRelease
 ```
 
 The release remains private as a draft until it is reviewed and published on

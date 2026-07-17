@@ -3,6 +3,7 @@
 This module owns every dashboard-facing responsibility:
   * its own kRPC connection and reconnect loop
   * flight, orbit, resource, science, heat, electricity, target, and stage data
+  * VAB/SPH craft stage analysis and editor-condition selection
   * the WebSocket server consumed by ksp_mission_dashboard.html
 
 It has no ESP32, serial-port, staging, abort, or panel-control dependencies.
@@ -13,8 +14,12 @@ Requires:  pip install krpc websockets
 
 Optional args: telemetry_server.py [host] [port]
   telemetry_server.py 0.0.0.0 8090
+
+Set WOOBIE_STAGE_TRACE=1 to emit opt-in StageStats lifecycle diagnostics.
 """
+import json
 import math
+import os
 import sys
 import time
 import krpc
@@ -31,6 +36,9 @@ RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
+STAGE_TRACE_ENABLED = os.environ.get("WOOBIE_STAGE_TRACE", "").casefold() in {
+    "1", "true", "yes", "on",
+}
 
 # KSP Recall exposes these internal refund-bookkeeping resources through kRPC.
 # They are implementation details, not vessel consumables. Match normalized
@@ -54,6 +62,18 @@ _tgt_last_poll = 0.0
 _stage_cache = {}
 _stage_last_poll = 0.0
 _stage_last_ut = None
+_stage_trace_last_published = None
+
+# MechJeb recalculates editor craft asynchronously. The service exposes an
+# editor_stable flag; the server also requires two matching snapshots before
+# publishing a changed craft/environment to the dashboard.
+_editor_revision = None
+_editor_bodies_cache = []
+_editor_stage_cache = {}
+_editor_stage_last_poll = 0.0
+_editor_stage_candidate = None
+_editor_stage_candidate_hits = 0
+_telemetry_mode = None
 
 # Current-stage resource ownership is inferred only when one decouple group
 # contains multiple engine stages. Cache the part assignment until the vessel
@@ -79,6 +99,48 @@ def connect_krpc(name):
     conn = krpc.connect(name=name)
     print(f"Connected to kRPC ({name}).")
     return conn
+
+
+def _stage_summary(snapshot):
+    """Return the small StageStats state needed for lifecycle diagnostics."""
+    if not isinstance(snapshot, dict):
+        return {}
+    rows = snapshot.get("stage.stages")
+    return {
+        "available": snapshot.get("stage.available"),
+        "complete": snapshot.get("stage.complete"),
+        "pending": snapshot.get("stage.pending"),
+        "count": snapshot.get("stage.count"),
+        "currentKsp": snapshot.get("stage.currentKsp"),
+        "rows": len(rows) if isinstance(rows, list) else None,
+    }
+
+
+def _stage_trace(event, **fields):
+    """Emit one compact JSON diagnostic when StageStats tracing is enabled."""
+    if not STAGE_TRACE_ENABLED:
+        return
+    record = {
+        "event": event,
+        "wallTime": round(time.time(), 3),
+    }
+    record.update(fields)
+    print("[stage-trace] " + json.dumps(record, sort_keys=True, default=str),
+          flush=True)
+
+
+def _trace_stage_publish(snapshot, source):
+    """Trace only stage-state transitions, not every 4 Hz telemetry frame."""
+    global _stage_trace_last_published
+    if not STAGE_TRACE_ENABLED:
+        return
+    summary = _stage_summary(snapshot)
+    signature = tuple(summary.get(key) for key in (
+        "available", "complete", "pending", "count", "currentKsp", "rows",
+    ))
+    if signature != _stage_trace_last_published:
+        _stage_trace_last_published = signature
+        _stage_trace("publish_transition", source=source, stage=summary)
 
 
 # ---------------------------------------------------------------------------
@@ -539,16 +601,21 @@ def _gather_target(conn, vessel):
 # The custom service pumps MechJeb's async sim on every read. Prime it, allow
 # MechJeb's 100 ms flight refresh window to complete, then take one snapshot.
 # ---------------------------------------------------------------------------
-def _gather_stages(conn):
+def _gather_stages(conn, source="flight"):
     try:
         ss = conn.stage_stats
-    except Exception:
+    except Exception as exc:
+        _stage_trace("service_missing", source=source,
+                     error=type(exc).__name__, message=str(exc))
         return {}  # service DLL not installed this session
 
     try:
         if not ss.available:
+            _stage_trace("service_unavailable", source=source)
             return {"stage.available": False}  # MechJeb not on this vessel
-    except Exception:
+    except Exception as exc:
+        _stage_trace("availability_error", source=source,
+                     error=type(exc).__name__, message=str(exc))
         return {}
 
     out = {"stage.available": True}
@@ -557,7 +624,7 @@ def _gather_stages(conn):
         # new asynchronous simulation. Waiting past MechJeb's 100 ms refresh
         # interval lets the second call collect that new result before we read
         # its individual fields.
-        ss.stage_count()
+        prime_count = int(ss.stage_count())
         time.sleep(STAGE_SETTLE_SECONDS)
         count = int(ss.stage_count())
         current_ksp = int(ss.current_stage())
@@ -568,6 +635,11 @@ def _gather_stages(conn):
         # continuing to show rows from the previous staging state.
         expected_count = max(0, current_ksp + 1)
         if count != expected_count:
+            _stage_trace(
+                "service_sample", source=source, primeCount=prime_count,
+                count=count, currentKsp=current_ksp,
+                expectedCount=expected_count, complete=False,
+            )
             return {
                 "stage.available": True,
                 "stage.complete": False,
@@ -585,6 +657,8 @@ def _gather_stages(conn):
         for i in range(count):
             dv_atmo = ss.stage_delta_v(i, False)
             dv_vac = ss.stage_delta_v(i, True)
+            twr_atmo = ss.stage_twr(i, False)
+            twr_vac = ss.stage_twr(i, True)
             total_atmo += dv_atmo
             total_vac += dv_vac
             stages.append({
@@ -592,7 +666,11 @@ def _gather_stages(conn):
                 "ksp": i,
                 "dvAtmo": round(dv_atmo, 1),
                 "dvVac": round(dv_vac, 1),
-                "twr": round(ss.stage_twr(i, False), 2),
+                # Keep `twr` as the atmospheric alias so released dashboards
+                # and any external consumers remain compatible.
+                "twr": round(twr_atmo, 2),
+                "twrAtmo": round(twr_atmo, 2),
+                "twrVac": round(twr_vac, 2),
                 "burn": round(ss.stage_burn_time(i, False), 1),
             })
         out["stage.stages"] = stages
@@ -601,16 +679,163 @@ def _gather_stages(conn):
 
         # If staging or a scene change happened while the individual RPCs were
         # being read, discard the mixed snapshot and retry on the next poll.
-        if int(ss.stage_count()) != count or int(ss.current_stage()) != current_ksp:
+        final_count = int(ss.stage_count())
+        final_current_ksp = int(ss.current_stage())
+        if final_count != count or final_current_ksp != current_ksp:
+            _stage_trace(
+                "mixed_service_sample", source=source,
+                primeCount=prime_count, count=count,
+                currentKsp=current_ksp, finalCount=final_count,
+                finalCurrentKsp=final_current_ksp,
+            )
             return {
                 "stage.available": True,
                 "stage.complete": False,
                 "stage.stages": [],
             }
-    except Exception:
+        _stage_trace(
+            "service_sample", source=source, primeCount=prime_count,
+            count=count, currentKsp=current_ksp,
+            expectedCount=expected_count, complete=True, rows=len(stages),
+        )
+    except Exception as exc:
+        _stage_trace("service_read_error", source=source,
+                     error=type(exc).__name__, message=str(exc))
         return {}  # mid-scene-change / sim not ready; retain last good cache
 
     return out
+
+
+def _stage_signature(result):
+    """Return a compact signature for recognizing a settled MechJeb result."""
+    rows = result.get("stage.stages") if isinstance(result, dict) else None
+    if not isinstance(rows, list) or result.get("stage.complete") is not True:
+        return None
+    return tuple(
+        (
+            row.get("index"), row.get("ksp"), row.get("dvAtmo"),
+            row.get("dvVac"), row.get("twrAtmo"), row.get("twrVac"),
+            row.get("burn"),
+        )
+        for row in rows
+    )
+
+
+def _reset_editor_stage_state(revision=None):
+    global _editor_revision, _editor_stage_cache, _editor_stage_last_poll
+    global _editor_stage_candidate, _editor_stage_candidate_hits
+    _editor_revision = revision
+    _editor_stage_cache = {}
+    _editor_stage_last_poll = 0.0
+    _editor_stage_candidate = None
+    _editor_stage_candidate_hits = 0
+
+
+def _gather_editor_telemetry(conn, facility):
+    """Gather the focused VAB/SPH payload from KRPC.StageStats."""
+    global _editor_revision, _editor_bodies_cache
+    global _editor_stage_cache, _editor_stage_last_poll
+    global _editor_stage_candidate, _editor_stage_candidate_hits
+
+    data = {
+        "context.mode": "editor",
+        "flight.active": False,
+        "editor.active": True,
+        "editor.facility": facility,
+        "stage.pending": True,
+    }
+
+    try:
+        service = conn.stage_stats
+    except Exception:
+        data["stage.available"] = False
+        data["stage.pending"] = False
+        return data
+
+    try:
+        revision = int(service.editor_revision)
+        stable = bool(service.editor_stable)
+        data.update({
+            "editor.craftName": (
+                service.editor_craft_name or "Untitled Space Craft"
+            ),
+            "editor.body": service.editor_body,
+            "editor.altitude": service.editor_altitude,
+            "editor.mach": service.editor_mach,
+            "editor.revision": revision,
+            "editor.stable": stable,
+        })
+    except Exception:
+        return data  # editor scene/service is still loading
+
+    if not _editor_bodies_cache:
+        try:
+            _editor_bodies_cache = list(service.editor_body_names())
+        except Exception:
+            pass
+    data["editor.bodies"] = _editor_bodies_cache
+
+    if revision != _editor_revision:
+        _reset_editor_stage_state(revision)
+
+    if not stable:
+        return data
+
+    now = time.time()
+    if now - _editor_stage_last_poll >= STAGE_POLL_SECONDS:
+        _editor_stage_last_poll = now
+        try:
+            result = _gather_stages(conn, "editor")
+            signature = _stage_signature(result)
+            if signature is None:
+                if result.get("stage.available") is False:
+                    _editor_stage_cache = result
+                    _editor_stage_candidate = None
+                    _editor_stage_candidate_hits = 0
+            elif signature == _editor_stage_candidate:
+                _editor_stage_candidate_hits += 1
+                if _editor_stage_candidate_hits >= 2:
+                    _editor_stage_cache = result
+            else:
+                _editor_stage_candidate = signature
+                _editor_stage_candidate_hits = 1
+        except Exception:
+            pass
+
+    if _editor_stage_cache:
+        data.update(_editor_stage_cache)
+        data["stage.pending"] = False
+    return data
+
+
+def _apply_telemetry_command(conn, command):
+    """Apply a dashboard editor-condition command on the telemetry connection."""
+    if not isinstance(command, dict) or command.get("type") != "editor.conditions":
+        return
+
+    try:
+        scene = conn.krpc.current_game_scene
+        if scene not in (
+            conn.krpc.GameScene.editor_vab,
+            conn.krpc.GameScene.editor_sph,
+        ):
+            return
+
+        service = conn.stage_stats
+        if "body" in command:
+            service.editor_body = str(command["body"])
+        if "altitude" in command:
+            altitude = float(command["altitude"])
+            if math.isfinite(altitude):
+                service.editor_altitude = altitude
+        if "mach" in command:
+            mach = float(command["mach"])
+            if math.isfinite(mach):
+                service.editor_mach = mach
+    except (TypeError, ValueError):
+        pass
+    except Exception:
+        pass  # scene transition or service temporarily unavailable
 
 
 # ---------------------------------------------------------------------------
@@ -725,13 +950,46 @@ def _gather_science(conn, vessel):
 # ---------------------------------------------------------------------------
 def gather_telemetry(conn):
     global _stage_cache, _stage_last_poll, _stage_last_ut
+    global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
     d = {}
 
     # The game scene is the authoritative signal. A vessel handle may remain
     # available briefly during editor and scene transitions.
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
-            return {"flight.active": False}
+        scene = conn.krpc.current_game_scene
+        if scene == conn.krpc.GameScene.editor_vab:
+            mode = "editor_vab"
+        elif scene == conn.krpc.GameScene.editor_sph:
+            mode = "editor_sph"
+        elif scene == conn.krpc.GameScene.flight:
+            mode = "flight"
+        else:
+            mode = "inactive"
+
+        if mode != _telemetry_mode:
+            previous_mode = _telemetry_mode
+            _stage_trace("mode_transition", previous=previous_mode, current=mode)
+            if mode == "flight":
+                _stage_trace("cache_clear", reason="enter_flight",
+                             previous=_stage_summary(_stage_cache))
+                _stage_cache = {}
+                _stage_last_poll = 0.0
+                _stage_last_ut = None
+            _telemetry_mode = mode
+            _stage_trace_last_published = None
+            _editor_bodies_cache = []
+            _reset_editor_stage_state()
+
+        if mode == "editor_vab":
+            return _gather_editor_telemetry(conn, "VAB")
+        if mode == "editor_sph":
+            return _gather_editor_telemetry(conn, "SPH")
+        if mode != "flight":
+            return {
+                "context.mode": "inactive",
+                "flight.active": False,
+                "editor.active": False,
+            }
     except Exception:
         pass
 
@@ -743,9 +1001,15 @@ def gather_telemetry(conn):
         # tracking station, VAB, main menu, or a scene load). The dashboard uses
         # this flag to show its "No Flight in Progress" overlay instead of
         # guessing from absent keys.
-        return {"flight.active": False}
+        return {
+            "context.mode": "inactive",
+            "flight.active": False,
+            "editor.active": False,
+        }
 
+    d["context.mode"] = "flight"
     d["flight.active"] = True
+    d["editor.active"] = False
     now = time.time()
 
     # ---- clocks (every tick) ----
@@ -851,6 +1115,11 @@ def gather_telemetry(conn):
     # stage snapshot across that boundary.
     if universal_time is not None:
         if _stage_last_ut is not None and universal_time < _stage_last_ut:
+            _stage_trace(
+                "ut_rewind", previousUt=_stage_last_ut,
+                currentUt=universal_time,
+                previousCache=_stage_summary(_stage_cache),
+            )
             _stage_cache = {}
             _stage_last_poll = 0.0
         _stage_last_ut = universal_time
@@ -860,10 +1129,17 @@ def gather_telemetry(conn):
         try:
             result = _gather_stages(conn)
             if result:
+                previous_stage_cache = _stage_summary(_stage_cache)
                 _stage_cache = result
+                _stage_trace(
+                    "cache_replace", source="flight",
+                    previous=previous_stage_cache,
+                    current=_stage_summary(result),
+                )
         except Exception:
             pass  # keep last good cache through scene changes
     d.update(_stage_cache)
+    _trace_stage_publish(d, "flight")
 
     # ---- science aboard: VesselScience, with stock experiment fallback ----
     global _sci_cache, _sci_last_poll
@@ -1031,12 +1307,19 @@ def run_telemetry_server(host, port):
 
     print(f"[telemetry] serving dashboard on ws://{host}:{port}  ({TELEMETRY_HZ} Hz)")
     clients = set()
+    commands = asyncio.Queue()
 
     async def handler(ws, *args):  # *args tolerates old & new websockets signatures
         clients.add(ws)
         try:
-            async for _ in ws:
-                pass  # ignore the dashboard's subscription msg; we push everything
+            async for raw in ws:
+                try:
+                    command = json.loads(raw)
+                    if (isinstance(command, dict) and
+                            command.get("type") == "editor.conditions"):
+                        await commands.put(command)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    pass
         except Exception:
             pass
         finally:
@@ -1048,6 +1331,12 @@ def run_telemetry_server(host, port):
         while True:
             if clients:
                 try:
+                    # Serialize commands and reads through this connection;
+                    # kRPC's protobuf stream is not safe for concurrent calls.
+                    while not commands.empty():
+                        command = commands.get_nowait()
+                        await loop.run_in_executor(
+                            None, _apply_telemetry_command, tconn, command)
                     # run the blocking kRPC gather off the event loop
                     data = await loop.run_in_executor(None, gather_telemetry, tconn)
                     # Reject any non-finite value that escaped _json_safe.

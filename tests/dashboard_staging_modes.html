@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard staging mode regression</title>
+  <style>
+    body{margin:0;font:14px system-ui;background:#111;color:#eee}
+    #result{margin:0;padding:12px;white-space:pre-wrap}
+    #dashboard{display:block;width:100%;height:900px;border:0}
+  </style>
+</head>
+<body>
+  <pre id="result">Running…</pre>
+  <iframe id="dashboard" src="../ksp_mission_dashboard.html"></iframe>
+  <script>
+    const result = document.getElementById("result");
+    const frame = document.getElementById("dashboard");
+
+    function assert(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+
+    frame.addEventListener("load", () => {
+      try {
+        const dashboard = frame.contentWindow;
+        const document = frame.contentDocument;
+        const stages = [
+          {index:0,ksp:0,dvAtmo:500,dvVac:650,twr:0.8,twrAtmo:0.8,twrVac:1.0,burn:42},
+          {index:1,ksp:1,dvAtmo:0,dvVac:0,twr:0,twrAtmo:0,twrVac:0,burn:0},
+          {index:2,ksp:2,dvAtmo:1000,dvVac:1200,twr:1.25,twrAtmo:1.25,twrVac:1.55,burn:75}
+        ];
+        const stagePayload = {
+          "stage.available": true,
+          "stage.complete": true,
+          "stage.currentKsp": 2,
+          "stage.stages": stages,
+          "stage.totalDvAtmo": 1500,
+          "stage.totalDvVac": 1850
+        };
+        const editorPayload = {
+          ...stagePayload,
+          "context.mode": "editor",
+          "editor.craftName": "Dual-condition regression craft",
+          "editor.facility": "VAB",
+          "editor.bodies": ["Kerbin", "Mun"],
+          "editor.body": "Kerbin",
+          "editor.altitude": 0,
+          "editor.mach": 0,
+          "editor.stable": true
+        };
+
+        dashboard.onDataKrpc(editorPayload);
+        assert(document.body.classList.contains("editor-mode"),
+          "editor payload did not select editor mode");
+        assert(getComputedStyle(document.querySelector(".editor-dv-grid")).display === "grid",
+          "editor dual-condition summary is not visible");
+        assert(getComputedStyle(document.querySelector(".flight-dv-grid")).display === "none",
+          "compact flight summary remained visible in editor mode");
+        assert(getComputedStyle(document.getElementById("dvModeToggle")).display === "none",
+          "flight condition toggle remained visible in editor mode");
+        assert(document.getElementById("ed_dv_stage_atmo").textContent === "1,000 m/s",
+          "editor atmospheric stage delta-v is wrong");
+        assert(document.getElementById("ed_dv_stage_vac").textContent === "1,200 m/s",
+          "editor vacuum stage delta-v is wrong");
+        assert(document.getElementById("ed_twr_atmo").textContent === "1.25",
+          "editor atmospheric TWR is wrong");
+        assert(document.getElementById("ed_twr_vac").textContent === "1.55",
+          "editor vacuum TWR is wrong");
+        assert(document.querySelectorAll("#stageTable .st-head span").length === 6,
+          "editor stage table does not have dual-condition columns");
+
+        dashboard.onDataKrpc({...stagePayload,"context.mode":"flight","flight.active":true});
+        assert(!document.body.classList.contains("editor-mode"),
+          "flight payload did not leave editor mode");
+        assert(getComputedStyle(document.querySelector(".flight-dv-grid")).display === "grid",
+          "compact flight summary is not visible in flight mode");
+        assert(document.getElementById("dv_stage").textContent === "1,000 m/s",
+          "flight atmospheric delta-v is wrong");
+        assert(document.getElementById("dv_twr").textContent === "1.25",
+          "flight atmospheric TWR is wrong");
+        assert(document.querySelectorAll("#stageTable .st-head span").length === 4,
+          "flight stage table did not retain its compact columns");
+
+        document.getElementById("dvModeToggle").click();
+        assert(document.getElementById("dv_stage").textContent === "1,200 m/s",
+          "flight vacuum toggle did not select vacuum delta-v");
+        assert(document.getElementById("dv_twr").textContent === "1.55",
+          "flight vacuum toggle did not select vacuum TWR");
+
+        // Leave the visible fixture in editor mode for visual inspection.
+        dashboard.onDataKrpc(editorPayload);
+        document.body.classList.remove("modal-open");
+        document.querySelectorAll(".scrim").forEach(scrim=>scrim.classList.remove("show"));
+
+        result.textContent = "PASS: editor shows atmospheric and vacuum Δv/TWR together; flight retains its compact toggle.";
+        result.dataset.status = "pass";
+      } catch (error) {
+        result.textContent = `FAIL: ${error.stack || error}`;
+        result.dataset.status = "fail";
+      }
+    });
+  </script>
+</body>
+</html>
