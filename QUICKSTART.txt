@@ -1,0 +1,37 @@
+WOOBIE'S MISSION CONTROL - WINDOWS QUICK START
+==============================================
+
+1. INSTALL THE KSP SERVICES
+
+   Close KSP. Copy the three folders inside this package's GameData folder
+   into Kerbal Space Program\GameData:
+
+     KRPC.StageStats
+     KRPC.SystemHeat
+     KRPC.VesselScience
+
+   Copy the folders themselves, not the package's top-level GameData folder.
+   The kRPC KSP mod is required. Other supported mods enable optional panels.
+
+2. SET UP AND START THE DASHBOARD
+
+   Open this package's Dashboard folder and double-click:
+
+     Start KSP Dashboard.bat
+
+   On the first run, approve the setup prompt. The launcher creates an
+   isolated .venv folder and downloads the required Python packages into it.
+   It does not add, upgrade, or remove packages in your system Python.
+
+   Python 3.14 is required for this release. If it is not installed, the
+   launcher provides the official download address and can be run again after
+   Python is installed.
+
+3. CONNECT TO KSP
+
+   Start KSP, enable its kRPC server, and load a vessel or open the VAB/SPH.
+   In the Mission Control launcher, start Dashboard feed (telemetry). The
+   dashboard opens in your browser automatically.
+
+For component choices, compatibility information, troubleshooting, and ESP32
+control-pad instructions, see README.md.
