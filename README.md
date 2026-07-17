@@ -51,6 +51,22 @@ a control-pad start button.
 
 ## Feature tour
 
+### VAB and SPH craft planning
+
+![VAB craft planning on Kerbin with atmospheric and vacuum delta-v and TWR](docs/images/editor-planning-kerbin.png)
+
+The editor planning view uses MechJeb's simulation while the craft is still in
+the VAB or SPH. Select a reference body, altitude above sea level, and Mach to
+compare atmospheric and vacuum delta-v and initial TWR for every propulsive
+stage. The body list comes from the running game, including installed planet
+packs.
+
+![The same craft evaluated on the airless Mun](docs/images/editor-planning-mun.png)
+
+On an airless body such as the Mun, the atmospheric and vacuum columns converge
+while TWR updates for the body's gravity. This makes it easy to compare launch
+and destination performance without leaving the craft editor.
+
 ### Science and staging
 
 ![Science tracking and MechJeb staging analysis](docs/images/science-and-staging.png)
