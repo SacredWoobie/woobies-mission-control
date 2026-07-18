@@ -108,6 +108,7 @@ $sourceFiles = @(
     @{ Source = 'LICENSE'; Destination = 'LICENSE' },
     @{ Source = 'QUICKSTART.txt'; Destination = 'QUICKSTART.txt' },
     @{ Source = 'README.md'; Destination = 'README.md' },
+    @{ Source = 'CHANGELOG.md'; Destination = 'CHANGELOG.md' },
     @{ Source = 'docs/CONTROL_PAD_PROTOCOL.md'; Destination = 'docs/CONTROL_PAD_PROTOCOL.md' },
     @{ Source = 'docs/images/dashboard-overview.png'; Destination = 'docs/images/dashboard-overview.png' },
     @{ Source = 'docs/images/docking-alignment.png'; Destination = 'docs/images/docking-alignment.png' },

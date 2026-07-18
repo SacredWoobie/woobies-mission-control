@@ -1,16 +1,15 @@
 WOOBIE'S MISSION CONTROL - WINDOWS QUICK START
 ==============================================
 
-1. INSTALL THE KSP SERVICES
+1. KEEP THE COMPLETE PACKAGE TOGETHER
 
-   Close KSP. Copy the three folders inside this package's GameData folder
-   into Kerbal Space Program\GameData:
+   Extract the complete ZIP so its Dashboard and GameData folders remain next
+   to one another. The launcher can then install or repair these services:
 
      KRPC.StageStats
      KRPC.SystemHeat
      KRPC.VesselScience
 
-   Copy the folders themselves, not the package's top-level GameData folder.
    The kRPC KSP mod is required. Other supported mods enable optional panels.
 
 2. SET UP AND START THE DASHBOARD
@@ -27,18 +26,27 @@ WOOBIE'S MISSION CONTROL - WINDOWS QUICK START
    launcher provides the official download address and can be run again after
    Python is installed.
 
-3. CONNECT TO KSP
+3. SELECT KSP AND INSTALL THE SERVICES
+
+   Before starting KSP, choose the main Kerbal Space Program installation
+   folder in the launcher's KSP installation section. Select the folder that
+   contains GameData, not GameData itself.
+
+   Review the Mission Control KSP services panel. If any service says Missing
+   or Repair available, choose Install / Repair and confirm the listed changes.
+   Existing service DLLs are backed up and each installed copy is verified.
+   No other GameData files are changed.
+
+4. CONNECT TO KSP
 
    Start KSP, enable its kRPC server, and load a vessel or open the VAB/SPH.
    In the Mission Control launcher, start Dashboard feed (telemetry). The
    dashboard opens in your browser automatically.
 
-   OPTIONAL NOTES INTEGRATION: Before starting the feed, choose the main KSP
-   installation folder in the launcher's KSP installation section. Select the
-   folder that contains GameData, not GameData itself. When the Notes mod is
-   detected, a Notes button appears in the dashboard during flight and opens
-   the active vessel's ship log in a right-side drawer. Select any saved note
-   and choose Pin to flight to show it in a scrollable final flight panel.
+   OPTIONAL NOTES INTEGRATION: When the Notes mod is detected at the selected
+   KSP location, a Notes button appears in the dashboard during flight and
+   opens the active vessel's ship log in a right-side drawer. Select any saved
+   note and choose Pin to flight to show it in a scrollable final flight panel.
    Use A- and A+ in either Notes view to adjust text size; click the size value
    to return to the default.
 

@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 
 
-DASHBOARD = Path(__file__).resolve().parents[1] / "Dashboard"
-sys.path.insert(0, str(DASHBOARD))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 import ksp_dashboard_app
 
