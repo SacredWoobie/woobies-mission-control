@@ -15,12 +15,14 @@ is responsible for its own dependencies.
 """
 
 import csv
+import ctypes
 import hashlib
 import json
 import os
 import queue
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -38,7 +40,7 @@ HERE = Path(__file__).resolve().parent
 DASHBOARD = HERE / "ksp_mission_dashboard.html"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.2.3"
+APP_VERSION = "0.2.4"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 LATEST_RELEASE_API = (
@@ -97,6 +99,59 @@ SERVICE_DLLS = (
     ("KRPC.StageStats", "Stage statistics"),
     ("KRPC.SystemHeat", "System Heat / electricity"),
     ("KRPC.VesselScience", "Stored science"),
+)
+SERVICE_TESTED_VERSIONS = {
+    "KRPC.StageStats": "0.2.0",
+    "KRPC.SystemHeat": "0.2.0",
+    "KRPC.VesselScience": "0.1.0",
+}
+KSP_TESTED_VERSION = "1.12.5"
+CORE_DLL_LOCATIONS = {
+    "KRPC.dll": Path("kRPC") / "KRPC.dll",
+    "KRPC.MechJeb.dll": Path("kRPC") / "KRPC.MechJeb.dll",
+    "MechJeb2.dll": Path("MechJeb2") / "Plugins" / "MechJeb2.dll",
+    "KRPC.StageStats.dll": Path("KRPC.StageStats") / "KRPC.StageStats.dll",
+    "KRPC.SystemHeat.dll": Path("KRPC.SystemHeat") / "KRPC.SystemHeat.dll",
+    "KRPC.VesselScience.dll": (
+        Path("KRPC.VesselScience") / "KRPC.VesselScience.dll"
+    ),
+}
+KRPC_ADDRESS = "127.0.0.1"
+KRPC_RPC_PORT = 50000
+KRPC_STREAM_PORT = 50001
+DASHBOARD_FEED_PORT = 8090
+KRPC_CONNECTED_EVENT = "WOOBIE_EVENT:KRPC_CONNECTED"
+KRPC_RETRY_EXHAUSTED_EVENT = "WOOBIE_EVENT:KRPC_RETRY_EXHAUSTED"
+KRPC_SETTINGS_PATH = Path("kRPC") / "PluginData" / "settings.cfg"
+KRPC_SERVICE_ATTRIBUTES = (
+    ("space_center", "SpaceCenter"),
+    ("mech_jeb", "MechJeb"),
+    ("stage_stats", "StageStats"),
+    ("system_heat", "SystemHeat"),
+    ("vessel_science", "VesselScience"),
+)
+KSP_PREREQUISITES = (
+    {
+        "key": "krpc",
+        "title": "kRPC",
+        "relative_path": Path("kRPC") / "KRPC.dll",
+        "tested_version": "0.5.4",
+        "required": True,
+    },
+    {
+        "key": "krpc_mechjeb",
+        "title": "KRPC.MechJeb",
+        "relative_path": Path("kRPC") / "KRPC.MechJeb.dll",
+        "tested_version": "0.7.1",
+        "required": False,
+    },
+    {
+        "key": "mechjeb",
+        "title": "MechJeb 2",
+        "relative_path": Path("MechJeb2") / "Plugins" / "MechJeb2.dll",
+        "tested_version": "2.14.3.0",
+        "required": False,
+    },
 )
 
 THEME = {
@@ -431,8 +486,774 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def service_inventory(ksp_root_value, packaged_gamedata=PACKAGED_GAMEDATA):
-    """Describe packaged and installed Mission Control service DLLs."""
+def read_windows_file_version(path):
+    """Return a Windows DLL's fixed file version without loading the assembly."""
+    if os.name != "nt":
+        return None
+    path = Path(path)
+    if not path.is_file():
+        return None
+
+    class VSFixedFileInfo(ctypes.Structure):
+        _fields_ = [
+            ("signature", ctypes.c_uint32),
+            ("struct_version", ctypes.c_uint32),
+            ("file_version_ms", ctypes.c_uint32),
+            ("file_version_ls", ctypes.c_uint32),
+            ("product_version_ms", ctypes.c_uint32),
+            ("product_version_ls", ctypes.c_uint32),
+            ("file_flags_mask", ctypes.c_uint32),
+            ("file_flags", ctypes.c_uint32),
+            ("file_os", ctypes.c_uint32),
+            ("file_type", ctypes.c_uint32),
+            ("file_subtype", ctypes.c_uint32),
+            ("file_date_ms", ctypes.c_uint32),
+            ("file_date_ls", ctypes.c_uint32),
+        ]
+
+    try:
+        library = ctypes.WinDLL("version", use_last_error=True)
+        get_size = library.GetFileVersionInfoSizeW
+        get_size.argtypes = [ctypes.c_wchar_p, ctypes.c_void_p]
+        get_size.restype = ctypes.c_uint32
+        get_info = library.GetFileVersionInfoW
+        get_info.argtypes = [
+            ctypes.c_wchar_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+        ]
+        get_info.restype = ctypes.c_int
+        query_value = library.VerQueryValueW
+        query_value.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_wchar_p,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_uint32),
+        ]
+        query_value.restype = ctypes.c_int
+
+        size = get_size(str(path), None)
+        if not size:
+            return None
+        buffer = ctypes.create_string_buffer(size)
+        if not get_info(str(path), 0, size, buffer):
+            return None
+        value_pointer = ctypes.c_void_p()
+        value_length = ctypes.c_uint32()
+        if not query_value(
+            buffer, "\\", ctypes.byref(value_pointer), ctypes.byref(value_length)
+        ):
+            return None
+        fixed = ctypes.cast(
+            value_pointer, ctypes.POINTER(VSFixedFileInfo)
+        ).contents
+        if fixed.signature != 0xFEEF04BD:
+            return None
+        parts = (
+            fixed.file_version_ms >> 16,
+            fixed.file_version_ms & 0xFFFF,
+            fixed.file_version_ls >> 16,
+            fixed.file_version_ls & 0xFFFF,
+        )
+        return ".".join(str(part) for part in parts)
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def read_avc_version(path):
+    """Return a dotted version from a KSP-AVC JSON file, if available."""
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+        version = payload["VERSION"]
+        parts = [version[name] for name in ("MAJOR", "MINOR", "PATCH")]
+        if "BUILD" in version:
+            parts.append(version["BUILD"])
+        if not all(isinstance(part, int) and part >= 0 for part in parts):
+            return None
+        return ".".join(str(part) for part in parts)
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _version_tuple(value):
+    if not isinstance(value, str) or not re.fullmatch(r"\d+(?:\.\d+)+", value):
+        return None
+    parts = [int(part) for part in value.split(".")]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return tuple(parts)
+
+
+def versions_equivalent(left, right):
+    """Compare dotted versions while ignoring insignificant trailing zeroes."""
+    left_parts = _version_tuple(left)
+    right_parts = _version_tuple(right)
+    return left_parts is not None and left_parts == right_parts
+
+
+def compare_versions(left, right):
+    """Return -1, 0, or 1 for dotted versions, or ``None`` if unparseable."""
+    left_parts = _version_tuple(left)
+    right_parts = _version_tuple(right)
+    if left_parts is None or right_parts is None:
+        return None
+    length = max(len(left_parts), len(right_parts))
+    left_parts += (0,) * (length - len(left_parts))
+    right_parts += (0,) * (length - len(right_parts))
+    return (left_parts > right_parts) - (left_parts < right_parts)
+
+
+def read_ksp_version(ksp_root):
+    """Read the installed KSP version from stable local release artifacts."""
+    root = Path(ksp_root)
+    candidates = (
+        (root / "readme.txt", re.compile(r"(?im)^Version\s+(\d+\.\d+\.\d+)")),
+        (
+            root / "KSP.log",
+            re.compile(
+                r"Kerbal Space Program\s+-\s+(\d+\.\d+\.\d+)(?:\.\d+)?"
+            ),
+        ),
+    )
+    for path, pattern in candidates:
+        try:
+            with path.open("r", encoding="utf-8-sig", errors="ignore") as stream:
+                sample = stream.read(64 * 1024)
+        except OSError:
+            continue
+        match = pattern.search(sample)
+        if match:
+            return match.group(1)
+    return None
+
+
+def ksp_installation_inventory(ksp_root_value):
+    """Validate the selected KSP root and report its tested-version status."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    if root is None:
+        return {
+            "status": "unconfigured",
+            "root": None,
+            "version": None,
+            "missing": [],
+        }
+    required_paths = (
+        ("KSP_x64.exe", root / "KSP_x64.exe"),
+        ("GameData\\Squad", root / "GameData" / "Squad"),
+    )
+    missing = [label for label, path in required_paths if not path.exists()]
+    version = read_ksp_version(root)
+    if missing:
+        status = "invalid"
+    elif version is None:
+        status = "unknown_version"
+    elif versions_equivalent(version, KSP_TESTED_VERSION):
+        status = "current"
+    else:
+        status = "untested"
+    return {
+        "status": status,
+        "root": root,
+        "version": version,
+        "missing": missing,
+    }
+
+
+def dll_layout_inventory(ksp_root_value):
+    """Find duplicate or misplaced Mission Control-related DLLs in GameData."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    if root is None:
+        return {"status": "unconfigured", "issues": [], "matches": {}}
+    game_data = root / "GameData"
+    wanted = {name.casefold(): name for name in CORE_DLL_LOCATIONS}
+    matches = {name: [] for name in CORE_DLL_LOCATIONS}
+    try:
+        for directory, child_directories, filenames in os.walk(game_data):
+            child_directories[:] = [
+                name
+                for name in child_directories
+                if name.casefold() not in {"plugindata", "__macosx"}
+            ]
+            for filename in filenames:
+                canonical_name = wanted.get(filename.casefold())
+                if canonical_name is not None:
+                    matches[canonical_name].append(Path(directory) / filename)
+    except OSError as exc:
+        return {
+            "status": "error",
+            "issues": [],
+            "matches": matches,
+            "error": str(exc),
+        }
+
+    issues = []
+    for filename, relative_path in CORE_DLL_LOCATIONS.items():
+        expected = game_data / relative_path
+        found = matches[filename]
+        expected_key = os.path.normcase(str(expected.resolve()))
+        canonical_found = any(
+            os.path.normcase(str(path.resolve())) == expected_key for path in found
+        )
+        extra = [
+            path
+            for path in found
+            if os.path.normcase(str(path.resolve())) != expected_key
+        ]
+        if extra:
+            issues.append(
+                {
+                    "filename": filename,
+                    "kind": "duplicate" if canonical_found else "misplaced",
+                    "expected": expected,
+                    "found": found,
+                }
+            )
+    return {
+        "status": "issues" if issues else "current",
+        "issues": issues,
+        "matches": matches,
+    }
+
+
+def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_version):
+    """Describe installed kRPC and MechJeb prerequisites without loading DLLs."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    inventory = []
+    for definition in KSP_PREREQUISITES:
+        target = (
+            root / "GameData" / definition["relative_path"]
+            if root is not None
+            else None
+        )
+        installed_version = None
+        if root is None:
+            status = "unconfigured"
+        elif target is None or not target.is_file():
+            status = "missing"
+        else:
+            if definition["key"] == "krpc":
+                installed_version = read_avc_version(
+                    root / "GameData" / "kRPC" / "kRPC.version"
+                )
+            if installed_version is None:
+                installed_version = version_reader(target)
+            if installed_version is None:
+                status = "unknown_version"
+            elif versions_equivalent(
+                installed_version, definition["tested_version"]
+            ):
+                status = "current"
+            else:
+                status = "untested"
+        inventory.append(
+            {
+                **definition,
+                "target": target,
+                "installed_version": installed_version,
+                "status": status,
+            }
+        )
+    return inventory
+
+
+def _parse_config_nodes(text):
+    """Parse the small ConfigNode subset used by kRPC's settings file."""
+    document = {"name": None, "values": {}, "children": []}
+    stack = [document]
+    pending_name = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("//"):
+            continue
+        if line.endswith("{") and line != "{":
+            pending_name = line[:-1].strip()
+            line = "{"
+        if line == "{":
+            if not pending_name:
+                raise ValueError("ConfigNode opening brace has no node name")
+            node = {"name": pending_name, "values": {}, "children": []}
+            stack[-1]["children"].append(node)
+            stack.append(node)
+            pending_name = None
+        elif line == "}":
+            if len(stack) == 1:
+                raise ValueError("ConfigNode has an unmatched closing brace")
+            stack.pop()
+            pending_name = None
+        elif "=" in line:
+            key, value = (part.strip() for part in line.split("=", 1))
+            stack[-1]["values"].setdefault(key, []).append(value)
+            pending_name = None
+        else:
+            pending_name = line
+    if len(stack) != 1:
+        raise ValueError("ConfigNode has an unclosed node")
+    return document
+
+
+def _child_nodes(node, name):
+    return [child for child in node["children"] if child["name"] == name]
+
+
+def _node_value(node, name, default=None):
+    values = node["values"].get(name, [])
+    return values[-1] if values else default
+
+
+def _config_bool(value):
+    if isinstance(value, str) and value.lower() in {"true", "false"}:
+        return value.lower() == "true"
+    return None
+
+
+def parse_krpc_settings(text):
+    """Return the server endpoints and launch flags from kRPC settings text."""
+    document = _parse_config_nodes(text)
+    configurations = _child_nodes(document, "KRPCConfiguration")
+    if not configurations:
+        raise ValueError("KRPCConfiguration node not found")
+    configuration = configurations[0]
+    server_groups = _child_nodes(configuration, "servers")
+    servers = []
+    if server_groups:
+        for server_node in _child_nodes(server_groups[0], "Item"):
+            settings_nodes = _child_nodes(server_node, "settings")
+            settings = {}
+            if settings_nodes:
+                for item in _child_nodes(settings_nodes[0], "Item"):
+                    key = _node_value(item, "key")
+                    value = _node_value(item, "value")
+                    if key is not None and value is not None:
+                        settings[key] = value
+            try:
+                rpc_port = int(settings.get("rpc_port", ""))
+                stream_port = int(settings.get("stream_port", ""))
+            except ValueError:
+                rpc_port = None
+                stream_port = None
+            servers.append(
+                {
+                    "name": _node_value(server_node, "name", "Unnamed server"),
+                    "address": settings.get("address"),
+                    "rpc_port": rpc_port,
+                    "stream_port": stream_port,
+                }
+            )
+    return {
+        "auto_start": _config_bool(
+            _node_value(configuration, "autoStartServers")
+        ),
+        "auto_accept": _config_bool(
+            _node_value(configuration, "autoAcceptConnections")
+        ),
+        "servers": servers,
+    }
+
+
+def krpc_configuration_inventory(ksp_root_value):
+    """Inspect kRPC's persisted endpoint settings in the selected GameData."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    if root is None:
+        return {"status": "unconfigured", "path": None, "server": None}
+    game_data = root / "GameData"
+    krpc_dll = game_data / "kRPC" / "KRPC.dll"
+    path = game_data / KRPC_SETTINGS_PATH
+    if not krpc_dll.is_file():
+        return {"status": "missing", "path": path, "server": None}
+    if not path.is_file():
+        return {
+            "status": "not_initialized",
+            "path": path,
+            "server": {
+                "name": "Default Server",
+                "address": KRPC_ADDRESS,
+                "rpc_port": KRPC_RPC_PORT,
+                "stream_port": KRPC_STREAM_PORT,
+            },
+            "auto_start": None,
+            "auto_accept": None,
+        }
+    try:
+        parsed = parse_krpc_settings(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        return {
+            "status": "invalid",
+            "path": path,
+            "server": None,
+            "error": str(exc),
+        }
+    if not parsed["servers"]:
+        return {
+            "status": "invalid",
+            "path": path,
+            "server": None,
+            "auto_start": parsed["auto_start"],
+            "auto_accept": parsed["auto_accept"],
+            "error": "No kRPC server definitions were found.",
+        }
+    expected = next(
+        (
+            server
+            for server in parsed["servers"]
+            if server["address"] == KRPC_ADDRESS
+            and server["rpc_port"] == KRPC_RPC_PORT
+            and server["stream_port"] == KRPC_STREAM_PORT
+        ),
+        None,
+    )
+    return {
+        "status": "current" if expected is not None else "custom",
+        "path": path,
+        "server": expected or parsed["servers"][0],
+        "servers": parsed["servers"],
+        "auto_start": parsed["auto_start"],
+        "auto_accept": parsed["auto_accept"],
+    }
+
+
+def installation_recommendations(ksp_installation, dll_layout):
+    """Build repair guidance for KSP identity and related DLL layout issues."""
+    recommendations = []
+    status = ksp_installation.get("status")
+    if status == "invalid":
+        missing = ", ".join(ksp_installation.get("missing", []))
+        recommendations.append(
+            {
+                "key": "ksp.installation",
+                "title": "Selected KSP installation",
+                "observed": f"Required KSP files or folders are missing: {missing}",
+                "expected": "The KSP 1 installation containing KSP_x64.exe and GameData\\Squad",
+                "fix": (
+                    "Select the main Kerbal Space Program folder, not GameData "
+                    "itself or a mod-staging folder."
+                ),
+            }
+        )
+    elif status == "unknown_version":
+        recommendations.append(
+            {
+                "key": "ksp.version",
+                "title": "Kerbal Space Program version",
+                "observed": "KSP is present, but its version could not be read",
+                "expected": f"Tested KSP version {KSP_TESTED_VERSION}",
+                "fix": (
+                    "Verify the KSP installation through Steam or restore its "
+                    "readme.txt. Mission Control can continue, but compatibility "
+                    "cannot be confirmed."
+                ),
+            }
+        )
+    elif status == "untested":
+        recommendations.append(
+            {
+                "key": "ksp.version",
+                "title": "Kerbal Space Program version",
+                "observed": f"Installed version {ksp_installation.get('version')}",
+                "expected": f"Tested KSP version {KSP_TESTED_VERSION}",
+                "fix": (
+                    f"Use KSP {KSP_TESTED_VERSION} for the known-good baseline, "
+                    "preferably in a separate backed-up KSP instance. Other "
+                    "versions may work but are not validated by Mission Control."
+                ),
+            }
+        )
+
+    if dll_layout.get("status") == "error":
+        recommendations.append(
+            {
+                "key": "dll.layout",
+                "title": "GameData DLL layout",
+                "observed": "GameData could not be scanned completely",
+                "expected": "One DLL in each documented canonical location",
+                "fix": (
+                    "Check GameData permissions and refresh the compatibility "
+                    "status before relying on the installed-mod results."
+                ),
+            }
+        )
+    for issue in dll_layout.get("issues", []):
+        root = ksp_installation.get("root")
+        game_data = root / "GameData" if root is not None else None
+
+        def display_path(path):
+            try:
+                return str(path.relative_to(game_data))
+            except (TypeError, ValueError):
+                return str(path)
+
+        found = "; ".join(display_path(path) for path in issue["found"])
+        recommendations.append(
+            {
+                "key": f"dll.layout.{issue['filename']}",
+                "title": f"{issue['filename']} DLL layout",
+                "observed": f"{issue['kind'].title()} copy or copies: {found}",
+                "expected": display_path(issue["expected"]),
+                "fix": (
+                    "Close KSP, use CKAN to reinstall the owning mod when "
+                    "possible, and remove stale duplicate or extra-nested copies "
+                    "only after confirming they are not the active installation."
+                ),
+            }
+        )
+    return recommendations
+
+
+def probe_krpc_connection(connector=None):
+    """Open a short-lived kRPC connection and report registered services."""
+    if connector is None:
+        import krpc
+
+        connector = krpc.connect
+    connection = connector(name="Woobie's Mission Control Connection Test")
+    try:
+        try:
+            server_version = connection.krpc.get_status().version
+        except Exception:
+            server_version = None
+        services = {}
+        for attribute, _title in KRPC_SERVICE_ATTRIBUTES:
+            try:
+                getattr(connection, attribute)
+            except Exception:
+                services[attribute] = False
+            else:
+                services[attribute] = True
+        return {"server_version": server_version, "services": services}
+    finally:
+        close = getattr(connection, "close", None)
+        if callable(close):
+            close()
+
+
+def expected_krpc_services(prerequisites, services):
+    """Return registered service attributes expected from installed DLLs."""
+    expected = {"space_center": "SpaceCenter"}
+    prerequisite_statuses = {
+        item["key"]: item["status"] for item in prerequisites
+    }
+    if prerequisite_statuses.get("krpc_mechjeb") not in {
+        None,
+        "missing",
+        "unconfigured",
+    }:
+        expected["mech_jeb"] = "MechJeb"
+    service_attributes = {
+        "KRPC.StageStats": ("stage_stats", "StageStats"),
+        "KRPC.SystemHeat": ("system_heat", "SystemHeat"),
+        "KRPC.VesselScience": ("vessel_science", "VesselScience"),
+    }
+    for item in services:
+        attribute_and_title = service_attributes.get(item["folder"])
+        if attribute_and_title and item.get("target_hash") is not None:
+            expected[attribute_and_title[0]] = attribute_and_title[1]
+    return expected
+
+
+def live_connection_recommendations(state):
+    """Build suggested actions from the most recent live kRPC result."""
+    status = state.get("status")
+    if status not in {"failed", "retry_exhausted", "service_issue"}:
+        return []
+    if status == "service_issue":
+        missing = ", ".join(state.get("missing_services", [])) or "unknown"
+        return [
+            {
+                "key": "krpc.live.services",
+                "title": "Live kRPC service registration",
+                "observed": f"Connected, but these services were unavailable: {missing}",
+                "expected": "Every service whose DLL is installed should be registered",
+                "fix": (
+                    "Restart KSP after any DLL change, test the connection again, "
+                    "and inspect KSP.log for assembly-load or kRPC service errors."
+                ),
+            }
+        ]
+    detail = state.get("error") or "The component exhausted its connection attempts"
+    return [
+        {
+            "key": "krpc.live.connection",
+            "title": "Live kRPC connection",
+            "observed": detail,
+            "expected": (
+                f"A running local kRPC server on RPC {KRPC_RPC_PORT} with "
+                f"stream port {KRPC_STREAM_PORT}"
+            ),
+            "fix": (
+                "Start KSP and load a save; the main menu is not enough because "
+                "kRPC stops its servers when no game is loaded. Confirm the "
+                "server is running and accepting connections, then use Test "
+                "connection. Mission Control tools stop after 10 attempts "
+                "instead of retrying forever."
+            ),
+        }
+    ]
+
+
+def prerequisite_recommendations(inventory, configuration):
+    """Build human-readable, read-only repair guidance for prerequisite issues."""
+    recommendations = []
+    for item in inventory:
+        status = item["status"]
+        if status in {"current", "unconfigured"}:
+            continue
+        key = item["key"]
+        title = item["title"]
+        tested = item["tested_version"]
+        installed = item["installed_version"]
+        optional_note = (
+            " This integration is optional and only affects MechJeb staging "
+            "features."
+            if not item["required"]
+            else ""
+        )
+        if status == "missing":
+            observed = "Not installed"
+            if key == "krpc":
+                fix = (
+                    f"Install kRPC {tested} through CKAN or the official kRPC "
+                    "release, then start KSP and load a save once so kRPC can "
+                    "create its server settings."
+                )
+            elif key == "krpc_mechjeb":
+                fix = (
+                    f"Use CKAN to reinstall the complete kRPC {KSP_PREREQUISITES[0]['tested_version']} "
+                    f"package. Its GameData\\kRPC folder should include "
+                    f"KRPC.MechJeb {tested}."
+                )
+            else:
+                fix = (
+                    f"Use CKAN to install MechJeb 2 {tested} for the tested "
+                    "staging integration."
+                )
+        elif status == "unknown_version":
+            observed = "Installed, but version metadata could not be read"
+            if key == "krpc_mechjeb":
+                fix = (
+                    f"Use CKAN to reinstall kRPC {KSP_PREREQUISITES[0]['tested_version']}; "
+                    f"the complete package includes the tested KRPC.MechJeb "
+                    f"{tested} DLL."
+                )
+            else:
+                package = "kRPC" if key == "krpc" else "MechJeb 2"
+                fix = (
+                    f"Use CKAN to reinstall {package} {tested} so its version "
+                    "metadata and DLLs come from one known package."
+                )
+        else:
+            observed = f"Installed version {installed}"
+            direction = compare_versions(installed, tested)
+            action = "downgrade" if direction == 1 else "update"
+            if direction is None or direction == 0:
+                action = "switch"
+            if key == "krpc_mechjeb":
+                fix = (
+                    f"For the tested combination, use CKAN to reinstall kRPC "
+                    f"{KSP_PREREQUISITES[0]['tested_version']}. The complete kRPC "
+                    f"package supplies KRPC.MechJeb {tested}."
+                )
+            else:
+                package = "kRPC" if key == "krpc" else "MechJeb 2"
+                fix = (
+                    f"For known-good compatibility, use CKAN to {action} "
+                    f"{package} to {tested}. Other versions may work, but "
+                    "Mission Control has not validated this installed version."
+                )
+        recommendations.append(
+            {
+                "key": f"{key}.version",
+                "title": f"{title} prerequisite",
+                "observed": observed,
+                "expected": f"Tested version {tested}",
+                "fix": fix + optional_note,
+            }
+        )
+
+    config_status = configuration.get("status")
+    server = configuration.get("server")
+    if config_status == "custom" and server is not None:
+        recommendations.append(
+            {
+                "key": "krpc.server",
+                "title": "kRPC server endpoint",
+                "observed": (
+                    f"Address {server.get('address') or 'unknown'}, RPC "
+                    f"{server.get('rpc_port')}, Stream {server.get('stream_port')}"
+                ),
+                "expected": (
+                    f"Address {KRPC_ADDRESS}, RPC {KRPC_RPC_PORT}, Stream "
+                    f"{KRPC_STREAM_PORT}"
+                ),
+                "fix": (
+                    "Open kRPC inside KSP, edit the server used by Mission "
+                    f"Control, and restore the expected values. Port "
+                    f"{DASHBOARD_FEED_PORT} is reserved for Mission Control's "
+                    "browser telemetry feed and must not be assigned to kRPC."
+                ),
+            }
+        )
+    elif config_status == "invalid":
+        recommendations.append(
+            {
+                "key": "krpc.server",
+                "title": "kRPC server settings",
+                "observed": "The saved PluginData/settings.cfg could not be read",
+                "expected": (
+                    f"A local server using RPC {KRPC_RPC_PORT} and Stream "
+                    f"{KRPC_STREAM_PORT}"
+                ),
+                "fix": (
+                    "Open kRPC inside KSP and recreate or resave its Default "
+                    "Server with the expected values. Avoid hand-editing the "
+                    "settings file while KSP is running."
+                ),
+            }
+        )
+
+    if configuration.get("auto_start") is False:
+        recommendations.append(
+            {
+                "key": "krpc.auto_start",
+                "title": "kRPC automatic server start",
+                "observed": "Disabled",
+                "expected": "Enabled for hands-off Mission Control startup",
+                "fix": (
+                    "Enable automatic server start in kRPC, or load a KSP save "
+                    "and start the kRPC server manually before starting Mission "
+                    "Control. The server does not run at KSP's main menu."
+                ),
+            }
+        )
+    if configuration.get("auto_accept") is False:
+        recommendations.append(
+            {
+                "key": "krpc.auto_accept",
+                "title": "kRPC automatic connection acceptance",
+                "observed": "Disabled",
+                "expected": "Enabled for hands-off Mission Control startup",
+                "fix": (
+                    "Enable automatic connection acceptance in kRPC, or approve "
+                    "each Mission Control client connection inside KSP."
+                ),
+            }
+        )
+    return recommendations
+
+
+def service_inventory(
+    ksp_root_value,
+    packaged_gamedata=PACKAGED_GAMEDATA,
+    version_reader=read_windows_file_version,
+):
+    """Assess installed service DLLs independently from packaged repair copies."""
     if isinstance(ksp_root_value, os.PathLike):
         ksp_root_value = os.fspath(ksp_root_value)
     root = resolve_ksp_root(ksp_root_value)
@@ -448,14 +1269,27 @@ def service_inventory(ksp_root_value, packaged_gamedata=PACKAGED_GAMEDATA):
             if target is not None and target.is_file()
             else None
         )
+        tested_version = SERVICE_TESTED_VERSIONS[folder]
+        installed_version = (
+            version_reader(target) if target_hash is not None else None
+        )
         if root is None:
             status = "unconfigured"
-        elif source_hash is None:
-            status = "package_missing"
         elif target_hash is None:
             status = "missing"
-        elif source_hash == target_hash:
+        elif source_hash is not None and source_hash == target_hash:
             status = "current"
+        elif versions_equivalent(installed_version, tested_version):
+            status = (
+                "current_different"
+                if source_hash is not None
+                else "current_package_missing"
+            )
+        elif installed_version is not None:
+            comparison = compare_versions(installed_version, tested_version)
+            status = "outdated" if comparison == -1 else "version_mismatch"
+        elif source_hash is None:
+            status = "unverified_package_missing"
         else:
             status = "different"
         inventory.append(
@@ -467,6 +1301,8 @@ def service_inventory(ksp_root_value, packaged_gamedata=PACKAGED_GAMEDATA):
                 "target": target,
                 "source_hash": source_hash,
                 "target_hash": target_hash,
+                "tested_version": tested_version,
+                "installed_version": installed_version,
                 "status": status,
             }
         )
@@ -539,7 +1375,10 @@ def install_service_dlls(
         raise FileNotFoundError(f"Packaged service DLLs are missing: {names}")
 
     changes = [
-        item for item in inventory if item["status"] in {"missing", "different"}
+        item
+        for item in inventory
+        if item["source_hash"] is not None
+        and item["source_hash"] != item["target_hash"]
     ]
     if not changes:
         return {"installed": [], "backup_dir": None}
@@ -741,6 +1580,161 @@ def telemetry_environment(ksp_root_value):
     return {"WOOBIE_KSP_ROOT": str(root)} if root is not None else {}
 
 
+def tcp_port_open(address, port, timeout=0.15):
+    """Return whether a TCP listener accepts connections at an endpoint."""
+    try:
+        with socket.create_connection((address, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def local_tcp_port_available(port, address=KRPC_ADDRESS):
+    """Return whether a local TCP port can be bound by the dashboard feed."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            probe.bind((address, port))
+        return True
+    except OSError:
+        return False
+
+
+def component_preflight(
+    ksp_root_value,
+    component_name,
+    port_open=tcp_port_open,
+    dashboard_port_available=local_tcp_port_available,
+):
+    """Return actionable errors and warnings before a kRPC component starts."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    errors = []
+    warnings = []
+    ksp_installation = ksp_installation_inventory(ksp_root_value)
+    dll_layout = dll_layout_inventory(ksp_root_value)
+    inventory = prerequisite_inventory(ksp_root_value)
+    configuration = krpc_configuration_inventory(ksp_root_value)
+
+    if root is None:
+        warnings.append(
+            "No KSP folder is selected, so kRPC prerequisites could not be verified."
+        )
+    else:
+        if ksp_installation["status"] == "invalid":
+            errors.append(
+                "The selected folder is not a complete KSP 1 installation. "
+                "Missing: " + ", ".join(ksp_installation["missing"]) + "."
+            )
+        elif ksp_installation["status"] == "untested":
+            warnings.append(
+                f"KSP {ksp_installation['version']} is installed; Mission Control "
+                f"is tested with KSP {KSP_TESTED_VERSION}."
+            )
+        elif ksp_installation["status"] == "unknown_version":
+            warnings.append(
+                "The selected KSP version could not be read; compatibility is "
+                "unverified."
+            )
+        if dll_layout["status"] == "issues":
+            warnings.append(
+                f"GameData contains {len(dll_layout['issues'])} duplicate or "
+                "misplaced core DLL issue(s); review the suggested fixes."
+            )
+        elif dll_layout["status"] == "error":
+            warnings.append(
+                "GameData could not be scanned completely for duplicate DLLs."
+            )
+
+        krpc_item = next(item for item in inventory if item["key"] == "krpc")
+        if krpc_item["status"] == "missing":
+            errors.append(
+                "kRPC is missing from the selected KSP GameData folder. Install "
+                "kRPC 0.5.4 before starting this component."
+            )
+
+        status = configuration["status"]
+        server = configuration.get("server")
+        if status == "custom" and server is not None:
+            endpoint = (
+                f"RPC {server.get('rpc_port')} and Stream "
+                f"{server.get('stream_port')}"
+            )
+            if (
+                server.get("rpc_port") == DASHBOARD_FEED_PORT
+                or server.get("stream_port") == DASHBOARD_FEED_PORT
+            ):
+                errors.append(
+                    f"kRPC is configured for {endpoint}. Mission Control reserves "
+                    f"port {DASHBOARD_FEED_PORT} for its browser telemetry feed and "
+                    f"expects kRPC on RPC {KRPC_RPC_PORT} / Stream "
+                    f"{KRPC_STREAM_PORT}. Restore those kRPC server values and try "
+                    "again."
+                )
+            else:
+                errors.append(
+                    f"kRPC is configured for {endpoint} at "
+                    f"{server.get('address') or 'an unknown address'}. Mission "
+                    f"Control currently expects {KRPC_ADDRESS}, RPC {KRPC_RPC_PORT} "
+                    f"/ Stream {KRPC_STREAM_PORT}. Restore those values and try "
+                    "again."
+                )
+        elif status == "invalid":
+            errors.append(
+                "Mission Control could not read kRPC's PluginData/settings.cfg. "
+                "Open kRPC in KSP, verify its Default Server configuration, save "
+                "it, and refresh this status."
+            )
+
+        if status in {"current", "not_initialized"}:
+            if not port_open(KRPC_ADDRESS, KRPC_RPC_PORT):
+                warnings.append(
+                    f"kRPC is not listening on {KRPC_ADDRESS}:{KRPC_RPC_PORT} yet. "
+                    "Load a KSP save (the main menu is not enough). The component "
+                    "will try 10 times over about 20 seconds, then stop and "
+                    "recommend the live connection test."
+                )
+            if configuration.get("auto_start") is False:
+                warnings.append(
+                    "kRPC automatic server start is off; load a save and start "
+                    "its server manually inside KSP."
+                )
+            if configuration.get("auto_accept") is False:
+                warnings.append(
+                    "kRPC automatic connection acceptance is off; approve the "
+                    "Mission Control client inside KSP."
+                )
+
+    if component_name == "feed" and not dashboard_port_available(
+        DASHBOARD_FEED_PORT
+    ):
+        server_uses_feed_port = (
+            configuration.get("status") == "custom"
+            and configuration.get("server") is not None
+            and DASHBOARD_FEED_PORT
+            in {
+                configuration["server"].get("rpc_port"),
+                configuration["server"].get("stream_port"),
+            }
+        )
+        if not server_uses_feed_port:
+            errors.append(
+                f"Dashboard telemetry port {DASHBOARD_FEED_PORT} is already in "
+                "use. Stop the other dashboard feed or program using that port, "
+                "then try again."
+            )
+    return {
+        "errors": errors,
+        "warnings": warnings,
+        "ksp_installation": ksp_installation,
+        "dll_layout": dll_layout,
+        "inventory": inventory,
+        "configuration": configuration,
+    }
+
+
 def get_fresh_cached_release(state, now=None, max_age=UPDATE_CACHE_SECONDS):
     """Return a validated cached release if it is recent enough."""
     if not isinstance(state, dict):
@@ -852,6 +1846,7 @@ class App:
         self.root = root
         self.log_queue = queue.Queue()
         self.update_queue = queue.Queue()
+        self.krpc_test_queue = queue.Queue()
         self.backends = []
         self.backend_rows = []
         self.update_state_path = Path(update_state_path)
@@ -863,6 +1858,11 @@ class App:
         self.latest_release_url = None
         self.changelog_path = find_changelog_path()
         self.changelog_dialog = None
+        self.prerequisite_fix_dialog = None
+        self.prerequisite_fix_items = []
+        self.krpc_test_generation = 0
+        self.krpc_test_checking = False
+        self.live_krpc_state = {"status": "not_tested"}
 
         self.style = configure_dashboard_theme(root)
         root.title(f"{APP_NAME} v{APP_VERSION}")
@@ -950,6 +1950,140 @@ class App:
         )
         self.ksp_root_status.pack(fill="x", padx=9, pady=(0, 4))
 
+        prerequisites = ttk.Frame(
+            settings_frame, style="Card.TFrame", padding=(14, 12)
+        )
+        prerequisites.pack(fill="x", padx=9, pady=(2, 8))
+        prerequisite_header = ttk.Frame(
+            prerequisites, style="CardInner.TFrame"
+        )
+        prerequisite_header.pack(fill="x", pady=(0, 6))
+        ttk.Label(
+            prerequisite_header,
+            text="KSP & KRPC COMPATIBILITY",
+            anchor="w",
+            style="CardTitle.TLabel",
+        ).pack(side="left")
+        self.prerequisite_summary = ttk.Label(
+            prerequisite_header,
+            text="Checking...",
+            foreground=THEME["slate_dim"],
+            anchor="e",
+            style="Card.TLabel",
+        )
+        self.prerequisite_summary.pack(side="right")
+
+        ksp_version_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
+        ksp_version_row.pack(fill="x", pady=2)
+        ttk.Label(
+            ksp_version_row,
+            text="Kerbal Space Program",
+            anchor="w",
+            style="Card.TLabel",
+        ).pack(side="left", fill="x", expand=True)
+        self.ksp_version_status = ttk.Label(
+            ksp_version_row,
+            text="Checking...",
+            width=32,
+            anchor="e",
+            style="Card.TLabel",
+        )
+        self.ksp_version_status.pack(side="right")
+
+        dll_layout_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
+        dll_layout_row.pack(fill="x", pady=2)
+        ttk.Label(
+            dll_layout_row,
+            text="Core DLL layout",
+            anchor="w",
+            style="Card.TLabel",
+        ).pack(side="left", fill="x", expand=True)
+        self.dll_layout_status = ttk.Label(
+            dll_layout_row,
+            text="Checking...",
+            width=32,
+            anchor="e",
+            style="Card.TLabel",
+        )
+        self.dll_layout_status.pack(side="right")
+
+        self.prerequisite_status_labels = {}
+        for definition in KSP_PREREQUISITES:
+            row = ttk.Frame(prerequisites, style="CardInner.TFrame")
+            row.pack(fill="x", pady=2)
+            ttk.Label(
+                row,
+                text=definition["title"],
+                anchor="w",
+                style="Card.TLabel",
+            ).pack(side="left", fill="x", expand=True)
+            status = ttk.Label(
+                row,
+                text="Checking...",
+                width=32,
+                anchor="e",
+                style="Card.TLabel",
+            )
+            status.pack(side="right")
+            self.prerequisite_status_labels[definition["key"]] = status
+
+        server_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
+        server_row.pack(fill="x", pady=2)
+        ttk.Label(
+            server_row,
+            text="kRPC server configuration",
+            anchor="w",
+            style="Card.TLabel",
+        ).pack(side="left", fill="x", expand=True)
+        self.krpc_configuration_status = ttk.Label(
+            server_row,
+            text="Checking...",
+            width=32,
+            anchor="e",
+            style="Card.TLabel",
+        )
+        self.krpc_configuration_status.pack(side="right")
+
+        connection_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
+        connection_row.pack(fill="x", pady=2)
+        ttk.Label(
+            connection_row,
+            text="Live kRPC connection",
+            anchor="w",
+            style="Card.TLabel",
+        ).pack(side="left", fill="x", expand=True)
+        self.krpc_test_button = ttk.Button(
+            connection_row,
+            text="Test connection",
+            command=self._start_krpc_connection_test,
+        )
+        self.krpc_test_button.pack(side="right", padx=(7, 0))
+        self.krpc_connection_status = ttk.Label(
+            connection_row,
+            text="Not tested",
+            width=32,
+            anchor="e",
+            style="Card.TLabel",
+        )
+        self.krpc_connection_status.pack(side="right")
+
+        prerequisite_buttons = ttk.Frame(
+            prerequisites, style="CardInner.TFrame"
+        )
+        prerequisite_buttons.pack(fill="x", pady=(10, 0))
+        self.prerequisite_refresh_button = ttk.Button(
+            prerequisite_buttons,
+            text="Refresh all status",
+            command=self._refresh_all_ksp_status,
+        )
+        self.prerequisite_refresh_button.pack(side="left")
+        self.prerequisite_fix_button = ttk.Button(
+            prerequisite_buttons,
+            text="Review fixes",
+            command=self._show_prerequisite_fixes,
+            style="Accent.TButton",
+        )
+
         services = ttk.Frame(
             settings_frame, style="Card.TFrame", padding=(14, 12)
         )
@@ -981,7 +2115,7 @@ class App:
             status = ttk.Label(
                 row,
                 text="Checking...",
-                width=20,
+                width=44,
                 anchor="e",
                 style="Card.TLabel",
             )
@@ -1000,8 +2134,8 @@ class App:
         self.install_services_button.pack(side="left")
         ttk.Button(
             service_buttons,
-            text="Refresh status",
-            command=self._refresh_service_status,
+            text="Refresh all status",
+            command=self._refresh_all_ksp_status,
         ).pack(side="left", padx=(6, 0))
         self.open_gamedata_button = ttk.Button(
             service_buttons,
@@ -1062,6 +2196,7 @@ class App:
 
         self._drain_log()
         self._drain_update_queue()
+        self._drain_krpc_test_queue()
         self._refresh()
         if self.check_updates_var.get():
             self.root.after(300, lambda: self._start_update_check(use_cache=True))
@@ -1159,40 +2294,418 @@ class App:
             )
         else:
             self.ksp_root_status.config(
-                text="Optional: configure this to enable the Notes ship-log drawer.",
+                text=(
+                    "Choose the KSP folder to verify kRPC and mods, maintain "
+                    "services, and enable Notes."
+                ),
                 foreground=THEME["slate_dim"],
             )
         if hasattr(self, "service_status_labels"):
-            self._refresh_service_status()
+            self._refresh_all_ksp_status()
+
+    def _refresh_all_ksp_status(self):
+        self._refresh_prerequisite_status()
+        self._refresh_service_status()
+
+    def _refresh_prerequisite_status(self):
+        root = resolve_ksp_root(self.ksp_root_var.get())
+        ksp_installation = ksp_installation_inventory(self.ksp_root_var.get())
+        dll_layout = dll_layout_inventory(self.ksp_root_var.get())
+        ksp_status = ksp_installation["status"]
+        if ksp_status == "unconfigured":
+            ksp_text, ksp_color = "KSP folder required", THEME["slate_dim"]
+        elif ksp_status == "invalid":
+            ksp_text, ksp_color = "Not a complete KSP 1 install", THEME["warn"]
+        elif ksp_status == "current":
+            ksp_text = f"{ksp_installation['version']} tested"
+            ksp_color = THEME["green"]
+        elif ksp_status == "untested":
+            ksp_text = f"{ksp_installation['version']} - untested"
+            ksp_color = THEME["amber"]
+        else:
+            ksp_text, ksp_color = "Installed - version unknown", THEME["amber"]
+        self.ksp_version_status.config(text=ksp_text, foreground=ksp_color)
+
+        layout_status = dll_layout["status"]
+        if layout_status == "unconfigured":
+            layout_text, layout_color = "KSP folder required", THEME["slate_dim"]
+        elif layout_status == "issues":
+            issue_count = len(dll_layout["issues"])
+            layout_text = f"{issue_count} duplicate/misplaced issue(s)"
+            layout_color = THEME["warn"]
+        elif layout_status == "error":
+            layout_text, layout_color = "Scan incomplete", THEME["amber"]
+        else:
+            layout_text, layout_color = "No duplicate core DLLs", THEME["green"]
+        self.dll_layout_status.config(text=layout_text, foreground=layout_color)
+
+        inventory = prerequisite_inventory(self.ksp_root_var.get())
+        for item in inventory:
+            status = item["status"]
+            version = item["installed_version"]
+            if status == "unconfigured":
+                text, color = "KSP folder required", THEME["slate_dim"]
+            elif status == "missing":
+                qualifier = "required" if item["required"] else "staging only"
+                text, color = f"Missing - {qualifier}", THEME["warn"]
+            elif status == "current":
+                text, color = f"{item['tested_version']} tested", THEME["green"]
+            elif status == "untested":
+                text, color = f"{version} - untested", THEME["amber"]
+            else:
+                text, color = "Installed - version unknown", THEME["amber"]
+            self.prerequisite_status_labels[item["key"]].config(
+                text=text, foreground=color
+            )
+
+        configuration = krpc_configuration_inventory(self.ksp_root_var.get())
+        config_status = configuration["status"]
+        server = configuration.get("server")
+        if config_status == "unconfigured":
+            config_text, config_color = "KSP folder required", THEME["slate_dim"]
+        elif config_status == "missing":
+            config_text, config_color = "kRPC not installed", THEME["warn"]
+        elif config_status == "not_initialized":
+            config_text = f"Defaults expected: {KRPC_RPC_PORT} / {KRPC_STREAM_PORT}"
+            config_color = THEME["amber"]
+        elif config_status == "invalid":
+            config_text, config_color = "Could not read settings", THEME["warn"]
+        else:
+            config_text = (
+                f"RPC {server['rpc_port']} / stream {server['stream_port']}"
+            )
+            flags = []
+            if configuration.get("auto_start") is False:
+                flags.append("auto-start off")
+            if configuration.get("auto_accept") is False:
+                flags.append("auto-accept off")
+            if flags:
+                config_text += " - " + ", ".join(flags)
+            config_color = (
+                THEME["green"]
+                if config_status == "current" and not flags
+                else THEME["amber"]
+            )
+        self.krpc_configuration_status.config(
+            text=config_text, foreground=config_color
+        )
+        self._refresh_live_krpc_status()
+        self.prerequisite_fix_items = (
+            installation_recommendations(ksp_installation, dll_layout)
+            + prerequisite_recommendations(inventory, configuration)
+            + live_connection_recommendations(self.live_krpc_state)
+        )
+        if self.prerequisite_fix_items:
+            self.prerequisite_fix_button.config(
+                text=f"Review fixes ({len(self.prerequisite_fix_items)})"
+            )
+            if not self.prerequisite_fix_button.winfo_manager():
+                self.prerequisite_fix_button.pack(side="left", padx=(6, 0))
+        elif self.prerequisite_fix_button.winfo_manager():
+            self.prerequisite_fix_button.pack_forget()
+
+        statuses = {item["key"]: item["status"] for item in inventory}
+        optional_attention = any(
+            statuses.get(key) in {"missing", "untested", "unknown_version"}
+            for key in ("krpc_mechjeb", "mechjeb")
+        )
+        if root is None:
+            summary_text, summary_color = "Choose a KSP folder", THEME["slate_dim"]
+        elif ksp_status == "invalid":
+            summary_text, summary_color = "Wrong KSP folder", THEME["warn"]
+        elif layout_status == "issues":
+            summary_text, summary_color = "DLL layout needs attention", THEME["warn"]
+        elif statuses.get("krpc") == "missing":
+            summary_text, summary_color = "kRPC required", THEME["warn"]
+        elif config_status in {"custom", "invalid"}:
+            summary_text, summary_color = "Setup needs attention", THEME["warn"]
+        elif statuses.get("krpc") in {"untested", "unknown_version"}:
+            summary_text, summary_color = "kRPC version untested", THEME["amber"]
+        elif config_status == "not_initialized":
+            summary_text, summary_color = "kRPC not initialized", THEME["amber"]
+        elif optional_attention:
+            summary_text, summary_color = "Core ready; check staging mods", THEME["amber"]
+        elif (
+            configuration.get("auto_start") is False
+            or configuration.get("auto_accept") is False
+        ):
+            summary_text, summary_color = "Manual kRPC action needed", THEME["amber"]
+        else:
+            summary_text, summary_color = "Prerequisites tested", THEME["green"]
+        self.prerequisite_summary.config(
+            text=summary_text, foreground=summary_color
+        )
+
+    def _refresh_live_krpc_status(self):
+        status = self.live_krpc_state.get("status", "not_tested")
+        if status == "testing":
+            text, color = "Testing...", THEME["amber"]
+        elif status == "connected":
+            version = self.live_krpc_state.get("server_version")
+            suffix = f" - server {version}" if version else ""
+            text, color = f"Connected{suffix}", THEME["green"]
+        elif status == "runtime_connected":
+            text, color = "Connected through running tool", THEME["green"]
+        elif status == "service_issue":
+            count = len(self.live_krpc_state.get("missing_services", []))
+            text, color = f"Connected - {count} service issue(s)", THEME["amber"]
+        elif status == "retry_exhausted":
+            text, color = "Startup timed out - test connection", THEME["amber"]
+        elif status == "failed":
+            text, color = "Connection failed - review/test", THEME["amber"]
+        else:
+            text, color = "Not tested", THEME["slate_dim"]
+        self.krpc_connection_status.config(text=text, foreground=color)
+
+    def _start_krpc_connection_test(self):
+        if self.krpc_test_checking:
+            return
+        self.krpc_test_generation += 1
+        generation = self.krpc_test_generation
+        self.krpc_test_checking = True
+        self.live_krpc_state = {"status": "testing"}
+        self.krpc_test_button.config(state="disabled")
+        self._refresh_live_krpc_status()
+
+        def worker():
+            try:
+                result = probe_krpc_connection()
+            except Exception as exc:
+                self.krpc_test_queue.put((generation, "error", str(exc)))
+            else:
+                self.krpc_test_queue.put((generation, "result", result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _drain_krpc_test_queue(self):
+        try:
+            while True:
+                generation, kind, payload = self.krpc_test_queue.get_nowait()
+                if generation != self.krpc_test_generation:
+                    continue
+                self.krpc_test_checking = False
+                self.krpc_test_button.config(state="normal")
+                if kind == "error":
+                    self.live_krpc_state = {
+                        "status": "failed",
+                        "error": payload,
+                    }
+                    self._enqueue(
+                        "preflight", f"live kRPC connection test failed: {payload}"
+                    )
+                else:
+                    prerequisites = prerequisite_inventory(
+                        self.ksp_root_var.get()
+                    )
+                    services = service_inventory(self.ksp_root_var.get())
+                    expected = expected_krpc_services(prerequisites, services)
+                    missing = [
+                        title
+                        for attribute, title in expected.items()
+                        if not payload["services"].get(attribute, False)
+                    ]
+                    self.live_krpc_state = {
+                        "status": "service_issue" if missing else "connected",
+                        "server_version": payload.get("server_version"),
+                        "missing_services": missing,
+                    }
+                    if missing:
+                        self._enqueue(
+                            "preflight",
+                            "live kRPC test connected, but services were missing: "
+                            + ", ".join(missing),
+                        )
+                    else:
+                        self._enqueue(
+                            "preflight", "live kRPC connection and services passed."
+                        )
+                self._refresh_prerequisite_status()
+        except queue.Empty:
+            pass
+        self.root.after(100, self._drain_krpc_test_queue)
+
+    def _show_prerequisite_fixes(self):
+        self._refresh_prerequisite_status()
+        if not self.prerequisite_fix_items:
+            messagebox.showinfo(
+                "kRPC prerequisites",
+                "No prerequisite mismatches need attention.",
+                parent=self.root,
+            )
+            return
+        if (
+            self.prerequisite_fix_dialog is not None
+            and self.prerequisite_fix_dialog.winfo_exists()
+        ):
+            self.prerequisite_fix_dialog.lift()
+            self.prerequisite_fix_dialog.focus_set()
+            return
+
+        dialog = tk.Toplevel(self.root)
+        self.prerequisite_fix_dialog = dialog
+        dialog.title("Suggested kRPC prerequisite fixes")
+        dialog.transient(self.root)
+        dialog.resizable(True, True)
+        dialog.configure(background=THEME["bg"])
+        dialog.protocol("WM_DELETE_WINDOW", self._close_prerequisite_fixes)
+
+        frame = ttk.Frame(dialog, padding=(18, 16))
+        frame.pack(fill="both", expand=True)
+        ttk.Label(
+            frame,
+            text="KRPC SETUP RECOMMENDATIONS",
+            style="DialogTitle.TLabel",
+        ).pack(anchor="w")
+        ttk.Label(
+            frame,
+            text=(
+                "Mission Control found the following differences in the "
+                "selected KSP installation. These are recommendations only; "
+                "no third-party files will be changed."
+            ),
+            foreground=THEME["slate"],
+            justify="left",
+            wraplength=700,
+        ).pack(fill="x", pady=(4, 10))
+
+        details = scrolledtext.ScrolledText(
+            frame,
+            width=86,
+            height=24,
+            wrap="word",
+            state="normal",
+            font=UI_FONT,
+            background=THEME["input"],
+            foreground=THEME["slate"],
+            insertbackground=THEME["cyan"],
+            selectbackground="#24485a",
+            selectforeground="#eef3f8",
+            borderwidth=0,
+            relief="flat",
+            padx=10,
+            pady=9,
+        )
+        details.pack(fill="both", expand=True)
+        details.tag_configure(
+            "issue",
+            foreground=THEME["amber"],
+            font=(UI_FONT_FAMILY, 11, "bold"),
+        )
+        details.tag_configure("label", foreground=THEME["cyan"])
+        details.tag_configure("note", foreground=THEME["slate_dim"])
+        for index, item in enumerate(self.prerequisite_fix_items, start=1):
+            details.insert("end", f"{index}. {item['title']}\n", "issue")
+            details.insert("end", "Observed: ", "label")
+            details.insert("end", item["observed"] + "\n")
+            details.insert("end", "Mission Control expects: ", "label")
+            details.insert("end", item["expected"] + "\n")
+            details.insert("end", "Suggested fix: ", "label")
+            details.insert("end", item["fix"] + "\n\n")
+        details.insert(
+            "end",
+            "Close KSP before changing mod versions through CKAN or replacing "
+            "GameData files. Refresh the prerequisite status afterward.",
+            "note",
+        )
+        details.config(state="disabled")
+        details.yview_moveto(0)
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(10, 0))
+        ttk.Button(
+            buttons,
+            text="Close",
+            width=10,
+            command=self._close_prerequisite_fixes,
+        ).pack(side="right")
+
+        dialog.update_idletasks()
+        width = min(780, max(620, dialog.winfo_reqwidth()))
+        height = min(600, max(440, dialog.winfo_reqheight()))
+        x = self.root.winfo_rootx() + max(0, (self.root.winfo_width() - width) // 2)
+        y = self.root.winfo_rooty() + max(0, (self.root.winfo_height() - height) // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+        dialog.focus_set()
+
+    def _close_prerequisite_fixes(self):
+        dialog = self.prerequisite_fix_dialog
+        self.prerequisite_fix_dialog = None
+        if dialog is not None:
+            dialog.destroy()
 
     def _refresh_service_status(self):
         root = resolve_ksp_root(self.ksp_root_var.get())
         inventory = service_inventory(self.ksp_root_var.get())
-        presentation = {
-            "unconfigured": ("KSP folder required", THEME["slate_dim"]),
-            "package_missing": ("Not in this package", THEME["warn"]),
-            "missing": ("Missing", THEME["warn"]),
-            "different": ("Repair available", THEME["amber"]),
-            "current": ("Current", THEME["green"]),
-        }
         counts = {}
         for item in inventory:
-            counts[item["status"]] = counts.get(item["status"], 0) + 1
-            text, color = presentation[item["status"]]
+            status = item["status"]
+            counts[status] = counts.get(status, 0) + 1
+            version = item["installed_version"]
+            package_available = item["source_hash"] is not None
+            if status == "unconfigured":
+                text, color = "KSP folder required", THEME["slate_dim"]
+            elif status == "current":
+                text, color = f"v{item['tested_version']} current", THEME["green"]
+            elif status == "current_package_missing":
+                text = f"v{version} current - not in package"
+                color = THEME["amber"]
+            elif status == "current_different":
+                text = f"v{version} current - package build differs"
+                color = THEME["amber"]
+            elif status == "unverified_package_missing":
+                text = "Installed - not in package; version unverified"
+                color = THEME["amber"]
+            elif status == "missing":
+                suffix = "repair ready" if package_available else "not in package"
+                text, color = f"Missing - {suffix}", THEME["warn"]
+            elif status == "outdated":
+                suffix = "repair ready" if package_available else "not in package"
+                text, color = f"v{version} outdated - {suffix}", THEME["warn"]
+            elif status == "version_mismatch":
+                suffix = "repair ready" if package_available else "not in package"
+                text, color = f"v{version} mismatch - {suffix}", THEME["warn"]
+            else:
+                text, color = "Different build - repair ready", THEME["warn"]
             self.service_status_labels[item["folder"]].config(
                 text=text, foreground=color
             )
 
-        needs_install = counts.get("missing", 0) + counts.get("different", 0)
-        package_missing = counts.get("package_missing", 0)
+        needs_install = sum(
+            item["source_hash"] is not None
+            and item["source_hash"] != item["target_hash"]
+            for item in inventory
+        )
+        package_missing = sum(item["source_hash"] is None for item in inventory)
+        installed_issues = sum(
+            item["status"]
+            in {"missing", "outdated", "version_mismatch", "different"}
+            for item in inventory
+        )
+        installed_current = sum(
+            item["status"]
+            in {"current", "current_package_missing", "current_different"}
+            for item in inventory
+        )
         if root is None:
             summary_text = "Choose a KSP folder"
             summary_color = THEME["slate_dim"]
-        elif package_missing:
-            summary_text = "Package incomplete"
+        elif installed_issues and package_missing:
+            summary_text = (
+                f"{installed_issues} installed service issue(s); package incomplete"
+            )
             summary_color = THEME["warn"]
-        elif needs_install:
-            summary_text = f"{needs_install} service update(s) ready"
+        elif installed_issues:
+            summary_text = f"{installed_issues} installed service repair(s) ready"
+            summary_color = THEME["warn"]
+        elif package_missing:
+            summary_text = (
+                "Installed services current; package incomplete"
+                if installed_current == len(inventory)
+                else "Installed services present; package incomplete"
+            )
+            summary_color = THEME["amber"]
+        elif counts.get("current_different", 0):
+            summary_text = "Installed versions current; package builds differ"
             summary_color = THEME["amber"]
         else:
             summary_text = "All services current"
@@ -1221,7 +2734,8 @@ class App:
         changes = [
             item
             for item in inventory
-            if item["status"] in {"missing", "different"}
+            if item["source_hash"] is not None
+            and item["source_hash"] != item["target_hash"]
         ]
         if not changes:
             messagebox.showinfo(
@@ -1233,7 +2747,7 @@ class App:
 
         action_lines = "\n".join(
             f"  - {item['title']}: "
-            + ("install" if item["status"] == "missing" else "replace")
+            + ("install" if item["target_hash"] is None else "replace")
             for item in changes
         )
         confirmed = messagebox.askyesno(
@@ -1303,6 +2817,7 @@ class App:
         if raw and root is None:
             self._refresh_ksp_root_status()
             return False
+        previous_root = self.settings.get("ksp_root", "")
         self.settings["ksp_root"] = str(root) if root is not None else ""
         self.ksp_root_var.set(self.settings["ksp_root"])
         try:
@@ -1310,6 +2825,8 @@ class App:
         except OSError as exc:
             self._enqueue("launcher", f"couldn't save KSP folder: {exc}")
             return False
+        if self.settings["ksp_root"] != previous_root:
+            self.live_krpc_state = {"status": "not_tested"}
         self._refresh_ksp_root_status()
         return True
 
@@ -1336,6 +2853,17 @@ class App:
         try:
             while True:
                 line = self.log_queue.get_nowait()
+                if KRPC_CONNECTED_EVENT in line:
+                    self.live_krpc_state = {"status": "runtime_connected"}
+                    self._refresh_prerequisite_status()
+                    continue
+                if KRPC_RETRY_EXHAUSTED_EVENT in line:
+                    self.live_krpc_state = {
+                        "status": "retry_exhausted",
+                        "error": "A Mission Control tool exhausted 10 connection attempts",
+                    }
+                    self._refresh_prerequisite_status()
+                    continue
                 self.logbox.configure(state="normal")
                 self.logbox.insert("end", line + "\n")
                 self.logbox.see("end")
@@ -1590,6 +3118,8 @@ class App:
                 widget.insert("end", stripped.lstrip("# ") + "\n", "heading")
             elif stripped.startswith("- "):
                 widget.insert("end", "\u2022 " + stripped[2:] + "\n", "bullet")
+            elif re.fullmatch(r"!\[[^]]*\]\([^)]+\)", stripped):
+                continue
             else:
                 widget.insert("end", line + "\n")
         widget.config(state="disabled")
@@ -1616,6 +3146,24 @@ class App:
     def _toggle(self, backend, open_dashboard):
         if backend.running():
             backend.stop()
+            return
+
+        preflight = component_preflight(
+            self.ksp_root_var.get(), backend.name
+        )
+        for warning in preflight["warnings"]:
+            self._enqueue("preflight", warning)
+        if preflight["errors"]:
+            details = "\n\n".join(preflight["errors"])
+            self._enqueue(
+                "preflight", "start blocked: " + " ".join(preflight["errors"])
+            )
+            messagebox.showerror(
+                "kRPC setup needs attention",
+                details,
+                parent=self.root,
+            )
+            self._refresh_all_ksp_status()
             return
 
         started = backend.start()

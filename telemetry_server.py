@@ -28,6 +28,10 @@ import krpc
 
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
 TELEMETRY_HZ = 4          # dashboard update rate
+KRPC_RETRY_SECONDS = 2
+KRPC_MAX_ATTEMPTS = 10
+KRPC_CONNECTED_EVENT = "WOOBIE_EVENT:KRPC_CONNECTED"
+KRPC_RETRY_EXHAUSTED_EVENT = "WOOBIE_EVENT:KRPC_RETRY_EXHAUSTED"
 
 # Poll tiers. Flight/orbit/navball values are inexpensive and update every tick.
 # Data that requires many RPC round trips is throttled and cached.
@@ -125,6 +129,49 @@ def connect_krpc(name):
     conn = krpc.connect(name=name)
     print(f"Connected to kRPC ({name}).")
     return conn
+
+
+def krpc_wait_message(error):
+    """Return an actionable retry message for common local kRPC failures."""
+    refused = isinstance(error, ConnectionRefusedError) or getattr(
+        error, "winerror", None
+    ) == 10061
+    if refused:
+        return (
+            "[telemetry] kRPC refused the connection at 127.0.0.1:50000. "
+            "Load a KSP save (the main menu is not enough), then start or "
+            "auto-start kRPC using RPC 50000 / Stream 50001. Port 8090 belongs "
+            "to Mission Control's browser telemetry feed."
+        )
+    return f"[telemetry] waiting for kRPC server... ({error})"
+
+
+def connect_krpc_with_retry(
+    name,
+    connector=connect_krpc,
+    attempts=KRPC_MAX_ATTEMPTS,
+    retry_seconds=KRPC_RETRY_SECONDS,
+    sleeper=time.sleep,
+):
+    """Try a bounded number of times and return a kRPC connection or ``None``."""
+    for attempt in range(1, attempts + 1):
+        try:
+            connection = connector(name)
+            print(KRPC_CONNECTED_EVENT)
+            return connection
+        except Exception as error:
+            print(
+                f"{krpc_wait_message(error)} "
+                f"(attempt {attempt}/{attempts})"
+            )
+            if attempt < attempts:
+                sleeper(retry_seconds)
+    print(KRPC_RETRY_EXHAUSTED_EVENT)
+    print(
+        "[telemetry] kRPC connection attempts exhausted. Use Mission Control's "
+        "Test connection action after checking KSP and kRPC."
+    )
+    return None
 
 
 def _stage_summary(snapshot):
@@ -1702,15 +1749,11 @@ def run_telemetry_server(host, port):
     except ImportError:
         print("[telemetry] 'websockets' not installed -- dashboard feed disabled.")
         print("[telemetry] Install with:  pip install websockets")
-        return
+        return False
 
-    tconn = None
-    while tconn is None:
-        try:
-            tconn = connect_krpc("KSP Dashboard Telemetry")
-        except Exception as e:
-            print(f"[telemetry] waiting for kRPC server... ({e})")
-            time.sleep(2)
+    tconn = connect_krpc_with_retry("KSP Dashboard Telemetry")
+    if tconn is None:
+        return False
 
     print(f"[telemetry] serving dashboard on ws://{host}:{port}  ({TELEMETRY_HZ} Hz)")
     clients = set()
@@ -1764,6 +1807,8 @@ def run_telemetry_server(host, port):
         asyncio.run(serve())
     except Exception as e:
         print(f"[telemetry] server stopped: {e}")
+        return False
+    return True
 
 
 def main():
@@ -1776,12 +1821,14 @@ def main():
         print("WARNING: this read-only telemetry feed has no authentication.")
         print(f"Network binding is enabled on {host}; use only a trusted network.")
 
-    run_telemetry_server(host, port)
+    return 0 if run_telemetry_server(host, port) else 2
 
 
 if __name__ == "__main__":
     try:
-        main()
+        exit_code = main()
+        if exit_code:
+            raise SystemExit(exit_code)
     except KeyboardInterrupt:
         print("\nStopped.")
     except Exception:

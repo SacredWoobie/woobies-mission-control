@@ -89,7 +89,7 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Guided KSP service maintenance", section)
+        self.assertIn("KSP & kRPC compatibility preflight", section)
 
 
 if __name__ == "__main__":
