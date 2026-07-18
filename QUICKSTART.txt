@@ -33,5 +33,14 @@ WOOBIE'S MISSION CONTROL - WINDOWS QUICK START
    In the Mission Control launcher, start Dashboard feed (telemetry). The
    dashboard opens in your browser automatically.
 
+   OPTIONAL NOTES INTEGRATION: Before starting the feed, choose the main KSP
+   installation folder in the launcher's KSP installation section. Select the
+   folder that contains GameData, not GameData itself. When the Notes mod is
+   detected, a Notes button appears in the dashboard during flight and opens
+   the active vessel's ship log in a right-side drawer. Select any saved note
+   and choose Pin to flight to show it in a scrollable final flight panel.
+   Use A- and A+ in either Notes view to adjust text size; click the size value
+   to return to the default.
+
 For component choices, compatibility information, troubleshooting, and ESP32
 control-pad instructions, see README.md.

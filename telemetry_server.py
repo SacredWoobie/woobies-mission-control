@@ -22,6 +22,8 @@ import math
 import os
 import sys
 import time
+from pathlib import Path
+
 import krpc
 
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
@@ -36,6 +38,9 @@ RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
+NOTES_POLL_SECONDS = 2.0
+NOTES_MAX_BYTES = 32 * 1024
+NOTES_MAX_CATALOG = 500
 STAGE_TRACE_ENABLED = os.environ.get("WOOBIE_STAGE_TRACE", "").casefold() in {
     "1", "true", "yes", "on",
 }
@@ -63,6 +68,12 @@ _stage_cache = {}
 _stage_last_poll = 0.0
 _stage_last_ut = None
 _stage_trace_last_published = None
+_notes_cache = {}
+_notes_last_poll = 0.0
+_notes_cache_key = None
+_notes_selected_path = None
+_notes_pinned_path = None
+_notes_favorites = None
 
 # MechJeb recalculates editor craft asynchronously. The service exposes an
 # editor_stable flag; the server also requires two matching snapshots before
@@ -74,6 +85,21 @@ _editor_stage_last_poll = 0.0
 _editor_stage_candidate = None
 _editor_stage_candidate_hits = 0
 _telemetry_mode = None
+
+_NOTES_PLUGIN_DATA = Path("Plugins") / "PluginData" / "notes"
+
+
+def _default_notes_favorites_path():
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return (
+            Path(local_app_data) / "WoobiesMissionControl" /
+            "notes_favorites.json"
+        )
+    return Path.home() / ".woobies-mission-control" / "notes_favorites.json"
+
+
+NOTES_FAVORITES_PATH = _default_notes_favorites_path()
 
 # Current-stage resource ownership is inferred only when one decouple group
 # contains multiple engine stages. Cache the part assignment until the vessel
@@ -383,6 +409,320 @@ def _resource_values_for_parts(parts):
                 previous_maximum + maximum,
             )
     return values
+
+
+# ---------------------------------------------------------------------------
+# Notes mod compatibility (zer0Kerbal/Notes)
+# ---------------------------------------------------------------------------
+def _load_notes_favorites(path=None):
+    """Load saved relative note paths, returning an empty set on bad data."""
+    if path is None:
+        path = NOTES_FAVORITES_PATH
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return set()
+    if not isinstance(payload, dict) or not isinstance(payload.get("favorites"), list):
+        return set()
+    return {
+        value.replace("\\", "/")
+        for value in payload["favorites"]
+        if isinstance(value, str) and value and len(value) <= 1024
+    }
+
+
+def _save_notes_favorites(favorites, path=None):
+    """Atomically persist favorite note keys outside the Notes mod folder."""
+    if path is None:
+        path = NOTES_FAVORITES_PATH
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps({"favorites": sorted(favorites, key=str.casefold)}, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def _get_notes_favorites():
+    global _notes_favorites
+    if _notes_favorites is None:
+        _notes_favorites = _load_notes_favorites()
+    return set(_notes_favorites)
+
+
+def _resolve_notes_dir(ksp_root=None):
+    """Return the installed Notes text directory, or ``None``.
+
+    A configured KSP root is authoritative. Relative fallbacks retain the
+    convenient source-checkout/KSP_ROOT/Dashboard development arrangement.
+    Both directory casings are accepted for provisional non-Windows support.
+    """
+    configured = ksp_root
+    if configured is None:
+        configured = os.environ.get("WOOBIE_KSP_ROOT", "").strip()
+
+    if configured:
+        roots = [Path(os.path.expandvars(str(configured))).expanduser()]
+    else:
+        script_dir = Path(__file__).resolve().parent
+        roots = [Path.cwd().parent, Path.cwd(), script_dir.parent, script_dir]
+
+    seen = set()
+    for root in roots:
+        try:
+            root = root.resolve(strict=False)
+        except (OSError, RuntimeError):
+            continue
+        for mod_folder in ("Notes", "notes"):
+            candidate = root / "GameData" / mod_folder / _NOTES_PLUGIN_DATA
+            try:
+                candidate = candidate.resolve(strict=False)
+                key = os.path.normcase(str(candidate))
+                if key in seen:
+                    continue
+                seen.add(key)
+                if candidate.is_dir():
+                    return candidate
+            except (OSError, RuntimeError):
+                pass
+    return None
+
+
+def _list_note_paths(notes_dir):
+    """Return saved Notes text files in a stable, searchable order."""
+    paths = []
+    try:
+        candidates = notes_dir.rglob("*.txt")
+    except OSError:
+        return paths
+    for path in candidates:
+        try:
+            if path.is_file():
+                paths.append(path)
+        except OSError:
+            continue
+    return sorted(
+        paths,
+        key=lambda path: path.relative_to(notes_dir).as_posix().casefold(),
+    )
+
+
+def _find_active_note(notes_dir, vessel_name, note_paths=None):
+    """Find the newest exact ship-log match, including Notes subfolders."""
+    if not vessel_name:
+        return None
+    expected = f"log_{vessel_name}"
+    matches = []
+    for path in note_paths if note_paths is not None else _list_note_paths(notes_dir):
+        try:
+            if path.stem == expected:
+                matches.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    return max(matches, default=(None, None), key=lambda item: item[0])[1]
+
+
+def _read_note_tail(path, max_bytes=NOTES_MAX_BYTES):
+    """Return a bounded UTF-8 tail and whether content was truncated."""
+    with path.open("rb") as stream:
+        stream.seek(0, 2)
+        byte_size = stream.tell()
+        start = max(0, byte_size - max_bytes)
+        stream.seek(start)
+        raw = stream.read(max_bytes)
+
+    text = raw.decode("utf-8", errors="replace")
+    if start:
+        # The first decoded line may begin in the middle of a multibyte value or
+        # log entry. Drop it when possible so the visible tail starts cleanly.
+        _discarded, separator, remainder = text.partition("\n")
+        if separator:
+            text = remainder
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text, start > 0, byte_size
+
+
+def _note_payload(path, notes_dir):
+    """Return bounded content and metadata for one catalogued note."""
+    stat = path.stat()
+    text, truncated, byte_size = _read_note_tail(path)
+    return {
+        "name": path.stem,
+        "relativePath": path.relative_to(notes_dir).as_posix(),
+        "modified": stat.st_mtime,
+        "size": byte_size,
+        "text": text,
+        "truncated": truncated,
+    }
+
+
+def _gather_notes(
+        vessel_name, ksp_root=None, selected_path=None, favorites=None,
+        pinned_path=None):
+    """Read the active log, catalog, browsed note, and flight-panel note."""
+    notes_dir = _resolve_notes_dir(ksp_root)
+    if notes_dir is None:
+        return {
+            "notes.available": False,
+            "notes.activeFound": False,
+            "notes.message": "Notes mod folder not found.",
+            "notes.active": None,
+            "notes.selected": None,
+            "notes.selectedPath": "",
+            "notes.selectionMode": "active",
+            "notes.pinned": None,
+            "notes.pinnedPath": "",
+            "notes.catalog": [],
+            "notes.catalogTruncated": False,
+        }
+
+    favorite_paths = set(favorites or ())
+    note_paths = _list_note_paths(notes_dir)
+    note_paths.sort(key=lambda path: (
+        0 if path.relative_to(notes_dir).as_posix() in favorite_paths else 1,
+        path.relative_to(notes_dir).as_posix().casefold(),
+    ))
+    active_path = _find_active_note(notes_dir, vessel_name, note_paths)
+    selected_lookup = selected_path.replace("\\", "/") if isinstance(selected_path, str) else None
+    selected_note_path = next(
+        (
+            path for path in note_paths
+            if path.relative_to(notes_dir).as_posix() == selected_lookup
+        ),
+        None,
+    )
+    pinned_lookup = pinned_path.replace("\\", "/") if isinstance(pinned_path, str) else None
+    pinned_note_path = next(
+        (
+            path for path in note_paths
+            if path.relative_to(notes_dir).as_posix() == pinned_lookup
+        ),
+        None,
+    )
+    selection_mode = "browse" if selected_note_path is not None else "active"
+    if selected_note_path is None:
+        selected_note_path = active_path
+
+    catalog_truncated = len(note_paths) > NOTES_MAX_CATALOG
+    catalog_paths = note_paths[:NOTES_MAX_CATALOG]
+    for important_path in (active_path, selected_note_path, pinned_note_path):
+        if important_path is not None and important_path not in catalog_paths:
+            # Keep context-critical entries even when the ordinary catalog cap
+            # has been reached. This can exceed the cap by at most three.
+            catalog_paths.append(important_path)
+    catalog_paths = sorted(
+        set(catalog_paths),
+        key=lambda path: (
+            0 if path.relative_to(notes_dir).as_posix() in favorite_paths else 1,
+            path.relative_to(notes_dir).as_posix().casefold(),
+        ),
+    )
+    catalog = []
+    for path in catalog_paths:
+        try:
+            stat = path.stat()
+            relative_path = path.relative_to(notes_dir).as_posix()
+            catalog.append({
+                "name": path.stem,
+                "relativePath": relative_path,
+                "modified": stat.st_mtime,
+                "size": stat.st_size,
+                "isActiveLog": path == active_path,
+                "isFavorite": relative_path in favorite_paths,
+            })
+        except (OSError, ValueError):
+            continue
+
+    active_note = None
+    selected_note = None
+    pinned_note = None
+    try:
+        if active_path is not None:
+            active_note = _note_payload(active_path, notes_dir)
+        if selected_note_path == active_path:
+            selected_note = active_note
+        elif selected_note_path is not None:
+            selected_note = _note_payload(selected_note_path, notes_dir)
+        if pinned_note_path == active_path:
+            pinned_note = active_note
+        elif pinned_note_path == selected_note_path:
+            pinned_note = selected_note
+        elif pinned_note_path is not None:
+            pinned_note = _note_payload(pinned_note_path, notes_dir)
+    except (OSError, ValueError):
+        if selected_note_path == active_path:
+            active_note = None
+        selected_note = None
+        pinned_note = None
+
+    if selected_note is not None and selection_mode == "browse":
+        message = "Saved note selected."
+    elif active_note is not None:
+        message = ""
+    elif note_paths:
+        message = "No ship log exists for the active vessel. Choose another saved note."
+    else:
+        message = "No saved notes were found."
+
+    return {
+        "notes.available": True,
+        "notes.activeFound": active_note is not None,
+        "notes.message": message,
+        "notes.active": active_note,
+        "notes.selected": selected_note,
+        "notes.selectedPath": (
+            selected_note["relativePath"] if selected_note is not None else ""
+        ),
+        "notes.selectionMode": selection_mode,
+        "notes.pinned": pinned_note,
+        "notes.pinnedPath": (
+            pinned_note["relativePath"] if pinned_note is not None else ""
+        ),
+        "notes.catalog": catalog,
+        "notes.catalogTruncated": catalog_truncated,
+    }
+
+
+def _attach_notes_telemetry(data, vessel_name="", now=None):
+    """Attach cached Notes data in flight, editor, and inactive scenes."""
+    global _notes_cache, _notes_last_poll, _notes_cache_key
+    global _notes_selected_path, _notes_pinned_path
+
+    if now is None:
+        now = time.time()
+    notes_key = (os.environ.get("WOOBIE_KSP_ROOT", ""), vessel_name)
+    if notes_key != _notes_cache_key:
+        _notes_cache_key = notes_key
+        _notes_cache = {}
+        _notes_last_poll = 0.0
+    if now - _notes_last_poll >= NOTES_POLL_SECONDS:
+        _notes_last_poll = now
+        try:
+            _notes_cache = _gather_notes(
+                vessel_name,
+                selected_path=_notes_selected_path,
+                favorites=_get_notes_favorites(),
+                pinned_path=_notes_pinned_path,
+            )
+        except Exception:
+            _notes_cache = {
+                "notes.available": False,
+                "notes.activeFound": False,
+                "notes.message": "Notes scan failed.",
+                "notes.active": None,
+                "notes.selected": None,
+                "notes.selectedPath": "",
+                "notes.selectionMode": "active",
+                "notes.pinned": None,
+                "notes.pinnedPath": "",
+                "notes.catalog": [],
+                "notes.catalogTruncated": False,
+            }
+    data.update(_notes_cache)
+    return data
 
 
 def _current_stage_resource_values(vessel, current_stage):
@@ -809,8 +1149,68 @@ def _gather_editor_telemetry(conn, facility):
 
 
 def _apply_telemetry_command(conn, command):
-    """Apply a dashboard editor-condition command on the telemetry connection."""
-    if not isinstance(command, dict) or command.get("type") != "editor.conditions":
+    """Apply a dashboard command on the telemetry connection."""
+    global _notes_selected_path, _notes_pinned_path
+    global _notes_cache, _notes_last_poll
+    global _notes_favorites
+
+    if not isinstance(command, dict):
+        return
+
+    if command.get("type") == "notes.pin":
+        pinned = command.get("relativePath")
+        if pinned is None or pinned == "":
+            _notes_pinned_path = None
+        elif isinstance(pinned, str) and len(pinned) <= 1024:
+            # As with selection, retain only a catalog key. _gather_notes must
+            # discover an exact match before any content can be read.
+            _notes_pinned_path = pinned.replace("\\", "/")
+        _notes_cache = {}
+        _notes_last_poll = 0.0
+        return
+
+    if command.get("type") == "notes.select":
+        selected = command.get("relativePath")
+        if selected is None or selected == "":
+            _notes_selected_path = None
+        elif isinstance(selected, str) and len(selected) <= 1024:
+            # This is only a catalog key. _gather_notes resolves it by exact
+            # match against discovered files and never joins it to the disk.
+            _notes_selected_path = selected.replace("\\", "/")
+        _notes_cache = {}
+        _notes_last_poll = 0.0
+        return
+
+    if command.get("type") == "notes.favorite":
+        relative_path = command.get("relativePath")
+        favorite = command.get("favorite")
+        if not isinstance(relative_path, str) or not isinstance(favorite, bool):
+            return
+        relative_path = relative_path.replace("\\", "/")
+        notes_dir = _resolve_notes_dir()
+        if notes_dir is None:
+            return
+        valid_paths = {
+            path.relative_to(notes_dir).as_posix()
+            for path in _list_note_paths(notes_dir)
+        }
+        if relative_path not in valid_paths:
+            return
+        favorites = _get_notes_favorites()
+        if favorite:
+            favorites.add(relative_path)
+        else:
+            favorites.discard(relative_path)
+        try:
+            _save_notes_favorites(favorites)
+        except OSError:
+            return
+        _notes_favorites = favorites
+        _notes_cache = {}
+        _notes_last_poll = 0.0
+        return
+
+    if command.get("type") != "editor.conditions":
         return
 
     try:
@@ -981,15 +1381,17 @@ def gather_telemetry(conn):
             _reset_editor_stage_state()
 
         if mode == "editor_vab":
-            return _gather_editor_telemetry(conn, "VAB")
+            return _attach_notes_telemetry(
+                _gather_editor_telemetry(conn, "VAB"))
         if mode == "editor_sph":
-            return _gather_editor_telemetry(conn, "SPH")
+            return _attach_notes_telemetry(
+                _gather_editor_telemetry(conn, "SPH"))
         if mode != "flight":
-            return {
+            return _attach_notes_telemetry({
                 "context.mode": "inactive",
                 "flight.active": False,
                 "editor.active": False,
-            }
+            })
     except Exception:
         pass
 
@@ -1001,11 +1403,11 @@ def gather_telemetry(conn):
         # example, the tracking station, space center, main menu, or a scene
         # load). The dashboard uses this mode to show its inactive-scene overlay
         # instead of guessing from absent keys.
-        return {
+        return _attach_notes_telemetry({
             "context.mode": "inactive",
             "flight.active": False,
             "editor.active": False,
-        }
+        })
 
     d["context.mode"] = "flight"
     d["flight.active"] = True
@@ -1014,6 +1416,11 @@ def gather_telemetry(conn):
 
     # ---- clocks (every tick) ----
     universal_time = None
+    try:
+        d["v.name"] = vessel.name
+    except Exception:
+        d["v.name"] = ""
+
     try:
         universal_time = sc.ut
         d["t.universalTime"] = universal_time
@@ -1269,7 +1676,7 @@ def gather_telemetry(conn):
             _elec_cache = elec
     d.update(_elec_cache)
 
-    return d
+    return _attach_notes_telemetry(d, d.get("v.name", ""), now)
 
 
 # ---------------------------------------------------------------------------
@@ -1316,7 +1723,9 @@ def run_telemetry_server(host, port):
                 try:
                     command = json.loads(raw)
                     if (isinstance(command, dict) and
-                            command.get("type") == "editor.conditions"):
+                            command.get("type") in {
+                                "editor.conditions", "notes.select", "notes.pin",
+                                "notes.favorite"}):
                         await commands.put(command)
                 except (TypeError, ValueError, json.JSONDecodeError):
                     pass

@@ -28,6 +28,7 @@
     --sky:#2f5c94;        /* navball sky */
     --ground:#5a3d24;     /* navball ground */
     --mono: ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --notes-font-size:10px;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -188,6 +189,14 @@
   button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   button.danger{color:var(--warn);border-color:#5a2b28;background:#1e1210}
   button.danger:hover{background:#2a1815}
+  .notes-trigger{display:inline-flex;align-items:center;gap:7px;margin-left:auto}
+  .notes-trigger[hidden]{display:none!important}
+  .notes-update-dot{
+    width:6px;height:6px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 8px rgba(78,201,224,.75);opacity:0;transform:scale(.5);
+    transition:opacity .15s,transform .15s;
+  }
+  .notes-trigger.has-update .notes-update-dot{opacity:1;transform:scale(1)}
   .status{display:flex;align-items:center;gap:7px;margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate)}
   .led{width:9px;height:9px;border-radius:50%;background:#333;box-shadow:0 0 0 1px #000 inset}
   .led.ok{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s ease-in-out infinite}
@@ -400,6 +409,123 @@
   .scrim.show{display:flex;animation:scrimIn .18s ease-out}
   @keyframes scrimIn{from{opacity:0}to{opacity:1}}
 
+  /* ---- optional Notes reference drawer ---------------------------------- */
+  .notes-drawer-backdrop{
+    position:fixed;inset:0;z-index:249;opacity:0;pointer-events:none;
+    transition:opacity .18s ease-out;
+  }
+  .notes-drawer{
+    position:fixed;z-index:250;top:10px;right:10px;bottom:10px;
+    width:clamp(640px,62vw,900px);display:flex;flex-direction:column;
+    color:var(--amber);background:linear-gradient(180deg,#101823 0%,#090e16 100%);
+    border:1px solid var(--rule-bright);border-radius:5px;
+    box-shadow:-18px 0 42px rgba(0,0,0,.48),0 0 0 1px rgba(78,201,224,.05);
+    transform:translateX(calc(100% + 24px));visibility:hidden;
+    transition:transform .2s ease-out,visibility 0s linear .2s;
+  }
+  .notes-drawer.open{transform:translateX(0);visibility:visible;transition-delay:0s}
+  .notes-drawer-head{
+    display:flex;align-items:flex-start;gap:12px;padding:11px 12px 10px;
+    border-bottom:1px solid var(--rule);background:rgba(255,255,255,.018);
+  }
+  .notes-drawer-heading{min-width:0;flex:1}
+  .notes-drawer-heading h2{
+    margin:0;color:var(--cyan);font-size:11px;font-weight:600;
+    letter-spacing:.2em;text-transform:uppercase;
+  }
+  .notes-vessel{
+    margin-top:4px;color:var(--slate);font-size:10px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  .notes-close{padding:4px 8px;font-size:15px;line-height:1}
+  .notes-drawer-body{
+    min-height:0;flex:1;display:grid;grid-template-columns:240px minmax(0,1fr);
+    gap:12px;padding:12px;
+  }
+  .notes-content{min-width:0;min-height:0;display:flex;flex-direction:column}
+  .notes-content-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .notes-content-summary{min-width:0}
+  .notes-pin{flex:0 0 auto;padding:5px 9px;font-size:9px}
+  .notes-pin[aria-pressed="true"]{color:var(--amber);border-color:var(--amber-dim);background:#241c0d}
+  .notes-status{color:var(--slate);font-size:10px;line-height:1.4}
+  .notes-meta{margin-top:3px;color:var(--slate-dim);font-size:9px}
+  .notes-browser{min-width:0;min-height:0;padding-right:12px;border-right:1px solid var(--rule)}
+  .notes-browser-nav{display:grid;grid-template-columns:auto auto auto 1fr;gap:6px;align-items:center}
+  .notes-browser-nav button{padding:5px 9px;font-size:9px}
+  .notes-position{text-align:right;color:var(--slate-dim);font-size:9px}
+  .notes-search{
+    box-sizing:border-box;width:100%;margin-top:7px;padding:6px 8px;
+    background:#060a0f;border:1px solid var(--rule-bright);border-radius:3px;
+    color:var(--amber);font:10px var(--mono);
+  }
+  .notes-search:focus-visible,.notes-list:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+  .notes-list{
+    width:100%;height:calc(100% - 68px);min-height:150px;margin-top:7px;
+    padding:3px;overflow:auto;
+    background:#070b11;border:1px solid var(--rule);border-radius:3px;
+    color:var(--amber);font:10px/1.35 var(--mono);
+  }
+  .notes-list-row{display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:3px;margin-bottom:2px}
+  .notes-item{
+    min-width:0;padding:5px 6px;text-align:left;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0;
+    color:var(--amber);background:transparent;border-color:transparent;
+  }
+  .notes-item.active{color:var(--cyan);background:#12202c;border-color:#24485a}
+  .notes-star{padding:4px;color:var(--slate-dim);background:transparent;border-color:transparent}
+  .notes-star.favorite{color:var(--amber)}
+  .notes-log{
+    min-height:0;flex:1;margin:10px 0 0;padding:10px;overflow:auto;
+    white-space:pre-wrap;overflow-wrap:anywhere;background:#070b11;
+    border:1px solid var(--rule);border-radius:3px;color:var(--amber);
+    font:var(--notes-font-size)/1.45 var(--mono);tab-size:2;
+  }
+  .notes-empty{
+    flex:1;display:flex;align-items:center;justify-content:center;
+    padding:24px;text-align:center;color:var(--slate-dim);font-size:11px;
+    line-height:1.5;font-style:italic;
+  }
+  .notes-empty[hidden],.notes-log[hidden]{display:none}
+  .notes-drawer-foot{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:9px 12px;border-top:1px solid var(--rule);color:var(--slate-dim);
+    font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  }
+  .notes-follow{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .notes-follow input{accent-color:var(--cyan)}
+  .notes-font-controls{display:inline-flex;align-items:center;gap:3px}
+  .notes-font-controls button{min-width:29px;padding:3px 6px;font-size:8px}
+  .notes-font-value{min-width:42px!important;color:var(--amber)!important}
+  #flightNote[hidden]{display:none}
+  #flightNote .body{padding:0}
+  .flight-note-heading-actions{display:flex;align-items:center;gap:8px;min-width:0}
+  .flight-note-name{
+    max-width:260px;color:var(--cyan);font-size:9px;letter-spacing:.08em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;
+  }
+  .flight-note-unpin{padding:3px 7px;font-size:8px}
+  .flight-note-meta{
+    padding:7px 10px;border-bottom:1px solid var(--rule);color:var(--slate-dim);
+    font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .flight-note-log{
+    box-sizing:border-box;width:100%;max-height:clamp(180px,30vh,340px);
+    min-height:120px;margin:0;padding:10px;overflow:auto;overscroll-behavior:contain;
+    white-space:pre-wrap;overflow-wrap:anywhere;color:var(--amber);background:#070b11;
+    font:var(--notes-font-size)/1.5 var(--mono);tab-size:2;
+  }
+  @media (max-width:720px){
+    .notes-drawer{top:6px;right:6px;bottom:6px;width:calc(100vw - 12px)}
+    .notes-drawer-body{grid-template-columns:1fr;grid-template-rows:minmax(170px,32vh) minmax(0,1fr)}
+    .notes-browser{padding:0 0 10px;border-right:0;border-bottom:1px solid var(--rule)}
+    .notes-list{height:calc(100% - 68px);min-height:92px}
+    .notes-drawer-foot{flex-wrap:wrap}
+    .notes-drawer-backdrop.open{
+      opacity:1;pointer-events:auto;background:rgba(4,7,11,.7);
+      backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+    }
+  }
+
   /* The hazard-striped frame: diagonal blue/gray warning bars via a repeating
      gradient on a padded wrapper; the inner panel sits on top. */
   .popout{
@@ -512,6 +638,7 @@
   body.editor-mode .wide-left,body.editor-mode .wide-systems{display:none!important}
   body.editor-mode .wide-mission{display:block!important}
   body.editor-mode #target{display:none!important}
+  body.editor-mode #flightNote{display:none!important}
   body.editor-mode #stage{display:block;max-width:900px;margin-left:auto;margin-right:auto}
   body.editor-mode #stageThrottle{display:none}
   body.editor-mode #dvModeToggle{display:none}
@@ -555,7 +682,8 @@
       <h3><span class="haz-badge"></span> Awaiting Flight or Editor</h3>
       <div class="sub">Telemetry linked · open a vessel in Flight, VAB, or SPH</div>
       <div class="big-status">STANDBY</div>
-      <div class="statusline"><span class="led wait"></span><span>Flight, VAB, and SPH scenes are supported</span></div>
+      <div class="statusline"><span class="led wait"></span><span>Notes remain available while telemetry is linked</span></div>
+      <button class="connect-btn" id="notesInactiveButton" type="button" hidden>Open Notes</button>
     </div>
   </div>
 </div>
@@ -573,6 +701,10 @@
       <span class="label" style="color:var(--cyan)">KRPC BRIDGE</span>
       <span class="label" id="connHostLabel">127.0.0.1:8090</span>
       <button id="connectBtnK">Disconnect</button>
+      <button class="notes-trigger" id="notesToggle" type="button" hidden
+              aria-controls="notesDrawer" aria-expanded="false">
+        Notes <span class="notes-update-dot" id="notesUpdateDot" aria-hidden="true"></span>
+      </button>
     </div>
   </section>
 
@@ -845,14 +977,86 @@
     </div>
   </section>
 
+  <!-- ============ PINNED NOTE (flight only, conditional) ============ -->
+  <section class="panel" id="flightNote" hidden>
+    <h2>
+      <span>Pinned note</span>
+      <span class="flight-note-heading-actions">
+        <span class="flight-note-name" id="flightNoteName"></span>
+        <span class="notes-font-controls" aria-label="Pinned note text size">
+          <button id="flightNoteFontDecrease" type="button" aria-label="Decrease note text size">A-</button>
+          <button class="notes-font-value" id="flightNoteFontValue" type="button"
+                  aria-label="Reset note text size to default" title="Reset to default">10px</button>
+          <button id="flightNoteFontIncrease" type="button" aria-label="Increase note text size">A+</button>
+        </span>
+        <button class="flight-note-unpin" id="flightNoteUnpin" type="button">Unpin</button>
+      </span>
+    </h2>
+    <div class="body">
+      <div class="flight-note-meta" id="flightNoteMeta"></div>
+      <pre class="flight-note-log" id="flightNoteLog" tabindex="0"></pre>
+    </div>
+  </section>
+
   </div><!-- /wide-mission -->
 
   </div><!-- /deck -->
   </div><!-- /flight-grid -->
 </div>
 
+<div class="notes-drawer-backdrop" id="notesBackdrop" aria-hidden="true"></div>
+<aside class="notes-drawer" id="notesDrawer" aria-hidden="true"
+       aria-labelledby="notesDrawerTitle">
+  <div class="notes-drawer-head">
+    <div class="notes-drawer-heading">
+      <h2 id="notesDrawerTitle">Active vessel log</h2>
+      <div class="notes-vessel" id="notesVessel">Awaiting flight telemetry</div>
+    </div>
+    <button class="notes-close" id="notesClose" type="button" aria-label="Close Notes drawer">&times;</button>
+  </div>
+  <div class="notes-drawer-body">
+    <div class="notes-browser" id="notesBrowser">
+      <div class="notes-browser-nav">
+        <button id="notesPrev" type="button" aria-label="Previous saved note">&lt;</button>
+        <button id="notesActiveButton" type="button">Active</button>
+        <button id="notesNext" type="button" aria-label="Next saved note">&gt;</button>
+        <span class="notes-position" id="notesPosition">0 notes</span>
+      </div>
+      <input class="notes-search" id="notesSearch" type="search"
+             placeholder="Search saved notes" aria-label="Search saved notes">
+      <div class="notes-list" id="notesList" role="list"
+           aria-label="Saved Notes files"></div>
+    </div>
+    <div class="notes-content">
+      <div class="notes-content-head">
+        <div class="notes-content-summary">
+          <div class="notes-status" id="notesStatus">Awaiting Notes scan</div>
+          <div class="notes-meta" id="notesMeta"></div>
+        </div>
+        <button class="notes-pin" id="notesPinButton" type="button" disabled
+                aria-pressed="false">Pin to flight</button>
+      </div>
+      <pre class="notes-log" id="notesLog" tabindex="0" hidden></pre>
+      <div class="notes-empty" id="notesEmpty">No saved note is selected.</div>
+    </div>
+  </div>
+  <div class="notes-drawer-foot">
+    <span>zer0Kerbal / Notes</span>
+    <span class="notes-font-controls" aria-label="Note text size">
+      <button id="notesFontDecrease" type="button" aria-label="Decrease note text size">A-</button>
+      <button class="notes-font-value" id="notesFontValue" type="button"
+              aria-label="Reset note text size to default" title="Reset to default">10px</button>
+      <button id="notesFontIncrease" type="button" aria-label="Increase note text size">A+</button>
+    </span>
+    <label class="notes-follow">
+      <input id="notesAutoFollow" type="checkbox" checked>
+      Auto-follow
+    </label>
+  </div>
+</aside>
+
 <footer class="project-footer" aria-label="Project information">
-  <span>Woobie's Mission Control v0.2.1</span><span class="sep">·</span>
+  <span>Woobie's Mission Control v0.2.2</span><span class="sep">·</span>
   <span>by SacredWoobie</span><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control" target="_blank" rel="noopener noreferrer">GitHub</a><span class="sep">·</span>
   <a href="https://github.com/SacredWoobie/woobies-mission-control/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
@@ -1035,6 +1239,7 @@ function connectK(){
     hasFlight=false;          // stale once the link drops
     contextMode="inactive";
     document.body.classList.remove("editor-mode");
+    resetNotesUi();
     connectBtnK.textContent="Connect";
     connectBtnK.classList.remove("danger");
     if(wantConnectK){
@@ -1054,6 +1259,7 @@ function disconnectK(){
   hasFlight=false;
   contextMode="inactive";
   document.body.classList.remove("editor-mode");
+  resetNotesUi();
   setStatusK("","Offline");
 }
 function toggleK(){ (connectedK||wantConnectK) ? disconnectK() : connectK(); }
@@ -1099,6 +1305,7 @@ function onDataKrpc(d){
     onDataKrpc._blanked=false;
     onDataKrpc._paintedMode="editor";
     lastKrpcData=d;
+    updateNotes(d);
     updateEditorContext(d);
     updateStaging(d);
     return;
@@ -1109,6 +1316,7 @@ function onDataKrpc(d){
     if(!onDataKrpc._blanked){ nullOutDashboard(); onDataKrpc._blanked=true; }
     lastKrpcData=d;
     onDataKrpc._paintedMode="inactive";
+    updateNotes(d);
     return;
   }
   onDataKrpc._blanked=false;
@@ -1118,6 +1326,7 @@ function onDataKrpc(d){
   set("stagePrimaryLabel","Stage");
 
   lastKrpcData=d;
+  updateNotes(d);
   updateClocks(d);
   updateThrottle(d);
   updateAscension(d);
@@ -1537,6 +1746,397 @@ function updateScience(d){
     ).join("");
   }
 }
+
+/* ---- Notes mod: optional active-vessel reference drawer ------------------ */
+const notesToggle=$("notesToggle"), notesDrawer=$("notesDrawer");
+const notesBackdrop=$("notesBackdrop"), notesClose=$("notesClose");
+const notesDrawerTitle=$("notesDrawerTitle");
+const notesVessel=$("notesVessel"), notesStatus=$("notesStatus");
+const notesMeta=$("notesMeta"), notesLog=$("notesLog"), notesEmpty=$("notesEmpty");
+const notesAutoFollow=$("notesAutoFollow");
+const notesSearch=$("notesSearch"), notesList=$("notesList");
+const notesPrev=$("notesPrev"), notesNext=$("notesNext");
+const notesActiveButton=$("notesActiveButton"), notesPosition=$("notesPosition");
+const notesInactiveButton=$("notesInactiveButton");
+const notesPinButton=$("notesPinButton");
+const flightNote=$("flightNote"), flightNoteName=$("flightNoteName");
+const flightNoteMeta=$("flightNoteMeta"), flightNoteLog=$("flightNoteLog");
+const flightNoteUnpin=$("flightNoteUnpin");
+const notesFontDecrease=$("notesFontDecrease"), notesFontIncrease=$("notesFontIncrease");
+const notesFontValue=$("notesFontValue");
+const flightNoteFontDecrease=$("flightNoteFontDecrease");
+const flightNoteFontIncrease=$("flightNoteFontIncrease");
+const flightNoteFontValue=$("flightNoteFontValue");
+const NOTES_FONT_DEFAULT=10, NOTES_FONT_MIN=8, NOTES_FONT_MAX=18;
+let notesFontSize=NOTES_FONT_DEFAULT;
+let notesDrawerOpen=false, notesAvailable=false, lastNotesSignature="";
+let notesCatalog=[], notesFilteredCatalog=[], notesSelectedPath="";
+let notesPinnedPath="", lastPinnedNotesSignature="";
+let notesCatalogTruncated=false;
+let notesReturnFocus=null;
+
+function setNotesFontSize(value){
+  const parsed=Number(value);
+  notesFontSize=Math.max(
+    NOTES_FONT_MIN,Math.min(NOTES_FONT_MAX,
+      Number.isFinite(parsed)?Math.round(parsed):NOTES_FONT_DEFAULT));
+  document.documentElement.style.setProperty("--notes-font-size",`${notesFontSize}px`);
+  [notesFontValue,flightNoteFontValue].forEach(control=>{
+    if(control) control.textContent=`${notesFontSize}px`;
+  });
+  [notesFontDecrease,flightNoteFontDecrease].forEach(control=>{
+    if(control) control.disabled=notesFontSize<=NOTES_FONT_MIN;
+  });
+  [notesFontIncrease,flightNoteFontIncrease].forEach(control=>{
+    if(control) control.disabled=notesFontSize>=NOTES_FONT_MAX;
+  });
+}
+
+setNotesFontSize(NOTES_FONT_DEFAULT);
+
+function setNotesDrawerOpen(open,{returnFocus=false}={}){
+  const wasOpen=notesDrawerOpen;
+  notesDrawerOpen=!!open && notesAvailable;
+  notesDrawer?.classList.toggle("open",notesDrawerOpen);
+  notesBackdrop?.classList.toggle("open",notesDrawerOpen);
+  notesDrawer?.setAttribute("aria-hidden",String(!notesDrawerOpen));
+  notesBackdrop?.setAttribute("aria-hidden",String(!notesDrawerOpen));
+  notesToggle?.setAttribute("aria-expanded",String(notesDrawerOpen));
+  if(notesDrawerOpen){
+    if(!wasOpen) notesReturnFocus=document.activeElement;
+    notesToggle?.classList.remove("has-update");
+    notesClose?.focus();
+    if(notesAutoFollow?.checked && notesLog && !notesLog.hidden){
+      requestAnimationFrame(()=>{ notesLog.scrollTop=notesLog.scrollHeight; });
+    }
+  }else if(returnFocus){
+    if(notesReturnFocus && typeof notesReturnFocus.focus==="function"){
+      notesReturnFocus.focus();
+    }
+    notesReturnFocus=null;
+  }
+}
+
+function resetNotesUi(){
+  notesAvailable=false;
+  lastNotesSignature="";
+  if(notesToggle){
+    notesToggle.hidden=true;
+    notesToggle.classList.remove("has-update");
+    notesToggle.setAttribute("aria-label","Open Notes drawer");
+  }
+  if(notesInactiveButton) notesInactiveButton.hidden=true;
+  if(notesVessel) notesVessel.textContent="Awaiting flight telemetry";
+  if(notesStatus) notesStatus.textContent="Awaiting Notes scan";
+  if(notesMeta) notesMeta.textContent="";
+  notesCatalog=[];
+  notesFilteredCatalog=[];
+  notesSelectedPath="";
+  notesPinnedPath="";
+  lastPinnedNotesSignature="";
+  notesCatalogTruncated=false;
+  if(notesSearch) notesSearch.value="";
+  if(notesList) notesList.replaceChildren();
+  if(notesPosition) notesPosition.textContent="0 notes";
+  if(notesPrev) notesPrev.disabled=true;
+  if(notesNext) notesNext.disabled=true;
+  if(notesActiveButton) notesActiveButton.disabled=true;
+  if(notesPinButton){
+    notesPinButton.disabled=true;
+    notesPinButton.textContent="Pin to flight";
+    notesPinButton.setAttribute("aria-pressed","false");
+  }
+  if(flightNote) flightNote.hidden=true;
+  if(flightNoteName) flightNoteName.textContent="";
+  if(flightNoteMeta) flightNoteMeta.textContent="";
+  if(flightNoteLog) flightNoteLog.textContent="";
+  if(notesLog){ notesLog.textContent=""; notesLog.hidden=true; }
+  if(notesEmpty){
+    notesEmpty.textContent="No active vessel log is available.";
+    notesEmpty.hidden=false;
+  }
+  setNotesDrawerOpen(false);
+}
+
+function activeNoteFromTelemetry(d){
+  const active=d["notes.active"];
+  if(active && typeof active==="object"){
+    return {
+      name:active.name||"active vessel log",
+      path:active.relativePath||active.path||"",
+      modified:active.modified,
+      size:active.size,
+      text:typeof active.text==="string"?active.text:(active.preview||""),
+      truncated:active.truncated===true
+    };
+  }
+  const files=Array.isArray(d["notes.files"])?d["notes.files"]:[];
+  const legacy=files.find(file=>file && file.isActiveLog);
+  if(!legacy) return null;
+  return {
+    name:legacy.name||"active vessel log",path:legacy.path||"",
+    modified:legacy.modified,size:legacy.size,
+    text:typeof legacy.preview==="string"?legacy.preview:"",truncated:false
+  };
+}
+
+function noteLabel(note){
+  const path=String(note?.relativePath||note?.path||"");
+  const name=String(note?.name||path.replace(/^.*\//,"").replace(/\.txt$/i,"")||"Untitled note");
+  return note?.isActiveLog ? `${name}  [ACTIVE]` : name;
+}
+
+function renderNotesCatalog(){
+  const query=String(notesSearch?.value||"").trim().toLocaleLowerCase();
+  notesFilteredCatalog=notesCatalog.filter(note=>{
+    const haystack=`${note?.name||""} ${note?.relativePath||""}`.toLocaleLowerCase();
+    return !query || haystack.includes(query);
+  });
+  if(notesList){
+    const rows=notesFilteredCatalog.map(note=>{
+      const path=String(note.relativePath||"");
+      const row=document.createElement("div");
+      row.className="notes-list-row";
+      const selectButton=document.createElement("button");
+      selectButton.type="button";
+      selectButton.className="notes-item"+(path===notesSelectedPath?" active":"");
+      selectButton.dataset.notePath=path;
+      selectButton.textContent=noteLabel(note);
+      selectButton.title=path;
+      const starButton=document.createElement("button");
+      starButton.type="button";
+      starButton.className="notes-star"+(note?.isFavorite?" favorite":"");
+      starButton.dataset.favoritePath=path;
+      starButton.dataset.favorite=String(note?.isFavorite===true);
+      starButton.textContent=note?.isFavorite?"★":"☆";
+      starButton.setAttribute(
+        "aria-label",`${note?.isFavorite?"Remove":"Add"} ${noteLabel(note)} ${note?.isFavorite?"from":"to"} favorites`);
+      row.append(selectButton,starButton);
+      return row;
+    });
+    notesList.replaceChildren(...rows);
+  }
+  const index=notesFilteredCatalog.findIndex(note=>note.relativePath===notesSelectedPath);
+  if(notesPosition){
+    if(!notesFilteredCatalog.length){
+      notesPosition.textContent=query
+        ? (notesCatalogTruncated?"No matches in first 500":"No matches")
+        : "0 notes";
+    }else if(index>=0){
+      notesPosition.textContent=`${index+1} / ${notesFilteredCatalog.length}`;
+    }else{
+      notesPosition.textContent=`${notesFilteredCatalog.length}${notesCatalogTruncated?"+":""} notes`;
+    }
+  }
+  if(notesPrev) notesPrev.disabled=!notesFilteredCatalog.length;
+  if(notesNext) notesNext.disabled=!notesFilteredCatalog.length;
+}
+
+function requestNoteSelection(relativePath){
+  if(!wsK || wsK.readyState!==WebSocket.OPEN) return;
+  notesSelectedPath=typeof relativePath==="string"?relativePath:"";
+  wsK.send(JSON.stringify({
+    type:"notes.select",
+    relativePath:notesSelectedPath||null
+  }));
+  if(notesStatus) notesStatus.textContent=notesSelectedPath
+    ? "Loading saved note..." : "Loading active vessel log...";
+  renderNotesCatalog();
+}
+
+function requestNoteFavorite(relativePath,favorite){
+  if(!wsK || wsK.readyState!==WebSocket.OPEN || !relativePath) return;
+  wsK.send(JSON.stringify({type:"notes.favorite",relativePath,favorite}));
+  if(notesStatus) notesStatus.textContent=favorite
+    ? "Adding note to favorites..." : "Removing note from favorites...";
+}
+
+function requestNotePin(relativePath){
+  if(!wsK || wsK.readyState!==WebSocket.OPEN) return;
+  const path=typeof relativePath==="string"?relativePath:"";
+  wsK.send(JSON.stringify({type:"notes.pin",relativePath:path||null}));
+  if(notesStatus) notesStatus.textContent=path
+    ? "Pinning note to the flight panel..." : "Removing pinned flight note...";
+}
+
+function cycleNotes(direction){
+  if(!notesFilteredCatalog.length) return;
+  let index=notesFilteredCatalog.findIndex(note=>note.relativePath===notesSelectedPath);
+  if(index<0) index=direction>0?-1:0;
+  index=(index+direction+notesFilteredCatalog.length)%notesFilteredCatalog.length;
+  requestNoteSelection(notesFilteredCatalog[index].relativePath);
+}
+
+function fmtNotesTime(epochSeconds){
+  if(!num(epochSeconds)) return "unknown time";
+  return new Date(epochSeconds*1000).toLocaleString();
+}
+
+function updatePinnedNotePanel(d){
+  notesPinnedPath=typeof d["notes.pinnedPath"]==="string"
+    ? d["notes.pinnedPath"] : "";
+  const pinned=(d["notes.pinned"] && typeof d["notes.pinned"]==="object")
+    ? activeNoteFromTelemetry({"notes.active":d["notes.pinned"]}) : null;
+  const selectedIsPinned=!!notesSelectedPath && notesSelectedPath===notesPinnedPath;
+  if(notesPinButton){
+    notesPinButton.disabled=!notesSelectedPath;
+    notesPinButton.textContent=selectedIsPinned?"Unpin from flight":"Pin to flight";
+    notesPinButton.setAttribute("aria-pressed",String(selectedIsPinned));
+    notesPinButton.title=notesPinnedPath && !selectedIsPinned
+      ? "Replace the currently pinned flight note" : "";
+  }
+
+  const visible=contextMode==="flight" && !!pinned;
+  if(flightNote) flightNote.hidden=!visible;
+  if(!pinned){
+    lastPinnedNotesSignature="";
+    if(flightNoteName) flightNoteName.textContent="";
+    if(flightNoteMeta) flightNoteMeta.textContent="";
+    if(flightNoteLog) flightNoteLog.textContent="";
+    return;
+  }
+
+  const text=String(pinned.text||"");
+  const signature=[pinned.path,pinned.size,pinned.modified,text].join("\u0000");
+  if(flightNoteName) flightNoteName.textContent=pinned.name||pinned.path||"Saved note";
+  if(flightNoteMeta){
+    const details=[];
+    if(pinned.path) details.push(pinned.path);
+    if(num(pinned.size)) details.push(`${(pinned.size/1024).toFixed(1)} KB`);
+    details.push(`updated ${fmtNotesTime(pinned.modified)}`);
+    if(pinned.truncated) details.push("latest 32 KiB shown");
+    flightNoteMeta.textContent=details.join(" / ");
+  }
+  if(flightNoteLog && signature!==lastPinnedNotesSignature){
+    const priorScroll=flightNoteLog.scrollTop;
+    flightNoteLog.textContent=text.trim()||"(empty note)";
+    flightNoteLog.scrollTop=priorScroll;
+  }
+  lastPinnedNotesSignature=signature;
+}
+
+function updateNotes(d){
+  const available=d["notes.available"]===true;
+  if(!available){
+    if(notesAvailable || notesDrawerOpen) resetNotesUi();
+    return;
+  }
+
+  notesAvailable=true;
+  if(notesToggle) notesToggle.hidden=false;
+  if(notesInactiveButton) notesInactiveButton.hidden=contextMode!=="inactive";
+  const vessel=(typeof d["v.name"]==="string" && d["v.name"].trim())
+    ? d["v.name"].trim() : "Active vessel";
+  if(notesDrawerTitle) notesDrawerTitle.textContent=contextMode==="flight"
+    ? "Active vessel log" : "Notes reference";
+  if(notesVessel) notesVessel.textContent=contextMode==="flight"
+    ? vessel : (contextMode==="editor"?"Available in the editor":"Available in this KSP scene");
+  notesToggle?.setAttribute("aria-label",`Open Notes drawer for ${vessel}`);
+
+  const incomingCatalog=Array.isArray(d["notes.catalog"])?d["notes.catalog"]:[];
+  notesCatalogTruncated=d["notes.catalogTruncated"]===true;
+  const catalogSignature=JSON.stringify(incomingCatalog.map(note=>[
+    note?.relativePath,note?.modified,note?.size,note?.isActiveLog,note?.isFavorite
+  ]));
+  const priorCatalogSignature=JSON.stringify(notesCatalog.map(note=>[
+    note?.relativePath,note?.modified,note?.size,note?.isActiveLog,note?.isFavorite
+  ]));
+  notesCatalog=incomingCatalog;
+  notesSelectedPath=typeof d["notes.selectedPath"]==="string"
+    ? d["notes.selectedPath"] : "";
+  if(catalogSignature!==priorCatalogSignature ||
+      !notesList?.querySelector(`.notes-item[data-note-path="${CSS.escape(notesSelectedPath)}"]`)?.classList.contains("active")){
+    renderNotesCatalog();
+  }
+  if(notesActiveButton){
+    notesActiveButton.disabled=d["notes.selectionMode"]!=="browse";
+  }
+
+  const selected=(d["notes.selected"] && typeof d["notes.selected"]==="object")
+    ? activeNoteFromTelemetry({"notes.active":d["notes.selected"]})
+    : activeNoteFromTelemetry(d);
+  updatePinnedNotePanel(d);
+  if(!selected){
+    lastNotesSignature="";
+    if(notesStatus) notesStatus.textContent=d["notes.message"]||"No saved note selected";
+    if(notesMeta) notesMeta.textContent="";
+    if(notesLog){ notesLog.textContent=""; notesLog.hidden=true; }
+    if(notesEmpty){
+      notesEmpty.textContent=notesCatalog.length
+        ? "Choose a saved note above, or open the active vessel's Ship Log in Notes."
+        : "Open Ship Log in the Notes mod to create a log for this vessel.";
+      notesEmpty.hidden=false;
+    }
+    return;
+  }
+
+  const text=String(selected.text||"");
+  const signature=[selected.path,selected.size,selected.modified,text].join("\u0000");
+  const changed=signature!==lastNotesSignature;
+  const hadPrior=!!lastNotesSignature;
+  const wasNearBottom=notesLog
+    ? notesLog.scrollHeight-notesLog.scrollTop-notesLog.clientHeight<28 : true;
+
+  const browsing=d["notes.selectionMode"]==="browse";
+  if(notesStatus) notesStatus.textContent=selected.truncated
+    ? `Showing the latest portion of ${browsing?"the selected note":"the active ship log"}`
+    : (browsing?"Saved note":"Active ship log");
+  if(notesMeta){
+    const details=[];
+    if(selected.path) details.push(selected.path);
+    if(num(selected.size)) details.push(`${(selected.size/1024).toFixed(1)} KB`);
+    details.push(`updated ${fmtNotesTime(selected.modified)}`);
+    notesMeta.textContent=details.join(" / ");
+  }
+  if(notesEmpty) notesEmpty.hidden=true;
+  if(notesLog){
+    notesLog.hidden=false;
+    if(changed) notesLog.textContent=text.trim()||"(empty log)";
+  }
+
+  if(changed && hadPrior && !notesDrawerOpen) notesToggle?.classList.add("has-update");
+  if(changed && notesDrawerOpen && notesAutoFollow?.checked && wasNearBottom && notesLog){
+    requestAnimationFrame(()=>{ notesLog.scrollTop=notesLog.scrollHeight; });
+  }
+  lastNotesSignature=signature;
+}
+
+notesToggle?.addEventListener("click",()=>setNotesDrawerOpen(!notesDrawerOpen));
+notesClose?.addEventListener("click",()=>setNotesDrawerOpen(false,{returnFocus:true}));
+notesBackdrop?.addEventListener("click",()=>setNotesDrawerOpen(false,{returnFocus:true}));
+notesSearch?.addEventListener("input",renderNotesCatalog);
+notesList?.addEventListener("click",event=>{
+  const selectButton=event.target.closest("[data-note-path]");
+  if(selectButton){ requestNoteSelection(selectButton.dataset.notePath); return; }
+  const starButton=event.target.closest("[data-favorite-path]");
+  if(starButton){
+    requestNoteFavorite(
+      starButton.dataset.favoritePath,starButton.dataset.favorite!=="true");
+  }
+});
+notesPrev?.addEventListener("click",()=>cycleNotes(-1));
+notesNext?.addEventListener("click",()=>cycleNotes(1));
+notesActiveButton?.addEventListener("click",()=>requestNoteSelection(null));
+notesPinButton?.addEventListener("click",()=>{
+  requestNotePin(notesSelectedPath===notesPinnedPath?null:notesSelectedPath);
+});
+flightNoteUnpin?.addEventListener("click",()=>requestNotePin(null));
+[notesFontDecrease,flightNoteFontDecrease].forEach(control=>{
+  control?.addEventListener("click",()=>setNotesFontSize(notesFontSize-1));
+});
+[notesFontIncrease,flightNoteFontIncrease].forEach(control=>{
+  control?.addEventListener("click",()=>setNotesFontSize(notesFontSize+1));
+});
+[notesFontValue,flightNoteFontValue].forEach(control=>{
+  control?.addEventListener("click",()=>setNotesFontSize(NOTES_FONT_DEFAULT));
+});
+notesInactiveButton?.addEventListener("click",()=>setNotesDrawerOpen(true));
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape" && notesDrawerOpen){
+    event.preventDefault();
+    setNotesDrawerOpen(false,{returnFocus:true});
+  }
+});
 
 /* ---- heat (System Heat via the custom kRPC service) ---- */
 function fmtKw(v){ return (v==null || !isFinite(v)) ? "—" : sciFmt(v)+" kW"; }
