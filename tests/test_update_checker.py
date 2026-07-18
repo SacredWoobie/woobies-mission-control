@@ -71,7 +71,7 @@ class UpdateCheckerTests(unittest.TestCase):
         self.assertEqual(captured["timeout"], 2)
         self.assertEqual(
             captured["request"].get_header("User-agent"),
-            "Woobies-Mission-Control/0.2.1",
+            "Woobies-Mission-Control/0.2.2",
         )
         self.assertEqual(
             captured["request"].get_header("Accept"),
@@ -79,7 +79,7 @@ class UpdateCheckerTests(unittest.TestCase):
         )
 
     def test_cache_must_be_recent_and_valid(self):
-        state = dict(VALID_RELEASE, app_version="0.2.1", last_checked=1000)
+        state = dict(VALID_RELEASE, app_version="0.2.2", last_checked=1000)
         self.assertEqual(
             ksp_dashboard_app.get_fresh_cached_release(
                 state,
@@ -107,7 +107,7 @@ class UpdateCheckerTests(unittest.TestCase):
     def test_update_state_round_trip(self):
         state = dict(
             VALID_RELEASE,
-            app_version="0.2.1",
+            app_version="0.2.2",
             last_checked=1234,
             check_enabled=False,
         )

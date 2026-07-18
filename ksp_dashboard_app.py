@@ -28,14 +28,14 @@ import webbrowser
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import filedialog, scrolledtext
 
 
 HERE = Path(__file__).resolve().parent
 DASHBOARD = HERE / "ksp_mission_dashboard.html"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.2.1"
+APP_VERSION = "0.2.2"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 LATEST_RELEASE_API = (
@@ -55,6 +55,16 @@ def _default_update_state_path():
 
 
 UPDATE_STATE_PATH = _default_update_state_path()
+
+
+def _default_settings_path():
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data) / "WoobiesMissionControl" / "settings.json"
+    return Path.home() / ".woobies-mission-control" / "settings.json"
+
+
+SETTINGS_PATH = _default_settings_path()
 
 # Add future optional programs here. The GUI will expose a component only when
 # its script is present beside this launcher.
@@ -162,6 +172,49 @@ def save_update_state(state, path=UPDATE_STATE_PATH):
     temporary.replace(path)
 
 
+def load_settings(path=SETTINGS_PATH):
+    """Load launcher settings, returning safe defaults on any error."""
+    try:
+        settings = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {"ksp_root": ""}
+    if not isinstance(settings, dict):
+        return {"ksp_root": ""}
+    root = settings.get("ksp_root")
+    return {"ksp_root": root.strip() if isinstance(root, str) else ""}
+
+
+def save_settings(settings, path=SETTINGS_PATH):
+    """Atomically save user-selected launcher settings."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(settings, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def resolve_ksp_root(value):
+    """Return a validated KSP root containing GameData, or ``None``."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        candidate = Path(os.path.expandvars(value.strip())).expanduser().resolve()
+        if candidate.is_dir() and (candidate / "GameData").is_dir():
+            return candidate
+    except (OSError, RuntimeError):
+        pass
+    return None
+
+
+def telemetry_environment(ksp_root_value):
+    """Return the child-process environment override for telemetry."""
+    root = resolve_ksp_root(ksp_root_value)
+    return {"WOOBIE_KSP_ROOT": str(root)} if root is not None else {}
+
+
 def get_fresh_cached_release(state, now=None, max_age=UPDATE_CACHE_SECONDS):
     """Return a validated cached release if it is recent enough."""
     if not isinstance(state, dict):
@@ -195,11 +248,12 @@ def discover_components(directory=HERE):
 class Backend:
     """One independently managed child process."""
 
-    def __init__(self, name, script, log):
+    def __init__(self, name, script, log, environment_provider=None):
         self.name = name
         self.script = Path(script)
         self.argv = [PYTHON, "-u", str(self.script)]
         self.log = log
+        self.environment_provider = environment_provider
         self.proc = None
 
     def running(self):
@@ -214,6 +268,9 @@ class Backend:
 
         self.log(self.name, "starting...")
         try:
+            child_environment = os.environ.copy()
+            if self.environment_provider is not None:
+                child_environment.update(self.environment_provider())
             self.proc = subprocess.Popen(
                 self.argv,
                 cwd=str(HERE),
@@ -222,6 +279,7 @@ class Backend:
                 text=True,
                 bufsize=1,
                 creationflags=CREATE_NO_WINDOW,
+                env=child_environment,
             )
         except Exception as exc:
             self.log(self.name, f"FAILED to start: {exc}")
@@ -263,7 +321,8 @@ class Backend:
 
 
 class App:
-    def __init__(self, root, update_state_path=UPDATE_STATE_PATH):
+    def __init__(self, root, update_state_path=UPDATE_STATE_PATH,
+                 settings_path=SETTINGS_PATH):
         self.root = root
         self.log_queue = queue.Queue()
         self.update_queue = queue.Queue()
@@ -271,12 +330,14 @@ class App:
         self.backend_rows = []
         self.update_state_path = Path(update_state_path)
         self.update_state = load_update_state(self.update_state_path)
+        self.settings_path = Path(settings_path)
+        self.settings = load_settings(self.settings_path)
         self.update_generation = 0
         self.update_checking = False
         self.latest_release_url = None
 
         root.title(f"{APP_NAME} v{APP_VERSION}")
-        root.minsize(600, 360)
+        root.minsize(660, 430)
         root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         header = tk.Frame(root)
@@ -323,6 +384,29 @@ class App:
             command=self._toggle_automatic_updates,
         ).pack(side="right", padx=(4, 0))
 
+        settings_frame = tk.LabelFrame(root, text="KSP installation")
+        settings_frame.pack(fill="x", padx=10, pady=6)
+        settings_controls = tk.Frame(settings_frame)
+        settings_controls.pack(fill="x", padx=8, pady=(8, 2))
+        tk.Label(settings_controls, text="KSP folder", width=12, anchor="w").pack(
+            side="left"
+        )
+        self.ksp_root_var = tk.StringVar(value=self.settings.get("ksp_root", ""))
+        self.ksp_root_entry = tk.Entry(
+            settings_controls, textvariable=self.ksp_root_var
+        )
+        self.ksp_root_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        self.ksp_root_entry.bind("<Return>", self._commit_ksp_root)
+        self.ksp_root_entry.bind("<FocusOut>", self._commit_ksp_root)
+        tk.Button(
+            settings_controls, text="Browse...", command=self._browse_ksp_root
+        ).pack(side="right")
+        self.ksp_root_status = tk.Label(
+            settings_frame, anchor="w", justify="left", fg="#666"
+        )
+        self.ksp_root_status.pack(fill="x", padx=9, pady=(0, 8))
+        self._refresh_ksp_root_status()
+
         components = discover_components()
         if components:
             for component in components:
@@ -361,7 +445,12 @@ class App:
 
     def _add_component(self, component):
         script = HERE / component["script"]
-        backend = Backend(component["name"], script, self._enqueue)
+        environment_provider = (
+            self._telemetry_environment if component["name"] == "feed" else None
+        )
+        backend = Backend(
+            component["name"], script, self._enqueue, environment_provider
+        )
 
         frame = tk.LabelFrame(self.root, text=component["title"])
         frame.pack(fill="x", padx=10, pady=6)
@@ -405,6 +494,66 @@ class App:
 
         self.backends.append(backend)
         self.backend_rows.append((backend, status, button))
+
+    def _telemetry_environment(self):
+        return telemetry_environment(self.ksp_root_var.get())
+
+    def _refresh_ksp_root_status(self):
+        raw = self.ksp_root_var.get().strip()
+        root = resolve_ksp_root(raw)
+        if root is not None:
+            notes_variants = (
+                root / "GameData" / "Notes" / "Plugins" / "PluginData" / "notes",
+                root / "GameData" / "notes" / "Plugins" / "PluginData" / "notes",
+            )
+            notes_installed = any(path.is_dir() for path in notes_variants)
+            text = "KSP folder ready"
+            if notes_installed:
+                text += " - Notes mod detected"
+            else:
+                text += " - Notes mod not detected (optional)"
+            self.ksp_root_status.config(text=text, fg="#2a8a3a")
+        elif raw:
+            self.ksp_root_status.config(
+                text="Choose the KSP folder that contains GameData.", fg="#b05040"
+            )
+        else:
+            self.ksp_root_status.config(
+                text="Optional: configure this to enable the Notes ship-log drawer.",
+                fg="#666",
+            )
+
+    def _save_ksp_root(self):
+        raw = self.ksp_root_var.get().strip()
+        root = resolve_ksp_root(raw)
+        if raw and root is None:
+            self._refresh_ksp_root_status()
+            return False
+        self.settings["ksp_root"] = str(root) if root is not None else ""
+        self.ksp_root_var.set(self.settings["ksp_root"])
+        try:
+            save_settings(self.settings, self.settings_path)
+        except OSError as exc:
+            self._enqueue("launcher", f"couldn't save KSP folder: {exc}")
+            return False
+        self._refresh_ksp_root_status()
+        return True
+
+    def _commit_ksp_root(self, _event=None):
+        self._save_ksp_root()
+
+    def _browse_ksp_root(self):
+        current = resolve_ksp_root(self.ksp_root_var.get())
+        selected = filedialog.askdirectory(
+            parent=self.root,
+            title="Select the Kerbal Space Program folder",
+            initialdir=str(current or HERE),
+            mustexist=True,
+        )
+        if not selected:
+            return
+        self.ksp_root_var.set(selected)
+        self._save_ksp_root()
 
     def _enqueue(self, source, message):
         self.log_queue.put(f"[{source}] {message}")

@@ -2,6 +2,23 @@
 
 All notable public changes will be recorded here.
 
+## v0.2.2 - Read-only Notes integration
+
+- Added optional integration with zer0Kerbal's Notes mod through a responsive
+  right-side drawer available in Flight, the VAB/SPH, and inactive KSP scenes.
+- Defaulted to the active vessel's Ship Log while adding saved-note search,
+  direct selection, previous/next cycling, and persisted dashboard favorites.
+- Added a single independently selected, scrollable pinned-note flight panel
+  and synchronized 8-18 px text-size controls with a 10 px reset.
+- Added a persisted KSP installation selector to the Windows launcher so the
+  telemetry feed can locate Notes without assuming a particular install path.
+- Kept Notes files read-only, bounded displayed content to the latest 32 KiB,
+  and rendered note text through text-only DOM operations.
+- Added nested-note discovery, exact catalog-key selection, launcher and
+  telemetry unit tests, a browser regression harness, and feature screenshots.
+- Preserved all v0.2.1 dashboard, editor-planning, KSP service, and ESP32
+  control-pad behavior when Notes is missing.
+
 ## v0.2.1 - Simplified Windows setup
 
 - Added automatic first-run creation and repair of the isolated Python
