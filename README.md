@@ -1,6 +1,6 @@
 # Woobie's Mission Control
 
-Current release: **v0.2.2**
+Current release: **v0.2.3**
 
 For the fastest Windows release setup, start with
 [`QUICKSTART.txt`](QUICKSTART.txt). It covers the `GameData` copy and automatic
@@ -203,9 +203,18 @@ The release package contains only this project's three service DLLs:
 - `KRPC.StageStats.dll`
 - `KRPC.VesselScience.dll`
 
-Copy each provided service folder into your KSP `GameData` folder. The intended
-layout uses `KRPC.SystemHeat`, `KRPC.StageStats`, and `KRPC.VesselScience` as the
-folder names, with the matching DLL inside each folder.
+After starting Mission Control, choose the main KSP installation folder that
+contains `GameData`. The launcher's **Mission Control KSP services** panel
+compares the packaged and installed DLLs by SHA-256. If a service is missing or
+different, close KSP and choose **Install / Repair**. Existing DLLs are backed
+up under `%LOCALAPPDATA%\WoobiesMissionControl\dll_backups` before replacement,
+and each new copy is verified after installation. The launcher changes only the
+three service DLL paths listed above.
+
+Manual copying remains available: copy each provided service folder into your
+KSP `GameData` folder. The intended layout uses `KRPC.SystemHeat`,
+`KRPC.StageStats`, and `KRPC.VesselScience` as the folder names, with the
+matching DLL inside each folder.
 
 The release DLLs are optimized deterministic builds without PDB files or
 embedded local build paths.
@@ -305,8 +314,13 @@ in Arduino IDE.
   public Releases API to report whether a newer stable release is available.
   It sends no authentication token or Mission Control telemetry. Automatic
   checks can be disabled in the launcher, and `Check now` remains available.
+  Starting a different launcher version bypasses a cached result from the
+  previous version and checks immediately when automatic checks are enabled.
   The preference and last successful result are stored under
   `%LOCALAPPDATA%\WoobiesMissionControl` on Windows.
+- The launcher shows that version's What's New notes once after an update by
+  default. This can be disabled independently in the changelog window, while
+  the `Changelog` button remains available for manual viewing.
 - Keep the telemetry server bound to `127.0.0.1` unless you intentionally need
   another device on your trusted local network to view it.
 - The WebSocket feed is read-only but has no authentication or encryption. Do
@@ -390,7 +404,7 @@ From a clean, up-to-date `main` checkout, first create and audit the package
 without changing anything on GitHub:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.2
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.3
 ```
 
 The script writes the ZIP, SHA-256 checksum, and generated release notes to the
@@ -410,7 +424,7 @@ Open a new PowerShell window after installation, authenticate once with
 `gh auth login`, and then rerun:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.2 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.3 -CreateDraftRelease
 ```
 
 The release remains private as a draft until it is reviewed and published on

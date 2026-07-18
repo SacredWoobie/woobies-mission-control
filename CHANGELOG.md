@@ -2,6 +2,28 @@
 
 All notable public changes will be recorded here.
 
+## v0.2.3 - Guided KSP service maintenance
+
+- Added SHA-256 status checks for the three packaged Mission Control KSP
+  service DLLs, with clear Current, Missing, and Repair available states.
+- Added a confirmed Install / Repair workflow that refuses to run while KSP is
+  open, backs up existing DLLs, stages and verifies replacements, and limits
+  changes to the three allowlisted service paths.
+- Added adjacent shortcuts for opening the selected KSP `GameData` destination
+  and the packaged service-DLL source folder for optional manual copying.
+- Made launcher-version changes bypass a still-fresh 24-hour release-check
+  cache while continuing to respect the automatic-update preference.
+- Added an optional once-per-version What's New window and an always-available
+  Changelog button in the launcher.
+- Added a dependency-free ttk visual theme using the dashboard's dark panels,
+  cyan headings, amber values, status colors, and monospaced typography.
+- Prioritized the frequently used dashboard-feed and panel-bridge controls
+  above the lower-frequency KSP installation and service-maintenance section.
+- Made initial window sizing screen-aware, added explicit Cascadia-to-Consolas
+  font fallback, and reused the drawn check/X control in the changelog viewer.
+- Added failure-injection coverage for install rollback and a prominent manual
+  restoration warning when Windows prevents automatic rollback from completing.
+
 ## v0.2.2 - Read-only Notes integration
 
 - Added optional integration with zer0Kerbal's Notes mod through a responsive

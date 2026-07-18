@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 
-DASHBOARD = Path(__file__).resolve().parents[1] / "Dashboard"
+DASHBOARD = Path(__file__).resolve().parents[1]
 sys.modules.setdefault("krpc", types.ModuleType("krpc"))
 sys.path.insert(0, str(DASHBOARD))
 
