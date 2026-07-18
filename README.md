@@ -1,6 +1,6 @@
 # Woobie's Mission Control
 
-Current release: **v0.2.3**
+Current release: **v0.2.4**
 
 For the fastest Windows release setup, start with
 [`QUICKSTART.txt`](QUICKSTART.txt). It covers the `GameData` copy and automatic
@@ -204,12 +204,45 @@ The release package contains only this project's three service DLLs:
 - `KRPC.VesselScience.dll`
 
 After starting Mission Control, choose the main KSP installation folder that
-contains `GameData`. The launcher's **Mission Control KSP services** panel
-compares the packaged and installed DLLs by SHA-256. If a service is missing or
-different, close KSP and choose **Install / Repair**. Existing DLLs are backed
-up under `%LOCALAPPDATA%\WoobiesMissionControl\dll_backups` before replacement,
-and each new copy is verified after installation. The launcher changes only the
-three service DLL paths listed above.
+contains `GameData`. The launcher's **KSP & kRPC compatibility** panel confirms
+that this is a complete KSP 1 installation, reads its version, and checks for
+duplicate or misplaced copies of the core kRPC, MechJeb, and Mission Control
+service DLLs. It also checks the installed kRPC, KRPC.MechJeb, and MechJeb 2
+versions and reads kRPC's saved server settings without changing any
+third-party files. A different installed version is reported as untested rather
+than incompatible because it may still work. When an actionable difference is
+found, **Review fixes** appears beside **Refresh all status**. Its read-only
+recommendation window shows the detected value, Mission Control's tested or
+required value, and a suggested correction. For version differences it
+recommends the appropriate tested CKAN version; newer-but-untested MechJeb
+builds are presented as downgrade recommendations, not as proof that the
+installed build is broken.
+
+<p align="center">
+  <a href="docs/images/v0.2.4-compatibility/launcher-preflight.png">
+    <img src="docs/images/v0.2.4-compatibility/launcher-preflight.png" width="760" alt="Woobie's Mission Control v0.2.4 launcher showing successful KSP, kRPC, MechJeb, DLL layout, live connection, and Mission Control service checks">
+  </a>
+</p>
+
+After loading a KSP save, use **Test connection** for an end-to-end check. The
+main menu is not sufficient: kRPC stops its servers while no game is loaded and
+auto-starts them only after entering a loaded-game scene. The test opens a
+temporary kRPC client, confirms that the server responds, and verifies that the
+kRPC services corresponding to installed integration DLLs are registered. If a
+DLL is present but its service is unavailable, restart KSP, load the save again,
+and inspect `KSP.log` for assembly-load or service-registration errors.
+
+The **Mission Control KSP services** panel compares the packaged and installed
+DLLs by SHA-256 and independently reads each installed DLL's version. Green
+means the installed DLL exactly matches the packaged repair copy. Amber means
+the installed version is current but the package copy is absent or has a
+different build hash; this is informational rather than an installed-service
+failure. Missing, outdated, mismatched, or unverifiable changed installed DLLs
+are shown in red. When a compatible repair copy is available, close KSP and
+choose **Install / Repair**. Existing DLLs are backed up under
+`%LOCALAPPDATA%\WoobiesMissionControl\dll_backups` before replacement, and each
+new copy is verified after installation. The launcher changes only the three
+service DLL paths listed above.
 
 Manual copying remains available: copy each provided service folder into your
 KSP `GameData` folder. The intended layout uses `KRPC.SystemHeat`,
@@ -218,6 +251,12 @@ matching DLL inside each folder.
 
 The release DLLs are optimized deterministic builds without PDB files or
 embedded local build paths.
+
+When either Mission Control tool starts, it makes 10 kRPC connection attempts
+two seconds apart (about 20 seconds total). The same limit applies if the panel
+bridge later loses its kRPC connection. If all attempts fail, that tool stops
+and the live-connection status turns amber with a recommendation to use
+**Test connection**; it does not retry forever in the background.
 
 ### 2. Choose your PC-side components
 
@@ -284,16 +323,23 @@ detected.
 You can leave this setting blank when you do not use Notes; every other
 dashboard feature continues to work normally.
 
-### 5. Start KSP and the tools
+### 5. Load a KSP save and start the tools
 
-1. Start KSP and enable its kRPC server.
-2. Load or launch a vessel.
+1. Start KSP and load a save; kRPC does not run at the main menu.
+2. Confirm kRPC auto-started, or start its server manually. Space Center, the
+   VAB/SPH, Tracking Station, and Flight are suitable loaded-game scenes.
 3. Double-click `Start KSP Dashboard.bat`.
 4. Start the dashboard feed, the panel bridge, or both.
 5. Starting the dashboard feed opens the dashboard automatically when the HTML
    file is present.
 
-The telemetry server listens only on `127.0.0.1:8090` by default.
+Keep kRPC on its standard local settings: address `127.0.0.1`, RPC port `50000`,
+and Stream port `50001`. The launcher checks these values before starting a
+component. It also reports when kRPC's automatic server start or automatic
+connection acceptance option is disabled.
+
+Mission Control's separate browser telemetry server listens only on
+`127.0.0.1:8090` by default. Do not assign port `8090` to kRPC.
 
 ## ESP32 control pad
 
@@ -348,7 +394,10 @@ open the project page from the About dialog.
 ### The dashboard says it is offline
 
 Confirm that the dashboard feed is running, KSP's kRPC server is enabled, and
-no other program is using port 8090.
+no other program is using port 8090. kRPC itself should use RPC port `50000` and
+Stream port `50001`; port `8090` belongs only to Mission Control's browser feed.
+Select the main KSP folder in the launcher and review **kRPC prerequisites** for
+the installed versions and saved server configuration.
 
 ### A dashboard section is blank
 
@@ -404,7 +453,7 @@ From a clean, up-to-date `main` checkout, first create and audit the package
 without changing anything on GitHub:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.3
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.4
 ```
 
 The script writes the ZIP, SHA-256 checksum, and generated release notes to the
@@ -424,7 +473,7 @@ Open a new PowerShell window after installation, authenticate once with
 `gh auth login`, and then rerun:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.3 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.4 -CreateDraftRelease
 ```
 
 The release remains private as a draft until it is reviewed and published on

@@ -114,6 +114,7 @@ $sourceFiles = @(
     @{ Source = 'docs/images/docking-alignment.png'; Destination = 'docs/images/docking-alignment.png' },
     @{ Source = 'docs/images/science-and-staging.png'; Destination = 'docs/images/science-and-staging.png' },
     @{ Source = 'docs/images/thermal-and-electricity.png'; Destination = 'docs/images/thermal-and-electricity.png' },
+    @{ Source = 'docs/images/v0.2.4-compatibility/launcher-preflight.png'; Destination = 'docs/images/v0.2.4-compatibility/launcher-preflight.png' },
     @{ Source = 'docs/images/v0.2.2-notes/notes-drawer-editor.png'; Destination = 'docs/images/v0.2.2-notes/notes-drawer-editor.png' },
     @{ Source = 'docs/images/v0.2.2-notes/notes-pinned-flight-panel.png'; Destination = 'docs/images/v0.2.2-notes/notes-pinned-flight-panel.png' },
     @{ Source = 'docs/images/v0.2.2-notes/notes-standby-access.png'; Destination = 'docs/images/v0.2.2-notes/notes-standby-access.png' },

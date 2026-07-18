@@ -45,6 +45,83 @@ class DllInstallRepairTests(unittest.TestCase):
             self.assertEqual(statuses[second[0]], "different")
             self.assertEqual(statuses[app.SERVICE_DLLS[2][0]], "missing")
 
+    def test_current_installed_versions_remain_current_when_package_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ksp_root = root / "KSP"
+            (ksp_root / "GameData").mkdir(parents=True)
+            for folder, _title in app.SERVICE_DLLS:
+                target = ksp_root / "GameData" / folder / f"{folder}.dll"
+                target.parent.mkdir(parents=True)
+                target.write_bytes(f"installed-{folder}".encode("ascii"))
+
+            def version_reader(path):
+                return app.SERVICE_TESTED_VERSIONS[Path(path).stem]
+
+            inventory = app.service_inventory(
+                ksp_root,
+                root / "package-without-gamedata",
+                version_reader,
+            )
+            self.assertTrue(
+                all(item["status"] == "current_package_missing" for item in inventory)
+            )
+            self.assertTrue(all(item["source_hash"] is None for item in inventory))
+            self.assertTrue(
+                all(item["installed_version"] is not None for item in inventory)
+            )
+
+    def test_missing_and_outdated_installations_are_distinct_from_missing_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ksp_root = root / "KSP"
+            (ksp_root / "GameData").mkdir(parents=True)
+            outdated_folder = app.SERVICE_DLLS[0][0]
+            current_folder = app.SERVICE_DLLS[2][0]
+            for folder in (outdated_folder, current_folder):
+                target = ksp_root / "GameData" / folder / f"{folder}.dll"
+                target.parent.mkdir(parents=True)
+                target.write_bytes(f"installed-{folder}".encode("ascii"))
+
+            def version_reader(path):
+                if Path(path).stem == outdated_folder:
+                    return "0.1.0"
+                return app.SERVICE_TESTED_VERSIONS[Path(path).stem]
+
+            statuses = {
+                item["folder"]: item["status"]
+                for item in app.service_inventory(
+                    ksp_root,
+                    root / "package-without-gamedata",
+                    version_reader,
+                )
+            }
+            self.assertEqual(statuses[outdated_folder], "outdated")
+            self.assertEqual(statuses[app.SERVICE_DLLS[1][0]], "missing")
+            self.assertEqual(statuses[current_folder], "current_package_missing")
+
+    def test_matching_version_with_different_packaged_build_is_yellow_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ksp_root, package = self.make_layout(root)
+            folder = app.SERVICE_DLLS[0][0]
+            target = ksp_root / "GameData" / folder / f"{folder}.dll"
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b"same-version-different-build")
+
+            def version_reader(path):
+                if Path(path).stem == folder:
+                    return app.SERVICE_TESTED_VERSIONS[folder]
+                return None
+
+            inventory = {
+                item["folder"]: item
+                for item in app.service_inventory(
+                    ksp_root, package, version_reader
+                )
+            }
+            self.assertEqual(inventory[folder]["status"], "current_different")
+
     def test_install_updates_only_needed_dlls_and_creates_backup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

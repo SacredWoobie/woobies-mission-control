@@ -22,6 +22,24 @@ import serial.tools.list_ports
 SERIAL_BAUD = 115200
 SERIAL_PORT = None  # e.g. "COM5" to force it; None = auto-detect
 KRPC_RETRY_SECONDS = 2
+KRPC_MAX_ATTEMPTS = 10
+KRPC_CONNECTED_EVENT = "WOOBIE_EVENT:KRPC_CONNECTED"
+KRPC_RETRY_EXHAUSTED_EVENT = "WOOBIE_EVENT:KRPC_RETRY_EXHAUSTED"
+
+
+def krpc_wait_message(error):
+    """Return an actionable retry message for common local kRPC failures."""
+    refused = isinstance(error, ConnectionRefusedError) or getattr(
+        error, "winerror", None
+    ) == 10061
+    if refused:
+        return (
+            "kRPC refused the connection at 127.0.0.1:50000. Load a KSP save "
+            "(the main menu is not enough), then start or auto-start kRPC using "
+            "RPC 50000 / Stream 50001. Port 8090 belongs to Mission Control's "
+            "browser telemetry feed."
+        )
+    return f"Waiting for the kRPC server... ({error})"
 
 
 def find_esp32_port():
@@ -63,17 +81,33 @@ def connect_serial():
     return connection
 
 
-def connect_krpc_forever():
-    """Wait for KSP's kRPC server and return a dedicated panel connection."""
-    while True:
+def connect_krpc_with_retry(
+    connector=krpc.connect,
+    attempts=KRPC_MAX_ATTEMPTS,
+    retry_seconds=KRPC_RETRY_SECONDS,
+    sleeper=time.sleep,
+):
+    """Try a bounded number of times and return a panel connection or ``None``."""
+    for attempt in range(1, attempts + 1):
         try:
             print("Connecting to kRPC (ESP32 Control Pad)...")
-            connection = krpc.connect(name="ESP32 Control Pad")
+            connection = connector(name="ESP32 Control Pad")
             print("Connected to kRPC (ESP32 Control Pad).")
+            print(KRPC_CONNECTED_EVENT)
             return connection
         except Exception as exc:
-            print(f"Waiting for the kRPC server... ({exc})")
-            time.sleep(KRPC_RETRY_SECONDS)
+            print(
+                f"{krpc_wait_message(exc)} "
+                f"(attempt {attempt}/{attempts})"
+            )
+            if attempt < attempts:
+                sleeper(retry_seconds)
+    print(KRPC_RETRY_EXHAUSTED_EVENT)
+    print(
+        "kRPC connection attempts exhausted. Use Mission Control's Test "
+        "connection action after checking KSP and kRPC."
+    )
+    return None
 
 
 def active_vessel_if_flying(connection):
@@ -136,21 +170,25 @@ def apply_panel_event(vessel, name, active, stage_armed, abort_armed):
 
 def main():
     panel = connect_serial()
-    connection = connect_krpc_forever()
-
-    stage_armed = False
-    abort_armed = False
-    last_led_state = None
-    last_flight_state = None
-
-    print("ESP32 control-pad bridge running. Ctrl+C to stop.")
     try:
+        connection = connect_krpc_with_retry()
+        if connection is None:
+            return 2
+
+        stage_armed = False
+        abort_armed = False
+        last_led_state = None
+        last_flight_state = None
+
+        print("ESP32 control-pad bridge running. Ctrl+C to stop.")
         while True:
             try:
                 vessel = active_vessel_if_flying(connection)
             except Exception as exc:
                 print(f"kRPC connection lost: {exc}")
-                connection = connect_krpc_forever()
+                connection = connect_krpc_with_retry()
+                if connection is None:
+                    return 2
                 vessel = None
 
             in_flight = vessel is not None
@@ -193,11 +231,14 @@ def main():
             panel.close()
         except Exception:
             pass
+    return 0
 
 
 if __name__ == "__main__":
     try:
-        main()
+        exit_code = main()
+        if exit_code:
+            raise SystemExit(exit_code)
     except KeyboardInterrupt:
         print("\nStopped.")
     except Exception:

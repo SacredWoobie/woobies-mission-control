@@ -2,6 +2,41 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+## v0.2.4 - KSP & kRPC compatibility preflight
+
+![Woobie's Mission Control v0.2.4 launcher compatibility preflight](https://raw.githubusercontent.com/SacredWoobie/woobies-mission-control/main/docs/images/v0.2.4-compatibility/launcher-preflight.png)
+
+- Added read-only launcher checks for the installed kRPC, KRPC.MechJeb, and
+  MechJeb 2 versions, distinguishing tested, untested, missing, and unknown
+  versions without treating optional staging integrations as core failures.
+- Added validation of kRPC's saved address, RPC port, stream port, automatic
+  server start, and automatic connection acceptance settings.
+- Added a conditional **Review fixes** launcher button that explains each
+  observed prerequisite mismatch, the tested or required value, and a suggested
+  correction such as restoring kRPC ports or selecting the tested MechJeb build
+  through CKAN.
+- Separated installed Mission Control service health from packaged repair-copy
+  availability: current installed versions remain an amber informational state
+  when absent from the package, while missing, outdated, mismatched, or damaged
+  installed DLLs are reported in red.
+- Added start-time guards for missing base kRPC, unsupported kRPC endpoints, and
+  an occupied dashboard telemetry port, while preserving wait-and-retry startup
+  when KSP or the correctly configured kRPC server is not running yet.
+- Added KSP installation identity and version validation plus a GameData scan
+  for duplicate or misplaced core kRPC, MechJeb, and Mission Control DLLs.
+- Added a non-blocking live kRPC connection test that checks the responding
+  server and confirms registration of services expected from installed DLLs.
+- Bounded dashboard-feed and panel-bridge kRPC startup/reconnect behavior to 10
+  attempts over about 20 seconds. Exhaustion stops the tool, turns the live
+  status amber, and recommends running the connection test.
+- Clarified connection guidance throughout the launcher and documentation that
+  a KSP save must be loaded because kRPC keeps its servers stopped at the main
+  menu.
+- Added targeted WinError 10061 guidance explaining that kRPC uses RPC 50000 /
+  Stream 50001 and Mission Control reserves port 8090 for its browser feed.
+
 ## v0.2.3 - Guided KSP service maintenance
 
 - Added SHA-256 status checks for the three packaged Mission Control KSP

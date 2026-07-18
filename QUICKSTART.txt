@@ -33,15 +33,35 @@ WOOBIE'S MISSION CONTROL - WINDOWS QUICK START
    contains GameData, not GameData itself.
 
    Review the Mission Control KSP services panel. If any service says Missing
-   or Repair available, choose Install / Repair and confirm the listed changes.
+   or repair ready, choose Install / Repair and confirm the listed changes.
+   Amber "current - not in package" statuses mean the installed DLL version is
+   already current but this copy of Mission Control cannot provide a repair;
+   missing or outdated installed DLLs are shown in red.
    Existing service DLLs are backed up and each installed copy is verified.
    No other GameData files are changed.
 
 4. CONNECT TO KSP
 
-   Start KSP, enable its kRPC server, and load a vessel or open the VAB/SPH.
+   Start KSP and load a save. The main menu is not enough: kRPC keeps its
+   servers stopped while no game is loaded. Enter Space Center, the VAB/SPH,
+   Tracking Station, or Flight, then confirm the server auto-started (or start
+   it manually).
+   Keep kRPC on address 127.0.0.1, RPC port 50000, and Stream port 50001. Port
+   8090 belongs to Mission Control's separate browser feed, not to kRPC.
+
+   Review the launcher's KSP & kRPC compatibility panel. It checks the selected
+   KSP version, duplicate or misplaced core DLLs, installed kRPC,
+   KRPC.MechJeb, and MechJeb 2 versions, plus kRPC's saved server settings. If
+   Review fixes appears, open it for the observed mismatch, required or tested
+   value, and a suggested kRPC or CKAN correction.
+
+   Choose Test connection after the save is loaded and the kRPC server is
+   running. It confirms that kRPC responds and that services for the installed
+   integration DLLs are registered.
    In the Mission Control launcher, start Dashboard feed (telemetry). The
-   dashboard opens in your browser automatically.
+   dashboard opens in your browser automatically. Each tool stops after 10
+   failed kRPC attempts (about 20 seconds) instead of retrying forever. Its
+   connection status then turns amber and recommends Test connection.
 
    OPTIONAL NOTES INTEGRATION: When the Notes mod is detected at the selected
    KSP location, a Notes button appears in the dashboard during flight and
