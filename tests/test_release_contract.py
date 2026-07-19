@@ -83,6 +83,34 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertTrue(required.issubset(actual))
         self.assertFalse(any(" " in name or "&" in name for name in actual))
 
+    def test_release_assets_sort_zip_before_curated_images(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        image_names = re.findall(
+            r'Name = "\$packageName\.([^\"]+\.png)"', publish_script
+        )
+
+        self.assertEqual(
+            image_names,
+            [
+                "zz-01-flight-dashboard.png",
+                "zz-02-mission-control.png",
+                "zz-03-vab-editor.png",
+                "zz-04-launcher.png",
+                "zz-05-notes-drawer.png",
+            ],
+        )
+        zip_name = "Woobies-Mission-Control-v0.3.0.zip"
+        release_image_names = [
+            f"Woobies-Mission-Control-v0.3.0.{name}" for name in image_names
+        ]
+        self.assertEqual(
+            sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name
+        )
+        self.assertIn("$zipPath, $checksumPath", publish_script)
+        self.assertIn(") + $releaseImagePaths + @(", publish_script)
+
 
 if __name__ == "__main__":
     unittest.main()
