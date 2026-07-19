@@ -70,6 +70,8 @@ The packager:
 - checks each staged DLL's assembly version and SHA-256;
 - creates an unpacked allowlisted package under `release-output`;
 - creates the ZIP, checksum, generated build information, and release notes;
+- stages five curated standalone screenshot assets using names that sort after
+  the ZIP and checksum in GitHub's release asset list;
 - audits the ZIP for missing files and forbidden source/build artifacts.
 
 The end-user package contains the compiled `Dashboard\web` directory, never
@@ -101,5 +103,8 @@ After committing, pushing, and confirming that `main` matches `origin/main`:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.3.0 -CreateDraftRelease
 ```
 
-This creates a draft GitHub Release and uploads the ZIP and checksum. Review
-the draft, its generated notes, and final screenshots before publishing it.
+This creates a draft GitHub Release and uploads the ZIP, checksum, and five
+curated screenshots. The screenshot filenames use a `.zz-01` through `.zz-05`
+suffix so `Woobies-Mission-Control-v0.3.0.zip` remains the first release asset.
+Review the draft, its generated notes, asset ordering, and final screenshots
+before publishing it.

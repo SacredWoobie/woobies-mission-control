@@ -117,7 +117,15 @@ $stageRoot = Join-Path $OutputDirectory $packageName
 $zipPath = Join-Path $OutputDirectory "$packageName.zip"
 $checksumPath = Join-Path $OutputDirectory "$packageName.zip.sha256"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
-foreach ($path in @($stageRoot, $zipPath, $checksumPath, $notesPath)) {
+$releaseImages = @(
+    @{ Source = 'docs/images/v0.3.0/flight-dashboard-landscape.png'; Name = "$packageName.zz-01-flight-dashboard.png" },
+    @{ Source = 'docs/images/v0.3.0/mission-control-landscape.png'; Name = "$packageName.zz-02-mission-control.png" },
+    @{ Source = 'docs/images/v0.3.0/editor-vab-landscape.png'; Name = "$packageName.zz-03-vab-editor.png" },
+    @{ Source = 'docs/images/v0.3.0/launcher.png'; Name = "$packageName.zz-04-launcher.png" },
+    @{ Source = 'docs/images/v0.3.0/notes-drawer.png'; Name = "$packageName.zz-05-notes-drawer.png" }
+)
+$releaseImagePaths = @($releaseImages | ForEach-Object { Join-Path $OutputDirectory $_.Name })
+foreach ($path in @($stageRoot, $zipPath, $checksumPath, $notesPath) + $releaseImagePaths) {
     Assert-SafeChildPath -Parent $OutputDirectory -Child $path
 }
 
@@ -147,6 +155,15 @@ $sourceFiles = @(
 Write-Step 'Checking release metadata and source inputs'
 foreach ($file in $sourceFiles) {
     Assert-RequiredFile (Join-Path $repoRoot $file.Source)
+}
+foreach ($image in $releaseImages) {
+    Assert-RequiredFile (Join-Path $repoRoot $image.Source)
+    if ([System.StringComparer]::OrdinalIgnoreCase.Compare(
+        [System.IO.Path]::GetFileName($zipPath),
+        $image.Name
+    ) -ge 0) {
+        throw "Release image '$($image.Name)' must sort after '$([System.IO.Path]::GetFileName($zipPath))'."
+    }
 }
 
 if ($builderReleaseSetPath) {
@@ -234,7 +251,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 if (Test-Path -LiteralPath $stageRoot) {
     Remove-Item -LiteralPath $stageRoot -Recurse -Force
 }
-foreach ($path in @($zipPath, $checksumPath, $notesPath)) {
+foreach ($path in @($zipPath, $checksumPath, $notesPath) + $releaseImagePaths) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Force
     }
@@ -288,6 +305,12 @@ if (-not $notesMatch.Success) {
 }
 $notes = $notesMatch.Groups['body'].Value.Trim() + [Environment]::NewLine
 [System.IO.File]::WriteAllText($notesPath, $notes, [System.Text.UTF8Encoding]::new($false))
+
+foreach ($image in $releaseImages) {
+    $source = Join-Path $repoRoot $image.Source
+    $destination = Join-Path $OutputDirectory $image.Name
+    Copy-Item -LiteralPath $source -Destination $destination -Force
+}
 
 Write-Step 'Auditing the unpacked package'
 $stageFiles = @(Get-ChildItem -LiteralPath $stageRoot -Recurse -File)
@@ -348,6 +371,10 @@ Write-Host "  Unpacked: $stageRoot"
 Write-Host "  ZIP:      $zipPath"
 Write-Host "  SHA-256:  $($hash.Hash.ToLowerInvariant())"
 Write-Host "  Notes:    $notesPath"
+Write-Host '  Images:'
+foreach ($imagePath in $releaseImagePaths) {
+    Write-Host "             $imagePath"
+}
 
 if (-not $CreateDraftRelease) {
     Write-Host "`nPackage-only run complete. Nothing was published to GitHub." -ForegroundColor Yellow
@@ -358,7 +385,8 @@ if (-not $CreateDraftRelease) {
 Write-Step 'Creating draft GitHub release'
 $releaseArguments = @(
     'release', 'create', "v$Version",
-    $zipPath, $checksumPath,
+    $zipPath, $checksumPath
+) + $releaseImagePaths + @(
     '--repo', $Repository,
     '--target', $Target,
     '--title', "Woobie's Mission Control v$Version",
