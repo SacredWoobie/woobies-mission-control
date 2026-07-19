@@ -1,8 +1,8 @@
 # Woobie's Mission Control
 
-Next release: **v0.3.0**
+Next release: **v0.3.1**
 
-Current public release: **v0.2.4**
+Current public release: **v0.3.0**
 
 Woobie's Mission Control is a read-only browser dashboard and optional ESP32
 control-pad bridge for Kerbal Space Program 1. It uses kRPC for live data and
