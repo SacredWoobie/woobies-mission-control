@@ -4,7 +4,7 @@ This module owns every dashboard-facing responsibility:
   * its own kRPC connection and reconnect loop
   * flight, orbit, resource, science, heat, electricity, target, and stage data
   * VAB/SPH craft stage analysis and editor-condition selection
-  * the WebSocket server consumed by ksp_mission_dashboard.html
+  * the loopback HTTP and WebSocket server consumed by the React dashboard
 
 It has no ESP32, serial-port, staging, abort, or panel-control dependencies.
 The physical control pad is handled exclusively by panel_bridge.py in a
@@ -19,9 +19,12 @@ Set WOOBIE_STAGE_TRACE=1 to emit opt-in StageStats lifecycle diagnostics.
 """
 import json
 import math
+import mimetypes
 import os
 import sys
 import time
+import urllib.parse
+from http import HTTPStatus
 from pathlib import Path
 
 import krpc
@@ -32,6 +35,7 @@ KRPC_RETRY_SECONDS = 2
 KRPC_MAX_ATTEMPTS = 10
 KRPC_CONNECTED_EVENT = "WOOBIE_EVENT:KRPC_CONNECTED"
 KRPC_RETRY_EXHAUSTED_EVENT = "WOOBIE_EVENT:KRPC_RETRY_EXHAUSTED"
+DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"
 
 # Poll tiers. Flight/orbit/navball values are inexpensive and update every tick.
 # Data that requires many RPC round trips is throttled and cached.
@@ -42,9 +46,20 @@ RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
+EDITOR_SUMMARY_RETRY_SECONDS = 1
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
 NOTES_MAX_CATALOG = 500
+OVERVIEW_ECONOMY_POLL_SECONDS = 2.0
+OVERVIEW_ALARMS_POLL_SECONDS = 2.0
+OVERVIEW_FLEET_POLL_SECONDS = 5.0
+OVERVIEW_CONTRACTS_POLL_SECONDS = 10.0
+OVERVIEW_ROSTER_POLL_SECONDS = 15.0
+OVERVIEW_MAX_VESSELS = 500
+OVERVIEW_TRACKED_VESSEL_TYPES = frozenset({
+    "Debris", "Probe", "Rover", "Lander", "Ship", "Station", "Base",
+    "Plane", "Relay",
+})
 STAGE_TRACE_ENABLED = os.environ.get("WOOBIE_STAGE_TRACE", "").casefold() in {
     "1", "true", "yes", "on",
 }
@@ -88,7 +103,22 @@ _editor_stage_cache = {}
 _editor_stage_last_poll = 0.0
 _editor_stage_candidate = None
 _editor_stage_candidate_hits = 0
+_editor_summary_cache = {}
+_editor_summary_last_poll = 0.0
 _telemetry_mode = None
+
+# The mission-control overview deliberately uses independent polling tiers.
+# Current UT is read every frame; larger collections are scanned much less
+# often so a tracking-station dashboard remains inexpensive on mature saves.
+_overview_cache = {
+    "economy": {},
+    "alarms": {},
+    "fleet": {},
+    "contracts": {},
+    "roster": {},
+}
+_overview_last_poll = {key: 0.0 for key in _overview_cache}
+_overview_last_ut = None
 
 _NOTES_PLUGIN_DATA = Path("Plugins") / "PluginData" / "notes"
 
@@ -172,6 +202,36 @@ def connect_krpc_with_retry(
         "Test connection action after checking KSP and kRPC."
     )
     return None
+
+
+def dashboard_asset(request_target, web_root=DASHBOARD_WEB_ROOT):
+    """Return an HTTP status, media type, cache policy, and local dashboard bytes."""
+    root = Path(web_root).resolve()
+    path = urllib.parse.unquote(urllib.parse.urlsplit(request_target).path)
+    relative_text = path.lstrip("/") or "index.html"
+    relative = Path(relative_text.replace("\\", "/"))
+    if relative.is_absolute() or ".." in relative.parts:
+        return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", "no-store", b"Not found\n"
+
+    target = (root / relative).resolve()
+    try:
+        inside_root = target.is_relative_to(root)
+    except AttributeError:
+        inside_root = root == target or root in target.parents
+    if not inside_root or not target.is_file():
+        return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", "no-store", b"Not found\n"
+
+    media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    if media_type.startswith("text/") or media_type in {
+        "application/javascript", "application/json", "image/svg+xml"
+    }:
+        media_type += "; charset=utf-8"
+    cache_policy = (
+        "no-cache"
+        if target.name == "index.html"
+        else "public, max-age=31536000, immutable"
+    )
+    return HTTPStatus.OK, media_type, cache_policy, target.read_bytes()
 
 
 def _stage_summary(snapshot):
@@ -1111,11 +1171,53 @@ def _stage_signature(result):
 def _reset_editor_stage_state(revision=None):
     global _editor_revision, _editor_stage_cache, _editor_stage_last_poll
     global _editor_stage_candidate, _editor_stage_candidate_hits
+    global _editor_summary_cache, _editor_summary_last_poll
     _editor_revision = revision
     _editor_stage_cache = {}
     _editor_stage_last_poll = 0.0
     _editor_stage_candidate = None
     _editor_stage_candidate_hits = 0
+    _editor_summary_cache = {}
+    _editor_summary_last_poll = 0.0
+
+
+def _gather_editor_summary(service):
+    """Read the revision-cached VAB/SPH craft summary from StageStats."""
+    try:
+        names = list(service.editor_resource_names())
+        amounts = list(service.editor_resource_amounts())
+        capacities = list(service.editor_resource_capacities())
+        if len(names) != len(amounts) or len(names) != len(capacities):
+            return {"editor.summaryAvailable": False}
+
+        visible_names = []
+        resources = {}
+        for name, amount, capacity in zip(names, amounts, capacities):
+            if not _is_consumable_resource(name) or capacity <= 0:
+                continue
+            visible_names.append(name)
+            resources[f"editor.res[{name}]"] = float(amount)
+            resources[f"editor.resMax[{name}]"] = float(capacity)
+
+        return {
+            "editor.summaryAvailable": True,
+            "editor.partCount": int(service.editor_part_count),
+            "editor.crewCapacity": int(service.editor_crew_capacity),
+            "editor.stageCount": int(service.editor_stage_count),
+            "editor.wetMass": float(service.editor_wet_mass),
+            "editor.dryMass": float(service.editor_dry_mass),
+            "editor.resourceMass": float(service.editor_resource_mass),
+            "editor.totalCost": float(service.editor_total_cost),
+            "editor.dryCost": float(service.editor_dry_cost),
+            "editor.resourceCost": float(service.editor_resource_cost),
+            "editor.res.names": visible_names,
+            **resources,
+        }
+    except Exception:
+        # The currently loaded DLL may predate the summary API, or the editor
+        # may be rebuilding the ship. The next craft revision/server restart
+        # retries without disturbing stage analysis.
+        return {"editor.summaryAvailable": False}
 
 
 def _gather_editor_telemetry(conn, facility):
@@ -1123,6 +1225,7 @@ def _gather_editor_telemetry(conn, facility):
     global _editor_revision, _editor_bodies_cache
     global _editor_stage_cache, _editor_stage_last_poll
     global _editor_stage_candidate, _editor_stage_candidate_hits
+    global _editor_summary_cache, _editor_summary_last_poll
 
     data = {
         "context.mode": "editor",
@@ -1169,6 +1272,17 @@ def _gather_editor_telemetry(conn, facility):
         return data
 
     now = time.time()
+    summary_unavailable = _editor_summary_cache.get(
+        "editor.summaryAvailable"
+    ) is False
+    if not _editor_summary_cache or (
+        summary_unavailable and
+        now - _editor_summary_last_poll >= EDITOR_SUMMARY_RETRY_SECONDS
+    ):
+        _editor_summary_last_poll = now
+        _editor_summary_cache = _gather_editor_summary(service)
+    data.update(_editor_summary_cache)
+
     if now - _editor_stage_last_poll >= STAGE_POLL_SECONDS:
         _editor_stage_last_poll = now
         try:
@@ -1286,7 +1400,7 @@ def _apply_telemetry_command(conn, command):
 
 
 # ---------------------------------------------------------------------------
-# Science aboard. KRPC.VesselScience includes both experiment modules and
+# Science aboard. WoobiesControlStats' VesselScience service includes both experiment modules and
 # science containers; built-in SpaceCenter experiments remain the fallback.
 # ---------------------------------------------------------------------------
 def _gather_science_stock(vessel):
@@ -1395,6 +1509,406 @@ def _gather_science(conn, vessel):
 # ---------------------------------------------------------------------------
 # Telemetry gathering
 # ---------------------------------------------------------------------------
+def _gather_sas(conn, vessel):
+    """Return stock SAS and Smart A.S.S. state without coupling either source."""
+    result = {}
+    try:
+        control = vessel.control
+        result["krpc.sas"] = bool(control.sas)
+        try:
+            result["krpc.sasMode"] = str(control.sas_mode)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    try:
+        mj = conn.mech_jeb
+        if mj.api_ready:
+            smart_ass_mode = str(mj.smart_ass.autopilot_mode)
+            result["mj.sasMode"] = smart_ass_mode
+            result["mj.sasActive"] = smart_ass_mode.split(".")[-1].lower() != "off"
+    except Exception:
+        pass
+    return result
+
+
+def _gather_system_heat(conn):
+    """Return live System Heat loop telemetry in the mod's native kW units."""
+    sh = conn.system_heat
+    if not sh.available:
+        return None
+    loop_ids = list(sh.loop_ids())
+    if not loop_ids:
+        return None
+    loops = []
+    for loop_id in loop_ids:
+        loops.append({
+            "id": str(loop_id),
+            "tempK": round(sh.loop_temperature(loop_id), 1),
+            "genKw": round(sh.loop_positive_flux(loop_id), 2),
+            "remKw": round(sh.loop_removed_flux(loop_id), 2),
+        })
+    generated = sh.total_heat_generation
+    removed = abs(sh.total_heat_rejection)
+    return {
+        "heat.backend": "system_heat",
+        "heat.generatedKw": round(generated, 2),
+        "heat.removedKw": round(removed, 2),
+        "heat.netKw": round(generated - removed, 2),
+        "heat.loops": loops,
+    }
+
+
+def _gather_stock_heat(conn):
+    """Return stock part thermal telemetry in watts, hottest parts first."""
+    stock = conn.stock_thermal
+    if not stock.available:
+        return None
+    columns = [
+        list(stock.part_names()),
+        list(stock.part_temperatures()),
+        list(stock.part_max_temperatures()),
+        list(stock.part_skin_temperatures()),
+        list(stock.part_max_skin_temperatures()),
+        list(stock.part_utilizations()),
+        list(stock.part_net_watts()),
+    ]
+    parts = []
+    for name, temp, max_temp, skin_temp, max_skin_temp, utilization, net in zip(*columns):
+        parts.append({
+            "name": str(name),
+            "tempK": round(temp, 1),
+            "maxTempK": round(max_temp, 1),
+            "skinTempK": round(skin_temp, 1),
+            "maxSkinTempK": round(max_skin_temp, 1),
+            "utilization": round(utilization, 1),
+            "netW": round(net, 1),
+        })
+        if len(parts) >= 12:
+            break
+    return {
+        "heat.backend": "stock",
+        "heat.generatedW": round(stock.generated_watts, 1),
+        "heat.removedW": round(stock.removed_watts, 1),
+        "heat.netW": round(stock.net_watts, 1),
+        "heat.parts": parts,
+    }
+
+
+def _gather_heat(conn):
+    """Prefer real System Heat loops, then fall back to stock vessel heat."""
+    try:
+        result = _gather_system_heat(conn)
+        if result:
+            return result
+    except Exception:
+        pass
+    try:
+        return _gather_stock_heat(conn)
+    except Exception:
+        return None
+
+
+def _overview_label(value, fallback=""):
+    """Turn a kRPC enum value into a stable, human-readable label."""
+    if value is None:
+        return fallback
+    text = str(value).split(".")[-1].strip()
+    return text.replace("_", " ").title() if text else fallback
+
+
+def _overview_value(obj, name, default=None):
+    try:
+        return getattr(obj, name)
+    except Exception:
+        return default
+
+
+def _overview_list(obj, name):
+    value = _overview_value(obj, name, [])
+    try:
+        return list(value or [])
+    except Exception:
+        return []
+
+
+def _overview_capabilities(game_mode):
+    normalized = str(game_mode or "").casefold().replace(" ", "_")
+    if normalized == "career":
+        return {
+            "funds": True,
+            "science": True,
+            "reputation": True,
+            "contracts": True,
+        }
+    if normalized in {"science", "science_sandbox"}:
+        return {
+            "funds": False,
+            "science": True,
+            "reputation": False,
+            "contracts": False,
+        }
+    return {
+        "funds": False,
+        "science": False,
+        "reputation": False,
+        "contracts": False,
+    }
+
+
+def _gather_overview_economy(sc):
+    game_mode = _overview_label(_overview_value(sc, "game_mode"), "Unknown")
+    capabilities = _overview_capabilities(game_mode)
+    data = {
+        "overview.gameMode": game_mode,
+        "overview.capabilities": capabilities,
+    }
+    if capabilities["funds"]:
+        funds = _overview_value(sc, "funds")
+        if funds is not None:
+            data["overview.funds"] = funds
+    if capabilities["science"]:
+        science = _overview_value(sc, "science")
+        if science is not None:
+            data["overview.science"] = science
+    if capabilities["reputation"]:
+        reputation = _overview_value(sc, "reputation")
+        if reputation is not None:
+            data["overview.reputation"] = reputation
+    return data
+
+
+def _gather_overview_fleet(sc):
+    rows = []
+    vessels = _overview_list(sc, "vessels")
+    truncated = False
+    for vessel in vessels:
+        try:
+            vessel_type = _overview_label(
+                _overview_value(vessel, "type"), "Unknown"
+            )
+            if vessel_type not in OVERVIEW_TRACKED_VESSEL_TYPES:
+                continue
+            if len(rows) >= OVERVIEW_MAX_VESSELS:
+                truncated = True
+                break
+            situation = _overview_label(
+                _overview_value(vessel, "situation"), "Unknown"
+            )
+            orbit = _overview_value(vessel, "orbit")
+            body = _overview_value(orbit, "body")
+            body_name = _overview_value(body, "name", "Unknown")
+            crew_count = _overview_value(vessel, "crew_count")
+            if crew_count is None:
+                crew_count = len(_overview_list(vessel, "crew"))
+            met = _overview_value(vessel, "met", 0.0)
+            rows.append({
+                "name": _overview_value(vessel, "name", "Unnamed vessel"),
+                "type": vessel_type,
+                "situation": situation,
+                "body": body_name,
+                "met": met if met is not None else 0.0,
+                "crewCount": int(crew_count),
+                "mission": vessel_type != "Debris",
+            })
+        except Exception:
+            # One modded or half-loaded vessel should not hide the rest.
+            continue
+    rows.sort(key=lambda row: str(row["name"]).casefold())
+    return {
+        "overview.vessels": rows,
+        "overview.vesselsTruncated": truncated,
+    }
+
+
+def _gather_overview_contracts(sc):
+    manager = _overview_value(sc, "contract_manager")
+    if manager is None:
+        return {
+            "overview.contractCounts": {
+                "active": 0, "offered": 0, "completed": 0, "failed": 0,
+            },
+            "overview.contracts": [],
+        }
+
+    groups = {
+        "active": _overview_list(manager, "active_contracts"),
+        "offered": _overview_list(manager, "offered_contracts"),
+        "completed": _overview_list(manager, "completed_contracts"),
+        "failed": _overview_list(manager, "failed_contracts"),
+    }
+    active_rows = []
+    for contract in groups["active"]:
+        active_rows.append({
+            "title": _overview_value(contract, "title", "Untitled contract"),
+            "type": _overview_label(_overview_value(contract, "type"), "Contract"),
+            "deadline": _overview_value(contract, "date_deadline"),
+        })
+    active_rows.sort(key=lambda row: (
+        row["deadline"] is None,
+        row["deadline"] if row["deadline"] is not None else float("inf"),
+        str(row["title"]).casefold(),
+    ))
+    return {
+        "overview.contractCounts": {
+            name: len(items) for name, items in groups.items()
+        },
+        "overview.contracts": active_rows,
+    }
+
+
+def _alarm_row(alarm, source):
+    alarm_time = _overview_value(alarm, "time")
+    if alarm_time is None:
+        return None
+    vessel = _overview_value(alarm, "vessel")
+    return {
+        "title": _overview_value(
+            alarm, "title",
+            _overview_value(alarm, "name", "Untitled alarm"),
+        ),
+        "type": _overview_label(_overview_value(alarm, "type"), "Alarm"),
+        "time": alarm_time,
+        "source": source,
+        "vessel": _overview_value(vessel, "name", "") if vessel else "",
+        "notes": (
+            _overview_value(alarm, "notes") or
+            _overview_value(alarm, "description", "") or ""
+        ),
+    }
+
+
+def _gather_overview_alarms(conn, sc):
+    rows = []
+    providers = {"stock": "unavailable", "kac": "unavailable"}
+
+    try:
+        manager = sc.alarm_manager
+        for alarm in _overview_list(manager, "alarms"):
+            row = _alarm_row(alarm, "Stock")
+            if row is not None:
+                rows.append(row)
+        providers["stock"] = "available"
+    except Exception:
+        providers["stock"] = "error"
+
+    try:
+        kac = conn.kerbal_alarm_clock
+        if bool(_overview_value(kac, "available", False)):
+            for alarm in _overview_list(kac, "alarms"):
+                row = _alarm_row(alarm, "KAC")
+                if row is not None:
+                    rows.append(row)
+            providers["kac"] = "available"
+    except Exception:
+        providers["kac"] = "unavailable"
+
+    rows.sort(key=lambda row: (row["time"], row["source"], row["title"]))
+    return {
+        "overview.alarms": rows,
+        "overview.alarmProviders": providers,
+    }
+
+
+def _gather_overview_roster(conn):
+    try:
+        service = conn.mission_overview
+        if not bool(service.available):
+            raise RuntimeError("MissionOverview unavailable")
+        columns = {
+            "name": list(service.roster_names()),
+            "status": list(service.roster_statuses()),
+            "type": list(service.roster_types()),
+            "trait": list(service.roster_traits()),
+            "experience": list(service.roster_experience()),
+            "level": list(service.roster_levels()),
+            "veteran": list(service.roster_veterans()),
+            "flightCount": list(service.roster_flight_counts()),
+        }
+        count = min((len(values) for values in columns.values()), default=0)
+        rows = [
+            {name: values[index] for name, values in columns.items()}
+            for index in range(count)
+        ]
+        rows.sort(key=lambda row: str(row["name"]).casefold())
+        return {
+            "overview.rosterAvailable": True,
+            "overview.roster": rows,
+        }
+    except Exception:
+        return {
+            "overview.rosterAvailable": False,
+            "overview.roster": [],
+        }
+
+
+def _reset_overview_state():
+    global _overview_cache, _overview_last_poll, _overview_last_ut
+    _overview_cache = {key: {} for key in _overview_cache}
+    _overview_last_poll = {key: 0.0 for key in _overview_last_poll}
+    _overview_last_ut = None
+
+
+def _gather_overview_telemetry(conn, scene, now=None):
+    """Return the read-only, independently throttled mission overview."""
+    global _overview_last_ut
+    if now is None:
+        now = time.time()
+    cached_vessel_count = len(
+        _overview_cache["fleet"].get("overview.vessels", [])
+    )
+    fleet_interval = min(
+        30.0,
+        OVERVIEW_FLEET_POLL_SECONDS + cached_vessel_count / 20.0,
+    )
+    data = {
+        "context.mode": "inactive",
+        "flight.active": False,
+        "editor.active": False,
+        "overview.scene": _overview_label(scene, "Space Center"),
+        "overview.readOnly": True,
+        "overview.refreshSeconds": {
+            "economy": OVERVIEW_ECONOMY_POLL_SECONDS,
+            "alarms": OVERVIEW_ALARMS_POLL_SECONDS,
+            "fleet": round(fleet_interval, 1),
+            "contracts": OVERVIEW_CONTRACTS_POLL_SECONDS,
+            "roster": OVERVIEW_ROSTER_POLL_SECONDS,
+        },
+    }
+    try:
+        sc = conn.space_center
+        current_ut = sc.ut
+        data["t.universalTime"] = current_ut
+        if _overview_last_ut is not None and current_ut < _overview_last_ut:
+            _reset_overview_state()
+        _overview_last_ut = current_ut
+    except Exception:
+        return data
+
+    tiers = (
+        ("economy", OVERVIEW_ECONOMY_POLL_SECONDS,
+         lambda: _gather_overview_economy(sc)),
+        ("alarms", OVERVIEW_ALARMS_POLL_SECONDS,
+         lambda: _gather_overview_alarms(conn, sc)),
+        ("fleet", fleet_interval,
+         lambda: _gather_overview_fleet(sc)),
+        ("contracts", OVERVIEW_CONTRACTS_POLL_SECONDS,
+         lambda: _gather_overview_contracts(sc)),
+        ("roster", OVERVIEW_ROSTER_POLL_SECONDS,
+         lambda: _gather_overview_roster(conn)),
+    )
+    for name, interval, gather in tiers:
+        if now - _overview_last_poll[name] >= interval:
+            _overview_last_poll[name] = now
+            try:
+                _overview_cache[name] = gather()
+            except Exception:
+                pass
+        data.update(_overview_cache[name])
+    return data
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
@@ -1426,6 +1940,8 @@ def gather_telemetry(conn):
             _stage_trace_last_published = None
             _editor_bodies_cache = []
             _reset_editor_stage_state()
+            if mode == "inactive":
+                _reset_overview_state()
 
         if mode == "editor_vab":
             return _attach_notes_telemetry(
@@ -1434,11 +1950,9 @@ def gather_telemetry(conn):
             return _attach_notes_telemetry(
                 _gather_editor_telemetry(conn, "SPH"))
         if mode != "flight":
-            return _attach_notes_telemetry({
-                "context.mode": "inactive",
-                "flight.active": False,
-                "editor.active": False,
-            })
+            return _attach_notes_telemetry(
+                _gather_overview_telemetry(conn, scene)
+            )
     except Exception:
         pass
 
@@ -1533,13 +2047,12 @@ def gather_telemetry(conn):
     except Exception:
         pass  # no antenna / no CommNet
 
-    # ---- MechJeb SmartASS mode ----
-    try:
-        mj = conn.mech_jeb
-        if mj.api_ready:
-            d["mj.sasMode"] = str(mj.smart_ass.autopilot_mode)
-    except Exception:
-        pass  # MechJeb not ready / not installed this session
+    # ---- stock SAS + MechJeb SmartASS mode ----
+    # Smart A.S.S. and stock SAS are mutually exclusive in normal operation,
+    # but stock SAS can pulse on briefly before MechJeb turns it back off. Send
+    # both sources so the dashboard can keep Smart A.S.S. authoritative during
+    # that handoff instead of flashing a stock mode.
+    d.update(_gather_sas(conn, vessel))
 
     # ---- resources ----
     global _res_cache, _res_last_poll
@@ -1618,35 +2131,13 @@ def gather_telemetry(conn):
             pass  # keep last good cache through scene changes
     d.update(_sci_cache)
 
-    # ---- System Heat: via the custom KRPC.SystemHeat service ----
-    # Reads System Heat's live simulator through the custom service. Fluxes are
-    # reported in kW and temperatures in K.
+    # ---- Heat management: System Heat loops, with stock thermal fallback ----
+    # System Heat retains its native kW display. Stock part flux is explicitly
+    # reported in W so the two backends never silently change scale.
     global _heat_cache, _heat_last_poll
     if now - _heat_last_poll >= HEAT_POLL_SECONDS:
         _heat_last_poll = now
-        try:
-            sh = conn.system_heat
-            if sh.available:
-                loops = []
-                for lid in sh.loop_ids():
-                    loops.append({
-                        "id": str(lid),
-                        "tempK": round(sh.loop_temperature(lid), 1),
-                        "genKw": round(sh.loop_positive_flux(lid), 2),
-                        "remKw": round(sh.loop_removed_flux(lid), 2),
-                    })
-                gen = sh.total_heat_generation
-                rem = abs(sh.total_heat_rejection)  # reported negative; show magnitude
-                _heat_cache = {
-                    "heat.generatedKw": round(gen, 2),
-                    "heat.removedKw": round(rem, 2),
-                    "heat.netKw": round(gen - rem, 2),
-                    "heat.loops": loops,
-                }
-            else:
-                _heat_cache = {}  # no SystemHeat parts on this vessel
-        except Exception:
-            pass  # service not present this session / scene change -- keep last good
+        _heat_cache = _gather_heat(conn) or {}
     d.update(_heat_cache)
 
     # ---- Electricity by source: reactors (custom service) + RTGs + solar ----
@@ -1746,6 +2237,8 @@ def run_telemetry_server(host, port):
 
     try:
         import websockets
+        from websockets.datastructures import Headers
+        from websockets.http11 import Response
     except ImportError:
         print("[telemetry] 'websockets' not installed -- dashboard feed disabled.")
         print("[telemetry] Install with:  pip install websockets")
@@ -1755,9 +2248,33 @@ def run_telemetry_server(host, port):
     if tconn is None:
         return False
 
-    print(f"[telemetry] serving dashboard on ws://{host}:{port}  ({TELEMETRY_HZ} Hz)")
+    if not DASHBOARD_WEB_ROOT.joinpath("index.html").is_file():
+        print(
+            "[telemetry] React dashboard files are missing. Expected "
+            f"{DASHBOARD_WEB_ROOT / 'index.html'}"
+        )
+        return False
+
+    print(f"[telemetry] dashboard: http://{host}:{port}/")
+    print(f"[telemetry] telemetry: ws://{host}:{port}/  ({TELEMETRY_HZ} Hz)")
     clients = set()
     commands = asyncio.Queue()
+
+    def process_request(_connection, request):
+        if request.headers.get("Upgrade", "").casefold() == "websocket":
+            return None
+        status, media_type, cache_policy, body = dashboard_asset(request.path)
+        return Response(
+            int(status),
+            status.phrase,
+            Headers([
+                ("Content-Type", media_type),
+                ("Content-Length", str(len(body))),
+                ("Cache-Control", cache_policy),
+                ("X-Content-Type-Options", "nosniff"),
+            ]),
+            body,
+        )
 
     async def handler(ws, *args):  # *args tolerates old & new websockets signatures
         clients.add(ws)
@@ -1800,7 +2317,12 @@ def run_telemetry_server(host, port):
             await asyncio.sleep(interval)
 
     async def serve():
-        async with websockets.serve(handler, host, port):
+        async with websockets.serve(
+            handler,
+            host,
+            port,
+            process_request=process_request,
+        ):
             await broadcaster()
 
     try:
@@ -1815,8 +2337,8 @@ def main():
     host = sys.argv[1] if len(sys.argv) >= 2 else "127.0.0.1"
     port = int(sys.argv[2]) if len(sys.argv) >= 3 else TELEMETRY_WS_PORT
 
-    print("KSP dashboard telemetry server (no ESP32 control code).")
-    print(f"Serving ws://{host}:{port} at {TELEMETRY_HZ} Hz. Ctrl+C to stop.")
+    print("KSP React dashboard and telemetry server (no ESP32 control code).")
+    print(f"Serving on http://{host}:{port}/. Ctrl+C to stop.")
     if host not in ("127.0.0.1", "localhost", "::1"):
         print("WARNING: this read-only telemetry feed has no authentication.")
         print(f"Network binding is enabled on {host}; use only a trusted network.")

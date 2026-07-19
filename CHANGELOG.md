@@ -4,6 +4,77 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.3.0 - React dashboard and Mission Control overview
+
+![Woobie's Mission Control v0.3.0 flight dashboard](https://raw.githubusercontent.com/SacredWoobie/woobies-mission-control/main/docs/images/v0.3.0/flight-dashboard-landscape.png)
+
+- Replaced the production dashboard surface with the compiled React flight,
+  editor, standby, Notes, and panel-visibility implementation.
+- Replaced the inactive Standby view with a read-only Mission Control overview:
+  save-mode-aware program totals, filterable/sortable tracked vessels and
+  astronaut roster, active contracts, and one time-sorted Stock/Kerbal Alarm
+  Clock alarm list with source badges.
+- Updated WoobiesControlStats to 0.2.1 as the single stock-game extension DLL,
+  combining complete-roster, stored-science, and stock-thermal kRPC services
+  while keeping the existing API names stable.
+- Added a scene-safe Kerbal Alarm Clock bootstrap to WoobiesControlStats. It
+  waits for KAC's API and then retries the official kRPC KAC bridge initializer,
+  correcting the upstream one-shot startup race without replacing its API or
+  adding a hard dependency on KAC.
+- Relabeled KAC's internal Raw alarm type as Date / Time in Mission Control and
+  increased alarm-row typography without enlarging the separate contract cards.
+- Kept Upcoming Alarms to one standard overview column on wide layouts even
+  when contracts are not relevant to the current save mode.
+- Added automatic stock heat monitoring in watts when System Heat is absent,
+  unavailable, or has no active vessel loops; System Heat stays in kilowatts.
+- Added an informational launcher scan for the SystemHeat plugin DLL and capped
+  landscape vessel/roster tables so alarms remain in the first screenful.
+- Extended vessel/roster table caps to portrait layouts, removed the redundant
+  Read Only banner badge, and replaced the single craft-type dropdown with a
+  KSP-style multi-select icon strip with per-type tracked-object counts.
+- Kept debris available to the vessel tracker but defaulted its craft-type
+  toggle off, including after switching to the All tracked objects scope.
+- Increased the portrait vessel/roster table cap and fixed the tracker contract
+  to Debris, Probes, Rovers, Landers, Ships, Stations, Bases, Planes, and
+  Relays. Unsupported KSP object categories are omitted at collection time,
+  while all nine filter buttons remain visible even at a zero count.
+- Added persistent Mission Control collapse controls for Active Vessels,
+  Astronaut Roster, and Upcoming Alarms with rocket, suited-Kerbonaut, and
+  twin-bell alarm-clock restore icons. The banner, program totals, and active
+  contracts remain fixed.
+- Added a safe installer migration that backs up and removes superseded
+  KRPC.MissionOverview and KRPC.VesselScience DLLs before the consolidated DLL
+  is loaded, preventing duplicate kRPC service registrations.
+- Split overview collection into independent cached polling tiers, with only
+  game time updating at dashboard frame rate and fleet scans automatically
+  slowing from 5 toward 30 seconds as tracked-object counts grow.
+- Replaced tall text restore tabs with compact square instrument icons for
+  flight panels and Notes, keeping a thumbtacked pinned-note icon last.
+- Added the VAB/SPH Craft Summary backed by the updated StageStats service.
+- Versioned the Craft Summary service changes as KRPC.StageStats 0.2.1 while
+  retaining the published SystemHeat 0.2.0 binary.
+- Served compiled dashboard files and WebSocket telemetry from the same local
+  `127.0.0.1:8090` endpoint; Node.js and Vite remain development-only.
+- Kept the complete v0.2.4 launcher compatibility preflight, service repair,
+  connection test, bounded retry, update/changelog, and panel-bridge behavior.
+- Removed the bundled v0.2.4 HTML dashboard; published prior releases remain
+  the rollback source without adding dead files to the 0.3.0 package.
+- Retained the ESP32 control-pad firmware source alongside the unchanged panel
+  bridge while removing the superseded prototype batch launchers.
+- Added a four-choice first-run setup menu with arrow-key or numbered selection,
+  component-specific dependency installs, and deferred Setup actions in the
+  launcher for components skipped initially. Dashboard-only setup no longer
+  installs `pyserial`.
+- Added a managed developer mock that serves the compiled dashboard and the
+  populated Flight, VAB/SPH, and Mission Control telemetry fixtures together on
+  the production loopback port, including interactive Editor and Notes commands.
+- Rebuilt the release pipeline around a versioned service manifest, frozen
+  frontend install, production-only bundle audit, curated package allowlist,
+  unpacked acceptance folder, ZIP checksum, and generated build information.
+- Replaced the legacy documentation captures with current v0.3.0 Flight,
+  Mission Control, VAB/SPH, Notes, and launcher screenshots while retaining
+  additional focused and portrait references for the project wiki.
+
 ## v0.2.4 - KSP & kRPC compatibility preflight
 
 ![Woobie's Mission Control v0.2.4 launcher compatibility preflight](https://raw.githubusercontent.com/SacredWoobie/woobies-mission-control/main/docs/images/v0.2.4-compatibility/launcher-preflight.png)
@@ -39,11 +110,11 @@ All notable public changes will be recorded here.
 
 ## v0.2.3 - Guided KSP service maintenance
 
-- Added SHA-256 status checks for the three packaged Mission Control KSP
+- Added SHA-256 status checks for the packaged Mission Control KSP
   service DLLs, with clear Current, Missing, and Repair available states.
 - Added a confirmed Install / Repair workflow that refuses to run while KSP is
   open, backs up existing DLLs, stages and verifies replacements, and limits
-  changes to the three allowlisted service paths.
+  changes to the allowlisted service paths.
 - Added adjacent shortcuts for opening the selected KSP `GameData` destination
   and the packaged service-DLL source folder for optional manual copying.
 - Made launcher-version changes bypass a still-fresh 24-hour release-check

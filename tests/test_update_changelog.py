@@ -83,13 +83,14 @@ class UpdateAndChangelogTests(unittest.TestCase):
         )
         self.assertFalse(app.should_show_changelog({}, "0.2.3", False))
 
-    def test_wip_package_contains_current_version_notes(self):
+    def test_source_tree_contains_current_version_notes(self):
         path = app.find_changelog_path()
         self.assertIsNotNone(path)
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("KSP & kRPC compatibility preflight", section)
+        self.assertIn("React dashboard and Mission Control overview", section)
+        self.assertIn("compiled React", section)
 
 
 if __name__ == "__main__":

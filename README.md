@@ -1,493 +1,196 @@
 # Woobie's Mission Control
 
-Current release: **v0.2.4**
+Next release: **v0.3.0**
 
-For the fastest Windows release setup, start with
-[`QUICKSTART.txt`](QUICKSTART.txt). It covers the `GameData` copy and automatic
-first-run dashboard setup; the full component, compatibility, and
-troubleshooting details remain below.
+Current public release: **v0.2.4**
 
-A modular mission dashboard and optional ESP32 control-pad bridge for Kerbal
-Space Program 1, powered by [kRPC](https://krpc.github.io/krpc/).
+Woobie's Mission Control is a read-only browser dashboard and optional ESP32
+control-pad bridge for Kerbal Space Program 1. It uses kRPC for live data and
+serves the dashboard only on local loopback at `http://127.0.0.1:8090/`.
 
-The browser dashboard displays live flight, orbit, resources, communications,
-science, thermal, electrical, target, and MechJeb stage-analysis data. When the
-optional Notes mod is installed, the active vessel's ship log is available from
-an on-demand right-side drawer. The physical control-pad bridge is a separate
-process and is not required to use the dashboard.
+The 0.3.0 release replaces the legacy single-file dashboard with a compiled
+React/TypeScript interface while retaining the 0.2.4 launcher, compatibility
+preflight, service repair, connection test, update/changelog controls, Notes
+support, and bounded reconnect behavior. End users do not install Node.js,
+Vite, pnpm, or frontend source.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
 
-## Dashboard preview
+## Dashboard previews
+
+### Flight
 
 <p align="center">
-  <img src="docs/images/dashboard-overview.png" width="760" alt="Woobie's Mission Control dashboard showing orbital telemetry, resources, science, staging, thermal management, electrical generation, and target information">
+  <a href="docs/images/v0.3.0/flight-dashboard-landscape.png">
+    <img src="docs/images/v0.3.0/flight-dashboard-landscape.png" width="900" alt="Flight dashboard with ascension, consumables, heat, electricity, science, staging, target, docking, and pinned Notes telemetry">
+  </a>
 </p>
 
-The dashboard is designed for a secondary display and keeps flight, vessel,
-and mission-support data visible in one browser window. Sections whose optional
-KSP integrations are not installed remain unobtrusive or show unavailable data.
+The flight workspace fills a normal widescreen monitor while retaining a
+responsive portrait stack. Any panel can collapse to its instrument icon on
+the left rail and return without resetting the rest of the layout.
 
-## Components
+### Mission Control
 
-| Component | Files | Purpose |
+<p align="center">
+  <a href="docs/images/v0.3.0/mission-control-landscape.png">
+    <img src="docs/images/v0.3.0/mission-control-landscape.png" width="900" alt="Mission Control overview with program totals, tracked vessels, astronaut roster, alarms, and contracts">
+  </a>
+</p>
+
+Space Center and Tracking Station scenes provide a read-only operational view
+of the current save. Vessel, roster, alarm, and contract collections use
+separate bounded polling intervals and scroll within the available screen.
+
+### VAB and SPH
+
+<p align="center">
+  <a href="docs/images/v0.3.0/editor-vab-landscape.png">
+    <img src="docs/images/v0.3.0/editor-vab-landscape.png" width="900" alt="VAB craft analysis with mass, cost, parts, resources, and atmospheric and vacuum staging results">
+  </a>
+</p>
+
+Editor telemetry combines the craft's stock build totals with MechJeb staging
+analysis. Reference-body, altitude, and Mach changes recalculate after a short
+pause, with the manual button retained as a fallback.
+
+## What 0.3.0 includes
+
+- Complete flight dashboard with responsive portrait/landscape layouts and
+  persistent icon-based panel collapse/restore controls
+- Flight, orbit, navball, resources, science, electrical, thermal, target,
+  docking, and MechJeb staging telemetry
+- System Heat monitoring in kW, with automatic stock thermal fallback in W
+- Read-only Notes drawer and pinned flight note
+- VAB/SPH Craft Summary plus debounced body, altitude, and Mach recalculation
+- Read-only Mission Control overview for program totals, contracts, active
+  vessels, astronaut roster, stock alarms, and Kerbal Alarm Clock alarms
+- Multi-select tracked-vessel type filters and sortable/filterable tables
+- Optional ESP32 stage/abort control pad
+
+<details>
+  <summary>Optional Notes drawer preview</summary>
+  <p align="center">
+    <a href="docs/images/v0.3.0/notes-drawer.png">
+      <img src="docs/images/v0.3.0/notes-drawer.png" width="540" alt="Read-only Notes drawer with active vessel log, saved-note search, favorites, pinning, and text controls">
+    </a>
+  </p>
+</details>
+
+The three packaged kRPC extensions are independently versioned:
+
+| Service | v0.3.0 selection | Purpose |
 | --- | --- | --- |
-| Launcher | `Start KSP Dashboard.bat`, `ksp_dashboard_app.py` | Shows controls only for the optional Python components installed beside it. |
-| Dashboard | `telemetry_server.py`, `ksp_mission_dashboard.html` | Sends kRPC telemetry to the self-contained browser dashboard. |
-| Control pad | `panel_bridge.py` | Connects an ESP32 serial control pad to staging, abort, and the stage-lock indicator. |
-| KSP services | Release DLLs installed under `GameData` | Adds System Heat/electricity, MechJeb stage statistics, and stored-science data to kRPC. |
-
-You may install only the pieces you want. For example, if `panel_bridge.py` is
-not beside the launcher, the launcher will not show control-pad information or
-a control-pad start button.
-
-## Current feature set
-
-- Flight and orbit instruments, navball, throttle, clocks, and sparklines
-- Vessel-total and current-stage resources
-- MechJeb atmospheric/vacuum delta-v, TWR, and burn-time staging analysis
-- VAB/SPH craft planning with selectable body, altitude, and Mach conditions
-- Stock CommNet data with optional RemoteTech signal delay
-- Recoverable and transmittable science, including science-container contents
-- System Heat loop temperatures, generation, rejection, and net heat
-- Electrical output by reactor, solar, RTG, and other generation sources
-- Target-vessel and docking-alignment information
-- Optional read-only Notes browser with active-vessel default, search, cycling,
-  favorites, and a pin-to-flight panel
-- Optional ESP32 stage/abort control with local arm/safe gates
-
-## Feature tour
-
-### VAB and SPH craft planning
-
-![VAB craft planning on Kerbin with atmospheric and vacuum delta-v and TWR](docs/images/editor-planning-kerbin.png)
-
-The editor planning view uses MechJeb's simulation while the craft is still in
-the VAB or SPH. Select a reference body, altitude above sea level, and Mach to
-compare atmospheric and vacuum delta-v and initial TWR for every propulsive
-stage. The body list comes from the running game, including installed planet
-packs.
-
-![The same craft evaluated on the airless Mun](docs/images/editor-planning-mun.png)
-
-On an airless body such as the Mun, the atmospheric and vacuum columns converge
-while TWR updates for the body's gravity. This makes it easy to compare launch
-and destination performance without leaving the craft editor.
-
-### Science and staging
-
-![Science tracking and MechJeb staging analysis](docs/images/science-and-staging.png)
-
-The science panel totals recoverable and transmittable science aboard the active
-vessel, including experiments moved into stock science containers. It also
-reports experiment count, biome, situation, and career science already banked
-at the KSC. In flight, the staging panel presents a compact atmospheric/vacuum
-toggle for delta-v and TWR. In the VAB and SPH, the planning view shows both
-conditions side by side and can simulate a selected body, altitude, and Mach.
-
-Stored-science reporting uses `KRPC.VesselScience`. Full staging analysis uses
-MechJeb 2, KRPC.MechJeb, and `KRPC.StageStats`.
-
-### Thermal and electrical management
-
-![System Heat and electrical-generation monitoring](docs/images/thermal-and-electricity.png)
-
-Monitor System Heat generation, rejection, net load, and individual loop
-temperature. Electrical reporting separates reactors, solar panels, RTGs, and
-other producers such as alternators and fuel cells. The compact reactor summary
-shows fleet status at a glance, while its collapsed detail list provides
-per-reactor temperature, output, integrity, and fuel information when needed.
-
-These panels use `KRPC.SystemHeat`; the values available depend on the installed
-System Heat and electrical-part mods.
-
-### Target and docking alignment
-
-![Target information and docking-port alignment display](docs/images/docking-alignment.png)
-
-With a vessel or docking port selected as the in-game target, the dashboard
-shows distance, relative motion, target orbit, and inclination. For docking-port
-targets, the alignment display plots lateral and angular error around a centered
-reference so corrections are easy to judge. Confirm the intended target and
-controlling docking port in KSP before relying on the display for final contact.
-
-### Notes ship-log drawer
-
-<p align="center">
-  <a href="docs/images/v0.2.2-notes/notes-drawer-editor.png">
-    <img src="docs/images/v0.2.2-notes/notes-drawer-editor.png" width="500" alt="Notes reference drawer open in the KSP editor, showing the searchable saved-note menu, favorite stars, selected note, Pin to Flight action, and text-size controls">
-  </a>
-</p>
-
-The drawer keeps the saved-note catalog and selected note visible together.
-The image is shown as a thumbnail; select it to view the complete layout.
-
-If the optional Notes mod is installed, choose the KSP installation folder in
-the Mission Control launcher before starting the dashboard feed. A **Notes**
-button appears at the right edge of the dashboard's datalink strip in Flight,
-the VAB/SPH, and other connected KSP scenes. In inactive scenes, the standby
-overlay also provides an **Open Notes** button.
-
-<p align="center">
-  <img src="docs/images/v0.2.2-notes/notes-standby-access.png" width="520" alt="Inactive-scene standby overlay explaining that Notes remains available and providing an Open Notes button">
-</p>
-
-The wider drawer keeps a saved-note menu beside the selected note. Search the
-catalog, choose any note, or use the previous/next controls to cycle through the
-filtered results. Starred notes sort to the top of the menu. In flight,
-**Active** returns to the current vessel's log; outside flight, saved notes
-remain available even though there is no active-vessel log.
-
-Use **Pin to flight** to place the currently selected note in a scrollable final
-panel on the flight dashboard. The pin is independent of the drawer selection,
-so you can continue browsing without changing the flight reference. Pinning a
-different note replaces the prior pin; **Unpin** removes the panel. Pins last for
-the current dashboard-feed session and the panel is shown only in Flight.
-
-<p align="center">
-  <a href="docs/images/v0.2.2-notes/notes-pinned-flight-panel.png">
-    <img src="docs/images/v0.2.2-notes/notes-pinned-flight-panel.png" width="760" alt="Flight dashboard with a selected note pinned as the final scrollable mission panel">
-  </a>
-</p>
-
-The **A-** and **A+** controls adjust text in both the drawer and pinned panel
-together from 8 px through 18 px. The existing 10 px size remains the default;
-click the displayed size between the buttons to reset it.
-
-Mission Control only reads the Notes text files. It does not edit, create, or
-delete notes. The displayed log is limited to its most recent 32 KiB so a large
-mission log cannot inflate every telemetry update.
-
-Favorites are dashboard-only metadata stored in
-`%LOCALAPPDATA%\WoobiesMissionControl\notes_favorites.json`. Starring a note
-does not modify its Notes text file or the Notes mod's configuration.
-
-## Compatibility status
-
-The versions below were used for the v0.2.0 release acceptance pass. Other
-versions may work but have not necessarily received the same test coverage.
-
-| Software/mod | Status |
-| --- | --- |
-| Kerbal Space Program 1 | `1.12.5` |
-| Python | `3.14` |
-| kRPC KSP mod/server | `0.5.4` |
-| Python `krpc` package | `0.5.4` |
-| Python `websockets` package | `16.0` |
-| Python `pyserial` package | `3.5`, for the ESP32 panel only |
-| MechJeb 2 | `2.14.3.0` |
-| KRPC.MechJeb | `0.7.1` |
-| KRPC.SystemHeat service | `0.2.0` |
-| KRPC.StageStats service | `0.2.0` |
-| KRPC.VesselScience service | `0.1.0` |
-| System Heat | `0.9.1` |
-| Near Future Electrical | `2.0.8` |
-| Near Future Electrical Core | `2.0.1` |
-| Near Future Electrical Decaying RTGs | `2.0.1` |
-| Dynamic Battery Storage | `2.3.7.0` |
-| RemoteTech | Optional; exposed by base kRPC `0.5.4` |
-| Notes | Optional; read-only saved-note browser tested with `0.17.0.0` |
+| WoobiesControlStats | 0.2.1 | Roster, stored science, stock thermal data, and KAC bridge recovery |
+| KRPC.StageStats | 0.2.1 | Flight/editor staging and VAB/SPH Craft Summary |
+| KRPC.SystemHeat | 0.2.0 | System Heat and electrical integration |
 
 ## Installation
 
-### 1. Install the KSP-side dependencies
+Download and extract the complete release, then open its `Dashboard` folder
+and double-click `Start KSP Dashboard.bat`.
 
-Install kRPC and the mods required for the dashboard features you plan to use.
-Do not copy KSP's own assemblies or third-party mod DLLs from another person's
-installation.
+First run offers four choices using Up/Down and Enter or a typed number:
 
-The release package contains only this project's three service DLLs:
+1. Set up Dashboard and ESP32 Controlpad
+2. Set up just Mission Control Dashboard
+3. Set up just ESP32 Controlpad
+4. Exit
 
-- `KRPC.SystemHeat.dll`
-- `KRPC.StageStats.dll`
-- `KRPC.VesselScience.dll`
+The launcher creates a package-local `.venv` and installs only the chosen
+component dependencies. Dashboard-only setup does not install `pyserial`; a
+component skipped initially retains a **Set up** button for later.
 
-After starting Mission Control, choose the main KSP installation folder that
-contains `GameData`. The launcher's **KSP & kRPC compatibility** panel confirms
-that this is a complete KSP 1 installation, reads its version, and checks for
-duplicate or misplaced copies of the core kRPC, MechJeb, and Mission Control
-service DLLs. It also checks the installed kRPC, KRPC.MechJeb, and MechJeb 2
-versions and reads kRPC's saved server settings without changing any
-third-party files. A different installed version is reported as untested rather
-than incompatible because it may still work. When an actionable difference is
-found, **Review fixes** appears beside **Refresh all status**. Its read-only
-recommendation window shows the detected value, Mission Control's tested or
-required value, and a suggested correction. For version differences it
-recommends the appropriate tested CKAN version; newer-but-untested MechJeb
-builds are presented as downgrade recommendations, not as proof that the
-installed build is broken.
+Choose the main KSP folder containing `GameData`, then use the launcher to
+install or repair the three provided services. Existing copies are backed up,
+and superseded `KRPC.MissionOverview` and `KRPC.VesselScience` development DLLs
+are safely removed during migration.
 
-<p align="center">
-  <a href="docs/images/v0.2.4-compatibility/launcher-preflight.png">
-    <img src="docs/images/v0.2.4-compatibility/launcher-preflight.png" width="760" alt="Woobie's Mission Control v0.2.4 launcher showing successful KSP, kRPC, MechJeb, DLL layout, live connection, and Mission Control service checks">
-  </a>
-</p>
+<details>
+  <summary>Launcher and compatibility-preflight preview</summary>
+  <p align="center">
+    <a href="docs/images/v0.3.0/launcher.png">
+      <img src="docs/images/v0.3.0/launcher.png" width="620" alt="Mission Control v0.3.0 launcher showing dashboard and ESP32 controls, KSP compatibility checks, and current service versions">
+    </a>
+  </p>
+</details>
 
-After loading a KSP save, use **Test connection** for an end-to-end check. The
-main menu is not sufficient: kRPC stops its servers while no game is loaded and
-auto-starts them only after entering a loaded-game scene. The test opens a
-temporary kRPC client, confirms that the server responds, and verifies that the
-kRPC services corresponding to installed integration DLLs are registered. If a
-DLL is present but its service is unavailable, restart KSP, load the save again,
-and inspect `KSP.log` for assembly-load or service-registration errors.
+Load a KSP save before testing or starting the feed. kRPC normally stops its
+servers at the main menu. The tested endpoints are RPC `50000`, Stream `50001`,
+and Mission Control loopback `8090`.
 
-The **Mission Control KSP services** panel compares the packaged and installed
-DLLs by SHA-256 and independently reads each installed DLL's version. Green
-means the installed DLL exactly matches the packaged repair copy. Amber means
-the installed version is current but the package copy is absent or has a
-different build hash; this is informational rather than an installed-service
-failure. Missing, outdated, mismatched, or unverifiable changed installed DLLs
-are shown in red. When a compatible repair copy is available, close KSP and
-choose **Install / Repair**. Existing DLLs are backed up under
-`%LOCALAPPDATA%\WoobiesMissionControl\dll_backups` before replacement, and each
-new copy is verified after installation. The launcher changes only the three
-service DLL paths listed above.
+See [`QUICKSTART.txt`](QUICKSTART.txt) for the compact offline walkthrough. The
+[project wiki](https://github.com/SacredWoobie/woobies-mission-control/wiki)
+contains the full setup, feature, compatibility, and troubleshooting guides.
 
-Manual copying remains available: copy each provided service folder into your
-KSP `GameData` folder. The intended layout uses `KRPC.SystemHeat`,
-`KRPC.StageStats`, and `KRPC.VesselScience` as the folder names, with the
-matching DLL inside each folder.
+## Source development
 
-The release DLLs are optimized deterministic builds without PDB files or
-embedded local build paths.
-
-When either Mission Control tool starts, it makes 10 kRPC connection attempts
-two seconds apart (about 20 seconds total). The same limit applies if the panel
-bridge later loses its kRPC connection. If all attempts fail, that tool stops
-and the live-connection status turns amber with a recommendation to use
-**Test connection**; it does not retry forever in the background.
-
-### 2. Choose your PC-side components
-
-Keep the launcher and whichever components you want in the same normal folder
-outside KSP's `GameData` directory.
-
-For the dashboard, keep:
-
-- `Start KSP Dashboard.bat`
-- `ksp_dashboard_app.py`
-- `telemetry_server.py`
-- `ksp_mission_dashboard.html`
-
-For the ESP32 control pad, also keep:
-
-- `panel_bridge.py`
-- `firmware/KSP_control.ino` when programming or modifying the panel
-
-### 3. Run the automatic first-time setup
-
-Python 3.14 is required for the current release. Open the folder that contains
-`Start KSP Dashboard.bat`:
-
-- In the complete release ZIP, this is the extracted `Dashboard` folder—not the
-  package's top-level folder.
-- In a source checkout, this is the repository root.
-
-Double-click `Start KSP Dashboard.bat`. On the first run, approve the setup
-prompt. The launcher creates `.venv`, installs all dashboard and control-pad
-dependencies into that isolated folder, verifies them, and then opens Mission
-Control. It does not install, upgrade, or remove packages in the system Python
-environment.
-
-If setup is interrupted, run the launcher again. It will reuse and repair the
-local environment without requiring Python to be reinstalled. Setup details are
-written to `mission_control_setup.log`; review that file before sharing it
-because it can contain local paths.
-
-For a read-only diagnostic from Command Prompt, run:
-
-```bat
-"Start KSP Dashboard.bat" --check
-```
-
-For source development or manual troubleshooting, the equivalent commands are:
-
-```bat
-py -3.14 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-The component-specific requirements files remain available to developers who
-do not want the complete environment.
-
-### 4. Configure the optional Notes integration
-
-To use the Notes drawer, choose the main Kerbal Space Program installation
-folder in the launcher's **KSP installation** section. Select the folder that
-contains `GameData`, not `GameData` itself. The launcher saves this path under
-`%LOCALAPPDATA%\WoobiesMissionControl\settings.json` and passes it only to the
-dashboard feed process. A valid installation reports whether the Notes mod was
-detected.
-
-You can leave this setting blank when you do not use Notes; every other
-dashboard feature continues to work normally.
-
-### 5. Load a KSP save and start the tools
-
-1. Start KSP and load a save; kRPC does not run at the main menu.
-2. Confirm kRPC auto-started, or start its server manually. Space Center, the
-   VAB/SPH, Tracking Station, and Flight are suitable loaded-game scenes.
-3. Double-click `Start KSP Dashboard.bat`.
-4. Start the dashboard feed, the panel bridge, or both.
-5. Starting the dashboard feed opens the dashboard automatically when the HTML
-   file is present.
-
-Keep kRPC on its standard local settings: address `127.0.0.1`, RPC port `50000`,
-and Stream port `50001`. The launcher checks these values before starting a
-component. It also reports when kRPC's automatic server start or automatic
-connection acceptance option is disabled.
-
-Mission Control's separate browser telemetry server listens only on
-`127.0.0.1:8090` by default. Do not assign port `8090` to kRPC.
-
-## ESP32 control pad
-
-The panel bridge uses a 115200-baud serial connection and recognizes common
-CP210x and CH340 USB-to-serial adapters. If more than one candidate device is
-connected, set `SERIAL_PORT` near the top of `panel_bridge.py`; the program will
-not guess between multiple devices.
-
-Firmware, pin assignments, wiring, debounce behavior, and the serial protocol
-are documented in
-[`docs/CONTROL_PAD_PROTOCOL.md`](docs/CONTROL_PAD_PROTOCOL.md). The tested
-controller is an ESP32-WROOM-32 DevKit V1, selected as `DOIT ESP32 DEVKIT V1`
-in Arduino IDE.
-
-## Network and safety notes
-
-- By default, the launcher makes one cached HTTPS request per day to GitHub's
-  public Releases API to report whether a newer stable release is available.
-  It sends no authentication token or Mission Control telemetry. Automatic
-  checks can be disabled in the launcher, and `Check now` remains available.
-  Starting a different launcher version bypasses a cached result from the
-  previous version and checks immediately when automatic checks are enabled.
-  The preference and last successful result are stored under
-  `%LOCALAPPDATA%\WoobiesMissionControl` on Windows.
-- The launcher shows that version's What's New notes once after an update by
-  default. This can be disabled independently in the changelog window, while
-  the `Changelog` button remains available for manual viewing.
-- Keep the telemetry server bound to `127.0.0.1` unless you intentionally need
-  another device on your trusted local network to view it.
-- The WebSocket feed is read-only but has no authentication or encryption. Do
-  not expose port 8090 to the internet or an untrusted network.
-- The ESP32 bridge can stage a vessel and activate the abort action group. Test
-  the panel on a disposable craft and verify the arm/safe behavior before using
-  it on an important mission.
-- Runtime logs such as `launcher_error.log` may include local file paths. They
-  are excluded from Git and should not be attached to a public issue without
-  reviewing them first.
-
-## Troubleshooting
-
-### The launcher shows no component buttons
-
-Make sure `telemetry_server.py` and/or `panel_bridge.py` is in the same folder as
-`ksp_dashboard_app.py`. Only installed components are displayed.
-
-### The launcher could not check for updates
-
-Update checks require internet access to `api.github.com`. A failed check does
-not affect Mission Control or its local KSP connection; use `Check now` later or
-open the project page from the About dialog.
-
-### The dashboard says it is offline
-
-Confirm that the dashboard feed is running, KSP's kRPC server is enabled, and
-no other program is using port 8090. kRPC itself should use RPC port `50000` and
-Stream port `50001`; port `8090` belongs only to Mission Control's browser feed.
-Select the main KSP folder in the launcher and review **kRPC prerequisites** for
-the installed versions and saved server configuration.
-
-### A dashboard section is blank
-
-Optional sections require their corresponding KSP mod and service DLL. Missing
-optional integrations should leave the relevant section blank without stopping
-the rest of the dashboard.
-
-### The Notes button does not appear
-
-In the launcher, choose the main KSP folder that contains `GameData`, then stop
-and restart the dashboard feed so it receives the updated location. Confirm the
-Notes mod has a `GameData\Notes\Plugins\PluginData\notes` folder (the lowercase
-`GameData\notes` variant is also accepted). The button appears in every
-connected KSP scene when that folder is available.
-
-If the drawer opens but no active log is shown, create or open the vessel's Ship
-Log in Notes. Mission Control matches the active KSP vessel name exactly.
-
-### The ESP32 is not found
-
-Check Windows Device Manager for the control pad's COM port. Set, for example,
-`SERIAL_PORT = "COM5"` near the top of `panel_bridge.py`, using the actual port
-shown on your computer.
-
-## Known limitations
-
-- Windows is the currently documented launcher platform. The Python scripts can
-  run on other platforms, but equivalent launch instructions are not yet tested.
-- Docking alignment depends on the vessel's controlling docking port and should
-  be validated against the navball before relying on it.
-- Compatibility outside the versions listed above remains provisional until it
-  receives equivalent clean-package and in-game testing.
-
-## Maintainer release process
-
-The repository includes `tools/Publish-Release.ps1` for assembling and checking
-the complete Windows release package. It does not build the three kRPC service
-DLLs; run the separate service builder and its release verification first.
-
-The default folder arrangement is:
-
-```text
-Documents\
-|-- woobies-mission-control\
-`-- Woobies-KRPC-Service-Builder\
-```
-
-With that arrangement, the script finds the verified DLLs under the sibling
-builder's `dist\GameData` folder. A different location can be supplied with
-`-GameDataPath`.
-
-From a clean, up-to-date `main` checkout, first create and audit the package
-without changing anything on GitHub:
+Production runtime source remains at the repository root. React/TypeScript
+source lives under `frontend`; fixtures and the Vite controller are developer
+only.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.4
+.\scripts\dashboard-dev.ps1 start
+.\scripts\dashboard-dev.ps1 stop
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-Frontend.ps1 -InstallDependencies -StageRuntimeWeb
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
-The script writes the ZIP, SHA-256 checksum, and generated release notes to the
-ignored `release-output` folder. Inspect and test that ZIP before continuing.
+Production builds start directly in Live KSP mode and omit fixture data and
+the developer drawer. `-StageRuntimeWeb` also copies the verified bundle to the
+ignored root `web` folder so the source launcher and telemetry server can be
+tested together. Generated dependencies, bundles, logs, runtime web files, and
+release staging are excluded by `.gitignore`.
 
-To let the script create the tag and a **draft** GitHub Release, use a Git clone
-of this repository and install [Git for Windows](https://git-scm.com/download/win)
-and [GitHub CLI](https://cli.github.com/). They can also be installed from
-PowerShell with:
+### Populated mock dashboard
+
+Double-click `tools\Mock Mission Control.bat` to open a small control menu for
+the production dashboard without running KSP or kRPC. It can hold Flight,
+VAB/SPH, or Mission Control data on screen, or cycle through all three every 15
+seconds. The mock uses the populated screenshot fixtures, updates flight trends
+at 4 Hz, and responds to Editor-condition and Notes commands.
+
+The real dashboard feed must be stopped first because both use the normal
+loopback port `8090`. The same controller can be scripted from PowerShell:
 
 ```powershell
-winget install --id Git.Git -e
-winget install --id GitHub.cli -e
+& ".\tools\Mock Mission Control.bat" start flight
+& ".\tools\Mock Mission Control.bat" restart editor
+& ".\tools\Mock Mission Control.bat" restart inactive
+& ".\tools\Mock Mission Control.bat" restart cycle
+& ".\tools\Mock Mission Control.bat" status
+& ".\tools\Mock Mission Control.bat" stop
 ```
 
-Open a new PowerShell window after installation, authenticate once with
-`gh auth login`, and then rerun:
+Its PID and logs stay under ignored `tools\.mock`. The stop action validates
+the saved process identity before terminating anything.
+
+## Release preparation
+
+The release pipeline never rebuilds all service DLLs merely because the
+dashboard changed. Each DLL is built and archived separately in the sibling
+`Woobies-KRPC-Service-Builder`; its selected release set is combined with a
+fresh verified frontend build by `tools/Publish-Release.ps1`.
+
+The package-only command creates both an unpacked acceptance-test folder and a
+ZIP without publishing anything:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.2.4 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.3.0
 ```
 
-The release remains private as a draft until it is reviewed and published on
-GitHub. Credentials are managed by GitHub CLI and are never stored in the
-repository.
+See [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) for service selection,
+validation, acceptance testing, and draft-release steps.
 
-## Contributing and issue reports
+## Safety and privacy
 
-When reporting a problem, include the KSP version, installed mod versions,
-Python version, the component that was running, and a short sanitized log. Do
-not upload save files or logs containing information you do not want public.
+- Dashboard and alarm/Notes integrations are read-only.
+- The WebSocket feed has no authentication; keep it on `127.0.0.1`.
+- The optional ESP32 bridge can stage or abort a vessel. Test its arm/safe
+  behavior on a disposable craft first.
+- Logs can contain local paths; review them before attaching them publicly.
 
 ## License
 
-This project is released under the MIT License. See [`LICENSE`](LICENSE).
-
-Created by **SacredWoobie**.
+Released under the [MIT License](LICENSE). Created by **SacredWoobie**.
