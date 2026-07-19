@@ -25,7 +25,19 @@ lib/
 *.mdb
 *.dll
 
-# Release archives are attached to GitHub Releases, not committed to source
+# Frontend dependencies, generated bundles, and local development state
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.dev/
+/frontend/coverage/
+/.pnpm-store/
+/frontend/.pnpm-store/
+/tools/.mock/
+
+# Runtime web assets are staged into packages from frontend/dist
+/web/
+
+# Release archives and unpacked staging trees are generated locally
 *.zip
 *.7z
 *.rar

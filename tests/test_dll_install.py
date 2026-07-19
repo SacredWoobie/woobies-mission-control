@@ -170,6 +170,31 @@ class DllInstallRepairTests(unittest.TestCase):
                 (result["backup_dir"] / unchanged_folder).exists()
             )
 
+    def test_consolidated_service_replaces_and_backs_up_legacy_dlls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ksp_root, package = self.make_layout(root)
+            for relative_path in app.SUPERSEDED_SERVICE_DLLS:
+                target = ksp_root / "GameData" / relative_path
+                target.parent.mkdir(parents=True)
+                target.write_bytes(b"legacy-service")
+
+            result = app.install_service_dlls(
+                ksp_root,
+                package,
+                root / "backups",
+                running_process_provider=lambda: [],
+            )
+
+            self.assertIn("WoobiesControlStats", result["installed"])
+            self.assertEqual(len(result["removed"]), 2)
+            for relative_path in app.SUPERSEDED_SERVICE_DLLS:
+                self.assertFalse((ksp_root / "GameData" / relative_path).exists())
+                self.assertEqual(
+                    (result["backup_dir"] / relative_path).read_bytes(),
+                    b"legacy-service",
+                )
+
     def test_running_ksp_blocks_all_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

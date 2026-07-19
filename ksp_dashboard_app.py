@@ -4,7 +4,7 @@ The launcher discovers the optional components beside this file. A component is
 shown only when its Python script exists, so a distribution may include either
 script or both:
 
-  * telemetry_server.py -- dashboard telemetry WebSocket server
+  * telemetry_server.py -- React dashboard loopback and telemetry server
   * panel_bridge.py     -- ESP32 serial/kRPC control bridge
 
 Each discovered component runs as an independent child process. Closing this
@@ -17,6 +17,9 @@ is responsible for its own dependencies.
 import csv
 import ctypes
 import hashlib
+import importlib
+import importlib.metadata
+import importlib.util
 import json
 import os
 import queue
@@ -28,6 +31,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -37,10 +41,11 @@ from tkinter import filedialog, font as tkfont, messagebox, scrolledtext, ttk
 
 
 HERE = Path(__file__).resolve().parent
-DASHBOARD = HERE / "ksp_mission_dashboard.html"
+DASHBOARD = HERE / "web" / "index.html"
+DASHBOARD_URL = "http://127.0.0.1:8090/"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.2.4"
+APP_VERSION = "0.3.0"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 LATEST_RELEASE_API = (
@@ -78,8 +83,13 @@ COMPONENTS = (
         "name": "feed",
         "title": "Dashboard feed (telemetry)",
         "script": "telemetry_server.py",
-        "description": "Serves kRPC telemetry to the browser dashboard.",
+        "description": "Serves the React dashboard and kRPC telemetry on local loopback.",
         "dashboard": True,
+        "requirements": "requirements-dashboard.txt",
+        "dependencies": (
+            ("krpc", "krpc", "0.5.4"),
+            ("websockets", "websockets", "16.0"),
+        ),
     },
     {
         "name": "panel",
@@ -87,6 +97,11 @@ COMPONENTS = (
         "script": "panel_bridge.py",
         "description": "Connects the ESP32 control pad to KSP through serial and kRPC.",
         "dashboard": False,
+        "requirements": "requirements-panel.txt",
+        "dependencies": (
+            ("krpc", "krpc", "0.5.4"),
+            ("pyserial", "serial", "3.5"),
+        ),
     },
 )
 
@@ -96,25 +111,29 @@ CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 PACKAGED_GAMEDATA = HERE.parent / "GameData"
 CHANGELOG_CANDIDATES = (HERE / "CHANGELOG.md", HERE.parent / "CHANGELOG.md")
 SERVICE_DLLS = (
+    ("WoobiesControlStats", "Stock game statistics"),
     ("KRPC.StageStats", "Stage statistics"),
     ("KRPC.SystemHeat", "System Heat / electricity"),
-    ("KRPC.VesselScience", "Stored science"),
 )
 SERVICE_TESTED_VERSIONS = {
-    "KRPC.StageStats": "0.2.0",
+    "WoobiesControlStats": "0.2.1",
+    "KRPC.StageStats": "0.2.1",
     "KRPC.SystemHeat": "0.2.0",
-    "KRPC.VesselScience": "0.1.0",
 }
+SUPERSEDED_SERVICE_DLLS = (
+    Path("KRPC.MissionOverview") / "KRPC.MissionOverview.dll",
+    Path("KRPC.VesselScience") / "KRPC.VesselScience.dll",
+)
 KSP_TESTED_VERSION = "1.12.5"
 CORE_DLL_LOCATIONS = {
     "KRPC.dll": Path("kRPC") / "KRPC.dll",
     "KRPC.MechJeb.dll": Path("kRPC") / "KRPC.MechJeb.dll",
     "MechJeb2.dll": Path("MechJeb2") / "Plugins" / "MechJeb2.dll",
+    "WoobiesControlStats.dll": (
+        Path("WoobiesControlStats") / "WoobiesControlStats.dll"
+    ),
     "KRPC.StageStats.dll": Path("KRPC.StageStats") / "KRPC.StageStats.dll",
     "KRPC.SystemHeat.dll": Path("KRPC.SystemHeat") / "KRPC.SystemHeat.dll",
-    "KRPC.VesselScience.dll": (
-        Path("KRPC.VesselScience") / "KRPC.VesselScience.dll"
-    ),
 }
 KRPC_ADDRESS = "127.0.0.1"
 KRPC_RPC_PORT = 50000
@@ -126,10 +145,13 @@ KRPC_SETTINGS_PATH = Path("kRPC") / "PluginData" / "settings.cfg"
 KRPC_SERVICE_ATTRIBUTES = (
     ("space_center", "SpaceCenter"),
     ("mech_jeb", "MechJeb"),
+    ("mission_overview", "MissionOverview"),
     ("stage_stats", "StageStats"),
     ("system_heat", "SystemHeat"),
     ("vessel_science", "VesselScience"),
+    ("stock_thermal", "StockThermal"),
 )
+SYSTEM_HEAT_MOD_PATH = Path("SystemHeat") / "Plugin" / "SystemHeat.dll"
 KSP_PREREQUISITES = (
     {
         "key": "krpc",
@@ -763,6 +785,21 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
     return inventory
 
 
+def system_heat_mod_inventory(ksp_root_value):
+    """Detect the actual System Heat plugin DLL; absence enables stock fallback."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    target = root / "GameData" / SYSTEM_HEAT_MOD_PATH if root is not None else None
+    if root is None:
+        status = "unconfigured"
+    elif target.is_file():
+        status = "installed"
+    else:
+        status = "stock_fallback"
+    return {"status": status, "target": target}
+
+
 def _parse_config_nodes(text):
     """Parse the small ConfigNode subset used by kRPC's settings file."""
     document = {"name": None, "values": {}, "children": []}
@@ -1047,14 +1084,19 @@ def expected_krpc_services(prerequisites, services):
     }:
         expected["mech_jeb"] = "MechJeb"
     service_attributes = {
-        "KRPC.StageStats": ("stage_stats", "StageStats"),
-        "KRPC.SystemHeat": ("system_heat", "SystemHeat"),
-        "KRPC.VesselScience": ("vessel_science", "VesselScience"),
+        "WoobiesControlStats": (
+            ("mission_overview", "MissionOverview"),
+            ("vessel_science", "VesselScience"),
+            ("stock_thermal", "StockThermal"),
+        ),
+        "KRPC.StageStats": (("stage_stats", "StageStats"),),
+        "KRPC.SystemHeat": (("system_heat", "SystemHeat"),),
     }
     for item in services:
-        attribute_and_title = service_attributes.get(item["folder"])
-        if attribute_and_title and item.get("target_hash") is not None:
-            expected[attribute_and_title[0]] = attribute_and_title[1]
+        attributes = service_attributes.get(item["folder"], ())
+        if item.get("target_hash") is not None:
+            for attribute, title in attributes:
+                expected[attribute] = title
     return expected
 
 
@@ -1273,6 +1315,12 @@ def service_inventory(
         installed_version = (
             version_reader(target) if target_hash is not None else None
         )
+        legacy_targets = (
+            [root / "GameData" / path for path in SUPERSEDED_SERVICE_DLLS]
+            if root is not None and folder == "WoobiesControlStats"
+            else []
+        )
+        legacy_present = [path for path in legacy_targets if path.is_file()]
         if root is None:
             status = "unconfigured"
         elif target_hash is None:
@@ -1292,6 +1340,10 @@ def service_inventory(
             status = "unverified_package_missing"
         else:
             status = "different"
+        if legacy_present and status in {
+            "current", "current_different", "current_package_missing"
+        }:
+            status = "legacy_cleanup"
         inventory.append(
             {
                 "folder": folder,
@@ -1304,6 +1356,8 @@ def service_inventory(
                 "tested_version": tested_version,
                 "installed_version": installed_version,
                 "status": status,
+                "legacy_targets": legacy_targets,
+                "legacy_present": legacy_present,
             }
         )
     return inventory
@@ -1380,14 +1434,22 @@ def install_service_dlls(
         if item["source_hash"] is not None
         and item["source_hash"] != item["target_hash"]
     ]
-    if not changes:
-        return {"installed": [], "backup_dir": None}
+    legacy_files = [
+        path
+        for item in inventory
+        for path in item.get("legacy_present", [])
+    ]
+    if not changes and not legacy_files:
+        return {"installed": [], "removed": [], "backup_dir": None}
 
     game_data = (root / "GameData").resolve()
     for item in changes:
         target = item["target"]
         if target is None or not target.resolve().is_relative_to(game_data):
             raise ValueError(f"Unsafe service destination: {target}")
+    for target in legacy_files:
+        if not target.resolve().is_relative_to(game_data):
+            raise ValueError(f"Unsafe superseded service destination: {target}")
 
     stamp = (
         time.strftime("%Y%m%d-%H%M%S")
@@ -1397,6 +1459,7 @@ def install_service_dlls(
     prior_files = {}
     staged_files = []
     changed_targets = []
+    removed_legacy = []
 
     try:
         for item in changes:
@@ -1420,6 +1483,14 @@ def install_service_dlls(
             changed_targets.append(item["target"])
             if sha256_file(item["target"]) != item["source_hash"]:
                 raise OSError(f"Install verification failed for {item['folder']}")
+
+        for target in legacy_files:
+            relative_path = target.relative_to(game_data)
+            backup = backup_dir / relative_path
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(target, backup)
+            target.unlink()
+            removed_legacy.append(target)
     except Exception as install_error:
         rollback_errors = []
         for staged in staged_files:
@@ -1439,6 +1510,14 @@ def install_service_dlls(
                     target.unlink(missing_ok=True)
             except OSError as exc:
                 rollback_errors.append(f"restore {target}: {exc}")
+        for target in reversed(removed_legacy):
+            relative_path = target.relative_to(game_data)
+            backup = backup_dir / relative_path
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(backup, target)
+            except OSError as exc:
+                rollback_errors.append(f"restore superseded {target}: {exc}")
         if rollback_errors:
             details = "\n".join(f"- {item}" for item in rollback_errors)
             raise ServiceRollbackError(
@@ -1450,6 +1529,7 @@ def install_service_dlls(
 
     return {
         "installed": [item["folder"] for item in changes],
+        "removed": [str(path.relative_to(game_data)) for path in removed_legacy],
         "backup_dir": backup_dir if backup_dir.is_dir() else None,
     }
 
@@ -1765,6 +1845,68 @@ def discover_components(directory=HERE):
     ]
 
 
+def component_dependency_inventory(component):
+    """Return installed-package health for one optional component."""
+    inventory = []
+    for distribution, module, expected_version in component["dependencies"]:
+        try:
+            installed_version = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            installed_version = None
+
+        try:
+            module_available = importlib.util.find_spec(module) is not None
+        except (ImportError, ModuleNotFoundError, ValueError):
+            module_available = False
+
+        if installed_version is None or not module_available:
+            status = "missing"
+        elif installed_version != expected_version:
+            status = "version_mismatch"
+        else:
+            status = "current"
+        inventory.append(
+            {
+                "distribution": distribution,
+                "module": module,
+                "expected_version": expected_version,
+                "installed_version": installed_version,
+                "status": status,
+            }
+        )
+    return inventory
+
+
+def component_dependencies_ready(component):
+    return all(
+        item["status"] == "current"
+        for item in component_dependency_inventory(component)
+    )
+
+
+def using_packaged_environment(python=PYTHON, directory=HERE):
+    """True when *python* belongs to the package-local .venv."""
+    try:
+        executable = Path(python).resolve()
+        environment = (Path(directory) / ".venv").resolve()
+    except OSError:
+        return False
+    return executable.parent.parent == environment
+
+
+def component_setup_command(component, python=PYTHON, directory=HERE):
+    requirements = Path(directory) / component["requirements"]
+    return [
+        str(python),
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "-r",
+        str(requirements),
+    ]
+
+
 class Backend:
     """One independently managed child process."""
 
@@ -1847,8 +1989,10 @@ class App:
         self.log_queue = queue.Queue()
         self.update_queue = queue.Queue()
         self.krpc_test_queue = queue.Queue()
+        self.component_setup_queue = queue.Queue()
         self.backends = []
         self.backend_rows = []
+        self.component_setups = set()
         self.update_state_path = Path(update_state_path)
         self.update_state = load_update_state(self.update_state_path)
         self.settings_path = Path(settings_path)
@@ -2027,6 +2171,23 @@ class App:
             status.pack(side="right")
             self.prerequisite_status_labels[definition["key"]] = status
 
+        system_heat_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
+        system_heat_row.pack(fill="x", pady=2)
+        ttk.Label(
+            system_heat_row,
+            text="System Heat thermal backend",
+            anchor="w",
+            style="Card.TLabel",
+        ).pack(side="left", fill="x", expand=True)
+        self.system_heat_mod_status = ttk.Label(
+            system_heat_row,
+            text="Checking...",
+            width=32,
+            anchor="e",
+            style="Card.TLabel",
+        )
+        self.system_heat_mod_status.pack(side="right")
+
         server_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
         server_row.pack(fill="x", pady=2)
         ttk.Label(
@@ -2197,6 +2358,7 @@ class App:
         self._drain_log()
         self._drain_update_queue()
         self._drain_krpc_test_queue()
+        self._drain_component_setup_queue()
         self._refresh()
         if self.check_updates_var.get():
             self.root.after(300, lambda: self._start_update_check(use_cache=True))
@@ -2245,8 +2407,8 @@ class App:
             controls,
             text="Start",
             width=9,
-            command=lambda be=backend, opens=component["dashboard"]: self._toggle(
-                be, opens
+            command=lambda comp=component, be=backend: self._component_action(
+                comp, be
             ),
         )
         button.pack(side="left", padx=4)
@@ -2267,7 +2429,97 @@ class App:
         ).pack(fill="x", padx=9, pady=(0, 8))
 
         self.backends.append(backend)
-        self.backend_rows.append((backend, status, button))
+        self.backend_rows.append(
+            {
+                "component": component,
+                "backend": backend,
+                "status": status,
+                "button": button,
+            }
+        )
+
+    def _component_action(self, component, backend):
+        if not component_dependencies_ready(component):
+            self._start_component_setup(component)
+            return
+        self._toggle(backend, component["dashboard"])
+
+    def _start_component_setup(self, component):
+        name = component["name"]
+        if self.component_setups:
+            return
+
+        requirements = HERE / component["requirements"]
+        if not requirements.is_file():
+            message = f"Required setup file is missing: {requirements.name}"
+            self._enqueue("setup", message)
+            messagebox.showerror(
+                "Component setup unavailable", message, parent=self.root
+            )
+            return
+        if not using_packaged_environment():
+            message = (
+                "Mission Control will only add component packages to its local "
+                ".venv. Close this window and start it with "
+                "Start KSP Dashboard.bat."
+            )
+            self._enqueue("setup", message)
+            messagebox.showerror(
+                "Local environment required", message, parent=self.root
+            )
+            return
+
+        self.component_setups.add(name)
+        self._enqueue("setup", f"installing {component['title']} dependencies...")
+
+        def worker():
+            try:
+                result = subprocess.run(
+                    component_setup_command(component),
+                    cwd=str(HERE),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    creationflags=CREATE_NO_WINDOW,
+                    check=False,
+                )
+            except Exception as exc:
+                self.component_setup_queue.put((name, False, str(exc)))
+                return
+            output = (result.stdout or "").strip()
+            importlib.invalidate_caches()
+            ready = result.returncode == 0 and component_dependencies_ready(component)
+            self.component_setup_queue.put((name, ready, output))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _drain_component_setup_queue(self):
+        try:
+            while True:
+                name, succeeded, output = self.component_setup_queue.get_nowait()
+                self.component_setups.discard(name)
+                component = next(
+                    item for item in COMPONENTS if item["name"] == name
+                )
+                if output:
+                    for line in output.splitlines()[-12:]:
+                        self._enqueue("setup", line)
+                if succeeded:
+                    self._enqueue(
+                        "setup", f"{component['title']} setup complete."
+                    )
+                else:
+                    message = (
+                        f"{component['title']} setup did not complete. "
+                        "Review the Mission Log, then click Set up to retry."
+                    )
+                    self._enqueue("setup", message)
+                    messagebox.showerror(
+                        "Component setup failed", message, parent=self.root
+                    )
+        except queue.Empty:
+            pass
+        self.root.after(100, self._drain_component_setup_queue)
 
     def _telemetry_environment(self):
         return telemetry_environment(self.ksp_root_var.get())
@@ -2357,6 +2609,15 @@ class App:
             self.prerequisite_status_labels[item["key"]].config(
                 text=text, foreground=color
             )
+
+        system_heat = system_heat_mod_inventory(self.ksp_root_var.get())
+        if system_heat["status"] == "unconfigured":
+            heat_text, heat_color = "KSP folder required", THEME["slate_dim"]
+        elif system_heat["status"] == "installed":
+            heat_text, heat_color = "Installed - System Heat (kW)", THEME["green"]
+        else:
+            heat_text, heat_color = "Not installed - stock heat (W)", THEME["cyan"]
+        self.system_heat_mod_status.config(text=heat_text, foreground=heat_color)
 
         configuration = krpc_configuration_inventory(self.ksp_root_var.get())
         config_status = configuration["status"]
@@ -2652,6 +2913,9 @@ class App:
             elif status == "current_different":
                 text = f"v{version} current - package build differs"
                 color = THEME["amber"]
+            elif status == "legacy_cleanup":
+                text = f"v{version} current - legacy DLL cleanup ready"
+                color = THEME["amber"]
             elif status == "unverified_package_missing":
                 text = "Installed - not in package; version unverified"
                 color = THEME["amber"]
@@ -2674,11 +2938,11 @@ class App:
             item["source_hash"] is not None
             and item["source_hash"] != item["target_hash"]
             for item in inventory
-        )
+        ) + sum(bool(item.get("legacy_present")) for item in inventory)
         package_missing = sum(item["source_hash"] is None for item in inventory)
         installed_issues = sum(
             item["status"]
-            in {"missing", "outdated", "version_mismatch", "different"}
+            in {"missing", "outdated", "version_mismatch", "different", "legacy_cleanup"}
             for item in inventory
         )
         installed_current = sum(
@@ -2737,7 +3001,12 @@ class App:
             if item["source_hash"] is not None
             and item["source_hash"] != item["target_hash"]
         ]
-        if not changes:
+        legacy_files = [
+            path
+            for item in inventory
+            for path in item.get("legacy_present", [])
+        ]
+        if not changes and not legacy_files:
             messagebox.showinfo(
                 "KSP services",
                 "All packaged Mission Control service DLLs are already current.",
@@ -2750,6 +3019,12 @@ class App:
             + ("install" if item["target_hash"] is None else "replace")
             for item in changes
         )
+        if legacy_files:
+            cleanup_lines = "\n".join(
+                f"  - {path.parent.name}: back up and remove superseded DLL"
+                for path in legacy_files
+            )
+            action_lines = "\n".join(filter(None, (action_lines, cleanup_lines)))
         confirmed = messagebox.askyesno(
             "Install / Repair KSP services",
             "Close Kerbal Space Program before continuing.\n\n"
@@ -2782,8 +3057,14 @@ class App:
 
         self._refresh_service_status()
         installed = ", ".join(result["installed"])
+        removed = result.get("removed", [])
         backup = result["backup_dir"]
-        details = f"Installed and verified: {installed}."
+        details = (
+            f"Installed and verified: {installed}."
+            if installed else "Current consolidated service verified."
+        )
+        if removed:
+            details += "\n\nBacked up and removed superseded DLLs: " + ", ".join(removed)
         if backup is not None:
             details += f"\n\nBackups: {backup}"
         self._enqueue("services", details.replace("\n\n", " "))
@@ -3168,14 +3449,48 @@ class App:
 
         started = backend.start()
         if started and open_dashboard and DASHBOARD.is_file():
-            self.root.after(1500, self._open_dashboard)
+            self.root.after(250, self._open_dashboard_when_ready)
+
+    def _dashboard_ready(self):
+        try:
+            with urllib.request.urlopen(DASHBOARD_URL, timeout=0.5) as response:
+                return response.status == 200
+        except (OSError, urllib.error.URLError):
+            return False
+
+    def _open_dashboard_when_ready(self, attempt=0):
+        if self._dashboard_ready():
+            self._open_dashboard()
+            return
+        if attempt < 100:
+            self.root.after(
+                250,
+                lambda: self._open_dashboard_when_ready(attempt + 1),
+            )
+            return
+        self._enqueue(
+            "launcher",
+            "dashboard loopback did not become ready; review the feed log and "
+            "run Test connection.",
+        )
 
     def _open_dashboard(self):
         if not DASHBOARD.is_file():
             self._enqueue("launcher", f"dashboard file not found at {DASHBOARD}")
             return
+        if not self._dashboard_ready():
+            self._enqueue(
+                "launcher",
+                "dashboard loopback is not running; start Dashboard feed first.",
+            )
+            messagebox.showwarning(
+                "Dashboard feed is stopped",
+                "Start Dashboard feed before opening the React dashboard.",
+                parent=self.root,
+            )
+            return
         try:
-            webbrowser.open(DASHBOARD.as_uri() + "?autoconnect=1")
+            webbrowser.open(DASHBOARD_URL)
         except Exception as exc:
             self._enqueue("launcher", f"couldn't open browser: {exc}")
 
@@ -3235,15 +3550,28 @@ class App:
         dialog.focus_set()
 
     def _refresh(self):
-        for backend, status, button in self.backend_rows:
+        for row in self.backend_rows:
+            component = row["component"]
+            backend = row["backend"]
+            status = row["status"]
+            button = row["button"]
             if backend.running():
                 status.config(text="\u25cf running", foreground=THEME["green"])
-                button.config(text="Stop")
+                button.config(text="Stop", state="normal")
+            elif component["name"] in self.component_setups:
+                status.config(text="installing...", foreground=THEME["amber"])
+                button.config(text="Setting...", state="disabled")
+            elif not component_dependencies_ready(component):
+                status.config(text="not set up", foreground=THEME["amber"])
+                button.config(
+                    text="Set up",
+                    state="disabled" if self.component_setups else "normal",
+                )
             else:
                 status.config(
                     text="\u25cb stopped", foreground=THEME["slate_dim"]
                 )
-                button.config(text="Start")
+                button.config(text="Start", state="normal")
         self.root.after(500, self._refresh)
 
     def _on_close(self):
