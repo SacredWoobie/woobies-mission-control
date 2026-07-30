@@ -149,17 +149,16 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("requirements-panel.txt", batch)
 
     def test_release_inputs_include_current_scene_images(self):
-        image_root = ROOT / "docs" / "images" / "v0.3.0"
-        required = {
-            "flight-dashboard-landscape.png",
-            "mission-control-landscape.png",
-            "editor-vab-landscape.png",
-            "launcher.png",
-            "notes-drawer.png",
-        }
-        actual = {path.name for path in image_root.glob("*.png")}
-        self.assertTrue(required.issubset(actual))
-        self.assertFalse(any(" " in name or "&" in name for name in actual))
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        screenshot_brief = (
+            ROOT / "docs" / "images" / "v0.4.0" / "README.md"
+        ).read_text(encoding="utf-8")
+        required = re.findall(r"`([^`]+\.png)`", screenshot_brief)
+        for name in required:
+            self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
+        self.assertFalse(any(" " in name or "&" in name for name in required))
 
     def test_release_assets_sort_zip_before_curated_images(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
@@ -172,22 +171,49 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(
             image_names,
             [
-                "zz-01-flight-dashboard.png",
-                "zz-02-mission-control.png",
-                "zz-03-vab-editor.png",
-                "zz-04-launcher.png",
-                "zz-05-notes-drawer.png",
+                "zz-01-flight-dashboard-mission-planning.png",
+                "zz-02-delta-v-planner.png",
+                "zz-03-resonant-orbit-planner.png",
+                "zz-04-editor-vab-mission-plan.png",
+                "zz-05-launcher-service-repair.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.3.0.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.0.zip"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.3.0.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.0.{name}" for name in image_names
         ]
         self.assertEqual(
             sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name
         )
         self.assertIn("$zipPath, $checksumPath", publish_script)
-        self.assertIn(") + $releaseImagePaths + @(", publish_script)
+        self.assertIn(
+            ") + $sourceArchiveOutputPaths + $releaseImagePaths + @(",
+            publish_script,
+        )
+
+    def test_release_package_includes_runtime_and_license_materials(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        for module in (
+            "electricity.py",
+            "heat.py",
+            "mission_planning.py",
+            "planner_persistence.py",
+            "staging.py",
+            "telemetry_runtime.py",
+        ):
+            self.assertIn(
+                f"Destination = 'Dashboard/{module}'",
+                publish_script,
+            )
+        self.assertIn(
+            "Destination = 'THIRD-PARTY/NOTICES.md'",
+            publish_script,
+        )
+        self.assertIn("RequiredPackageFiles", publish_script)
+        self.assertIn("SourceArchiveSha256", publish_script)
+        self.assertIn('Destination = "SOURCE/', publish_script)
 
 
 if __name__ == "__main__":

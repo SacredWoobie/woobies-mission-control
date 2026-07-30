@@ -1,7 +1,7 @@
 WOOBIE'S MISSION CONTROL - WINDOWS QUICK START
 ==============================================
 
-VERSION 0.3.0
+VERSION 0.4.0
 
 This build retains the v0.2.4 launcher and serves the compiled React dashboard
 from http://127.0.0.1:8090/. Node.js and Vite are not required.
@@ -14,6 +14,7 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
      WoobiesControlStats
      KRPC.StageStats
      KRPC.SystemHeat
+     KRPC.WoobiesMechJeb
 
    The kRPC KSP mod is required. Other supported mods enable optional panels.
 
@@ -64,9 +65,10 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
 
    Review the launcher's KSP & kRPC compatibility panel. It checks the selected
    KSP version, duplicate or misplaced core DLLs, installed kRPC,
-   KRPC.MechJeb, and MechJeb 2 versions, plus kRPC's saved server settings. If
-   Review fixes appears, open it for the observed mismatch, required or tested
-   value, and a suggested kRPC or CKAN correction.
+   Woobie's MechJeb bridge and MechJeb 2 versions, plus kRPC's saved server
+   settings. If Review fixes appears, open it for the observed mismatch,
+   required or tested value, and the suggested service-repair, kRPC, or CKAN
+   correction.
 
    Choose Test connection after the save is loaded and the kRPC server is
    running. It confirms that kRPC responds and that services for the installed
@@ -85,6 +87,16 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    after its API becomes ready; use Install / Repair and restart KSP if either
    section is unavailable. The installer backs up and removes the two
    superseded KRPC.MissionOverview and KRPC.VesselScience DLLs automatically.
+   It also backs up and removes the upstream GameData\kRPC\KRPC.MechJeb.dll
+   before installing KRPC.WoobiesMechJeb, preventing duplicate MechJeb service
+   registration.
+
+   MISSION PLANNING: The left rail opens Delta-V and Resonant Orbit planners in
+   Mission Control, the VAB/SPH, and Flight. Saved plans are shared through the
+   local Mission Control feed. Transfer calculations are read-only until
+   Flight, where creating a maneuver requires a preview and a separate
+   confirmation. Mission Control never executes the node, warps, steers,
+   stages, or changes throttle.
 
    OPTIONAL NOTES INTEGRATION: When the Notes mod is detected at the selected
    KSP location, a Notes button appears in the dashboard during flight and

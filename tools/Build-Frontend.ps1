@@ -79,7 +79,7 @@ foreach ($forbidden in @(
     "Crew reports nominal systems.",
     "Dual-condition regression craft",
     "React proof of concept",
-    "React dashboard · v0.3.0 WIP"
+    "React dashboard · v0.4.0 WIP"
 )) {
     if ($bundleText.Contains($forbidden)) {
         throw "Production dashboard contains development-only text: $forbidden"

@@ -1,23 +1,26 @@
 # Woobie's Mission Control
 
-Next release: **v0.3.0**
+Next release: **v0.4.0**
 
-Current public release: **v0.2.4**
+Current public release: **v0.3.0**
 
-Woobie's Mission Control is a read-only browser dashboard and optional ESP32
-control-pad bridge for Kerbal Space Program 1. It uses kRPC for live data and
-serves the dashboard only on local loopback at `http://127.0.0.1:8090/`.
+Woobie's Mission Control is a browser dashboard, mission-planning workspace,
+and optional ESP32 control-pad bridge for Kerbal Space Program 1. It uses kRPC
+for live data and serves the dashboard only on local loopback at
+`http://127.0.0.1:8090/`.
 
-The 0.3.0 release replaces the legacy single-file dashboard with a compiled
-React/TypeScript interface while retaining the 0.2.4 launcher, compatibility
-preflight, service repair, connection test, update/changelog controls, Notes
-support, and bounded reconnect behavior. End users do not install Node.js,
-Vite, pnpm, or frontend source.
+The 0.4.0 release adds persisted delta-v, transfer-window, and resonant-orbit
+planning to the compiled React/TypeScript interface while retaining the 0.3.0
+Flight, Editor, Mission Control, Notes, launcher, compatibility, and repair
+workflows. End users do not install Node.js, Vite, pnpm, or frontend source.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
 
 ## Dashboard previews
+
+These v0.3.0 images remain the public production reference until the v0.4.0
+release-candidate capture pass is approved.
 
 ### Flight
 
@@ -55,12 +58,20 @@ Editor telemetry combines the craft's stock build totals with MechJeb staging
 analysis. Reference-body, altitude, and Mach changes recalculate after a short
 pause, with the manual button retained as a fallback.
 
-## What 0.3.0 includes
+## What 0.4.0 includes
 
 - Complete flight dashboard with responsive portrait/landscape layouts and
   persistent icon-based panel collapse/restore controls
+- Delta-v mission planner with multi-leg routes, live MechJeb transfer
+  calculations, porkchop selection, saved-plan libraries, and craft assignment
+- Resonant-orbit constellation planner with LOS guidance, saved plans, and
+  Flight/VAB pinned-plan progress
+- Explicit Flight-only preview and confirmation before creating one transfer
+  maneuver node; Mission Control does not execute nodes or control the vessel
 - Flight, orbit, navball, resources, science, electrical, thermal, target,
   docking, and MechJeb staging telemetry
+- Expanded stage TWR/burn details, calibrated ElectricCharge flow, and
+  expandable System Heat loop/component telemetry
 - System Heat monitoring in kW, with automatic stock thermal fallback in W
 - Read-only Notes drawer and pinned flight note
 - VAB/SPH Craft Summary plus debounced body, altitude, and Mach recalculation
@@ -78,13 +89,14 @@ pause, with the manual button retained as a fallback.
   </p>
 </details>
 
-The three packaged kRPC extensions are independently versioned:
+The four packaged kRPC extensions are independently versioned:
 
-| Service | v0.3.0 selection | Purpose |
+| Service | v0.4.0 selection | Purpose |
 | --- | --- | --- |
 | WoobiesControlStats | 0.2.1 | Roster, stored science, stock thermal data, and KAC bridge recovery |
-| KRPC.StageStats | 0.2.1 | Flight/editor staging and VAB/SPH Craft Summary |
-| KRPC.SystemHeat | 0.2.0 | System Heat and electrical integration |
+| KRPC.StageStats | 0.2.5 | Flight/editor staging, TWR ranges, and VAB/SPH Craft Summary |
+| KRPC.SystemHeat | 0.2.2 | System Heat loop/component and electrical integration |
+| KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 bridge and mission-transfer planning |
 
 ## Installation
 
@@ -103,9 +115,9 @@ component dependencies. Dashboard-only setup does not install `pyserial`; a
 component skipped initially retains a **Set up** button for later.
 
 Choose the main KSP folder containing `GameData`, then use the launcher to
-install or repair the three provided services. Existing copies are backed up,
-and superseded `KRPC.MissionOverview` and `KRPC.VesselScience` development DLLs
-are safely removed during migration.
+install or repair the four provided services. Existing copies are backed up,
+and superseded `KRPC.MissionOverview`, `KRPC.VesselScience`, and upstream
+`GameData\kRPC\KRPC.MechJeb.dll` copies are safely removed during migration.
 
 <details>
   <summary>Launcher and compatibility-preflight preview</summary>
@@ -148,8 +160,9 @@ release staging are excluded by `.gitignore`.
 Double-click `tools\Mock Mission Control.bat` to open a small control menu for
 the production dashboard without running KSP or kRPC. It can hold Flight,
 VAB/SPH, or Mission Control data on screen, or cycle through all three every 15
-seconds. The mock uses the populated screenshot fixtures, updates flight trends
-at 4 Hz, and responds to Editor-condition and Notes commands.
+seconds. The mock uses populated telemetry, updates flight trends at 4 Hz, and
+responds to Editor, Notes, transfer-planning, node-preview, and shared planner
+persistence commands.
 
 The real dashboard feed must be stopped first because both use the normal
 loopback port `8090`. The same controller can be scripted from PowerShell:
@@ -177,7 +190,7 @@ The package-only command creates both an unpacked acceptance-test folder and a
 ZIP without publishing anything:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.3.0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.0
 ```
 
 See [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) for service selection,
@@ -185,7 +198,9 @@ validation, acceptance testing, and draft-release steps.
 
 ## Safety and privacy
 
-- Dashboard and alarm/Notes integrations are read-only.
+- Telemetry, overview, alarm, Notes, and planner calculations are read-only.
+- Transfer-node creation is the dashboard's only KSP write: it requires an
+  explicit preview and a second confirmation, and creates exactly one node.
 - The WebSocket feed has no authentication; keep it on `127.0.0.1`.
 - The optional ESP32 bridge can stage or abort a vessel. Test its arm/safe
   behavior on a disposable craft first.
@@ -193,4 +208,13 @@ validation, acceptance testing, and draft-release steps.
 
 ## License
 
-Released under the [MIT License](LICENSE). Created by **SacredWoobie**.
+Mission Control is released under the [MIT License](LICENSE). Created by
+**SacredWoobie**. Bundled and adapted components retain their own licenses and
+notices in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+Mission planning is powered in part by
+[MechJeb 2](https://github.com/MuMech/MechJeb2), installed separately by the
+user. The distributed bridge is Woobie's GPLv3 fork of
+[KRPC.MechJeb](https://github.com/Genhis/KRPC.MechJeb); its license, provenance,
+and corresponding source are included with each release. This project is not
+affiliated with or endorsed by either upstream project.

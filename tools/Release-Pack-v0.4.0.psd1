@@ -60,9 +60,9 @@
         }
         @{
             Name = "ResonantOrbitCalculator"
-            Commit = "09da28df6943f0ae2795855068e2783bda51340a"
+            Commit = "09da28df5422f8d060d1a03a9c9a391f01a01351"
             License = "MIT"
-            Source = "https://github.com/bjschafer/ResonantOrbitCalculator"
+            Source = "https://github.com/linuxgurugamer/ResonantOrbitCalculator"
         }
         @{
             Name = "Eric Meyer's original Resonant Orbit Calculator"
