@@ -29,11 +29,14 @@ from pathlib import Path
 
 import krpc
 
+from electricity import ElectricityFlowEstimator
+from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
     MISSION_PLANNING_COMMAND_TYPES,
     MissionPlanningController,
 )
+from staging import enrich_stage_result, flight_conditions
 from telemetry_runtime import create_telemetry_runtime
 
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
@@ -127,6 +130,7 @@ _overview_cache = {
 _overview_last_poll = {key: 0.0 for key in _overview_cache}
 _overview_last_ut = None
 _mission_planning = MissionPlanningController()
+_electricity_flow = ElectricityFlowEstimator()
 
 _NOTES_PLUGIN_DATA = Path("Plugins") / "PluginData" / "notes"
 
@@ -1158,6 +1162,9 @@ def _gather_stages(conn, source="flight"):
                      error=type(exc).__name__, message=str(exc))
         return {}  # mid-scene-change / sim not ready; retain last good cache
 
+    enrich_stage_result(ss, out)
+    if source == "flight":
+        out.update(flight_conditions(conn))
     return out
 
 
@@ -1561,13 +1568,14 @@ def _gather_system_heat(conn):
         })
     generated = sh.total_heat_generation
     removed = abs(sh.total_heat_rejection)
-    return {
+    result = {
         "heat.backend": "system_heat",
         "heat.generatedKw": round(generated, 2),
         "heat.removedKw": round(removed, 2),
         "heat.netKw": round(generated - removed, 2),
         "heat.loops": loops,
     }
+    return enrich_system_heat_result(sh, result)
 
 
 def _gather_stock_heat(conn):
@@ -1936,6 +1944,17 @@ def _gather_overview_telemetry(conn, scene, now=None):
     return data
 
 
+def _finalize_telemetry(conn, payload):
+    """Attach shared planning and derived fields to one scene payload."""
+    payload.update(_mission_planning.gather(
+        conn,
+        payload.get("context.mode"),
+        payload.get("t.universalTime"),
+    ))
+    payload.update(_electricity_flow.update(payload))
+    return payload
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
@@ -1974,32 +1993,17 @@ def gather_telemetry(conn):
             payload = _attach_notes_telemetry(
                 _gather_editor_telemetry(conn, "VAB")
             )
-            payload.update(_mission_planning.gather(
-                conn,
-                payload.get("context.mode"),
-                payload.get("t.universalTime"),
-            ))
-            return payload
+            return _finalize_telemetry(conn, payload)
         if mode == "editor_sph":
             payload = _attach_notes_telemetry(
                 _gather_editor_telemetry(conn, "SPH")
             )
-            payload.update(_mission_planning.gather(
-                conn,
-                payload.get("context.mode"),
-                payload.get("t.universalTime"),
-            ))
-            return payload
+            return _finalize_telemetry(conn, payload)
         if mode != "flight":
             payload = _attach_notes_telemetry(
                 _gather_overview_telemetry(conn, scene)
             )
-            payload.update(_mission_planning.gather(
-                conn,
-                payload.get("context.mode"),
-                payload.get("t.universalTime"),
-            ))
-            return payload
+            return _finalize_telemetry(conn, payload)
     except Exception:
         pass
 
@@ -2016,12 +2020,7 @@ def gather_telemetry(conn):
             "flight.active": False,
             "editor.active": False,
         })
-        payload.update(_mission_planning.gather(
-            conn,
-            payload.get("context.mode"),
-            payload.get("t.universalTime"),
-        ))
-        return payload
+        return _finalize_telemetry(conn, payload)
 
     d["context.mode"] = "flight"
     d["flight.active"] = True
@@ -2268,12 +2267,7 @@ def gather_telemetry(conn):
     d.update(_elec_cache)
 
     payload = _attach_notes_telemetry(d, d.get("v.name", ""), now)
-    payload.update(_mission_planning.gather(
-        conn,
-        payload.get("context.mode"),
-        payload.get("t.universalTime"),
-    ))
-    return payload
+    return _finalize_telemetry(conn, payload)
 
 
 # ---------------------------------------------------------------------------
