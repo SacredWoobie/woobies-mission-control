@@ -364,8 +364,8 @@ export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
                 <article><span>Carrier apoapsis</span><strong>{formatDistance(plan.carrierApoapsis, unit)}</strong><small>{plan.releaseAt === "apoapsis" ? "Release point" : "High point"}</small></article>
                 <article><span>Carrier periapsis</span><strong>{formatDistance(plan.carrierPeriapsis, unit)}</strong><small>{plan.releaseAt === "periapsis" ? "Release point" : "Low point"}</small></article>
                 <article className="delta"><span>Injection Δv</span><strong>{plan.injectionDeltaV.toFixed(2)} m/s</strong><small>Circularization burn</small></article>
-                <article><span>Final period</span><strong>{formatDuration(plan.finalPeriod)}</strong><small>Deployed satellites</small></article>
-                <article><span>Carrier period</span><strong>{formatDuration(plan.carrierPeriod)}</strong><small>{ratioText} resonance</small></article>
+                <article className="duration"><span>Final period</span><strong>{formatDuration(plan.finalPeriod)}</strong><small>Deployed satellites</small></article>
+                <article className="duration"><span>Carrier period</span><strong>{formatDuration(plan.carrierPeriod)}</strong><small>{ratioText} resonance</small></article>
                 <article><span>Minimum LOS altitude</span><strong>{plan.minimumLosAltitude > 0 ? formatDistance(plan.minimumLosAltitude, unit) : "Surface clear"}</strong><small>{losConflict ? "Below LOS estimate" : "Target clears estimate"}</small></article>
               </div>
               {plan.warnings.length > 0 && <div className="resonant-warnings">{plan.warnings.map((warning) => <div className={warning.level} key={warning.code}>{warning.message}</div>)}</div>}

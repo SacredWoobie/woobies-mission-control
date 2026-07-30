@@ -63,9 +63,10 @@ function loopSeverityFor(
     && ratio >= CRITICAL_RATIO
     && isFiniteNumber(netFlux)
     && netFlux > 0.05;
+  const warmingOrUnknown = !isFiniteNumber(netFlux) || netFlux > 0.05;
 
   if (explicitCriticalState || approachingCritical || accumulatingNearNominal) return "critical";
-  if (isFiniteNumber(ratio) && ratio >= HOT_RATIO) return "hot";
+  if (isFiniteNumber(ratio) && ratio >= HOT_RATIO && warmingOrUnknown) return "hot";
   return "nominal";
 }
 

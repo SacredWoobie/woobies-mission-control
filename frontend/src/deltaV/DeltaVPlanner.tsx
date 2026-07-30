@@ -112,7 +112,7 @@ function ParkingAltitudeInput({ body, label, onChange, unit, value }: { body: De
   const invalid = !Number.isFinite(value) || value < minimum;
   const helpId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-help`;
   const help = invalid ? `Minimum valid orbit is ${formatDistance(minimum, unit)}` : body.atmosphereDepth > 0 ? `Atmosphere ends at ${formatDistance(body.atmosphereDepth, unit)}` : "Vacuum body";
-  return <label><span className="delta-v-field-heading">{label}<small className={invalid ? "delta-v-input-error" : undefined} id={helpId} role={invalid ? "alert" : undefined}>{help}</small></span><div className="resonant-input-unit"><input
+  return <label className="delta-v-parking-altitude"><span>{label}</span><div className="resonant-input-unit"><input
     aria-describedby={helpId}
     aria-invalid={invalid ? "true" : undefined}
     aria-label={label}
@@ -121,7 +121,7 @@ function ParkingAltitudeInput({ body, label, onChange, unit, value }: { body: De
     type="number"
     value={Number(distanceToUnit(value, unit).toFixed(DISTANCE_UNITS[unit].inputDecimals))}
     onChange={(event) => onChange(distanceFromUnit(Number(event.target.value), unit))}
-  /><span>{unit}</span></div></label>;
+  /><span>{unit}</span></div><small className={invalid ? "delta-v-input-error" : undefined} id={helpId} role={invalid ? "alert" : undefined}>{help}</small></label>;
 }
 
 function ArrivalStepControls({ leg, strategy, onChange }: { leg: DeltaVLeg; strategy: ArrivalStrategy; onChange(patch: Partial<ArrivalStrategy>): void }) {
@@ -474,6 +474,11 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     telemetry?.["mj.transfer.ejectionDeltaV"], telemetry?.["mj.transfer.arrivalVInfinity"],
   ];
   const liveResultValid = liveResultNumbers.every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  const liveManeuverVectorAvailable = telemetry?.["mj.transfer.maneuverVectorSchema"] === 1
+    && ["departureVInfinityX", "departureVInfinityY", "departureVInfinityZ"].every((field) => {
+      const value = telemetry?.[`mj.transfer.${field}`];
+      return typeof value === "number" && Number.isFinite(value);
+    });
   const activeArc = transferArcs.find((arc) => arc.direction === activeTransferDirection);
   const activeSolution: LiveTransferSolution | undefined = matchingResult && transferState === "completed" && liveResultValid && activeArc ? {
     ...activeArc,
@@ -485,6 +490,14 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     transferTime: Number(telemetry?.["mj.transfer.transferTime"] ?? 0),
     ejectionDeltaV: Number(telemetry?.["mj.transfer.ejectionDeltaV"] ?? 0),
     arrivalVInfinity: Number(telemetry?.["mj.transfer.arrivalVInfinity"] ?? 0),
+    ...(liveManeuverVectorAvailable ? {
+      departureVInfinity: [
+        Number(telemetry?.["mj.transfer.departureVInfinityX"]),
+        Number(telemetry?.["mj.transfer.departureVInfinityY"]),
+        Number(telemetry?.["mj.transfer.departureVInfinityZ"]),
+      ] as [number, number, number],
+      maneuverVectorSchema: 1 as const,
+    } : {}),
   } : undefined;
   const liveSolution = activeTransferPurpose === "quick" ? activeSolution : undefined;
   const appliedTransferSolutions = useMemo(() => ({

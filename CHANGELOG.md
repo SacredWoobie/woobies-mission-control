@@ -11,6 +11,11 @@ All notable public changes will be recorded here.
 - Added a MechJeb-backed porkchop calculator with explicit preview and
   confirmation steps before Mission Control creates a maneuver node. The
   dashboard never executes nodes, warps, steers, stages, or changes throttle.
+- Enabled Simple ideal-transfer plans to retain MechJeb's departure vector for
+  the same safe maneuver preview and confirmation workflow used by selected
+  porkchop transfers.
+- Prevented a reloaded or reconnected dashboard from offering node creation
+  against a maneuver preview owned by an expired browser session.
 - Added persistent planner drafts, saved plans, vessel assignments, and
   resonant-orbit records with revision checks, bounded storage, backup recovery,
   and cross-tab merge behavior.
@@ -19,8 +24,15 @@ All notable public changes will be recorded here.
   and compatibility fallbacks for older service responses.
 - Expanded System Heat loop details with nominal temperature, net flux,
   radiator state, and grouped producer/radiator components.
+- Corrected System Heat status so settled or cooling loops at their nominal
+  operating temperature are not mislabeled as hot; active warming and explicit
+  hazards still surface.
 - Added calibrated ElectricCharge net-flow and draw estimates that account for
   the telemetry collector's slower resource cadence and full/empty saturation.
+- Stabilized the Flight electricity layout by suppressing physically invalid
+  negative "Other" generation remainders caused by sequential source sampling.
+- Moved the Mission Plan progress and Undo Last controls out of the narrow
+  delta-v comparison card so completed-step actions remain readable in Flight.
 - Hardened the production loopback server with exact host/origin validation,
   content security policy, bounded commands and queues, per-WebSocket sessions,
   and a shared persisted planning controller.

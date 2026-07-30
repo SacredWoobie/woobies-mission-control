@@ -603,6 +603,10 @@ describe("delta-v planner drawer", () => {
         "mj.transfer.transferTime": 1_000_000,
         "mj.transfer.ejectionDeltaV": 2_100,
         "mj.transfer.arrivalVInfinity": 2_300,
+        "mj.transfer.departureVInfinityX": 321,
+        "mj.transfer.departureVInfinityY": -654,
+        "mj.transfer.departureVInfinityZ": 987,
+        "mj.transfer.maneuverVectorSchema": 1,
       },
     };
     await act(async () => listeners.forEach((listener) => listener()));
@@ -629,6 +633,10 @@ describe("delta-v planner drawer", () => {
         "mj.transfer.transferTime": 1_000_000,
         "mj.transfer.ejectionDeltaV": 2_800,
         "mj.transfer.arrivalVInfinity": 1_900,
+        "mj.transfer.departureVInfinityX": -123,
+        "mj.transfer.departureVInfinityY": 456,
+        "mj.transfer.departureVInfinityZ": -789,
+        "mj.transfer.maneuverVectorSchema": 1,
       },
     };
     await act(async () => listeners.forEach((listener) => listener()));
@@ -646,6 +654,14 @@ describe("delta-v planner drawer", () => {
     expect(screen.getAllByText("CALCULATED STAY").length).toBeGreaterThan(0);
     expect(screen.getByText(/window wait/)).toBeTruthy();
     expect(screen.getByText(/Capture at Kerbin/).closest(".delta-v-leg")?.querySelector(".delta-v-leg-timeline")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+    const savedSolutions = Object.values(
+      JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null").plans[0].draft.selectedTransferSolutions,
+    );
+    expect(savedSolutions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ departureVInfinity: [321, -654, 987], maneuverVectorSchema: 1 }),
+      expect.objectContaining({ departureVInfinity: [-123, 456, -789], maneuverVectorSchema: 1 }),
+    ]));
   });
 
   it("keeps sequential calculation in Simple and exposes eligible porkchops in Advanced", () => {

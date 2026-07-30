@@ -156,6 +156,7 @@
 .delta-v-controls input[aria-invalid="true"] { border-color: var(--warn); }
 .delta-v-controls small { min-height: 11px; color: var(--slate-muted-text); font-size: 9px; line-height: 1.25; }
 .delta-v-controls small.delta-v-input-error { color: #e4a79f; }
+.delta-v-parking-altitude > small { overflow: visible; text-overflow: clip; white-space: normal; }
 .delta-v-stop-builder.editing { padding: 6px; border: 1px solid rgba(255,180,84,.45); background: rgba(255,180,84,.035); }
 .delta-v-empty-stop { display: grid; min-height: 58px; grid-column: 2 / -1; align-content: center; gap: 5px; padding: 7px 10px; border: 1px dashed #294657; background: #070d13; }
 .delta-v-empty-stop span { color: var(--slate); font-size: 9px; letter-spacing: .08em; }
@@ -407,57 +408,71 @@
 }
 @media (min-width: 1280px) {
   .delta-v-header-controls {
-    grid-template-columns: minmax(0,1fr);
+    grid-template-columns: max-content minmax(132px,1fr) minmax(184px,1fr) 44px;
     grid-template-rows: 44px auto;
     column-gap: 7px;
     row-gap: 6px;
   }
   .delta-v-header-actions {
-    grid-column: 1;
+    display: grid;
+    grid-column: 1 / -1;
     grid-row: 1;
+    grid-template-columns: subgrid;
+    gap: 7px;
+  }
+  .delta-v-header-actions > button {
+    width: 100%;
   }
   .delta-v-save-slot {
-    display: block;
-    grid-column: 1;
+    display: grid;
+    grid-column: 1 / -1;
     grid-row: 2;
+    grid-template-columns: subgrid;
   }
   .delta-v-save-slot .delta-v-save-bar {
     display: grid;
-    grid-template-columns: max-content minmax(0,1fr) max-content;
-    align-items: center;
+    min-width: 0;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: end;
   }
   .delta-v-save-slot .delta-v-save-bar label {
     display: grid;
     min-width: 0;
     grid-column: 1 / 3;
-    grid-template-columns: subgrid;
-    align-items: center;
-    gap: 7px;
+    grid-template-columns: minmax(0,1fr);
+    align-items: end;
+    gap: 4px;
   }
   .delta-v-save-slot .delta-v-save-bar label > span {
     display: flex;
     min-width: 0;
-    min-height: 44px;
+    min-height: 0;
     grid-column: 1;
     align-items: center;
-    justify-content: flex-end;
-    font-size: 13px !important;
+    justify-content: flex-start;
+    font-size: 10px !important;
     letter-spacing: .08em;
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
   }
   .delta-v-save-slot .delta-v-save-bar input {
-    grid-column: 2;
+    grid-column: 1;
   }
   .delta-v-save-slot .delta-v-save-actions {
     display: grid;
     min-width: 0;
     grid-column: 3;
+    align-self: end;
     grid-template-columns: repeat(auto-fit,minmax(0,1fr));
     gap: 6px;
   }
+  .delta-v-save-slot .delta-v-save-actions button {
+    padding-inline: 5px;
+    font-size: 10px !important;
+  }
   .delta-v-save-slot .delta-v-save-bar small {
-    grid-column: 1 / -1;
+    grid-column: 1 / 4;
   }
 }
 .delta-v-modal-backdrop { position: absolute; z-index: 20; inset: 0; display: grid; padding: 20px; place-items: center; background: rgba(0,0,0,.72); }
@@ -534,7 +549,7 @@
 .delta-v-pinned-facts > div { min-width: 0; padding: 6px 7px; border: 1px solid var(--rule); background: #090f17; }
 .delta-v-pinned-facts span, .delta-v-pinned-window span { display: block; margin-bottom: 3px; color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-facts strong { display: block; color: var(--cyan); font-size: 10px; overflow-wrap: anywhere; }
-.delta-v-pinned-progress { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 5px; margin-top: auto; padding-top: 7px; border-top: 1px solid var(--rule); }
+.delta-v-pinned-progress { display: flex; min-width: 0; margin-top: 7px; padding: 6px 8px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--rule); background: #090f17; }
 .delta-v-pinned-progress > span { color: var(--slate); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-progress strong { color: #d7e2ee; font-size: 9px; white-space: nowrap; }
 .delta-v-pinned-progress button { min-width: 58px; padding: 5px 7px; border: 1px solid var(--rule-bright); color: var(--slate); background: #0c141e; cursor: pointer; font: 8px var(--mono); text-transform: uppercase; }
@@ -1112,23 +1127,29 @@
   width: min(100%, 680px);
 }
 .delta-v-drawer .delta-v-custom-label input,
-.delta-v-drawer .delta-v-custom-actions input {
-  height: 32px;
-  min-height: 32px;
+.delta-v-drawer .delta-v-custom-actions input,
+.delta-v-drawer .delta-v-custom-actions button {
+  height: 44px;
+  min-height: 44px !important;
 }
 .delta-v-drawer .delta-v-custom-actions {
-  width: 178px;
-  grid-template-columns: 140px 32px;
+  width: 190px;
+  align-self: start;
+  grid-template-columns: minmax(0,140px) 44px;
 }
 .delta-v-drawer .delta-v-custom-actions button {
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 44px;
+  min-width: 44px;
+}
+.delta-v-drawer .delta-v-custom-actions .resonant-input-unit input {
+  padding-right: 48px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 .delta-v-drawer .delta-v-custom-actions .resonant-input-unit > span {
-  top: 9px;
-  right: 28px;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1541,8 +1562,13 @@
   }
   .resonant-orbit-drawer .resonant-controls {
     grid-area: controls;
+    grid-template-columns: minmax(0,1fr) 76px minmax(180px,1.1fr);
     align-self: start;
     border-right: 1px solid var(--rule);
+  }
+  .resonant-orbit-drawer .resonant-controls label > span,
+  .resonant-orbit-drawer .resonant-controls legend {
+    font-size: 10px;
   }
   .resonant-orbit-drawer .resonant-advanced {
     grid-area: advanced;
@@ -1569,6 +1595,9 @@
   .resonant-orbit-drawer .resonant-result-grid article {
     min-height: 78px;
     padding: 8px;
+  }
+  .resonant-orbit-drawer .resonant-result-grid article.duration > strong {
+    font-size: clamp(12px,1.15vw,15px);
   }
   .resonant-orbit-drawer .resonant-error {
     grid-area: error;

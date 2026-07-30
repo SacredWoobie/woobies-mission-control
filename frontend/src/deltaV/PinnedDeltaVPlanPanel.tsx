@@ -101,6 +101,14 @@ function finiteTelemetryNumber(snapshot: TelemetrySnapshot | null, key: string) 
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function newManeuverActionId(planId: string, legId: string) {
+  const nonce = (globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`)
+    .replaceAll("-", "")
+    .slice(0, 16);
+  return `${`${planId}:${legId}`.slice(0, 111)}:${nonce}`;
+}
+
 export function PinnedDeltaVPlanPanel({
   scene = "flight",
   snapshot: suppliedSnapshot,
@@ -116,10 +124,17 @@ export function PinnedDeltaVPlanPanel({
     : suppliedSnapshot === undefined ? liveSnapshot : suppliedSnapshot;
   const { system } = useTimeSystem();
   const [maneuverSendError, setManeuverSendError] = useState("");
+  const [maneuverPreview, setManeuverPreview] = useState<{
+    actionId: string;
+    context: string;
+  } | null>(null);
   const [routeExpanded, setRouteExpanded] = useState(false);
   const pinned = pinnedForTelemetry(snapshot);
   useEffect(() => rememberPinnedCraft(snapshot), [rememberPinnedCraft, snapshot]);
   useEffect(() => setRouteExpanded(false), [pinned?.id]);
+  useEffect(() => {
+    if (connection.status !== "linked") setManeuverPreview(null);
+  }, [connection.status]);
   if (!pinned) return null;
 
   const { plan } = pinned;
@@ -158,15 +173,32 @@ export function PinnedDeltaVPlanPanel({
     pinned.draft.selectedTransferSolutions ?? {},
     nextTransferLeg,
   );
-  const actionId = selectedSolution && nextTransferLeg
-    ? `${pinned.id}:${nextTransferLeg.id}`.slice(0, 128)
+  const maneuverContext = selectedSolution && nextTransferLeg
+    ? [
+      pinned.id,
+      nextTransferLeg.id,
+      selectedSolution.fingerprint,
+      selectedSolution.departureUT,
+      selectedSolution.ejectionDeltaV,
+      selectedSolution.departureVInfinity?.join(",") ?? "",
+    ].join("|")
+    : "";
+  const actionId = maneuverPreview?.context === maneuverContext
+    ? maneuverPreview.actionId
     : "";
   const vesselGuid = typeof snapshot?.["v.guid"] === "string" ? snapshot["v.guid"] : "";
-  const nodeTelemetryMatches = Boolean(actionId && selectedSolution)
-    && snapshot?.["mj.transfer.node.actionId"] === actionId
+  const nodeIdentityMatches = Boolean(selectedSolution)
     && snapshot?.["mj.transfer.node.fingerprint"] === selectedSolution?.fingerprint
     && snapshot?.["mj.transfer.node.vesselGuid"] === vesselGuid;
-  const nodeState = nodeTelemetryMatches ? snapshot?.["mj.transfer.node.state"] : "idle";
+  const persistedNodeMatches = nodeIdentityMatches
+    && ["created", "executed"].includes(snapshot?.["mj.transfer.node.state"] ?? "");
+  const previewTelemetryMatches = nodeIdentityMatches
+    && Boolean(actionId)
+    && snapshot?.["mj.transfer.node.actionId"] === actionId;
+  const nodeTelemetryMatches = persistedNodeMatches || previewTelemetryMatches;
+  const nodeState = nodeTelemetryMatches
+    ? snapshot?.["mj.transfer.node.state"]
+    : actionId ? "previewing" : "idle";
   const apoapsisAltitude = finiteTelemetryNumber(snapshot, "o.ApA");
   const periapsisAltitude = finiteTelemetryNumber(snapshot, "o.PeA");
   const inclination = finiteTelemetryNumber(snapshot, "o.inclination");
@@ -202,10 +234,15 @@ export function PinnedDeltaVPlanPanel({
   const blockingAltitudeError = plannedAltitude === undefined ? undefined : Math.max(10_000, plannedAltitude * .2);
   const readinessBlockers: string[] = [];
   const readinessWarnings: string[] = [];
+  const usesPorkchopTransfer = pinned.draft.transferMode === "advanced";
   if (connection.status !== "linked") readinessBlockers.push("Link the live dashboard to check this maneuver.");
   if (!pinned.craftBound || !vesselGuid) readinessBlockers.push("This plan must be bound to the active craft.");
-  if (nextTransferLeg && !selectedSolution) readinessBlockers.push("Select and save a MechJeb porkchop transfer before checking this maneuver.");
-  if (selectedSolution && (!selectedSolution.departureVInfinity || selectedSolution.maneuverVectorSchema !== 1)) readinessBlockers.push("Recalculate and update this porkchop selection to enable maneuver creation.");
+  if (nextTransferLeg && !selectedSolution) readinessBlockers.push(usesPorkchopTransfer
+    ? "Select and save a MechJeb porkchop transfer before checking this maneuver."
+    : "Calculate and save this ideal transfer before checking the maneuver.");
+  if (selectedSolution && (!selectedSolution.departureVInfinity || selectedSolution.maneuverVectorSchema !== 1)) readinessBlockers.push(usesPorkchopTransfer
+    ? "Recalculate and update this porkchop selection to enable maneuver creation."
+    : "Recalculate and update this ideal transfer to enable maneuver creation.");
   if (selectedSolution && !currentBody) readinessBlockers.push("Active-vessel body telemetry is required.");
   else if (selectedSolution && currentBody !== selectedSolution.origin) readinessBlockers.push(`Active vessel must be orbiting ${selectedSolution.origin}.`);
   if (selectedSolution && typeof currentUT === "number" && selectedSolution.departureUT <= currentUT) readinessBlockers.push("The selected transfer epoch has passed.");
@@ -252,11 +289,12 @@ export function PinnedDeltaVPlanPanel({
       ? "executed"
     : readinessBlockers.length || nodeError ? "blocked" : readinessWarnings.length ? "warning" : "ready";
   const previewManeuver = () => {
-    if (!selectedSolution?.departureVInfinity || !vesselGuid || !actionId) return;
+    if (!selectedSolution?.departureVInfinity || !vesselGuid || !nextTransferLeg || !maneuverContext) return;
+    const previewActionId = newManeuverActionId(pinned.id, nextTransferLeg.id);
     setManeuverSendError("");
-    if (!liveTelemetryStore.send({
+    if (liveTelemetryStore.send({
       type: "mechjeb.transfer.node.preview",
-      actionId,
+      actionId: previewActionId,
       fingerprint: selectedSolution.fingerprint,
       origin: selectedSolution.origin,
       plannedParkingAltitude: selectedSolution.originParkingAltitude,
@@ -264,7 +302,11 @@ export function PinnedDeltaVPlanPanel({
       expectedDeltaV: selectedSolution.ejectionDeltaV,
       departureVInfinity: selectedSolution.departureVInfinity,
       expectedVesselGuid: vesselGuid,
-    })) setManeuverSendError("The live dashboard did not accept the maneuver check.");
+    })) {
+      setManeuverPreview({ actionId: previewActionId, context: maneuverContext });
+    } else {
+      setManeuverSendError("The live dashboard did not accept the maneuver check.");
+    }
   };
   const createManeuver = () => {
     if (!selectedSolution || !vesselGuid || !actionId) return;
@@ -304,12 +346,12 @@ export function PinnedDeltaVPlanPanel({
       <div className={`delta-v-pinned-comparison ${comparison.status}`} role={comparison.status === "shortfall" || comparison.status === "tight" ? "alert" : undefined}>
         <header><span>VAC {"\u0394"}v</span><strong>{comparison.status.toUpperCase()}</strong></header>
         <p>{comparisonMessage(comparison.status)} <span>Staging CURRENT may differ.</span></p>
-        {scene === "flight" && <div className="delta-v-pinned-progress">
-          <span>Progress <strong>{completedLegIds.length} / {plan.legs.length} steps</strong></span>
-          {lastCompletedLegId && <button onClick={() => setPinnedStepComplete(lastCompletedLegId, false, snapshot)} type="button">Undo last</button>}
-        </div>}
       </div>
     </div>
+    {scene === "flight" && <div className="delta-v-pinned-progress">
+      <span>Progress <strong>{completedLegIds.length} / {plan.legs.length} steps</strong></span>
+      {lastCompletedLegId && <button onClick={() => setPinnedStepComplete(lastCompletedLegId, false, snapshot)} type="button">Undo last</button>}
+    </div>}
     {scene === "flight" && showLaunchTarget && <div className="delta-v-launch-target">
       <header><span>LAUNCH TARGET</span><strong>ASCENT GUIDANCE</strong></header>
       <div className="delta-v-launch-target-grid">

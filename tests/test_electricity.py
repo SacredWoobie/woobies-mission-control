@@ -41,6 +41,16 @@ class ElectricityFlowEstimatorTests(unittest.TestCase):
     def update(self, **overrides):
         return self.estimator.update(flight_payload(**overrides))
 
+    def test_generation_remainder_clamps_sequential_sample_noise(self):
+        self.assertEqual(
+            electricity.generation_remainder(62.5, 63.1),
+            0.0,
+        )
+        self.assertAlmostEqual(
+            electricity.generation_remainder(65.0, 62.5, 1.2),
+            1.3,
+        )
+
     def test_first_sample_calibrates_then_estimates_net_and_draw(self):
         self.assertEqual(
             self.update(),

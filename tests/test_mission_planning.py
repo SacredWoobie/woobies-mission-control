@@ -273,6 +273,32 @@ class TransferCommandTests(unittest.TestCase):
         self.assertEqual(payload["mj.transfer.ejectionDeltaV"], 1_065.25)
         self.assertEqual(payload["mj.transfer.arrivalVInfinity"], 805.75)
         self.assertEqual(payload["mj.transfer.calculatedTotal"], 1_871.0)
+        self.assertEqual(payload["mj.transfer.departureVInfinityX"], 321.0)
+        self.assertEqual(payload["mj.transfer.departureVInfinityY"], -654.0)
+        self.assertEqual(payload["mj.transfer.departureVInfinityZ"], 987.0)
+        self.assertEqual(payload["mj.transfer.maneuverVectorSchema"], 1)
+
+    def test_completed_result_survives_missing_maneuver_vector(self):
+        self.extension.command(self.conn, start_command())
+        planner = self.conn.planner
+        planner.state = "completed"
+        planner.best_departure_ut = 1_000_000.0
+        planner.best_arrival_ut = 2_000_000.0
+        planner.best_transfer_time = 1_000_000.0
+        planner.best_ejection_delta_v = 1_065.25
+        planner.best_arrival_v_infinity = 805.75
+        planner.best_total_delta_v = 1_871.0
+
+        def fail_detailed(*_args):
+            raise RuntimeError("Detailed evaluation unavailable")
+
+        planner.evaluate_point_detailed = fail_detailed
+        payload = self.extension.gather(self.conn)
+
+        self.assertEqual(payload["mj.transfer.state"], "completed")
+        self.assertEqual(payload["mj.transfer.ejectionDeltaV"], 1_065.25)
+        self.assertIsNone(payload["mj.transfer.departureVInfinityX"])
+        self.assertEqual(payload["mj.transfer.maneuverVectorSchema"], 0)
 
     def test_cancel_matching_request(self):
         self.extension.command(self.conn, start_command())

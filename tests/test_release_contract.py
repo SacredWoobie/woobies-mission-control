@@ -93,11 +93,11 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(
             screenshot_names,
             [
-                "flight-dashboard-mission-planning.png",
-                "delta-v-planner.png",
+                "space-center-overview.png",
                 "resonant-orbit-planner.png",
+                "delta-v-planner.png",
                 "editor-vab-mission-plan.png",
-                "launcher-service-repair.png",
+                "flight-dashboard-mission-planning.png",
             ],
         )
 
@@ -155,9 +155,16 @@ class ReleaseContractTests(unittest.TestCase):
         screenshot_brief = (
             ROOT / "docs" / "images" / "v0.4.0" / "README.md"
         ).read_text(encoding="utf-8")
-        required = re.findall(r"`([^`]+\.png)`", screenshot_brief)
+        gallery_brief, supplemental_brief = screenshot_brief.split(
+            "## Supplemental documentation captures", 1
+        )
+        required = re.findall(r"`([^`]+\.png)`", gallery_brief)
+        supplemental = re.findall(r"`([^`]+\.png)`", supplemental_brief)
+        self.assertEqual(len(required), 5)
         for name in required:
             self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
+        for name in supplemental:
+            self.assertNotIn(f"docs/images/v0.4.0/{name}", publish_script)
         self.assertFalse(any(" " in name or "&" in name for name in required))
 
     def test_release_assets_sort_zip_before_curated_images(self):
@@ -171,11 +178,11 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(
             image_names,
             [
-                "zz-01-flight-dashboard-mission-planning.png",
-                "zz-02-delta-v-planner.png",
-                "zz-03-resonant-orbit-planner.png",
+                "zz-01-space-center-overview.png",
+                "zz-02-resonant-orbit-planner.png",
+                "zz-03-delta-v-planner.png",
                 "zz-04-editor-vab-mission-plan.png",
-                "zz-05-launcher-service-repair.png",
+                "zz-05-flight-dashboard-mission-planning.png",
             ],
         )
         zip_name = "Woobies-Mission-Control-v0.4.0.zip"

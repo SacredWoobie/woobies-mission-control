@@ -161,13 +161,45 @@ describe("pinned delta-v Mission Plan", () => {
     await waitFor(() => expect(screen.getByLabelText("Remaining mission plan steps").textContent).not.toContain("Launch to Kerbin orbit"));
     expect(screen.queryByText("LAUNCH TARGET", { exact: true })).toBeNull();
     expect(screen.getByText("TRANSFER READINESS", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Calculate and save this ideal transfer before checking the maneuver.", { exact: true })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("porkchop");
     expect(screen.getByText("1 / 5 steps", { exact: true })).toBeTruthy();
     expect(screen.getAllByText("2,185 m/s", { exact: true })).toHaveLength(1);
     expect(screen.getByText("SURPLUS", { exact: true })).toBeTruthy();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null").assignments[0].completedLegIds).toEqual(["segment-1-ascent"]));
 
-    fireEvent.click(screen.getByRole("button", { name: "Undo last" }));
+    const undo = screen.getByRole("button", { name: "Undo last" });
+    expect(undo.closest(".delta-v-pinned-progress")).toBeTruthy();
+    expect(undo.closest('[aria-label="Mission delta-v overview"]')).toBeNull();
+    fireEvent.click(undo);
     expect(screen.getByText("Launch to Kerbin orbit", { exact: true })).toBeTruthy();
+  });
+
+  it("describes a legacy Simple transfer as ideal when its maneuver vector is missing", () => {
+    seedPinnedPlan();
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
+    library.assignments[0].completedLegIds = ["segment-1-ascent"];
+    library.plans[0].draft.selectedTransferSolutions["segment-1"] = {
+      arcId: "segment-1-primary",
+      requestId: "legacy-ideal",
+      fingerprint: "Kerbin|Duna|80000|ideal",
+      origin: "Kerbin",
+      destination: "Duna",
+      originParkingAltitude: 80_000,
+      destinationParkingAltitude: 60_000,
+      optimizePoweredCapture: false,
+      departureUT: 4_600,
+      arrivalUT: 10_000,
+      transferTime: 5_400,
+      ejectionDeltaV: 1_050,
+      arrivalVInfinity: 700,
+    };
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
+
+    renderPanel("flight");
+
+    expect(screen.getByText("Recalculate and update this ideal transfer to enable maneuver creation.", { exact: true })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("porkchop");
   });
 
   it("restores the collapsed panel as Mission Plan with a distinct icon", () => {
@@ -258,7 +290,7 @@ describe("pinned delta-v Mission Plan", () => {
     });
     const send = vi.spyOn(liveTelemetryStore, "send").mockReturnValue(true);
 
-    renderPanel("flight");
+    const panel = renderPanel("flight");
 
     expect(screen.getByText((_, element) => element?.textContent === "80.0\u2009km circular")).toBeTruthy();
     expect(
@@ -276,13 +308,17 @@ describe("pinned delta-v Mission Plan", () => {
       departureVInfinity: [321, -654, 987],
       expectedVesselGuid: "11111111-2222-3333-4444-555555555555",
     }));
+    const firstPreview = send.mock.calls.at(-1)?.[0];
+    if (!firstPreview || firstPreview.type !== "mechjeb.transfer.node.preview") throw new Error("Expected the first maneuver preview.");
+    expect(firstPreview.actionId).not.toBe("duna-plan:segment-1-primary-ejection");
+    expect(screen.getByRole("button", { name: "Checking\u2026" })).toBeTruthy();
 
     liveState = {
       ...liveState,
       frameCount: 2,
       snapshot: {
         ...baseSnapshot,
-        "mj.transfer.node.actionId": "duna-plan:segment-1-primary-ejection",
+        "mj.transfer.node.actionId": firstPreview.actionId,
         "mj.transfer.node.fingerprint": "Kerbin|Duna|80000|selected",
         "mj.transfer.node.vesselGuid": "11111111-2222-3333-4444-555555555555",
         "mj.transfer.node.state": "ready",
@@ -294,15 +330,33 @@ describe("pinned delta-v Mission Plan", () => {
 
     expect(screen.getByText("Active-orbit burn", { exact: true })).toBeTruthy();
     expect(screen.getByText("1,075 m/s", { exact: true })).toBeTruthy();
+    panel.unmount();
+    renderPanel("flight");
+    expect(screen.queryByRole("button", { name: "Create KSP node" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Check maneuver" }));
+    const secondPreview = send.mock.calls.at(-1)?.[0];
+    if (!secondPreview || secondPreview.type !== "mechjeb.transfer.node.preview") throw new Error("Expected the second maneuver preview.");
+    expect(secondPreview.actionId).not.toBe(firstPreview.actionId);
+    liveState = {
+      ...liveState,
+      frameCount: 3,
+      snapshot: {
+        ...liveState.snapshot,
+        "mj.transfer.node.actionId": secondPreview.actionId,
+      },
+    };
+    await act(async () => listeners.forEach((listener) => listener()));
+
     fireEvent.click(screen.getByRole("button", { name: "Create KSP node" }));
     expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
       type: "mechjeb.transfer.node.create",
+      actionId: secondPreview.actionId,
       expectedVesselGuid: "11111111-2222-3333-4444-555555555555",
     }));
 
     liveState = {
       ...liveState,
-      frameCount: 3,
+      frameCount: 4,
       snapshot: {
         ...liveState.snapshot,
         "mj.transfer.node.state": "created",
@@ -314,7 +368,7 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByRole("button", { name: "Mark transfer complete" })).toBeTruthy();
     liveState = {
       ...liveState,
-      frameCount: 4,
+      frameCount: 5,
       snapshot: {
         ...liveState.snapshot,
         "mj.transfer.node.state": "executed",

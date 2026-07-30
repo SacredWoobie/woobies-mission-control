@@ -17,13 +17,25 @@ does not become `approved` until both parties are satisfied with it.
 
 | Order | Status | Documentation filename | Required content |
 | --- | --- | --- | --- |
-| 1 | not ready | `flight-dashboard-mission-planning.png` | Flight dashboard with healthy live telemetry, the mission-planning rail controls, useful staging rows, and non-alarm heat/electricity data. |
-| 2 | not ready | `delta-v-planner.png` | Delta-V planner with a credible multi-leg route, transfer-window details, totals, and a pinned plan visible behind or beside the drawer. |
-| 3 | not ready | `resonant-orbit-planner.png` | Resonant Orbit planner with target Ap/Pe guidance, LOS context, and the required source links visible. |
-| 4 | not ready | `editor-vab-mission-plan.png` | VAB/SPH craft summary and staging analysis with a craft-bound saved plan; show both atmospheric and vacuum values without warnings caused by fixture gaps. |
-| 5 | not ready | `launcher-service-repair.png` | v0.4.0 launcher showing all four selected services current after legacy `KRPC.MechJeb.dll` migration and repair. |
+| 1 | captured | `space-center-overview.png` | Space Center program overview with live Career data, transfer windows, active vessels, roster, alarms, and contracts. |
+| 2 | captured | `resonant-orbit-planner.png` | Resonant Orbit planner configured for three satellites at a 2,000 km circular Kerbin orbit, with target Ap/Pe guidance, LOS context, and source links visible. |
+| 3 | captured | `delta-v-planner.png` | Delta-V planner for a credible Kerbin-to-Sarnus orbit mission, with transfer-window details, route legs, and totals visible. |
+| 4 | captured | `editor-vab-mission-plan.png` | VAB/SPH craft summary and staging analysis with the three-satellite resonant-orbit plan pinned to the craft; show atmospheric and vacuum values without fixture warnings. |
+| 5 | captured | `flight-dashboard-mission-planning.png` | Flight dashboard with the Sarnus mission plan pinned, healthy live telemetry, useful staging rows, and non-alarm heat/electricity data. |
 
 The release assets derived from these captures must use the established
 `.zz-01` through `.zz-05` suffixes so the normal release ZIP sorts first.
 Retain the full-resolution originals in this directory and optimize only copies
-if GitHub or README rendering requires it.
+if GitHub or README rendering requires it. Launcher migration and service-repair
+acceptance remain required release evidence, but are documented separately
+rather than occupying a product-gallery screenshot.
+
+## Supplemental documentation captures
+
+These images support README/wiki documentation but are not part of the five
+ordered `.zz-01` through `.zz-05` GitHub release-gallery assets.
+
+| Status | Documentation filename | Required content |
+| --- | --- | --- |
+| captured | `delta-v-porkchop-selection.png` | Advanced Kerbin-to-Sarnus porkchop selector with the live MechJeb grid, selected departure/arrival solution, and evaluation readouts visible. |
+| captured | `delta-v-round-trip-plan.png` | Advanced Kerbin-to-Sarnus round-trip budget with the setup collapsed and the calculated loiter, return window, and Kerbin aerocapture visible. |

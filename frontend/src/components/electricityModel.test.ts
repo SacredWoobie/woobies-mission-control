@@ -83,6 +83,31 @@ describe("selectElectricity", () => {
     });
   });
 
+  it("does not turn a negative reconciliation remainder into an Other source", () => {
+    const model = selectElectricity({
+      "context.mode": "flight",
+      "elec.reactors": [{
+        name: "Fission reactor",
+        on: true,
+        ecPerSec: 62.5,
+        ecMax: 62.5,
+        coreTemp: 850,
+        nominalTemp: 850,
+        integrity: 100,
+      }],
+      "elec.totalGenEcPerSec": 62.5,
+      "elec.otherEcPerSec": -0.6,
+      "elec.netEcPerSec": 0,
+      "elec.flowState": "valid",
+      "r.resource[ElectricCharge]": 8_655,
+      "r.resourceMax[ElectricCharge]": 8_655,
+    });
+
+    expect(model.sources.map((source) => source.kind)).toEqual(["reactor"]);
+    expect(model.tier).toBe(2);
+    expect(model.primarySource?.kind).toBe("reactor");
+  });
+
   it("reserves the reactor danger tone for thermal or integrity alerts", () => {
     const model = selectElectricity({
       "context.mode": "flight",

@@ -34,6 +34,24 @@ def _vessel_identity(payload):
     return None
 
 
+def generation_remainder(total, *itemized):
+    """Return only physically valid unitemized generation.
+
+    The service and per-source calls are sampled sequentially, so their totals
+    can briefly disagree. A negative remainder is reconciliation noise, not a
+    consuming generator family.
+    """
+    total = _finite_number(total)
+    if total is None or total < 0.0:
+        return None
+    remainder = total
+    for value in itemized:
+        value = _finite_number(value)
+        if value is not None and value > 0.0:
+            remainder -= value
+    return max(0.0, remainder)
+
+
 class ElectricityFlowEstimator:
     """Estimate net EC flow from successive vessel-total observations."""
 
@@ -194,4 +212,3 @@ class ElectricityFlowEstimator:
             self.saturated_boundary = boundary
             return {"elec.flowState": "saturated"}
         return self._result("valid", generation)
-

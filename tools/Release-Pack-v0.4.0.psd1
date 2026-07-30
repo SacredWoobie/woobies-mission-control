@@ -81,10 +81,10 @@
     }
 
     Screenshots = @(
-        "flight-dashboard-mission-planning.png",
-        "delta-v-planner.png",
+        "space-center-overview.png",
         "resonant-orbit-planner.png",
+        "delta-v-planner.png",
         "editor-vab-mission-plan.png",
-        "launcher-service-repair.png"
+        "flight-dashboard-mission-planning.png"
     )
 }

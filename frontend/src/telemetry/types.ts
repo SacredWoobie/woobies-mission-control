@@ -267,6 +267,10 @@ export interface TelemetrySnapshot {
   "mj.transfer.ejectionDeltaV"?: number;
   "mj.transfer.arrivalVInfinity"?: number;
   "mj.transfer.calculatedTotal"?: number;
+  "mj.transfer.departureVInfinityX"?: number | null;
+  "mj.transfer.departureVInfinityY"?: number | null;
+  "mj.transfer.departureVInfinityZ"?: number | null;
+  "mj.transfer.maneuverVectorSchema"?: 0 | 1;
   "mj.transfer.detectedVersion"?: string;
   "mj.transfer.compatibilityTarget"?: string;
   "mj.transfer.windows.requestId"?: string;

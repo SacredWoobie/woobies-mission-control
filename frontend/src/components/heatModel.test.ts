@@ -36,7 +36,7 @@ describe("heatModel", () => {
     expect(entity.stateText).toBe("cooling");
   });
 
-  it("does not call a steady or cooling loop critical based on nominal temperature alone", () => {
+  it("keeps settled or cooling loops nominal regardless of nominal temperature ratio", () => {
     const steady = loopHeatEntity({
       id: "0",
       tempK: 345,
@@ -50,8 +50,8 @@ describe("heatModel", () => {
       netKw: -12,
     });
 
-    expect(steady.severity).toBe("hot");
-    expect(cooling.severity).toBe("hot");
+    expect(steady.severity).toBe("nominal");
+    expect(cooling.severity).toBe("nominal");
   });
 
   it("reserves loop critical status for accumulating heat or an explicit hazard", () => {

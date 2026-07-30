@@ -56,6 +56,10 @@ def _planner_state():
         "ejectionDeltaV": 0.0,
         "arrivalVInfinity": 0.0,
         "calculatedTotal": 0.0,
+        "departureVInfinityX": None,
+        "departureVInfinityY": None,
+        "departureVInfinityZ": None,
+        "maneuverVectorSchema": 0,
         "detectedVersion": "",
         "compatibilityTarget": "",
     }
@@ -1044,6 +1048,29 @@ def _build_controller():
                 arrival_property = planner.best_capture_delta_v
             state["arrivalVInfinity"] = float(arrival_property)
             state["calculatedTotal"] = float(planner.best_total_delta_v)
+            if state["maneuverVectorSchema"] != 1:
+                try:
+                    detailed = [
+                        float(value)
+                        for value in planner.evaluate_point_detailed(
+                            int(planner.best_departure_index),
+                            int(planner.best_transfer_time_index),
+                        )
+                    ]
+                    if len(detailed) != 9 or not all(
+                        math.isfinite(value) for value in detailed
+                    ):
+                        raise ValueError(
+                            "MechJeb returned an invalid ideal-transfer point evaluation."
+                        )
+                    state["departureVInfinityX"] = detailed[6]
+                    state["departureVInfinityY"] = detailed[7]
+                    state["departureVInfinityZ"] = detailed[8]
+                    state["maneuverVectorSchema"] = 1
+                except Exception:
+                    # The ideal transfer remains useful for budgeting even when
+                    # its optional maneuver-preview vector cannot be recovered.
+                    pass
         except Exception as error:
             if state["requestId"]:
                 fail(error)

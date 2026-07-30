@@ -145,7 +145,7 @@ function legacySources(snapshot: TelemetrySnapshot, reactors: ReactorTelemetry[]
 
   const otherOutput = finiteOrUndefined(snapshot["elec.otherEcPerSec"]);
   const otherCount = finiteOrUndefined(snapshot["elec.otherCount"]) ?? 0;
-  if (otherCount > 0 || (isFiniteNumber(otherOutput) && Math.abs(otherOutput) > 0.05)) {
+  if (otherCount > 0 || (isFiniteNumber(otherOutput) && otherOutput > 0.05)) {
     sources.push({
       kind: "other",
       label: sourceLabels.other,

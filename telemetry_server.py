@@ -29,7 +29,7 @@ from pathlib import Path
 
 import krpc
 
-from electricity import ElectricityFlowEstimator
+from electricity import ElectricityFlowEstimator, generation_remainder
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
@@ -2252,12 +2252,15 @@ def gather_telemetry(conn):
 
             reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
             rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
-            other = total_gen - reactor_sum - solar_ec - rtg_ec
-            if -0.05 < other < 0.0:
-                other = 0.0  # clamp tiny rounding noise to zero
+            other = generation_remainder(
+                total_gen,
+                reactor_sum,
+                solar_ec,
+                rtg_ec,
+            )
 
             elec["elec.totalGenEcPerSec"] = round(total_gen, 2)
-            elec["elec.otherEcPerSec"] = round(other, 2)
+            elec["elec.otherEcPerSec"] = round(other or 0.0, 2)
         except Exception:
             pass  # service absent -> dashboard just won't show total/other
 

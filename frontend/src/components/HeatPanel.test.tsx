@@ -125,7 +125,7 @@ describe("HeatPanel", () => {
     expect(screen.getByText("no radiators")).toBeTruthy();
   });
 
-  it("shows an inactive warm loop as HOT rather than CRITICAL", () => {
+  it("shows an inactive settled loop as NOMINAL", () => {
     render(<HeatPanel snapshot={{
       ...flightTelemetryFixture,
       "heat.backend": "system_heat",
@@ -139,9 +139,10 @@ describe("HeatPanel", () => {
       }],
     }} />);
 
-    expect(screen.getByText("1 HOT")).toBeTruthy();
+    expect(screen.getAllByText("NOMINAL")).toHaveLength(2);
+    expect(screen.queryByText("1 HOT")).toBeNull();
     expect(screen.queryByText("1 CRITICAL")).toBeNull();
-    expect(screen.getByText("steady")).toBeTruthy();
+    expect(screen.getByText("All loops within nominal range")).toBeTruthy();
   });
 
   it("keeps an installed zero-flux integrated radiator out of the missing-radiator state", () => {
@@ -172,10 +173,8 @@ describe("HeatPanel", () => {
     }} />);
 
     expect(screen.queryByText("NO RADIATORS")).toBeNull();
-    expect(screen.getByText("1 HOT")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Expand Loop 0" }));
-    expect(screen.getAllByText("MN-1 SNAK Fission Reactor")).toHaveLength(2);
-    expect(screen.getByText("radiator")).toBeTruthy();
+    expect(screen.getAllByText("NOMINAL")).toHaveLength(2);
+    expect(screen.queryByText("1 HOT")).toBeNull();
   });
 
   it("renders a compact unavailable state when no backend has thermal entities", () => {
