@@ -85,7 +85,11 @@ class ReleaseContractTests(unittest.TestCase):
         screenshot_brief = (
             ROOT / "docs" / "images" / "v0.4.0" / "README.md"
         ).read_text(encoding="utf-8")
-        screenshot_names = re.findall(r"\| \d \| `([^`]+\.png)` \|", screenshot_brief)
+        screenshot_names = re.findall(
+            r"\| \d \| (?:not ready|ready|captured|approved) "
+            r"\| `([^`]+\.png)` \|",
+            screenshot_brief,
+        )
         self.assertEqual(
             screenshot_names,
             [
