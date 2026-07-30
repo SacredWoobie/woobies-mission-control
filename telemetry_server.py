@@ -29,6 +29,13 @@ from pathlib import Path
 
 import krpc
 
+from mission_planning import (
+    MAX_ACTION_ID_LENGTH,
+    MISSION_PLANNING_COMMAND_TYPES,
+    MissionPlanningController,
+)
+from telemetry_runtime import create_telemetry_runtime
+
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
 TELEMETRY_HZ = 4          # dashboard update rate
 KRPC_RETRY_SECONDS = 2
@@ -119,6 +126,7 @@ _overview_cache = {
 }
 _overview_last_poll = {key: 0.0 for key in _overview_cache}
 _overview_last_ut = None
+_mission_planning = MissionPlanningController()
 
 _NOTES_PLUGIN_DATA = Path("Plugins") / "PluginData" / "notes"
 
@@ -1317,6 +1325,8 @@ def _apply_telemetry_command(conn, command):
 
     if not isinstance(command, dict):
         return
+    if _mission_planning.apply_command(conn, command):
+        return
 
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
@@ -1703,7 +1713,7 @@ def _gather_overview_fleet(sc):
             if crew_count is None:
                 crew_count = len(_overview_list(vessel, "crew"))
             met = _overview_value(vessel, "met", 0.0)
-            rows.append({
+            row = {
                 "name": _overview_value(vessel, "name", "Unnamed vessel"),
                 "type": vessel_type,
                 "situation": situation,
@@ -1711,7 +1721,11 @@ def _gather_overview_fleet(sc):
                 "met": met if met is not None else 0.0,
                 "crewCount": int(crew_count),
                 "mission": vessel_type != "Debris",
-            })
+            }
+            vessel_guid = str(_overview_value(vessel, "id", "")).strip()
+            if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
+                row["guid"] = vessel_guid
+            rows.append(row)
         except Exception:
             # One modded or half-loaded vessel should not hide the rest.
             continue
@@ -1740,11 +1754,24 @@ def _gather_overview_contracts(sc):
     }
     active_rows = []
     for contract in groups["active"]:
-        active_rows.append({
+        row = {
             "title": _overview_value(contract, "title", "Untitled contract"),
             "type": _overview_label(_overview_value(contract, "type"), "Contract"),
             "deadline": _overview_value(contract, "date_deadline"),
-        })
+        }
+        for source, target in (
+            ("funds_completion", "fundsCompletion"),
+            ("reputation_completion", "reputationCompletion"),
+            ("science_completion", "scienceCompletion"),
+        ):
+            value = _overview_value(contract, source)
+            if (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+            ):
+                row[target] = float(value)
+        active_rows.append(row)
     active_rows.sort(key=lambda row: (
         row["deadline"] is None,
         row["deadline"] if row["deadline"] is not None else float("inf"),
@@ -1944,15 +1971,35 @@ def gather_telemetry(conn):
                 _reset_overview_state()
 
         if mode == "editor_vab":
-            return _attach_notes_telemetry(
-                _gather_editor_telemetry(conn, "VAB"))
+            payload = _attach_notes_telemetry(
+                _gather_editor_telemetry(conn, "VAB")
+            )
+            payload.update(_mission_planning.gather(
+                conn,
+                payload.get("context.mode"),
+                payload.get("t.universalTime"),
+            ))
+            return payload
         if mode == "editor_sph":
-            return _attach_notes_telemetry(
-                _gather_editor_telemetry(conn, "SPH"))
+            payload = _attach_notes_telemetry(
+                _gather_editor_telemetry(conn, "SPH")
+            )
+            payload.update(_mission_planning.gather(
+                conn,
+                payload.get("context.mode"),
+                payload.get("t.universalTime"),
+            ))
+            return payload
         if mode != "flight":
-            return _attach_notes_telemetry(
+            payload = _attach_notes_telemetry(
                 _gather_overview_telemetry(conn, scene)
             )
+            payload.update(_mission_planning.gather(
+                conn,
+                payload.get("context.mode"),
+                payload.get("t.universalTime"),
+            ))
+            return payload
     except Exception:
         pass
 
@@ -1964,11 +2011,17 @@ def gather_telemetry(conn):
         # example, the tracking station, space center, main menu, or a scene
         # load). The dashboard uses this mode to show its inactive-scene overlay
         # instead of guessing from absent keys.
-        return _attach_notes_telemetry({
+        payload = _attach_notes_telemetry({
             "context.mode": "inactive",
             "flight.active": False,
             "editor.active": False,
         })
+        payload.update(_mission_planning.gather(
+            conn,
+            payload.get("context.mode"),
+            payload.get("t.universalTime"),
+        ))
+        return payload
 
     d["context.mode"] = "flight"
     d["flight.active"] = True
@@ -2214,13 +2267,19 @@ def gather_telemetry(conn):
             _elec_cache = elec
     d.update(_elec_cache)
 
-    return _attach_notes_telemetry(d, d.get("v.name", ""), now)
+    payload = _attach_notes_telemetry(d, d.get("v.name", ""), now)
+    payload.update(_mission_planning.gather(
+        conn,
+        payload.get("context.mode"),
+        payload.get("t.universalTime"),
+    ))
+    return payload
 
 
 # ---------------------------------------------------------------------------
 # Telemetry WebSocket server (runs in its own thread, own kRPC connection)
 # ---------------------------------------------------------------------------
-def run_telemetry_server(host, port):
+def _run_telemetry_server_legacy(host, port):
     import asyncio
     import json
     import math as _math
@@ -2282,10 +2341,16 @@ def run_telemetry_server(host, port):
             async for raw in ws:
                 try:
                     command = json.loads(raw)
-                    if (isinstance(command, dict) and
-                            command.get("type") in {
-                                "editor.conditions", "notes.select", "notes.pin",
-                                "notes.favorite"}):
+                    if (
+                        isinstance(command, dict)
+                        and command.get("type") in {
+                            "editor.conditions",
+                            "notes.select",
+                            "notes.pin",
+                            "notes.favorite",
+                            *MISSION_PLANNING_COMMAND_TYPES,
+                        }
+                    ):
                         await commands.put(command)
                 except (TypeError, ValueError, json.JSONDecodeError):
                     pass
@@ -2331,6 +2396,19 @@ def run_telemetry_server(host, port):
         print(f"[telemetry] server stopped: {e}")
         return False
     return True
+
+
+def run_telemetry_server(host, port):
+    """Run the hardened, session-bound production dashboard transport."""
+    _asset_handler, server = create_telemetry_runtime(
+        dashboard_asset,
+        connect_krpc_with_retry,
+        gather_telemetry,
+        _apply_telemetry_command,
+        DASHBOARD_WEB_ROOT,
+        TELEMETRY_HZ,
+    )
+    return server(host, port)
 
 
 def main():

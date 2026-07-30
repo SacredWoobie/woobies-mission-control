@@ -33,6 +33,7 @@ class MissionOverviewService:
 
 def fake_vessel(name="Odyssey", vessel_type="VesselType.ship", body="Kerbin"):
     return SimpleNamespace(
+        id=f"{name}-guid",
         name=name,
         type=vessel_type,
         situation="VesselSituation.orbiting",
@@ -97,6 +98,31 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertTrue(by_name["Odyssey"]["mission"])
         self.assertFalse(by_name["Spent stage"]["mission"])
         self.assertEqual(by_name["Odyssey"]["body"], "Kerbin")
+        self.assertEqual(by_name["Odyssey"]["guid"], "Odyssey-guid")
+
+    def test_contract_rows_include_finite_completion_rewards(self):
+        contract = SimpleNamespace(
+            title="Point a dish out from Kerbin",
+            type="ContractType.configured",
+            date_deadline=None,
+            funds_completion=42_500,
+            reputation_completion=8.5,
+            science_completion=3,
+        )
+        manager = SimpleNamespace(
+            active_contracts=[contract],
+            offered_contracts=[],
+            completed_contracts=[],
+            failed_contracts=[],
+        )
+
+        row = telemetry_server._gather_overview_contracts(
+            SimpleNamespace(contract_manager=manager)
+        )["overview.contracts"][0]
+
+        self.assertEqual(row["fundsCompletion"], 42_500)
+        self.assertEqual(row["reputationCompletion"], 8.5)
+        self.assertEqual(row["scienceCompletion"], 3)
 
     def test_merges_alarm_sources_by_time_without_querying_remaining(self):
         conn = fake_connection()
