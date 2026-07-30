@@ -4,6 +4,37 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.4.0 - Mission planning and flight engineering
+
+- Added integrated mission-planning workspaces for transfer windows, selected
+  transfer details, resonant-orbit deployment, and vessel delta-v planning.
+- Added a MechJeb-backed porkchop calculator with explicit preview and
+  confirmation steps before Mission Control creates a maneuver node. The
+  dashboard never executes nodes, warps, steers, stages, or changes throttle.
+- Added persistent planner drafts, saved plans, vessel assignments, and
+  resonant-orbit records with revision checks, bounded storage, backup recovery,
+  and cross-tab merge behavior.
+- Expanded the Flight and VAB/SPH staging views with authoritative KSP stage
+  numbers, start-to-burnout TWR ranges, total burn duration, flight conditions,
+  and compatibility fallbacks for older service responses.
+- Expanded System Heat loop details with nominal temperature, net flux,
+  radiator state, and grouped producer/radiator components.
+- Added calibrated ElectricCharge net-flow and draw estimates that account for
+  the telemetry collector's slower resource cadence and full/empty saturation.
+- Hardened the production loopback server with exact host/origin validation,
+  content security policy, bounded commands and queues, per-WebSocket sessions,
+  and a shared persisted planning controller.
+- Replaced the upstream `KRPC.MechJeb.dll` bridge with
+  `KRPC.WoobiesMechJeb` 0.8.6, Woobie's GPLv3-compatible fork targeting
+  MechJeb 2.15.3. The launcher backs up and removes the superseded bridge during
+  service repair.
+- Updated the selected service set to WoobiesControlStats 0.2.1,
+  KRPC.StageStats 0.2.5, KRPC.SystemHeat 0.2.2, and
+  KRPC.WoobiesMechJeb 0.8.6.
+- Added release packaging contracts for exact service hashes, GPL source and
+  notice delivery, consolidated third-party attribution, and five ordered
+  v0.4.0 screenshot slots.
+
 ## v0.3.0 - React dashboard and Mission Control overview
 
 ![Woobie's Mission Control v0.3.0 flight dashboard](https://raw.githubusercontent.com/SacredWoobie/woobies-mission-control/main/docs/images/v0.3.0/flight-dashboard-landscape.png)

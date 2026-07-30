@@ -150,10 +150,14 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (krpc / "KRPC.MechJeb.dll").write_bytes(b"mechjeb bridge")
+            bridge = root / "GameData" / "KRPC.WoobiesMechJeb"
+            bridge.mkdir()
+            (bridge / "KRPC.WoobiesMechJeb.dll").write_bytes(
+                b"mechjeb bridge"
+            )
 
             def version_reader(path):
-                if Path(path).name == "KRPC.MechJeb.dll":
+                if Path(path).name == "KRPC.WoobiesMechJeb.dll":
                     return "0.8.0.0"
                 return None
 
@@ -166,8 +170,8 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             self.assertEqual(inventory["mechjeb"]["status"], "missing")
 
     def test_version_comparison_ignores_trailing_zeroes(self):
-        self.assertTrue(app.versions_equivalent("0.7.1.0", "0.7.1"))
-        self.assertFalse(app.versions_equivalent("0.7.2", "0.7.1"))
+        self.assertTrue(app.versions_equivalent("0.8.6.0", "0.8.6"))
+        self.assertFalse(app.versions_equivalent("0.8.7", "0.8.6"))
 
     def test_newer_mechjeb_recommends_ckan_downgrade_to_tested_version(self):
         inventory = []
@@ -179,7 +183,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 "status": "current",
             }
             if definition["key"] == "mechjeb":
-                item["installed_version"] = "2.15.0.0"
+                item["installed_version"] = "2.16.0.0"
                 item["status"] = "untested"
             inventory.append(item)
         recommendations = app.prerequisite_recommendations(
@@ -197,8 +201,8 @@ class KrpcPrerequisiteTests(unittest.TestCase):
         )
         self.assertEqual(len(recommendations), 1)
         recommendation = recommendations[0]
-        self.assertIn("Installed version 2.15.0.0", recommendation["observed"])
-        self.assertIn("Tested version 2.14.3.0", recommendation["expected"])
+        self.assertIn("Installed version 2.16.0.0", recommendation["observed"])
+        self.assertIn("Tested version 2.15.3.0", recommendation["expected"])
         self.assertIn("CKAN to downgrade MechJeb 2", recommendation["fix"])
         self.assertIn("may work", recommendation["fix"])
 

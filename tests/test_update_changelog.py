@@ -89,8 +89,8 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("React dashboard and Mission Control overview", section)
-        self.assertIn("compiled React", section)
+        self.assertIn("Mission planning and flight engineering", section)
+        self.assertIn("KRPC.WoobiesMechJeb", section)
 
 
 if __name__ == "__main__":
