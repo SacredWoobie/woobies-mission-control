@@ -1,8 +1,8 @@
 import {
-  formatResourceAmount,
+  formatResourcePair,
   humanizeResourceName,
   isFiniteNumber,
-} from "../telemetry/formatters";
+} from "../formatting/numbers";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
 import { resourceSeverity } from "./resourceMeter";
@@ -81,6 +81,7 @@ export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }
                   ? Math.max(0, Math.min(100, Math.round(current / capacity * 100)))
                   : 0;
                 const severity = resourceSeverity(percent);
+                const formatted = formatResourcePair(current, capacity);
                 return (
                   <div className="editor-resource-row" key={name}>
                     <span title={name}>{humanizeResourceName(name)}</span>
@@ -95,8 +96,8 @@ export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }
                       <span className={`fill ${severity}`} style={{ width: `${percent}%` }} />
                     </div>
                     <span className="editor-resource-amount">
-                      {formatResourceAmount(current, capacity)}
-                      <small>/ {formatResourceAmount(capacity, capacity)}</small>
+                      {formatted.value}
+                      <small>/ {formatted.capacity}</small>
                     </span>
                   </div>
                 );

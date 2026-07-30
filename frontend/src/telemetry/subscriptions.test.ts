@@ -5,14 +5,16 @@ import {
   consumablesSnapshotsEqual,
   editorSnapshotsEqual,
   electricitySnapshotsEqual,
+  flightAvailabilitySnapshotsEqual,
   headerSnapshotsEqual,
   heatSnapshotsEqual,
   notesSnapshotsEqual,
+  overviewSnapshotsEqual,
   scienceSnapshotsEqual,
   stagingSnapshotsEqual,
   targetSnapshotsEqual,
 } from "./subscriptions";
-import { editorTelemetryFixture, flightTelemetryFixture } from "./fixtures";
+import { editorTelemetryFixture, flightTelemetryFixture, inactiveTelemetryFixture } from "./fixtures";
 
 describe("panel telemetry subscriptions", () => {
   it("ignore unrelated 4 Hz fields while detecting panel-owned changes", () => {
@@ -39,6 +41,10 @@ describe("panel telemetry subscriptions", () => {
       ...flightTelemetryFixture,
       "stage.totalDvAtmo": 1490,
     };
+    const vesselIdentityChange = {
+      ...flightTelemetryFixture,
+      "v.name": "Odyssey II",
+    };
     const noteChange = {
       ...flightTelemetryFixture,
       "notes.message": "Updated",
@@ -47,6 +53,7 @@ describe("panel telemetry subscriptions", () => {
     expect(consumablesSnapshotsEqual(flightTelemetryFixture, resourceChange)).toBe(false);
     expect(stagingSnapshotsEqual(flightTelemetryFixture, resourceChange)).toBe(true);
     expect(stagingSnapshotsEqual(flightTelemetryFixture, stageChange)).toBe(false);
+    expect(clockSnapshotsEqual(flightTelemetryFixture, vesselIdentityChange)).toBe(false);
     expect(notesSnapshotsEqual(flightTelemetryFixture, noteChange)).toBe(false);
     expect(ascensionSnapshotsEqual(flightTelemetryFixture, {
       ...flightTelemetryFixture,
@@ -62,6 +69,19 @@ describe("panel telemetry subscriptions", () => {
     })).toBe(false);
   });
 
+  it("hands ElectricCharge updates from Consumables to Electricity", () => {
+    const chargeChange = {
+      ...flightTelemetryFixture,
+      "r.resource[ElectricCharge]": 800,
+    };
+    expect(consumablesSnapshotsEqual(flightTelemetryFixture, chargeChange)).toBe(true);
+    expect(electricitySnapshotsEqual(flightTelemetryFixture, chargeChange)).toBe(false);
+    expect(electricitySnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      "elec.netEcPerSec": -2,
+    })).toBe(false);
+  });
+
   it("tracks editor control values independently from staging simulation values", () => {
     expect(editorSnapshotsEqual(editorTelemetryFixture, {
       ...editorTelemetryFixture,
@@ -71,5 +91,38 @@ describe("panel telemetry subscriptions", () => {
       ...editorTelemetryFixture,
       "editor.altitude": 10_000,
     })).toBe(false);
+  });
+
+  it("invalidates mission-plan subscriptions when the active vessel identity changes", () => {
+    const switchedVessel = {
+      ...flightTelemetryFixture,
+      "v.name": "Duna Lander",
+      "v.guid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "v.persistentId": "9100",
+      "v.rootPartPersistentId": "2100",
+      "v.partPersistentIds": ["2100", "2101"],
+    };
+
+    expect(headerSnapshotsEqual(flightTelemetryFixture, switchedVessel)).toBe(false);
+    expect(notesSnapshotsEqual(flightTelemetryFixture, switchedVessel)).toBe(false);
+    expect(flightAvailabilitySnapshotsEqual(flightTelemetryFixture, switchedVessel)).toBe(false);
+  });
+
+  it("updates Mission Control when transfer-window rows or progress change", () => {
+    expect(overviewSnapshotsEqual(inactiveTelemetryFixture, {
+      ...inactiveTelemetryFixture,
+      "mj.transfer.windows.results": [
+        ...(inactiveTelemetryFixture["mj.transfer.windows.results"] ?? []),
+        { destination: "Sarnus", departureUT: 12_000_000 },
+      ],
+    })).toBe(false);
+    expect(overviewSnapshotsEqual(inactiveTelemetryFixture, {
+      ...inactiveTelemetryFixture,
+      "mj.transfer.windows.progress": 47,
+    })).toBe(false);
+    expect(overviewSnapshotsEqual(inactiveTelemetryFixture, {
+      ...inactiveTelemetryFixture,
+      "mj.transfer.grid.costs": [1, 2, 3],
+    })).toBe(true);
   });
 });

@@ -8,11 +8,15 @@ export type PanelRailIconName =
   | "sci"
   | "stage"
   | "target"
+  | "overviewTransfers"
   | "overviewFleet"
   | "overviewRoster"
   | "overviewAlarms"
   | "notes"
-  | "flightNote";
+  | "flightNote"
+  | "flightOrbitPlan"
+  | "flightDeltaVPlan"
+  | "editorDeltaVPlan";
 
 export function PanelRailIcon({ name }: { name: PanelRailIconName }) {
   const common = {
@@ -83,7 +87,16 @@ export function PanelRailIcon({ name }: { name: PanelRailIconName }) {
       />
     </svg>
   );
-  if (name === "target") return (
+  if (name === "flightDeltaVPlan" || name === "editorDeltaVPlan") return (
+    <svg {...common}>
+      <path d="M7 3.5h13l5 5V28H7Z" />
+      <path className="rail-icon-detail" d="M20 3.5V9h5M11 14h10M11 19h10M11 24h7" />
+      <circle className="rail-icon-fill" cx="11" cy="14" r="1.5" />
+      <circle className="rail-icon-fill" cx="18" cy="24" r="1.5" />
+      <path className="rail-icon-detail" d="m11 14 4 5 3 5" />
+    </svg>
+  );
+  if (name === "target" || name === "flightOrbitPlan") return (
     <svg {...common}>
       <circle cx="16" cy="16" r="11.5" />
       <circle cx="16" cy="16" r="6" />
@@ -96,6 +109,14 @@ export function PanelRailIcon({ name }: { name: PanelRailIconName }) {
       <path d="M16 3c-3.6 3.7-5.5 8.4-5.5 14v5h11v-5c0-5.6-1.9-10.3-5.5-14Z" />
       <circle className="rail-icon-detail" cx="16" cy="12" r="2.6" />
       <path d="m10.5 17-4.5 5v4.5l4.5-2.2m11-7.3 4.5 5v4.5l-4.5-2.2M13 25l3 4 3-4" />
+    </svg>
+  );
+  if (name === "overviewTransfers") return (
+    <svg {...common}>
+      <circle className="rail-icon-fill" cx="11" cy="17" r="3.2" />
+      <ellipse cx="16" cy="16" rx="12" ry="6.5" transform="rotate(-24 16 16)" />
+      <circle cx="25" cy="10" r="1.8" />
+      <path className="rail-icon-detail" d="M5 7h7M8.5 3.5v7M23 23l4 4m0-4-4 4" />
     </svg>
   );
   if (name === "overviewRoster") return (

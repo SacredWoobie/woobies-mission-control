@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TelemetryClient,
+  parseMissionPlanningPersistenceState,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -52,6 +53,40 @@ describe("parseTelemetrySnapshot", () => {
   });
 });
 
+describe("parseMissionPlanningPersistenceState", () => {
+  it("accepts typed persistence state events and rejects malformed ones", () => {
+    expect(parseMissionPlanningPersistenceState(JSON.stringify({
+      type: "mission.planning.persistence.state",
+      requestId: "request-1",
+      section: "resonant",
+      value: { plans: [] },
+      revision: 4,
+      status: "ok",
+      message: "Planner persistence loaded.",
+    }))).toEqual({
+      type: "mission.planning.persistence.state",
+      requestId: "request-1",
+      section: "resonant",
+      value: { plans: [] },
+      revision: 4,
+      status: "ok",
+      message: "Planner persistence loaded.",
+    });
+    expect(parseMissionPlanningPersistenceState({
+      type: "mission.planning.persistence.state",
+      requestId: "request-2",
+      section: "unknown",
+      revision: 1,
+    })).toBeNull();
+    expect(parseMissionPlanningPersistenceState({
+      type: "mission.planning.persistence.state",
+      requestId: "request-3",
+      section: "deltaVDraft",
+      revision: -1,
+    })).toBeNull();
+  });
+});
+
 describe("TelemetryClient", () => {
   it("publishes snapshots and sends existing dashboard commands when linked", () => {
     const sockets: FakeSocket[] = [];
@@ -87,6 +122,52 @@ describe("TelemetryClient", () => {
       type: "notes.pin",
       relativePath: "Flight.txt",
     });
+  });
+
+  it("routes persistence state events before telemetry snapshot parsing", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const persistenceStates: MissionPlanningPersistenceState[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onPersistenceState: (state) => persistenceStates.push(state),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "mission.planning.persistence.state",
+      requestId: "request-1",
+      section: "deltaVLibrary",
+      value: { plans: [] },
+      revision: 2,
+      status: "ok",
+      message: "Planner persistence loaded.",
+    }));
+    socket.message(JSON.stringify({
+      type: "mission.planning.persistence.state",
+      requestId: "malformed",
+      section: "unknown",
+      revision: -1,
+      status: "error",
+      message: "Unknown section.",
+    }));
+
+    expect(persistenceStates).toEqual([{
+      type: "mission.planning.persistence.state",
+      requestId: "request-1",
+      section: "deltaVLibrary",
+      value: { plans: [] },
+      revision: 2,
+      status: "ok",
+      message: "Planner persistence loaded.",
+    }]);
+    expect(snapshots).toEqual([]);
   });
 
   it("retries a dropped link and stops retrying after a manual disconnect", () => {

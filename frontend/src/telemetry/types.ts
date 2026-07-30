@@ -9,6 +9,8 @@ export interface StageTelemetryRow {
   twr?: number;
   twrAtmo?: number;
   twrVac?: number;
+  twrStart?: number;
+  twrEnd?: number;
   burn?: number;
 }
 
@@ -33,8 +35,24 @@ export interface NoteCatalogEntry {
 export interface HeatLoopTelemetry {
   id: string;
   tempK?: number;
+  nominalTempK?: number;
   genKw?: number;
   remKw?: number;
+  netKw?: number;
+  hasRadiators?: boolean;
+  producers?: HeatComponentTelemetry[];
+  radiators?: HeatComponentTelemetry[];
+  stateText?: string;
+  timeToCriticalSeconds?: number;
+  thermalCapacityKjPerK?: number;
+}
+
+export interface HeatComponentTelemetry {
+  name: string;
+  count?: number;
+  fluxKw?: number;
+  role?: string;
+  moduleName?: string;
 }
 
 export interface StockHeatPartTelemetry {
@@ -60,6 +78,34 @@ export interface ReactorTelemetry {
   throttle?: number;
 }
 
+export type ElectricitySourceKind =
+  | "reactor"
+  | "solar"
+  | "rtg"
+  | "fuel-cell"
+  | "other";
+
+export interface ElectricitySourceTelemetry {
+  kind: ElectricitySourceKind;
+  label?: string;
+  count?: number;
+  activeCount?: number;
+  outputEcPerSec?: number;
+  maxEcPerSec?: number;
+  state?: string;
+  detail?: string;
+  runtimeSeconds?: number;
+  limitingResource?: string;
+}
+
+export interface SolarForecastTelemetry {
+  phase: "sunlight" | "shadow";
+  transitionInSeconds?: number;
+  orbitSeconds?: number;
+  shadowSeconds?: number;
+  valid: boolean;
+}
+
 export interface ScienceExperimentTelemetry {
   title: string;
   value?: number;
@@ -72,6 +118,7 @@ export interface ScienceExperimentTelemetry {
 }
 
 export interface OverviewVesselTelemetry {
+  guid?: string;
   name: string;
   type: string;
   situation: string;
@@ -105,6 +152,20 @@ export interface OverviewContractTelemetry {
   title: string;
   type: string;
   deadline?: number | null;
+  fundsCompletion?: number;
+  reputationCompletion?: number;
+  scienceCompletion?: number;
+}
+
+export interface TransferWindowTelemetry {
+  destination: string;
+  departureUT?: number;
+  arrivalUT?: number;
+  transferTime?: number;
+  ejectionDeltaV?: number;
+  arrivalVInfinity?: number;
+  calculatedTotal?: number;
+  error?: string;
 }
 
 export interface OverviewCapabilities {
@@ -114,17 +175,40 @@ export interface OverviewCapabilities {
   contracts: boolean;
 }
 
+export interface CelestialBodyTelemetry {
+  name: string;
+  parent?: string;
+  semiMajorAxis?: number;
+  parentGravitationalParameter?: number;
+  orbitEpoch?: number;
+  meanLongitudeAtEpoch?: number;
+  gravitationalParameter: number;
+  radius: number;
+  rotationPeriod: number;
+  atmosphereDepth: number;
+  sphereOfInfluence: number;
+  surfaceGravity?: number;
+  solidSurface?: boolean;
+  atmosphereDensityAltitudes?: number[];
+  atmosphereDensities?: number[];
+}
+
 /**
- * Typed boundary for the proof-of-concept panels plus the v0.2.3 cross-scene
- * Notes guardrail. The index signature temporarily permits fields owned by
- * production panels that have not migrated.
+ * Dashboard telemetry contract. The index signature also accepts additive
+ * fields published by optional integrations and newer runtime builds.
  */
 export interface TelemetrySnapshot {
   "context.mode": SceneMode;
   "flight.active"?: boolean;
   "krpc.throttle"?: number;
   "krpc.currentStage"?: number;
+  "identity.available"?: boolean;
+  "game.saveFolder"?: string;
   "v.name"?: string;
+  "v.guid"?: string;
+  "v.persistentId"?: string;
+  "v.rootPartPersistentId"?: string;
+  "v.partPersistentIds"?: string[];
   "v.body"?: string;
   "v.missionTime"?: number;
   "v.altitude"?: number;
@@ -165,6 +249,80 @@ export interface TelemetrySnapshot {
   "krpc.sasMode"?: string;
   "mj.sasActive"?: boolean;
   "mj.sasMode"?: string;
+  "mj.transfer.available"?: boolean;
+  "mj.transfer.compatibilityReady"?: boolean;
+  "mj.transfer.state"?: "idle" | "starting" | "running" | "cancelling" | "cancelled" | "completed" | "failed";
+  "mj.transfer.progress"?: number;
+  "mj.transfer.error"?: string;
+  "mj.transfer.requestId"?: string;
+  "mj.transfer.fingerprint"?: string;
+  "mj.transfer.origin"?: string;
+  "mj.transfer.destination"?: string;
+  "mj.transfer.originParkingAltitude"?: number;
+  "mj.transfer.optimizePoweredCapture"?: boolean;
+  "mj.transfer.requestedAtUT"?: number;
+  "mj.transfer.departureUT"?: number;
+  "mj.transfer.arrivalUT"?: number;
+  "mj.transfer.transferTime"?: number;
+  "mj.transfer.ejectionDeltaV"?: number;
+  "mj.transfer.arrivalVInfinity"?: number;
+  "mj.transfer.calculatedTotal"?: number;
+  "mj.transfer.detectedVersion"?: string;
+  "mj.transfer.compatibilityTarget"?: string;
+  "mj.transfer.windows.requestId"?: string;
+  "mj.transfer.windows.state"?: "idle" | "queued" | "paused" | "running" | "cancelling" | "cancelled" | "completed" | "partial" | "failed";
+  "mj.transfer.windows.origin"?: string;
+  "mj.transfer.windows.originParkingAltitude"?: number;
+  "mj.transfer.windows.optimizePoweredCapture"?: boolean;
+  "mj.transfer.windows.activeDestination"?: string;
+  "mj.transfer.windows.completedCount"?: number;
+  "mj.transfer.windows.totalCount"?: number;
+  "mj.transfer.windows.progress"?: number;
+  "mj.transfer.windows.requestedAtUT"?: number;
+  "mj.transfer.windows.refreshedAtUT"?: number;
+  "mj.transfer.windows.results"?: TransferWindowTelemetry[];
+  "mj.transfer.windows.pauseReason"?: string;
+  "mj.transfer.windows.error"?: string;
+  "mj.transfer.grid.requestId"?: string;
+  "mj.transfer.grid.fingerprint"?: string;
+  "mj.transfer.grid.dateSamples"?: number;
+  "mj.transfer.grid.durationSamples"?: number;
+  "mj.transfer.grid.departureUTs"?: number[];
+  "mj.transfer.grid.transferTimes"?: number[];
+  "mj.transfer.grid.costs"?: (number | null)[];
+  "mj.transfer.grid.error"?: string;
+  "mj.transfer.grid.bestDepartureIndex"?: number;
+  "mj.transfer.grid.bestTransferTimeIndex"?: number;
+  "mj.transfer.grid.published"?: boolean;
+  "mj.transfer.evaluation.requestId"?: string;
+  "mj.transfer.evaluation.fingerprint"?: string;
+  "mj.transfer.evaluation.departureIndex"?: number;
+  "mj.transfer.evaluation.transferTimeIndex"?: number;
+  "mj.transfer.evaluation.departureUT"?: number;
+  "mj.transfer.evaluation.arrivalUT"?: number;
+  "mj.transfer.evaluation.transferTime"?: number;
+  "mj.transfer.evaluation.ejectionDeltaV"?: number;
+  "mj.transfer.evaluation.arrivalVInfinity"?: number;
+  "mj.transfer.evaluation.rawCost"?: number;
+  "mj.transfer.evaluation.departureVInfinityX"?: number;
+  "mj.transfer.evaluation.departureVInfinityY"?: number;
+  "mj.transfer.evaluation.departureVInfinityZ"?: number;
+  "mj.transfer.evaluation.error"?: string;
+  "mj.transfer.node.actionId"?: string;
+  "mj.transfer.node.fingerprint"?: string;
+  "mj.transfer.node.vesselGuid"?: string;
+  "mj.transfer.node.state"?: "idle" | "previewing" | "ready" | "creating" | "created" | "executed" | "failed";
+  "mj.transfer.node.error"?: string;
+  "mj.transfer.node.nodeUT"?: number;
+  "mj.transfer.node.deltaV"?: number;
+  "mj.transfer.node.deltaVX"?: number;
+  "mj.transfer.node.deltaVY"?: number;
+  "mj.transfer.node.deltaVZ"?: number;
+  "mj.transfer.node.apoapsisAltitude"?: number;
+  "mj.transfer.node.periapsisAltitude"?: number;
+  "mj.transfer.node.inclination"?: number;
+  "mj.transfer.node.eccentricity"?: number;
+  "mj.transfer.node.semiMajorAxis"?: number;
   "rt.available"?: boolean;
   "rt.hasConnection"?: boolean;
   "rt.signalDelay"?: number | null;
@@ -177,7 +335,16 @@ export interface TelemetrySnapshot {
   "stage.available"?: boolean;
   "stage.complete"?: boolean;
   "stage.pending"?: boolean;
+  "stage.count"?: number;
   "stage.currentKsp"?: number;
+  "stage.activeKsp"?: number;
+  "stage.unpoweredCount"?: number;
+  "stage.totalBurnSeconds"?: number;
+  "stage.staticPressureAtm"?: number;
+  "stage.altitude"?: number;
+  "stage.body"?: string;
+  "stage.situation"?: string;
+  "stage.throttle"?: number;
   "stage.stages"?: StageTelemetryRow[];
   "stage.totalDvAtmo"?: number;
   "stage.totalDvVac"?: number;
@@ -191,13 +358,24 @@ export interface TelemetrySnapshot {
   "heat.netW"?: number;
   "heat.parts"?: StockHeatPartTelemetry[];
   "elec.reactors"?: ReactorTelemetry[];
+  "elec.sources"?: ElectricitySourceTelemetry[];
   "elec.totalGenEcPerSec"?: number;
   "elec.otherEcPerSec"?: number;
+  "elec.otherCount"?: number;
+  "elec.netEcPerSec"?: number;
+  "elec.drawEcPerSec"?: number;
+  "elec.flowState"?: "valid" | "calibrating" | "saturated" | "unavailable";
   "solar.count"?: number;
   "solar.outputEcPerSec"?: number;
   "solar.efficiency"?: number;
+  "solar.forecast"?: SolarForecastTelemetry;
   "rtg.count"?: number;
   "rtg.outputEcPerSec"?: number;
+  "fuelCell.count"?: number;
+  "fuelCell.activeCount"?: number;
+  "fuelCell.outputEcPerSec"?: number;
+  "fuelCell.runtimeSeconds"?: number;
+  "fuelCell.limitingResource"?: string;
   "sci.krpc.total"?: number;
   "sci.krpc.transmitTotal"?: number;
   "sci.krpc.count"?: number;
@@ -218,6 +396,9 @@ export interface TelemetrySnapshot {
   "dock.ax"?: number;
   "dock.ay"?: number;
   "editor.craftName"?: string;
+  "editor.craftPersistentId"?: string;
+  "editor.rootPartPersistentId"?: string;
+  "editor.partPersistentIds"?: string[];
   "editor.facility"?: string;
   "editor.body"?: string;
   "editor.bodies"?: string[];
@@ -236,6 +417,7 @@ export interface TelemetrySnapshot {
   "editor.dryCost"?: number;
   "editor.resourceCost"?: number;
   "editor.res.names"?: string[];
+  "catalog.bodies"?: CelestialBodyTelemetry[];
   "notes.available"?: boolean;
   "notes.activeFound"?: boolean;
   "notes.message"?: string;
@@ -250,11 +432,58 @@ export interface TelemetrySnapshot {
   [key: string]: unknown;
 }
 
+export type MissionPlanningPersistenceSection =
+  | "resonant"
+  | "deltaVLibrary"
+  | "deltaVDraft";
+
+export type MissionPlanningPersistenceCommand =
+  | {
+    type: "mission.planning.persistence.get";
+    requestId: string;
+    section: MissionPlanningPersistenceSection;
+  }
+  | {
+    type: "mission.planning.persistence.merge";
+    requestId: string;
+    section: MissionPlanningPersistenceSection;
+    incoming: unknown;
+    baseRevision: number;
+  }
+  | {
+    type: "mission.planning.persistence.update";
+    requestId: string;
+    section: MissionPlanningPersistenceSection;
+    value: unknown;
+    baseRevision: number;
+  };
+
+export interface MissionPlanningPersistenceState {
+  type: "mission.planning.persistence.state";
+  requestId: string;
+  section: MissionPlanningPersistenceSection;
+  value: unknown;
+  revision: number;
+  status: "ok" | "merged" | "unchanged" | "updated" | "conflict" | "invalid" | "too_large" | "error";
+  message: string;
+}
+
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
   | { type: "notes.select"; relativePath: string | null }
   | { type: "notes.pin"; relativePath: string | null }
-  | { type: "notes.favorite"; relativePath: string; favorite: boolean };
+  | { type: "notes.favorite"; relativePath: string; favorite: boolean }
+  | { type: "mechjeb.transfer.start"; requestId: string; fingerprint: string; origin: string; destination: string; originParkingAltitude: number; optimizePoweredCapture: boolean; earliestDepartureUT?: number }
+  | { type: "mechjeb.transfer.cancel"; requestId: string }
+  | { type: "mechjeb.transfer.release"; requestId: string }
+  | { type: "mechjeb.transfer.windows.refresh"; requestId: string; origin: string; originParkingAltitude: number; optimizePoweredCapture: boolean }
+  | { type: "mechjeb.transfer.windows.cancel"; requestId: string }
+  | { type: "mechjeb.transfer.grid.request"; requestId: string; fingerprint: string }
+  | { type: "mechjeb.transfer.grid.ack"; requestId: string }
+  | { type: "mechjeb.transfer.evaluate"; requestId: string; fingerprint: string; departureIndex: number; transferTimeIndex: number }
+  | { type: "mechjeb.transfer.node.preview"; actionId: string; fingerprint: string; origin: string; plannedParkingAltitude: number; departureUT: number; expectedDeltaV: number; departureVInfinity: [number, number, number]; expectedVesselGuid: string }
+  | { type: "mechjeb.transfer.node.create"; actionId: string; fingerprint: string; expectedVesselGuid: string }
+  | MissionPlanningPersistenceCommand;
 
 export interface ResourceAmount {
   current?: number;
@@ -274,6 +503,8 @@ export interface StageViewModel {
   deltaVVacuum?: number;
   twrAtmosphere?: number;
   twrVacuum?: number;
+  twrStart?: number;
+  twrEnd?: number;
   burnSeconds?: number;
 }
 

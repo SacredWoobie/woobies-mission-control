@@ -1,5 +1,10 @@
 import { TelemetryClient, type ConnectionStatus } from "./client";
-import type { TelemetryCommand, TelemetrySnapshot } from "./types";
+import type {
+  MissionPlanningPersistenceSection,
+  MissionPlanningPersistenceState,
+  TelemetryCommand,
+  TelemetrySnapshot,
+} from "./types";
 
 export interface LiveTelemetryState {
   endpoint: string;
@@ -11,6 +16,10 @@ export interface LiveTelemetryState {
 }
 
 type Listener = () => void;
+export type MissionPlanningPersistenceListener = (
+  state: MissionPlanningPersistenceState,
+) => void;
+
 interface TelemetryConnection {
   connect(): void;
   disconnect(): void;
@@ -28,12 +37,14 @@ const initialState: LiveTelemetryState = {
 export class TelemetryStore {
   private client: TelemetryConnection | null = null;
   private readonly listeners = new Set<Listener>();
+  private readonly persistenceListeners = new Set<MissionPlanningPersistenceListener>();
   private state = initialState;
 
   constructor(
     private readonly createClient: (
       endpoint: string,
       callbacks: {
+        onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
       },
@@ -47,6 +58,13 @@ export class TelemetryStore {
     return () => this.listeners.delete(listener);
   };
 
+  readonly subscribeMissionPlanningPersistence = (
+    listener: MissionPlanningPersistenceListener,
+  ) => {
+    this.persistenceListeners.add(listener);
+    return () => this.persistenceListeners.delete(listener);
+  };
+
   connect(endpoint: string) {
     const normalized = endpoint.trim();
     if (!normalized) throw new Error("A WebSocket endpoint is required.");
@@ -54,6 +72,9 @@ export class TelemetryStore {
 
     this.client?.disconnect();
     this.client = this.createClient(normalized, {
+      onPersistenceState: (persistenceState) => {
+        this.persistenceListeners.forEach((listener) => listener(persistenceState));
+      },
       onSnapshot: (snapshot) => this.patch({
         frameCount: this.state.frameCount + 1,
         lastFrameAt: Date.now(),
@@ -89,6 +110,47 @@ export class TelemetryStore {
 
   send(command: TelemetryCommand) {
     return this.client?.send(command) ?? false;
+  }
+
+  requestMissionPlanningPersistence(
+    requestId: string,
+    section: MissionPlanningPersistenceSection,
+  ) {
+    return this.send({
+      type: "mission.planning.persistence.get",
+      requestId,
+      section,
+    });
+  }
+
+  mergeMissionPlanningPersistence(
+    requestId: string,
+    section: MissionPlanningPersistenceSection,
+    incoming: unknown,
+    baseRevision: number,
+  ) {
+    return this.send({
+      type: "mission.planning.persistence.merge",
+      requestId,
+      section,
+      incoming,
+      baseRevision,
+    });
+  }
+
+  updateMissionPlanningPersistence(
+    requestId: string,
+    section: MissionPlanningPersistenceSection,
+    value: unknown,
+    baseRevision: number,
+  ) {
+    return this.send({
+      type: "mission.planning.persistence.update",
+      requestId,
+      section,
+      value,
+      baseRevision,
+    });
   }
 
   private emit() {

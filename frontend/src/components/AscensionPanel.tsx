@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
-  formatAscensionDistance,
-  formatCountdown,
-  formatDegrees,
+  formatDistance,
+  formatEccentricity,
+  formatAttitudeDegrees,
+  formatHeadingDegrees,
+  formatInclination,
+  formatOrbitApoapsisCountdown,
+  formatOrbitPeriapsisCountdown,
+  formatOrbitPeriod,
+  formatPercent,
   formatSpeed,
+  formatTelemetryNumber,
   isFiniteNumber,
-} from "../telemetry/formatters";
+} from "../formatting/numbers";
 import type { TelemetrySnapshot } from "../telemetry/types";
+import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { Panel } from "./Panel";
 
 function normalHeading(value: number | undefined) {
@@ -101,22 +109,24 @@ function useStableSasDisplay(snapshot: TelemetrySnapshot) {
 }
 
 export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+  const { system } = useTimeSystem();
+  const kerbinTime = isKerbinTime(system);
   const throttle = isFiniteNumber(snapshot["krpc.throttle"]) ? Math.round(snapshot["krpc.throttle"] * 100) : 0;
   const heading = snapshot["n.heading"];
   const pitch = snapshot["n.pitch"];
   const roll = snapshot["n.roll"];
   const sas = useStableSasDisplay(snapshot);
   const exactAltitude = isFiniteNumber(snapshot["v.altitude"])
-    ? `Exact: ${snapshot["v.altitude"].toLocaleString("en-US", { maximumFractionDigits: 1 })} m` : undefined;
+    ? `Exact: ${formatTelemetryNumber(snapshot["v.altitude"])} m` : undefined;
 
   return (
     <Panel hideable id="asc" title="Ascension" tag="Attitude · Throttle · Flight">
       <div className="asc-top">
-        <div className="asc-left"><div className="sas-box"><span className="label">{sas.source === "mj" ? "Smart A.S.S (MechJeb)" : "SAS"}</span><span className={`sas-val ${sas.source === "off" ? "off" : ""}`}>{sas.mode}</span></div><div className="alt-box"><span className="label">Altitude</span><span className="alt-val" title={exactAltitude}>{formatAscensionDistance(snapshot["v.altitude"])}</span></div></div>
-        <div className="navwrap"><div className="heading-tape"><HeadingTape heading={heading} /></div><Navball heading={heading} pitch={pitch} roll={roll} /><div className="hdg-readout">HDG {normalHeading(heading)?.toFixed(0).padStart(3, "0") ?? "---"}° · PIT {isFiniteNumber(pitch) ? `${pitch >= 0 ? "+" : ""}${Math.round(pitch)}` : "--"}° · ROL {isFiniteNumber(roll) ? Math.round(roll) : "--"}°</div></div>
-        <div className="throttle-col"><span className="label">THR</span><div aria-label="Throttle" aria-valuemax={100} aria-valuemin={0} aria-valuenow={throttle} className="thr-track" role="meter"><span className="thr-fill" style={{ "--throttle-width": `${throttle}%`, height: `${throttle}%` } as CSSProperties} /></div><span className="thr-pct">{throttle}%</span></div>
+        <div className="asc-left"><div className="sas-box"><span className="label">{sas.source === "mj" ? "Smart A.S.S (MechJeb)" : "SAS"}</span><span className={`sas-val ${sas.source === "off" ? "off" : ""}`}>{sas.mode}</span></div><div className="alt-box"><span className="label">Altitude</span><span className="alt-val" title={exactAltitude}>{formatDistance(snapshot["v.altitude"], "live")}</span></div></div>
+        <div className="navwrap"><div className="heading-tape"><HeadingTape heading={heading} /></div><Navball heading={heading} pitch={pitch} roll={roll} /><div className="hdg-readout">HDG {formatHeadingDegrees(heading)}° · PIT {formatAttitudeDegrees(pitch, true)}° · ROL {formatAttitudeDegrees(roll)}°</div></div>
+        <div className="throttle-col"><span className="label">THR</span><div aria-label="Throttle" aria-valuemax={100} aria-valuemin={0} aria-valuenow={throttle} className="thr-track" role="meter"><span className="thr-fill" style={{ "--throttle-width": `${throttle}%`, height: `${throttle}%` } as CSSProperties} /></div><span className="thr-pct">{formatPercent(throttle)}</span></div>
       </div>
-      <div className="stats-grid"><Stat label="Apoapsis" value={formatAscensionDistance(snapshot["o.ApA"])} /><Stat label="T→Ap" value={formatCountdown(snapshot["o.timeToAp"])} /><Stat label="Periapsis" value={formatAscensionDistance(snapshot["o.PeA"])} /><Stat label="T→Pe" value={formatCountdown(snapshot["o.timeToPe"])} /><Stat label="Vert Spd" value={formatSpeed(snapshot["v.verticalSpeed"])} /><Stat label="Surf Spd" value={formatSpeed(snapshot["v.surfaceSpeed"])} /><Stat label="Orb Vel" value={formatSpeed(snapshot["v.orbitalVelocity"])} /><Stat label="Inclination" value={formatDegrees(snapshot["o.inclination"])} /><Stat label="Eccentricity" value={isFiniteNumber(snapshot["o.eccentricity"]) ? snapshot["o.eccentricity"].toFixed(4) : "—"} /><Stat label="Period" value={formatCountdown(snapshot["o.period"])} /></div>
+      <div className="stats-grid"><Stat label="Apoapsis" value={formatDistance(snapshot["o.ApA"], "live")} /><Stat label="T→Ap" value={formatOrbitApoapsisCountdown(snapshot["o.timeToAp"], snapshot["o.eccentricity"], kerbinTime)} /><Stat label="Periapsis" value={formatDistance(snapshot["o.PeA"], "live")} /><Stat label="T→Pe" value={formatOrbitPeriapsisCountdown(snapshot["o.timeToPe"], snapshot["o.eccentricity"], snapshot["v.verticalSpeed"], kerbinTime)} /><Stat label="Vert Spd" value={formatSpeed(snapshot["v.verticalSpeed"])} /><Stat label="Surf Spd" value={formatSpeed(snapshot["v.surfaceSpeed"])} /><Stat label="Orb Vel" value={formatSpeed(snapshot["v.orbitalVelocity"])} /><Stat label="Inclination" value={formatInclination(snapshot["o.inclination"])} /><Stat label="Eccentricity" value={formatEccentricity(snapshot["o.eccentricity"])} /><Stat label="Period" value={formatOrbitPeriod(snapshot["o.period"], snapshot["o.eccentricity"], kerbinTime)} /></div>
       <div className="spark-row"><div><div className="spark-lab">Altitude</div><Sparkline value={snapshot["v.altitude"]} /></div><div><div className="spark-lab">Vertical speed</div><Sparkline signed value={snapshot["v.verticalSpeed"]} /></div></div>
     </Panel>
   );

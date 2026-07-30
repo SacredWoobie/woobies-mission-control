@@ -103,7 +103,7 @@ export function EditorContextPanel({
           : "Analysis current";
 
   return (
-    <Panel id="editorContext" title="Craft analysis" tag="VAB · SPH · MechJeb simulation">
+    <Panel collapsible id="editorContext" title="Craft analysis" tag="VAB · SPH · MechJeb simulation">
       <div className="editor-head">
         <div>
           <div className="label">Craft</div>
@@ -145,9 +145,10 @@ export function EditorContextPanel({
             value={mach}
           />
         </label>
-        <button disabled={!commandEnabled || unavailable || !conditionsValid} onClick={() => submit(true)} type="button">Recalculate</button>
+        <button disabled={!commandEnabled || unavailable || !conditionsValid} onClick={() => submit(true)} type="button">Recalculate now</button>
       </div>
       <div aria-live="polite" className={`editor-state ${statusClass}`}>{statusText}</div>
+      <p className="editor-recalculation-note">Condition changes recalculate automatically after a brief pause. Use Recalculate now to force an immediate refresh.</p>
     </Panel>
   );
 }

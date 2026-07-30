@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   formatMissionDuration,
   formatTelemetryNumber,
@@ -7,11 +7,15 @@ import {
 } from "../telemetry/formatters";
 import type {
   OverviewAlarmTelemetry,
+  OverviewContractTelemetry,
   OverviewCrewTelemetry,
   OverviewVesselTelemetry,
+  TelemetryCommand,
   TelemetrySnapshot,
 } from "../telemetry/types";
+import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { PanelRestoreRail, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
+import { TransferWindowsPanel } from "./TransferWindowsPanel";
 
 type SortDirection = "asc" | "desc";
 
@@ -19,7 +23,7 @@ const trackedVesselTypes = [
   "Debris", "Probe", "Rover", "Lander", "Ship", "Station", "Base", "Plane", "Relay",
 ] as const;
 const trackedVesselTypeSet = new Set<string>(trackedVesselTypes);
-const missionOverviewPanels = new Set<DashboardPanelId>(["overviewFleet", "overviewRoster", "overviewAlarms"]);
+const missionOverviewPanels = new Set<DashboardPanelId>(["overviewTransfers", "overviewFleet", "overviewRoster", "overviewAlarms"]);
 
 function unique(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -32,6 +36,26 @@ function compareValues(left: string | number, right: string | number, direction:
   return direction === "asc" ? result : -result;
 }
 
+function vesselKey(row: OverviewVesselTelemetry) {
+  return row.guid || `${row.name}\u0000${row.type}\u0000${row.body}`;
+}
+
+function crewKey(row: OverviewCrewTelemetry) {
+  return `${row.name}\u0000${row.type}`;
+}
+
+function ContractRewards({ contract }: { contract: OverviewContractTelemetry }) {
+  const rewards = [
+    ["Funds", contract.fundsCompletion],
+    ["Rep", contract.reputationCompletion],
+    ["Science", contract.scienceCompletion],
+  ].filter((entry): entry is [string, number] => isFiniteNumber(entry[1]) && entry[1] > 0);
+  if (rewards.length === 0) return null;
+  return <div aria-label="Completion rewards" className="overview-contract-rewards">
+    {rewards.map(([label, value]) => <span key={label}>{label} <strong>+{formatTelemetryNumber(value)}</strong></span>)}
+  </div>;
+}
+
 function FilterSelect({ label, value, values, onChange }: {
   label: string;
   value: string;
@@ -41,9 +65,9 @@ function FilterSelect({ label, value, values, onChange }: {
   return <label><span>{label}</span><select aria-label={label} onChange={(event) => onChange(event.target.value)} value={value}><option value="all">All</option>{values.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>;
 }
 
-function SectionHeader({ count, panelId, title }: { count?: number; panelId?: DashboardPanelId; title: string }) {
+function SectionHeader({ children, count, panelId, title }: { children?: ReactNode; count?: number; panelId?: DashboardPanelId; title: string }) {
   const { hidePanel } = usePanelVisibility();
-  return <header className="overview-section-head"><div><span>MISSION CONTROL</span><h2>{title}</h2></div><div className="overview-section-actions">{count !== undefined && <strong>{count}</strong>}{panelId && <button aria-label={`Hide ${title} panel`} className="panel-hide-button" onClick={() => hidePanel(panelId)} title="Hide panel" type="button">‹</button>}</div></header>;
+  return <header className="overview-section-head"><h2>{title}</h2><div className="overview-section-actions">{children}{count !== undefined && <strong>{count}</strong>}{panelId && <button aria-label={`Hide ${title} panel`} className="panel-hide-button" onClick={() => hidePanel(panelId)} title="Hide panel" type="button">‹</button>}</div></header>;
 }
 
 function VesselTypeGlyph({ type }: { type: string }) {
@@ -86,10 +110,12 @@ function VesselTypeFilter({ rows, excluded, onToggle, onReset }: {
 function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
   const [query, setQuery] = useState("");
   const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set(["Debris"]));
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [body, setBody] = useState("all");
   const [scope, setScope] = useState("missions");
   const [sort, setSort] = useState("name");
   const [direction, setDirection] = useState<SortDirection>("asc");
+  const [selectedVesselKey, setSelectedVesselKey] = useState("");
   const trackedRows = useMemo(() => rows.filter((row) => trackedVesselTypeSet.has(row.type)), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -104,6 +130,16 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
       return compareValues(leftValue, rightValue, direction);
     });
   }, [body, direction, excludedTypes, query, scope, sort, trackedRows]);
+  const groups = useMemo(() => {
+    const next = new Map<string, OverviewVesselTelemetry[]>();
+    visible.forEach((row) => {
+      const group = next.get(row.body) ?? [];
+      group.push(row);
+      next.set(row.body, group);
+    });
+    return [...next.entries()];
+  }, [visible]);
+  const selected = visible.find((row) => vesselKey(row) === selectedVesselKey) ?? visible[0];
 
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
@@ -112,25 +148,65 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
   });
 
   return <section className="overview-section overview-fleet">
-    <SectionHeader count={visible.length} panelId="overviewFleet" title="Active vessels" />
-    <div className="overview-controls fleet-controls">
-      <label className="overview-search"><span>Search</span><input aria-label="Search vessels" onChange={(event) => setQuery(event.target.value)} placeholder="Craft, type, SOI..." value={query} /></label>
-      <FilterSelect label="SOI" onChange={setBody} value={body} values={unique(trackedRows.map((row) => row.body))} />
-      <label><span>Scope</span><select aria-label="Vessel scope" onChange={(event) => setScope(event.target.value)} value={scope}><option value="missions">Mission craft</option><option value="all">All tracked objects</option></select></label>
-      <label><span>Sort</span><select aria-label="Sort vessels" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="type">Type</option><option value="met">MET</option><option value="body">SOI</option><option value="situation">Status</option></select></label>
-      <button aria-label="Reverse vessel sort" className="overview-sort-direction" onClick={() => setDirection((value) => value === "asc" ? "desc" : "asc")} type="button">{direction === "asc" ? "ASC" : "DESC"}</button>
+    <SectionHeader count={visible.length} panelId="overviewFleet" title="Active vessels">
+      <button
+        aria-expanded={filtersExpanded}
+        className="overview-header-button"
+        onClick={() => setFiltersExpanded((value) => !value)}
+        type="button"
+      >
+        Filters {excludedTypes.size > 0 ? excludedTypes.size : ""}
+      </button>
+    </SectionHeader>
+    {filtersExpanded && <div className="overview-fleet-filter-tray">
+      <div className="overview-controls fleet-controls">
+        <label className="overview-search"><span>Search</span><input aria-label="Search vessels" onChange={(event) => setQuery(event.target.value)} placeholder="Craft, type, SOI..." value={query} /></label>
+        <FilterSelect label="SOI" onChange={setBody} value={body} values={unique(trackedRows.map((row) => row.body))} />
+        <label><span>Scope</span><select aria-label="Vessel scope" onChange={(event) => setScope(event.target.value)} value={scope}><option value="missions">Mission craft</option><option value="all">All tracked objects</option></select></label>
+        <label><span>Sort</span><select aria-label="Sort vessels" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="type">Type</option><option value="met">MET</option><option value="body">SOI</option><option value="situation">Status</option></select></label>
+        <button aria-label="Reverse vessel sort" className="overview-sort-direction" onClick={() => setDirection((value) => value === "asc" ? "desc" : "asc")} type="button">{direction === "asc" ? "ASC" : "DESC"}</button>
+      </div>
+      <VesselTypeFilter excluded={excludedTypes} onReset={() => setExcludedTypes(new Set())} onToggle={toggleType} rows={trackedRows} />
+    </div>}
+    <div className="overview-vessel-split">
+      <div aria-label="Filtered vessels" className="overview-vessel-index">
+        {groups.map(([groupBody, groupRows]) => <section className="overview-vessel-group" key={groupBody}>
+          <h3>{groupBody}<span>{groupRows.length}</span></h3>
+          {groupRows.map((row) => {
+            const key = vesselKey(row);
+            const active = selected ? vesselKey(selected) === key : false;
+            return <button aria-label={`Select ${row.name}`} aria-pressed={active} key={key} onClick={() => setSelectedVesselKey(key)} type="button">
+              <VesselTypeGlyph type={row.type} />
+              <span>{row.name}</span>
+              <small>{row.type}</small>
+            </button>;
+          })}
+        </section>)}
+        {visible.length === 0 && <p className="overview-empty">No vessels match these filters.</p>}
+      </div>
+      {selected ? <article aria-live="polite" className="overview-vessel-detail">
+        <header><div><strong>{selected.name}</strong><span>{selected.type}</span></div><small>{selected.situation} {selected.body} / MET {formatMissionDuration(selected.met)}</small></header>
+        <div className="overview-vessel-facts">
+          <div><span>Status</span><strong>{selected.situation}</strong></div>
+          <div><span>SOI</span><strong>{selected.body}</strong></div>
+          <div><span>Mission elapsed</span><strong>{formatMissionDuration(selected.met)}</strong></div>
+          <div><span>Crew</span><strong>{selected.crewCount}</strong></div>
+          <div><span>Craft type</span><strong>{selected.type}</strong></div>
+          <div><span>Tracking scope</span><strong>{selected.mission ? "Mission craft" : "Tracked object"}</strong></div>
+        </div>
+      </article> : <div className="overview-vessel-detail overview-vessel-detail-empty"><span>Select a vessel to inspect its mission status.</span></div>}
     </div>
-    <VesselTypeFilter excluded={excludedTypes} onReset={() => setExcludedTypes(new Set())} onToggle={toggleType} rows={trackedRows} />
-    <div className="overview-table-wrap"><table className="overview-table"><thead><tr><th>Craft</th><th>Type</th><th>Status</th><th>SOI</th><th>MET</th><th>Crew</th></tr></thead><tbody>{visible.map((row) => <tr key={`${row.name}-${row.type}`}><td>{row.name}</td><td>{row.type}</td><td>{row.situation}</td><td>{row.body}</td><td>{formatMissionDuration(row.met)}</td><td>{row.crewCount}</td></tr>)}</tbody></table>{visible.length === 0 && <p className="overview-empty">No vessels match these filters.</p>}</div>
   </section>;
 }
 
 function RosterSection({ available, rows }: { available: boolean; rows: OverviewCrewTelemetry[] }) {
   const [query, setQuery] = useState("");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [status, setStatus] = useState("all");
   const [trait, setTrait] = useState("all");
   const [level, setLevel] = useState("all");
   const [sort, setSort] = useState("name");
+  const [selectedCrewKey, setSelectedCrewKey] = useState("");
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     return rows.filter((row) => (
@@ -146,18 +222,66 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
       return compareValues(left[key], right[key], "asc");
     });
   }, [level, query, rows, sort, status, trait]);
+  const groups = useMemo(() => {
+    const next = new Map<string, OverviewCrewTelemetry[]>();
+    visible.forEach((row) => {
+      const group = next.get(row.status) ?? [];
+      group.push(row);
+      next.set(row.status, group);
+    });
+    return [...next.entries()];
+  }, [visible]);
+  const selected = visible.find((row) => crewKey(row) === selectedCrewKey) ?? visible[0];
 
   return <section className="overview-section overview-roster">
-    <SectionHeader count={available ? visible.length : undefined} panelId="overviewRoster" title="Astronaut roster" />
+    <SectionHeader count={available ? visible.length : undefined} panelId="overviewRoster" title="Astronaut roster">
+      {available && <button
+        aria-expanded={filtersExpanded}
+        aria-label="Roster filters"
+        className="overview-header-button"
+        onClick={() => setFiltersExpanded((value) => !value)}
+        type="button"
+      >
+        Filters
+      </button>}
+    </SectionHeader>
     {!available ? <p className="overview-service-warning"><strong>Roster service unavailable</strong><span>Use Install / Repair so WoobiesControlStats can enumerate the complete roster after KSP restarts.</span></p> : <>
-      <div className="overview-controls compact">
+      {filtersExpanded && <div className="overview-roster-filter-tray"><div className="overview-controls compact roster-controls">
         <label className="overview-search"><span>Search</span><input aria-label="Search roster" onChange={(event) => setQuery(event.target.value)} placeholder="Kerbonaut..." value={query} /></label>
         <FilterSelect label="Roster status" onChange={setStatus} value={status} values={unique(rows.map((row) => row.status))} />
         <FilterSelect label="Job" onChange={setTrait} value={trait} values={unique(rows.map((row) => row.trait))} />
         <FilterSelect label="Level" onChange={setLevel} value={level} values={unique(rows.map((row) => String(row.level)))} />
         <label><span>Sort</span><select aria-label="Sort roster" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="status">Status</option><option value="trait">Job</option><option value="level">Level</option><option value="experience">Experience</option><option value="flights">Flights</option></select></label>
+      </div></div>}
+      <div className="overview-roster-split">
+        <div aria-label="Filtered Kerbonauts" className="overview-roster-index">
+          {groups.map(([groupStatus, groupRows]) => <section className="overview-roster-group" key={groupStatus}>
+            <h3 aria-label={`${groupStatus} Kerbonauts`}>{groupStatus}<span>{groupRows.length}</span></h3>
+            {groupRows.map((row) => {
+              const key = crewKey(row);
+              const active = selected ? crewKey(selected) === key : false;
+              const fallen = row.status.toLocaleLowerCase() === "dead";
+              return <button aria-label={`Select ${row.name}`} aria-pressed={active} className={fallen ? "honor-row" : ""} key={key} onClick={() => setSelectedCrewKey(key)} type="button">
+                <span aria-hidden="true" className="overview-roster-avatar">{row.trait.slice(0, 1).toLocaleUpperCase()}</span>
+                <span>{row.name}{fallen && <span aria-label="Fallen Kerbonaut" className="honor-star" title="Fallen Kerbonaut">&#9733;</span>}</span>
+                <small>LV {row.level}</small>
+              </button>;
+            })}
+          </section>)}
+          {visible.length === 0 && <p className="overview-empty">No Kerbonauts match these filters.</p>}
+        </div>
+        {selected ? <article aria-live="polite" className={`overview-roster-detail${selected.status.toLocaleLowerCase() === "dead" ? " honor-detail" : ""}`}>
+          <header><div><strong>{selected.name}</strong><span>{selected.trait}</span></div><small>{selected.status} / {selected.flightCount} flight{selected.flightCount === 1 ? "" : "s"}</small></header>
+          <div className="overview-roster-facts">
+            <div><span>Status</span><strong>{selected.status}</strong></div>
+            <div><span>Job</span><strong>{selected.trait}</strong></div>
+            <div><span>Level</span><strong>{selected.level}</strong></div>
+            <div><span>Experience</span><strong>{formatTelemetryNumber(selected.experience)}</strong></div>
+            <div><span>Flights</span><strong>{selected.flightCount}</strong></div>
+            <div><span>Crew record</span><strong>{selected.veteran ? "Veteran" : "Standard"}</strong></div>
+          </div>
+        </article> : <div className="overview-roster-detail overview-roster-detail-empty"><span>Select a Kerbonaut to inspect their service record.</span></div>}
       </div>
-      <div className="overview-table-wrap"><table className="overview-table"><thead><tr><th>Kerbonaut</th><th>Status</th><th>Job</th><th>Level</th><th>XP</th><th>Flights</th></tr></thead><tbody>{visible.map((row) => <tr className={row.status.toLocaleLowerCase() === "dead" ? "honor-row" : ""} key={row.name}><td>{row.name}{row.status.toLocaleLowerCase() === "dead" && <span aria-label="Fallen Kerbonaut" className="honor-star" title="Fallen Kerbonaut">&#9733;</span>}</td><td>{row.status}</td><td>{row.trait}</td><td>{row.level}</td><td>{formatTelemetryNumber(row.experience)}</td><td>{row.flightCount}</td></tr>)}</tbody></table>{visible.length === 0 && <p className="overview-empty">No Kerbonauts match these filters.</p>}</div>
     </>}
   </section>;
 }
@@ -166,38 +290,79 @@ function formatAlarmType(type: string) {
   return type.toLocaleLowerCase() === "raw" ? "Date / Time" : type;
 }
 
-function AlarmSection({ rows, universalTime, providers }: { rows: OverviewAlarmTelemetry[]; universalTime?: number; providers?: Record<"stock" | "kac", string> }) {
-  const [source, setSource] = useState("all");
-  const visible = rows.filter((row) => source === "all" || row.source === source).sort((left, right) => left.time - right.time);
+function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTelemetry[]; universalTime?: number; kerbin: boolean }) {
+  const [source, setSource] = useState<"all" | "stock" | "kac">("all");
+  const hasKacAlarm = rows.some((row) => row.source.toLocaleLowerCase() === "kac");
+  const activeSource = hasKacAlarm ? source : "all";
+  const visible = rows
+    .filter((row) => activeSource === "all" || row.source.toLocaleLowerCase() === activeSource)
+    .sort((left, right) => left.time - right.time);
   return <section className="overview-section overview-alarms">
-    <SectionHeader count={visible.length} panelId="overviewAlarms" title="Upcoming alarms" />
-    <div className="overview-controls compact"><FilterSelect label="Alarm source" onChange={setSource} value={source} values={unique(rows.map((row) => row.source))} /><span className="overview-provider-state">STOCK {providers?.stock ?? "unknown"} / KAC {providers?.kac ?? "unknown"}</span></div>
-    <div className="overview-card-list">{visible.map((row, index) => <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}><div><strong>{row.title}</strong><span>{formatAlarmType(row.type)}{row.vessel ? ` / ${row.vessel}` : ""}</span></div><div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)))}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div><span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></article>)}</div>
-    {visible.length === 0 && <p className="overview-empty">No upcoming alarms from this source.</p>}
+    <SectionHeader count={visible.length} panelId="overviewAlarms" title="Upcoming alarms">
+      {hasKacAlarm && <div aria-label="Alarm source" className="overview-alarm-source-buttons" role="group">
+        {(["all", "stock", "kac"] as const).map((option) => <button
+          aria-label={`Show ${option === "all" ? "all" : option.toUpperCase()} alarms`}
+          aria-pressed={activeSource === option}
+          className="overview-header-button"
+          key={option}
+          onClick={() => setSource(option)}
+          type="button"
+        >{option.toUpperCase()}</button>)}
+      </div>}
+    </SectionHeader>
+    <div className="overview-card-list">{visible.map((row, index) => <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}><div><strong>{row.title}</strong><span>{formatAlarmType(row.type)}{row.vessel ? ` / ${row.vessel}` : ""}</span></div><div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)), kerbin)}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div><span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></article>)}</div>
+    {visible.length === 0 && <p className="overview-empty">{hasKacAlarm ? "No upcoming alarms from this source." : "No upcoming alarms."}</p>}
   </section>;
 }
 
-export function MissionOverview({ snapshot }: { snapshot: TelemetrySnapshot }) {
+export function MissionOverview({
+  commandEnabled = false,
+  onSendCommand = () => false,
+  snapshot,
+}: {
+  commandEnabled?: boolean;
+  onSendCommand?(command: TelemetryCommand): boolean;
+  snapshot: TelemetrySnapshot;
+}) {
   const { hiddenPanels } = usePanelVisibility();
+  const { system, toggleSystem } = useTimeSystem();
+  const kerbin = isKerbinTime(system);
   const capabilities = snapshot["overview.capabilities"] ?? { funds: false, science: false, reputation: false, contracts: false };
-  const ut = formatUniversalTime(snapshot["t.universalTime"]);
+  const ut = formatUniversalTime(snapshot["t.universalTime"], kerbin);
   const contracts = snapshot["overview.contracts"] ?? [];
   const counts = snapshot["overview.contractCounts"];
   const fleetVisible = !hiddenPanels.has("overviewFleet");
   const rosterVisible = !hiddenPanels.has("overviewRoster");
   const alarmsVisible = !hiddenPanels.has("overviewAlarms");
+  const transfersVisible = !hiddenPanels.has("overviewTransfers");
+  const sidebarVisible = rosterVisible || alarmsVisible || capabilities.contracts;
   return <div className="mission-overview">
     <PanelRestoreRail available={missionOverviewPanels} />
     <header className="mission-overview-banner"><div><span>{snapshot["overview.scene"] ?? "SPACE CENTER"} / {snapshot["overview.gameMode"] ?? "UNKNOWN SAVE"}</span><h1>Woobie's Mission Control</h1></div></header>
     <section className="overview-metrics" aria-label="Program status">
-      <div><span>Game time</span><strong>{ut.big}</strong><small>{ut.sub}</small></div>
+      <div><span>Game time <button aria-label={`Time system: ${kerbin ? "Kerbin" : "Earth"}`} className="calendar-toggle" onClick={toggleSystem} type="button">[{kerbin ? "KERBIN" : "EARTH"}]</button></span><strong>{ut.big}</strong><small>{ut.sub}</small></div>
       {capabilities.funds && <div><span>Funds</span><strong>{formatTelemetryNumber(snapshot["overview.funds"])}</strong><small>AVAILABLE</small></div>}
       {capabilities.science && <div><span>Science</span><strong>{formatTelemetryNumber(snapshot["overview.science"])}</strong><small>BANKED</small></div>}
       {capabilities.reputation && <div><span>Reputation</span><strong>{formatTelemetryNumber(snapshot["overview.reputation"])}</strong><small>{isFiniteNumber(snapshot["overview.reputation"]) ? "CURRENT" : "UNAVAILABLE"}</small></div>}
       {capabilities.contracts && <div><span>Contracts</span><strong>{counts?.active ?? 0} active</strong><small>{counts?.offered ?? 0} offered / {counts?.completed ?? 0} complete / {counts?.failed ?? 0} failed</small></div>}
     </section>
-    {(fleetVisible || rosterVisible) && <div className={`overview-primary-grid ${fleetVisible !== rosterVisible ? "single" : ""}`}>{fleetVisible && <FleetSection rows={snapshot["overview.vessels"] ?? []} />}{rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}</div>}
-    {(alarmsVisible || capabilities.contracts) && <div className="overview-secondary-grid">{alarmsVisible && <AlarmSection providers={snapshot["overview.alarmProviders"]} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}{capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" /><div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card" key={`${contract.title}-${index}`}><div><strong>{contract.title}</strong><span>{contract.type}</span></div><div className="overview-contract-time"><strong>{isFiniteNumber(contract.deadline) ? `T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)))}` : "NO DEADLINE"}</strong><span>{isFiniteNumber(contract.deadline) ? `UT ${Math.floor(contract.deadline).toLocaleString("en-US")}` : ""}</span></div></article>)}</div>{contracts.length === 0 && <p className="overview-empty">No active contracts.</p>}</section>}</div>}
+    <div className={`overview-command-grid ${transfersVisible ? "" : "without-transfers"}`}>
+      {transfersVisible && <TransferWindowsPanel commandEnabled={commandEnabled} onSendCommand={onSendCommand} snapshot={snapshot} />}
+      {(fleetVisible || sidebarVisible) && <div className={[
+        "overview-data-grid",
+        fleetVisible ? "" : "without-fleet",
+        rosterVisible ? "" : "without-roster",
+        alarmsVisible ? "" : "without-alarms",
+        capabilities.contracts ? "" : "without-contracts",
+        (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
+        contracts.length > 0 ? "" : "contracts-empty",
+      ].filter(Boolean).join(" ")}>
+        {fleetVisible && <FleetSection rows={snapshot["overview.vessels"] ?? []} />}
+        {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
+        {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
+        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" /><div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} /><div className="overview-contract-time"><strong>{isFiniteNumber(contract.deadline) ? `T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}` : "NO DEADLINE"}</strong><span>{isFiniteNumber(contract.deadline) ? `UT ${Math.floor(contract.deadline).toLocaleString("en-US")}` : ""}</span></div></article>)}</div>{contracts.length === 0 && <p className="overview-empty">No active contracts.</p>}</section>}
+      </div>}
+    </div>
     {snapshot["overview.vesselsTruncated"] && <p className="overview-truncated">Fleet list limited to the first 500 tracked objects.</p>}
   </div>;
 }

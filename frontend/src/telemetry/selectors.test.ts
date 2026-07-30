@@ -15,7 +15,6 @@ describe("selectConsumables", () => {
     };
 
     expect(selectConsumables(snapshot).map((resource) => resource.name)).toEqual([
-      "ElectricCharge",
       "LiquidFuel",
       "ModB",
       "ModA",
@@ -41,10 +40,19 @@ describe("staging selectors", () => {
     expect(selectStages(snapshot, "vacuum").map((stage) => stage.ksp)).toEqual([1, 2]);
   });
 
-  it("keeps a known zero-propulsion current stage number without borrowing another row", () => {
+  it("uses the nearest remaining propulsive row when the raw stage is unpowered", () => {
     expect(selectStageSummary(snapshot, "atmosphere")).toEqual({
-      currentKsp: 3,
-      current: undefined,
+      currentKsp: 2,
+      current: {
+        ksp: 2,
+        deltaVAtmosphere: 500,
+        deltaVVacuum: 600,
+        twrAtmosphere: 1.2,
+        twrVacuum: 1.3,
+        twrStart: 1.2,
+        twrEnd: 1.2,
+        burnSeconds: undefined,
+      },
       totalDeltaV: 1000,
     });
   });
