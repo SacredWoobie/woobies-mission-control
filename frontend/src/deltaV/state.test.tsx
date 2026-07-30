@@ -208,7 +208,7 @@ describe("craft-scoped delta-v plan assignments", () => {
   afterEach(cleanup);
 
   it("keeps valid saved plans when another record is malformed", () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [
         record("saved-plan", "Valid plan"),
@@ -223,17 +223,35 @@ describe("craft-scoped delta-v plan assignments", () => {
     expect(screen.getByLabelText("saved count").textContent).toBe("1");
   });
 
+  it("reads the pre-release library key and writes the production key", () => {
+    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+      schemaVersion: 2,
+      plans: [record("prototype-plan", "Recovered mission")],
+      assignments: [],
+      legacyPinned: null,
+    }));
+
+    render(<DeltaVDraftProvider><LibraryRevisionHarness /></DeltaVDraftProvider>);
+
+    expect(screen.getByLabelText("saved count").textContent).toBe("1");
+    expect(
+      JSON.parse(
+        localStorage.getItem("wmc-delta-v-library-v1") ?? "null",
+      ).plans[0].name,
+    ).toBe("Recovered mission");
+  });
+
   it("does not overwrite an unreadable saved-plan library on mount", () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", "{not valid json");
+    localStorage.setItem("wmc-delta-v-library-v1", "{not valid json");
 
     render(<DeltaVDraftProvider><LibraryRevisionHarness /></DeltaVDraftProvider>);
 
     expect(screen.getByLabelText("saved count").textContent).toBe("0");
-    expect(localStorage.getItem("wmc-prototype-delta-v-library-v1")).toBe("{not valid json");
+    expect(localStorage.getItem("wmc-delta-v-library-v1")).toBe("{not valid json");
   });
 
   it("keeps the dockee plan active and restores each plan after undock", async () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [record("mother-plan", "Duna Mothership"), record("lander-plan", "Duna Lander")],
       assignments: [
@@ -250,13 +268,13 @@ describe("craft-scoped delta-v plan assignments", () => {
     view.rerender(<DeltaVDraftProvider><Harness snapshot={undockedLander} /></DeltaVDraftProvider>);
     expect(screen.getByLabelText("active plan").textContent).toBe("Duna Lander");
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const stored = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(stored.assignments.find((value: { id: string }) => value.id === "lander-assignment").lastVesselGuid).toBe("new-lander-guid");
     });
   });
 
   it("uses the incoming plan only as a fallback when the dockee has no plan", () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [record("lander-plan", "Duna Lander")],
       assignments: [assignment("lander-assignment", "lander-plan", "200", "lander-guid")],
@@ -268,7 +286,7 @@ describe("craft-scoped delta-v plan assignments", () => {
   });
 
   it("keeps completion isolated when the same saved plan is pinned to two craft", async () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [record("shared-plan", "Shared Duna Plan")],
       assignments: [
@@ -285,7 +303,7 @@ describe("craft-scoped delta-v plan assignments", () => {
     expect(screen.getByLabelText("active plan").textContent).toBe("Shared Duna Plan");
     expect(screen.getByLabelText("completed steps").textContent).toBe("");
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const stored = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(stored.plans[0].completedLegIds).toBeUndefined();
       expect(stored.assignments[0].completedLegIds).toEqual(["burn"]);
       expect(stored.assignments[1].completedLegIds).toEqual([]);
@@ -293,7 +311,7 @@ describe("craft-scoped delta-v plan assignments", () => {
   });
 
   it("preserves a v1 global pin as unassigned until the user explicitly pins it", () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 1,
       plans: [{ ...record("shared-plan", "Legacy Duna Plan"), completedLegIds: ["burn"] }],
       pinnedPlanId: "shared-plan",
@@ -307,7 +325,7 @@ describe("craft-scoped delta-v plan assignments", () => {
   });
 
   it("links an unscoped saved plan to the craft save when it is pinned", async () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [{ ...record("shared-plan", "Unlinked Duna Plan"), saveFolder: "" }],
       assignments: [],
@@ -318,14 +336,14 @@ describe("craft-scoped delta-v plan assignments", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pin shared" }));
     expect(screen.getByLabelText("active plan").textContent).toBe("Unlinked Duna Plan");
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const stored = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(stored.plans[0].saveFolder).toBe("Docking Tests");
       expect(stored.assignments[0].saveFolder).toBe("Docking Tests");
     });
   });
 
   it("updates the loaded plan with its porkchop selection and rejects duplicate names", () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [record("saved-plan", "MOHO Scan")],
       assignments: [],
@@ -356,7 +374,7 @@ describe("craft-scoped delta-v plan assignments", () => {
   });
 
   it("resets only the working draft while preserving saved and pinned plan state", async () => {
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
       schemaVersion: 2,
       plans: [record("saved-plan", "MOHO Scan")],
       assignments: [assignment("saved-assignment", "saved-plan", "100", "mother-guid")],
@@ -373,7 +391,7 @@ describe("craft-scoped delta-v plan assignments", () => {
     expect(screen.getByLabelText("saved count").textContent).toBe("1");
     expect(screen.getByLabelText("pinned plan after reset").textContent).toBe("MOHO Scan");
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const stored = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(stored.plans).toHaveLength(1);
       expect(stored.assignments).toHaveLength(1);
       expect(stored.assignments[0].planId).toBe("saved-plan");

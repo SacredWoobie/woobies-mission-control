@@ -20,6 +20,7 @@ from websockets.http11 import Response
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_MODULE = ROOT / "scripts" / "mock_telemetry_server.py"
+MISSION_PLANNING_MOCK_MODULE = ROOT / "mission_planning_mock.py"
 SCENE_ALIASES = {
     "flight": "flight",
     "editor": "editor",
@@ -46,6 +47,23 @@ FIXTURES = load_fixture_module()
 SCENES = FIXTURES.SCENES
 NOTE = FIXTURES.NOTE
 CHECKLIST = FIXTURES.CHECKLIST
+
+
+def load_mission_planning_mock():
+    specification = importlib.util.spec_from_file_location(
+        "mission_planning_mock_profile", MISSION_PLANNING_MOCK_MODULE
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError(
+            "Unable to load Mission Planning mock profile from "
+            f"{MISSION_PLANNING_MOCK_MODULE}"
+        )
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module.MissionPlanningMockProfile
+
+
+MissionPlanningMockProfile = load_mission_planning_mock()
 
 
 def normalize_scenes(value):
@@ -127,7 +145,14 @@ def initial_note_state():
     }
 
 
-def build_payload(scene, frame, elapsed, editor_conditions, note_state):
+def build_payload(
+    scene,
+    frame,
+    elapsed,
+    editor_conditions,
+    note_state,
+    mission_planning=None,
+):
     payload = dict(SCENES[scene])
     payload["notes.pinned"] = note_state["pinned"]
     payload["notes.pinnedPath"] = (
@@ -171,7 +196,53 @@ def build_payload(scene, frame, elapsed, editor_conditions, note_state):
 
     payload["mock.frame"] = frame + 1
     payload["mock.scene"] = scene
+    if mission_planning is not None:
+        mission_planning.overlay(payload)
     return payload
+
+
+async def receive_commands(
+    socket,
+    editor_conditions,
+    note_state,
+    mission_planning,
+):
+    async for raw in socket:
+        try:
+            command = json.loads(raw)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            print(
+                f"[mock-mission-control] ignored invalid command: {raw!r}",
+                flush=True,
+            )
+            continue
+        print(
+            "[mock-mission-control] command: "
+            + json.dumps(command, sort_keys=True),
+            flush=True,
+        )
+        kind = command.get("type")
+        if kind == "editor.conditions":
+            for key in ("body", "altitude", "mach"):
+                if key in command:
+                    editor_conditions[key] = command[key]
+            editor_conditions["revision"] += 1
+        elif kind == "notes.pin":
+            path = command.get("relativePath")
+            note_state["pinned"] = (
+                CHECKLIST if path == CHECKLIST["relativePath"]
+                else NOTE if path else None
+            )
+        elif kind == "notes.select":
+            path = command.get("relativePath")
+            note_state["selected"] = (
+                CHECKLIST if path == CHECKLIST["relativePath"] else NOTE
+            )
+            note_state["selection_mode"] = "browse" if path else "active"
+        elif kind == "notes.favorite":
+            note_state["favorite"] = bool(command.get("favorite"))
+        else:
+            await mission_planning.apply_command(command)
 
 
 async def run(args):
@@ -214,8 +285,14 @@ async def run(args):
         print(f"[mock-mission-control] dashboard linked: {peer}", flush=True)
         editor_conditions = initial_editor_conditions()
         note_state = initial_note_state()
+        mission_planning = MissionPlanningMockProfile()
         receiver = asyncio.create_task(
-            FIXTURES.receive_commands(socket, editor_conditions, note_state)
+            receive_commands(
+                socket,
+                editor_conditions,
+                note_state,
+                mission_planning,
+            )
         )
         started = time.monotonic()
         frame = 0
@@ -229,8 +306,15 @@ async def run(args):
                     print(f"[mock-mission-control] scene: {scene}", flush=True)
                     last_scene = scene
                 payload = build_payload(
-                    scene, frame, elapsed, editor_conditions, note_state
+                    scene,
+                    frame,
+                    elapsed,
+                    editor_conditions,
+                    note_state,
+                    mission_planning,
                 )
+                for event in await mission_planning.drain_events():
+                    await socket.send(json.dumps(event))
                 await socket.send(json.dumps(payload))
                 frame += 1
                 await asyncio.sleep(1.0 / args.hz)

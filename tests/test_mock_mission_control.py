@@ -53,5 +53,53 @@ class MockMissionControlTests(unittest.TestCase):
             self.assertEqual(traversal[0], HTTPStatus.NOT_FOUND)
 
 
+class MissionPlanningMockTests(unittest.IsolatedAsyncioTestCase):
+    async def test_profile_overlays_windows_and_completes_transfer_commands(self):
+        profile = mock_server.MissionPlanningMockProfile()
+        payload = {}
+        profile.overlay(payload)
+
+        self.assertTrue(payload["mj.transfer.available"])
+        self.assertEqual(payload["mj.transfer.windows.state"], "completed")
+        self.assertGreater(len(payload["mj.transfer.windows.results"]), 0)
+
+        await profile.apply_command({
+            "type": "mechjeb.transfer.start",
+            "requestId": "mock-request",
+            "fingerprint": "mock-fingerprint",
+            "origin": "Kerbin",
+            "destination": "Duna",
+            "originParkingAltitude": 100_000,
+            "optimizePoweredCapture": False,
+        })
+        await profile.apply_command({
+            "type": "mechjeb.transfer.grid.request",
+            "requestId": "mock-request",
+            "fingerprint": "mock-fingerprint",
+        })
+        profile.overlay(payload)
+
+        self.assertEqual(payload["mj.transfer.state"], "completed")
+        self.assertEqual(payload["mj.transfer.destination"], "Duna")
+        self.assertEqual(payload["mj.transfer.grid.dateSamples"], 3)
+        self.assertEqual(len(payload["mj.transfer.grid.costs"]), 9)
+
+    async def test_profile_round_trips_persistence_state(self):
+        profile = mock_server.MissionPlanningMockProfile()
+        await profile.apply_command({
+            "type": "mission.planning.persistence.update",
+            "requestId": "save-resonant",
+            "section": "resonant",
+            "baseRevision": 0,
+            "value": {"plans": []},
+        })
+        events = await profile.drain_events()
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["status"], "updated")
+        self.assertEqual(events[0]["revision"], 1)
+        self.assertEqual(events[0]["value"], {"plans": []})
+
+
 if __name__ == "__main__":
     unittest.main()

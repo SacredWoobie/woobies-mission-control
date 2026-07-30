@@ -3,10 +3,15 @@ import { useSharedPlannerPersistence } from "../sharedPlannerPersistence";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { DISTANCE_UNITS, type DistanceUnit, type ResonantOrbitPlan } from "./calculations";
 
-const LIBRARY_STORAGE_KEY = "wmc-prototype-resonant-library-v2";
+const LIBRARY_STORAGE_KEY = "wmc-resonant-library-v2";
+const LEGACY_LIBRARY_STORAGE_KEY = "wmc-prototype-resonant-library-v2";
 const LEGACY_PLAN_STORAGE_KEY = "wmc-prototype-resonant-plan-v1";
-const UNIT_STORAGE_KEY = "wmc-prototype-resonant-unit-v1";
-const LEGACY_LIBRARY_KEYS = [LEGACY_PLAN_STORAGE_KEY];
+const UNIT_STORAGE_KEY = "wmc-resonant-unit-v1";
+const LEGACY_UNIT_STORAGE_KEY = "wmc-prototype-resonant-unit-v1";
+const LEGACY_LIBRARY_KEYS = [
+  LEGACY_LIBRARY_STORAGE_KEY,
+  LEGACY_PLAN_STORAGE_KEY,
+];
 
 export interface SavedPlanRecord {
   id: string;
@@ -164,7 +169,11 @@ interface LoadedPlanLibrary {
 
 function loadLibrary(): LoadedPlanLibrary {
   try {
-    const saved = JSON.parse(localStorage.getItem(LIBRARY_STORAGE_KEY) ?? "null") as (Omit<PlanLibraryState, "schemaVersion"> & { schemaVersion?: number }) | null;
+    const saved = JSON.parse(
+      localStorage.getItem(LIBRARY_STORAGE_KEY)
+      ?? localStorage.getItem(LEGACY_LIBRARY_STORAGE_KEY)
+      ?? "null",
+    ) as (Omit<PlanLibraryState, "schemaVersion"> & { schemaVersion?: number }) | null;
     if ((saved?.schemaVersion === 2 || saved?.schemaVersion === 3 || saved?.schemaVersion === 4) && Array.isArray(saved.plans)) {
       const plans = saved.plans.filter(validPlanRecord).map(normalizePlanRecord);
       return {
@@ -206,7 +215,8 @@ function loadLibrary(): LoadedPlanLibrary {
 
 function loadUnit(): DistanceUnit {
   try {
-    const saved = localStorage.getItem(UNIT_STORAGE_KEY);
+    const saved = localStorage.getItem(UNIT_STORAGE_KEY)
+      ?? localStorage.getItem(LEGACY_UNIT_STORAGE_KEY);
     if (saved && saved in DISTANCE_UNITS) return saved as DistanceUnit;
   } catch {
     // Browser storage is optional; in-memory planning remains available.
@@ -366,7 +376,10 @@ export function ResonantOrbitProvider({ children }: PropsWithChildren) {
 
   const setUnit = useCallback((next: DistanceUnit) => {
     setUnitState(next);
-    try { localStorage.setItem(UNIT_STORAGE_KEY, next); } catch { /* optional preference */ }
+    try {
+      localStorage.setItem(UNIT_STORAGE_KEY, next);
+      localStorage.removeItem(LEGACY_UNIT_STORAGE_KEY);
+    } catch { /* optional preference */ }
   }, []);
 
   const pinned = useMemo(

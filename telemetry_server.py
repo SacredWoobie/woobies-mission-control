@@ -33,7 +33,6 @@ from electricity import ElectricityFlowEstimator
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
-    MISSION_PLANNING_COMMAND_TYPES,
     MissionPlanningController,
 )
 from staging import enrich_stage_result, flight_conditions
@@ -2268,128 +2267,6 @@ def gather_telemetry(conn):
 
     payload = _attach_notes_telemetry(d, d.get("v.name", ""), now)
     return _finalize_telemetry(conn, payload)
-
-
-# ---------------------------------------------------------------------------
-# Telemetry WebSocket server (runs in its own thread, own kRPC connection)
-# ---------------------------------------------------------------------------
-def _run_telemetry_server_legacy(host, port):
-    import asyncio
-    import json
-    import math as _math
-
-    def _json_safe(obj):
-        """Replace non-finite floats with None so frames remain valid JSON."""
-        if isinstance(obj, float):
-            return obj if _math.isfinite(obj) else None
-        if isinstance(obj, dict):
-            return {k: _json_safe(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [_json_safe(v) for v in obj]
-        return obj
-
-    try:
-        import websockets
-        from websockets.datastructures import Headers
-        from websockets.http11 import Response
-    except ImportError:
-        print("[telemetry] 'websockets' not installed -- dashboard feed disabled.")
-        print("[telemetry] Install with:  pip install websockets")
-        return False
-
-    tconn = connect_krpc_with_retry("KSP Dashboard Telemetry")
-    if tconn is None:
-        return False
-
-    if not DASHBOARD_WEB_ROOT.joinpath("index.html").is_file():
-        print(
-            "[telemetry] React dashboard files are missing. Expected "
-            f"{DASHBOARD_WEB_ROOT / 'index.html'}"
-        )
-        return False
-
-    print(f"[telemetry] dashboard: http://{host}:{port}/")
-    print(f"[telemetry] telemetry: ws://{host}:{port}/  ({TELEMETRY_HZ} Hz)")
-    clients = set()
-    commands = asyncio.Queue()
-
-    def process_request(_connection, request):
-        if request.headers.get("Upgrade", "").casefold() == "websocket":
-            return None
-        status, media_type, cache_policy, body = dashboard_asset(request.path)
-        return Response(
-            int(status),
-            status.phrase,
-            Headers([
-                ("Content-Type", media_type),
-                ("Content-Length", str(len(body))),
-                ("Cache-Control", cache_policy),
-                ("X-Content-Type-Options", "nosniff"),
-            ]),
-            body,
-        )
-
-    async def handler(ws, *args):  # *args tolerates old & new websockets signatures
-        clients.add(ws)
-        try:
-            async for raw in ws:
-                try:
-                    command = json.loads(raw)
-                    if (
-                        isinstance(command, dict)
-                        and command.get("type") in {
-                            "editor.conditions",
-                            "notes.select",
-                            "notes.pin",
-                            "notes.favorite",
-                            *MISSION_PLANNING_COMMAND_TYPES,
-                        }
-                    ):
-                        await commands.put(command)
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    pass
-        except Exception:
-            pass
-        finally:
-            clients.discard(ws)
-
-    async def broadcaster():
-        loop = asyncio.get_event_loop()
-        interval = 1.0 / TELEMETRY_HZ
-        while True:
-            if clients:
-                try:
-                    # Serialize commands and reads through this connection;
-                    # kRPC's protobuf stream is not safe for concurrent calls.
-                    while not commands.empty():
-                        command = commands.get_nowait()
-                        await loop.run_in_executor(
-                            None, _apply_telemetry_command, tconn, command)
-                    # run the blocking kRPC gather off the event loop
-                    data = await loop.run_in_executor(None, gather_telemetry, tconn)
-                    # Reject any non-finite value that escaped _json_safe.
-                    msg = json.dumps(_json_safe(data), allow_nan=False)
-                    await asyncio.gather(*(c.send(msg) for c in list(clients)),
-                                         return_exceptions=True)
-                except Exception:
-                    pass  # transient, e.g. scene change
-            await asyncio.sleep(interval)
-
-    async def serve():
-        async with websockets.serve(
-            handler,
-            host,
-            port,
-            process_request=process_request,
-        ):
-            await broadcaster()
-
-    try:
-        asyncio.run(serve())
-    except Exception as e:
-        print(f"[telemetry] server stopped: {e}")
-        return False
-    return True
 
 
 def run_telemetry_server(host, port):

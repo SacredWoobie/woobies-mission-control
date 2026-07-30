@@ -66,7 +66,7 @@ const plan: DeltaVPlan = {
 };
 
 function seedPinnedPlan(includeCompletionState = true) {
-  localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify({
+  localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify({
     schemaVersion: 2,
     plans: [{
       id: "duna-plan",
@@ -164,7 +164,7 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByText("1 / 5 steps", { exact: true })).toBeTruthy();
     expect(screen.getAllByText("2,185 m/s", { exact: true })).toHaveLength(1);
     expect(screen.getByText("SURPLUS", { exact: true })).toBeTruthy();
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null").assignments[0].completedLegIds).toEqual(["segment-1-ascent"]));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null").assignments[0].completedLegIds).toEqual(["segment-1-ascent"]));
 
     fireEvent.click(screen.getByRole("button", { name: "Undo last" }));
     expect(screen.getByText("Launch to Kerbin orbit", { exact: true })).toBeTruthy();
@@ -205,7 +205,7 @@ describe("pinned delta-v Mission Plan", () => {
 
   it("checks orbit readiness, previews the active-orbit burn, and confirms node creation", async () => {
     seedPinnedPlan();
-    const library = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
     library.assignments[0].completedLegIds = ["segment-1-ascent"];
     library.plans[0].draft.transferMode = "advanced";
     library.plans[0].draft.selectedTransferSolutions["segment-1"] = {
@@ -225,7 +225,7 @@ describe("pinned delta-v Mission Plan", () => {
       departureVInfinity: [321, -654, 987],
       maneuverVectorSchema: 1,
     };
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify(library));
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
 
     const baseSnapshot = {
       ...flightTelemetryFixture,
@@ -329,7 +329,7 @@ describe("pinned delta-v Mission Plan", () => {
 
   it("starts a long flight route collapsed while keeping transfer readiness visible", () => {
     seedPinnedPlan();
-    const library = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
     library.plans[0].plan.legs = Array.from({ length: 10 }, (_, index) => ({
       ...plan.legs[index % plan.legs.length],
       id: `long-route-${index + 1}`,
@@ -340,7 +340,7 @@ describe("pinned delta-v Mission Plan", () => {
         transferSource: "mechjeb",
       } : {}),
     }));
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify(library));
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
 
     renderPanel("flight");
 

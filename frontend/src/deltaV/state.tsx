@@ -24,8 +24,10 @@ import {
 import type { PorkchopEvaluation } from "./PorkchopPlotModal";
 import type { TelemetrySnapshot } from "../telemetry/types";
 
-const DRAFT_STORAGE_KEY = "wmc-prototype-delta-v-draft-v1";
-const LIBRARY_STORAGE_KEY = "wmc-prototype-delta-v-library-v1";
+const DRAFT_STORAGE_KEY = "wmc-delta-v-draft-v1";
+const LEGACY_DRAFT_STORAGE_KEY = "wmc-prototype-delta-v-draft-v1";
+const LIBRARY_STORAGE_KEY = "wmc-delta-v-library-v1";
+const LEGACY_LIBRARY_STORAGE_KEY = "wmc-prototype-delta-v-library-v1";
 
 export type TransferPlanningMode = "simple" | "advanced";
 
@@ -261,7 +263,11 @@ function normalizeDraftSnapshot(value: unknown): DeltaVDraftSnapshot | null {
 function loadDraft(): DeltaVDraftSnapshot {
   try {
     return normalizeDraftSnapshot(
-      JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) ?? "null"),
+      JSON.parse(
+        localStorage.getItem(DRAFT_STORAGE_KEY)
+        ?? localStorage.getItem(LEGACY_DRAFT_STORAGE_KEY)
+        ?? "null",
+      ),
     ) ?? defaultDraft();
   } catch {
     return defaultDraft();
@@ -411,7 +417,11 @@ interface LoadedDeltaVLibrary {
 
 function loadLibrary(): LoadedDeltaVLibrary {
   try {
-    const stored = JSON.parse(localStorage.getItem(LIBRARY_STORAGE_KEY) ?? "null") as {
+    const stored = JSON.parse(
+      localStorage.getItem(LIBRARY_STORAGE_KEY)
+      ?? localStorage.getItem(LEGACY_LIBRARY_STORAGE_KEY)
+      ?? "null",
+    ) as {
       schemaVersion?: number;
       plans?: unknown[];
       assignments?: unknown[];
@@ -670,6 +680,7 @@ export function DeltaVDraftProvider({ children }: PropsWithChildren) {
   const draftHasContent = activeSavedPlanId !== null || draftHasMeaningfulContent(draft);
 
   useSharedPlannerPersistence({
+    clearLocalKeys: [LEGACY_DRAFT_STORAGE_KEY],
     localStorageKey: DRAFT_STORAGE_KEY,
     normalize: normalizeDraftSnapshot,
     onRemoteValue: (restored) => {
@@ -691,6 +702,7 @@ export function DeltaVDraftProvider({ children }: PropsWithChildren) {
 
   useSharedPlannerPersistence({
     allowInitialLocalWrite: loadedLibrary.persistOnMount,
+    clearLocalKeys: [LEGACY_LIBRARY_STORAGE_KEY],
     localStorageKey: LIBRARY_STORAGE_KEY,
     normalize: normalizeSharedLibrary,
     onRemoteValue: setLibrary,

@@ -32,8 +32,10 @@ describe("live body catalog comparison", () => {
   });
 });
 
-function seedLockedStartDraft() {
-  localStorage.setItem("wmc-prototype-delta-v-draft-v1", JSON.stringify({
+function seedLockedStartDraft(
+  storageKey = "wmc-delta-v-draft-v1",
+) {
+  localStorage.setItem(storageKey, JSON.stringify({
     schemaVersion: 1,
     customSteps: [],
     editingStopId: null,
@@ -108,6 +110,17 @@ describe("delta-v planner drawer", () => {
     expect((screen.getByRole("combobox", { name: "Next stop" }) as HTMLSelectElement).value).toBe("");
     expect(screen.queryByRole("list", { name: "Committed mission stops" })).toBeNull();
     expect(screen.getByRole("button", { name: "Edit stop 1" }).closest(".delta-v-leg")?.textContent).toContain("Capture at Duna");
+  });
+
+  it("reads a pre-release working draft from its legacy key", () => {
+    localStorage.clear();
+    seedLockedStartDraft("wmc-prototype-delta-v-draft-v1");
+
+    render(<ResonantOrbitProvider><DeltaVTool onOpen={() => undefined} /></ResonantOrbitProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
+
+    expect(screen.queryByRole("combobox", { name: "Start" })).toBeNull();
+    expect(localStorage.getItem("wmc-delta-v-draft-v1")).not.toBeNull();
   });
 
   it("opens model assumptions from the drawer header", () => {
@@ -285,12 +298,12 @@ describe("delta-v planner drawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
 
     await waitFor(() => {
-      const library = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(library.plans[0].saveFolder).toBe("WMC Fixture Save");
     });
     view.unmount();
 
-    const library = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
     library.plans.push({
       ...library.plans[0],
       id: "other-save-plan",
@@ -307,7 +320,7 @@ describe("delta-v planner drawer", () => {
       createdAt: "2026-07-19T00:00:00.000Z",
       updatedAt: "2026-07-19T00:00:00.000Z",
     });
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify(library));
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
 
     renderPlanner();
     fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
@@ -336,7 +349,7 @@ describe("delta-v planner drawer", () => {
     expect(dialog.textContent).toContain("Unlinked Plan");
     expect(dialog.textContent).not.toContain("Other Save Plan");
     await waitFor(() => {
-      const linkedLibrary = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const linkedLibrary = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(linkedLibrary.plans.find((record: { id: string }) => record.id === "unlinked-plan").saveFolder).toBe("WMC Fixture Save");
       expect(linkedLibrary.plans.find((record: { id: string }) => record.id === "other-save-plan").saveFolder).toBe("Other Career");
     });
@@ -349,11 +362,11 @@ describe("delta-v planner drawer", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
     fireEvent.change(screen.getByRole("textbox", { name: "Delta-v plan name" }), { target: { value: "Unlinked Plan" } });
     fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null").plans).toHaveLength(1));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null").plans).toHaveLength(1));
     initial.unmount();
-    const unlinkedLibrary = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+    const unlinkedLibrary = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
     unlinkedLibrary.plans[0].saveFolder = "";
-    localStorage.setItem("wmc-prototype-delta-v-library-v1", JSON.stringify(unlinkedLibrary));
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(unlinkedLibrary));
 
     renderPlanner();
     fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
@@ -363,7 +376,7 @@ describe("delta-v planner drawer", () => {
     fireEvent.click(recovery);
     expect(screen.getByRole("dialog", { name: "Saved Delta-V plans" }).textContent).toContain("Unlinked Plan");
     await waitFor(() => {
-      const library = JSON.parse(localStorage.getItem("wmc-prototype-delta-v-library-v1") ?? "null");
+      const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
       expect(library.plans[0].saveFolder).toBe("WMC Fixture Save");
     });
   });

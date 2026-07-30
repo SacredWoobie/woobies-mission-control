@@ -42,7 +42,7 @@ describe("resonant orbit tool scene availability", () => {
   });
 
   it("restores the saved LOS assumption and exposes update versus save-as actions", async () => {
-    localStorage.setItem("wmc-prototype-resonant-library-v2", JSON.stringify({
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
       schemaVersion: 4,
       pinnedPlanId: null,
       plans: [{

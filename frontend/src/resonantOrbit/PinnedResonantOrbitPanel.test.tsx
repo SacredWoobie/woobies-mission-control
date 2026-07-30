@@ -56,7 +56,7 @@ describe("pinned resonant orbit panel", () => {
 
   it("renders Editor design guidance without Flight deployment controls", () => {
     const plan = calculateResonantOrbit({ body: STOCK_BODIES.Duna, satelliteCount: 4, targetAltitude: 600_000, mode: "raise" });
-    localStorage.setItem("wmc-prototype-resonant-library-v2", JSON.stringify({
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
       schemaVersion: 2,
       pinnedPlanId: "editor-plan",
       plans: [{ id: "editor-plan", name: "Duna Editor Relay", plan, releaseCount: 0, createdAt: "2026-07-19T00:00:00Z", updatedAt: "2026-07-19T00:00:00Z" }],
@@ -88,7 +88,7 @@ describe("pinned resonant orbit panel", () => {
 
   it("does not show a pinned plan while a different game save is active", () => {
     const plan = calculateResonantOrbit({ body: STOCK_BODIES.Duna, satelliteCount: 4, targetAltitude: 600_000, mode: "raise" });
-    localStorage.setItem("wmc-prototype-resonant-library-v2", JSON.stringify({
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
       schemaVersion: 3,
       pinnedPlanId: "save-a-plan",
       plans: [{ id: "save-a-plan", name: "Save A Relay", plan, releaseCount: 0, saveFolder: "Save A", createdAt: "2026-07-19T00:00:00Z", updatedAt: "2026-07-19T00:00:00Z" }],

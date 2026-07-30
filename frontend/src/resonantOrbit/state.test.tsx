@@ -54,7 +54,7 @@ describe("resonant orbit plan library", () => {
   afterEach(() => cleanup());
 
   it("filters malformed saved plans before rendering", () => {
-    localStorage.setItem("wmc-prototype-resonant-library-v2", JSON.stringify({
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
       schemaVersion: 3,
       pinnedPlanId: null,
       plans: [
@@ -67,16 +67,31 @@ describe("resonant orbit plan library", () => {
 
     expect(screen.getByText("Saved count 1")).toBeTruthy();
     expect(screen.getByTestId("first-occlusion").textContent).toBe("true");
-    expect(JSON.parse(localStorage.getItem("wmc-prototype-resonant-library-v2") ?? "null").schemaVersion).toBe(4);
+    expect(JSON.parse(localStorage.getItem("wmc-resonant-library-v2") ?? "null").schemaVersion).toBe(4);
+  });
+
+  it("reads the pre-release library key and writes the production key", () => {
+    localStorage.setItem("wmc-prototype-resonant-library-v2", JSON.stringify({
+      schemaVersion: 4,
+      pinnedPlanId: null,
+      plans: [
+        { id: "prototype-plan", name: "Recovered relay", plan, releaseCount: 0, saveFolder: "", createdAt: "", updatedAt: "" },
+      ],
+    }));
+
+    render(<ResonantOrbitProvider><LibraryHarness /></ResonantOrbitProvider>);
+
+    expect(screen.getByText("Saved count 1")).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem("wmc-resonant-library-v2") ?? "null").plans[0].name).toBe("Recovered relay");
   });
 
   it("does not overwrite an unreadable saved-plan library on mount", () => {
-    localStorage.setItem("wmc-prototype-resonant-library-v2", "{not valid json");
+    localStorage.setItem("wmc-resonant-library-v2", "{not valid json");
 
     render(<ResonantOrbitProvider><LibraryHarness /></ResonantOrbitProvider>);
 
     expect(screen.getByText("Saved count 0")).toBeTruthy();
-    expect(localStorage.getItem("wmc-prototype-resonant-library-v2")).toBe("{not valid json");
+    expect(localStorage.getItem("wmc-resonant-library-v2")).toBe("{not valid json");
   });
 
   it("saves multiple-plan metadata and pins a selected record", async () => {
@@ -85,7 +100,7 @@ describe("resonant orbit plan library", () => {
 
     await user.click(screen.getByRole("button", { name: "Save test plan" }));
     expect(screen.getByText("Saved count 1")).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem("wmc-prototype-resonant-library-v2") ?? "null").plans[0].name).toBe("Duna Relay Ring");
+    expect(JSON.parse(localStorage.getItem("wmc-resonant-library-v2") ?? "null").plans[0].name).toBe("Duna Relay Ring");
     expect(screen.getByTestId("first-save").textContent).toBe("UNLINKED");
 
     await user.click(screen.getByRole("button", { name: "Pin first plan" }));
@@ -101,7 +116,7 @@ describe("resonant orbit plan library", () => {
   });
 
   it("migrates version-two records as recoverable unlinked plans", () => {
-    localStorage.setItem("wmc-prototype-resonant-library-v2", JSON.stringify({
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
       schemaVersion: 2,
       pinnedPlanId: null,
       plans: [{ id: "legacy-library-plan", name: "Legacy relay", plan, releaseCount: 0, createdAt: "2026-07-19T00:00:00Z", updatedAt: "2026-07-19T00:00:00Z" }],
@@ -110,7 +125,7 @@ describe("resonant orbit plan library", () => {
     render(<ResonantOrbitProvider><LibraryHarness /></ResonantOrbitProvider>);
 
     expect(screen.getByTestId("first-save").textContent).toBe("UNLINKED");
-    const migrated = JSON.parse(localStorage.getItem("wmc-prototype-resonant-library-v2") ?? "null");
+    const migrated = JSON.parse(localStorage.getItem("wmc-resonant-library-v2") ?? "null");
     expect(migrated.schemaVersion).toBe(4);
     expect(migrated.plans[0].useOcclusionModifiers).toBe(true);
   });
@@ -122,7 +137,7 @@ describe("resonant orbit plan library", () => {
     await user.click(screen.getByRole("button", { name: "Save linked plan" }));
 
     expect(screen.getByTestId("first-save").textContent).toBe("Save A");
-    expect(JSON.parse(localStorage.getItem("wmc-prototype-resonant-library-v2") ?? "null").plans[0].saveFolder).toBe("Save A");
+    expect(JSON.parse(localStorage.getItem("wmc-resonant-library-v2") ?? "null").plans[0].saveFolder).toBe("Save A");
   });
 
   it("updates the active record, supports save-as, and rejects duplicate names within a save", async () => {
