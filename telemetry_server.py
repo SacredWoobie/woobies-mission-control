@@ -29,6 +29,15 @@ from pathlib import Path
 
 import krpc
 
+from electricity import ElectricityFlowEstimator, generation_remainder
+from heat import enrich_system_heat_result
+from mission_planning import (
+    MAX_ACTION_ID_LENGTH,
+    MissionPlanningController,
+)
+from staging import enrich_stage_result, flight_conditions
+from telemetry_runtime import create_telemetry_runtime
+
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
 TELEMETRY_HZ = 4          # dashboard update rate
 KRPC_RETRY_SECONDS = 2
@@ -119,6 +128,8 @@ _overview_cache = {
 }
 _overview_last_poll = {key: 0.0 for key in _overview_cache}
 _overview_last_ut = None
+_mission_planning = MissionPlanningController()
+_electricity_flow = ElectricityFlowEstimator()
 
 _NOTES_PLUGIN_DATA = Path("Plugins") / "PluginData" / "notes"
 
@@ -1150,6 +1161,9 @@ def _gather_stages(conn, source="flight"):
                      error=type(exc).__name__, message=str(exc))
         return {}  # mid-scene-change / sim not ready; retain last good cache
 
+    enrich_stage_result(ss, out)
+    if source == "flight":
+        out.update(flight_conditions(conn))
     return out
 
 
@@ -1316,6 +1330,8 @@ def _apply_telemetry_command(conn, command):
     global _notes_favorites
 
     if not isinstance(command, dict):
+        return
+    if _mission_planning.apply_command(conn, command):
         return
 
     if command.get("type") == "notes.pin":
@@ -1551,13 +1567,14 @@ def _gather_system_heat(conn):
         })
     generated = sh.total_heat_generation
     removed = abs(sh.total_heat_rejection)
-    return {
+    result = {
         "heat.backend": "system_heat",
         "heat.generatedKw": round(generated, 2),
         "heat.removedKw": round(removed, 2),
         "heat.netKw": round(generated - removed, 2),
         "heat.loops": loops,
     }
+    return enrich_system_heat_result(sh, result)
 
 
 def _gather_stock_heat(conn):
@@ -1703,7 +1720,7 @@ def _gather_overview_fleet(sc):
             if crew_count is None:
                 crew_count = len(_overview_list(vessel, "crew"))
             met = _overview_value(vessel, "met", 0.0)
-            rows.append({
+            row = {
                 "name": _overview_value(vessel, "name", "Unnamed vessel"),
                 "type": vessel_type,
                 "situation": situation,
@@ -1711,7 +1728,11 @@ def _gather_overview_fleet(sc):
                 "met": met if met is not None else 0.0,
                 "crewCount": int(crew_count),
                 "mission": vessel_type != "Debris",
-            })
+            }
+            vessel_guid = str(_overview_value(vessel, "id", "")).strip()
+            if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
+                row["guid"] = vessel_guid
+            rows.append(row)
         except Exception:
             # One modded or half-loaded vessel should not hide the rest.
             continue
@@ -1740,11 +1761,24 @@ def _gather_overview_contracts(sc):
     }
     active_rows = []
     for contract in groups["active"]:
-        active_rows.append({
+        row = {
             "title": _overview_value(contract, "title", "Untitled contract"),
             "type": _overview_label(_overview_value(contract, "type"), "Contract"),
             "deadline": _overview_value(contract, "date_deadline"),
-        })
+        }
+        for source, target in (
+            ("funds_completion", "fundsCompletion"),
+            ("reputation_completion", "reputationCompletion"),
+            ("science_completion", "scienceCompletion"),
+        ):
+            value = _overview_value(contract, source)
+            if (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+            ):
+                row[target] = float(value)
+        active_rows.append(row)
     active_rows.sort(key=lambda row: (
         row["deadline"] is None,
         row["deadline"] if row["deadline"] is not None else float("inf"),
@@ -1909,6 +1943,17 @@ def _gather_overview_telemetry(conn, scene, now=None):
     return data
 
 
+def _finalize_telemetry(conn, payload):
+    """Attach shared planning and derived fields to one scene payload."""
+    payload.update(_mission_planning.gather(
+        conn,
+        payload.get("context.mode"),
+        payload.get("t.universalTime"),
+    ))
+    payload.update(_electricity_flow.update(payload))
+    return payload
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
@@ -1944,15 +1989,20 @@ def gather_telemetry(conn):
                 _reset_overview_state()
 
         if mode == "editor_vab":
-            return _attach_notes_telemetry(
-                _gather_editor_telemetry(conn, "VAB"))
+            payload = _attach_notes_telemetry(
+                _gather_editor_telemetry(conn, "VAB")
+            )
+            return _finalize_telemetry(conn, payload)
         if mode == "editor_sph":
-            return _attach_notes_telemetry(
-                _gather_editor_telemetry(conn, "SPH"))
+            payload = _attach_notes_telemetry(
+                _gather_editor_telemetry(conn, "SPH")
+            )
+            return _finalize_telemetry(conn, payload)
         if mode != "flight":
-            return _attach_notes_telemetry(
+            payload = _attach_notes_telemetry(
                 _gather_overview_telemetry(conn, scene)
             )
+            return _finalize_telemetry(conn, payload)
     except Exception:
         pass
 
@@ -1964,11 +2014,12 @@ def gather_telemetry(conn):
         # example, the tracking station, space center, main menu, or a scene
         # load). The dashboard uses this mode to show its inactive-scene overlay
         # instead of guessing from absent keys.
-        return _attach_notes_telemetry({
+        payload = _attach_notes_telemetry({
             "context.mode": "inactive",
             "flight.active": False,
             "editor.active": False,
         })
+        return _finalize_telemetry(conn, payload)
 
     d["context.mode"] = "flight"
     d["flight.active"] = True
@@ -2201,12 +2252,15 @@ def gather_telemetry(conn):
 
             reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
             rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
-            other = total_gen - reactor_sum - solar_ec - rtg_ec
-            if -0.05 < other < 0.0:
-                other = 0.0  # clamp tiny rounding noise to zero
+            other = generation_remainder(
+                total_gen,
+                reactor_sum,
+                solar_ec,
+                rtg_ec,
+            )
 
             elec["elec.totalGenEcPerSec"] = round(total_gen, 2)
-            elec["elec.otherEcPerSec"] = round(other, 2)
+            elec["elec.otherEcPerSec"] = round(other or 0.0, 2)
         except Exception:
             pass  # service absent -> dashboard just won't show total/other
 
@@ -2214,123 +2268,21 @@ def gather_telemetry(conn):
             _elec_cache = elec
     d.update(_elec_cache)
 
-    return _attach_notes_telemetry(d, d.get("v.name", ""), now)
+    payload = _attach_notes_telemetry(d, d.get("v.name", ""), now)
+    return _finalize_telemetry(conn, payload)
 
 
-# ---------------------------------------------------------------------------
-# Telemetry WebSocket server (runs in its own thread, own kRPC connection)
-# ---------------------------------------------------------------------------
 def run_telemetry_server(host, port):
-    import asyncio
-    import json
-    import math as _math
-
-    def _json_safe(obj):
-        """Replace non-finite floats with None so frames remain valid JSON."""
-        if isinstance(obj, float):
-            return obj if _math.isfinite(obj) else None
-        if isinstance(obj, dict):
-            return {k: _json_safe(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [_json_safe(v) for v in obj]
-        return obj
-
-    try:
-        import websockets
-        from websockets.datastructures import Headers
-        from websockets.http11 import Response
-    except ImportError:
-        print("[telemetry] 'websockets' not installed -- dashboard feed disabled.")
-        print("[telemetry] Install with:  pip install websockets")
-        return False
-
-    tconn = connect_krpc_with_retry("KSP Dashboard Telemetry")
-    if tconn is None:
-        return False
-
-    if not DASHBOARD_WEB_ROOT.joinpath("index.html").is_file():
-        print(
-            "[telemetry] React dashboard files are missing. Expected "
-            f"{DASHBOARD_WEB_ROOT / 'index.html'}"
-        )
-        return False
-
-    print(f"[telemetry] dashboard: http://{host}:{port}/")
-    print(f"[telemetry] telemetry: ws://{host}:{port}/  ({TELEMETRY_HZ} Hz)")
-    clients = set()
-    commands = asyncio.Queue()
-
-    def process_request(_connection, request):
-        if request.headers.get("Upgrade", "").casefold() == "websocket":
-            return None
-        status, media_type, cache_policy, body = dashboard_asset(request.path)
-        return Response(
-            int(status),
-            status.phrase,
-            Headers([
-                ("Content-Type", media_type),
-                ("Content-Length", str(len(body))),
-                ("Cache-Control", cache_policy),
-                ("X-Content-Type-Options", "nosniff"),
-            ]),
-            body,
-        )
-
-    async def handler(ws, *args):  # *args tolerates old & new websockets signatures
-        clients.add(ws)
-        try:
-            async for raw in ws:
-                try:
-                    command = json.loads(raw)
-                    if (isinstance(command, dict) and
-                            command.get("type") in {
-                                "editor.conditions", "notes.select", "notes.pin",
-                                "notes.favorite"}):
-                        await commands.put(command)
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    pass
-        except Exception:
-            pass
-        finally:
-            clients.discard(ws)
-
-    async def broadcaster():
-        loop = asyncio.get_event_loop()
-        interval = 1.0 / TELEMETRY_HZ
-        while True:
-            if clients:
-                try:
-                    # Serialize commands and reads through this connection;
-                    # kRPC's protobuf stream is not safe for concurrent calls.
-                    while not commands.empty():
-                        command = commands.get_nowait()
-                        await loop.run_in_executor(
-                            None, _apply_telemetry_command, tconn, command)
-                    # run the blocking kRPC gather off the event loop
-                    data = await loop.run_in_executor(None, gather_telemetry, tconn)
-                    # Reject any non-finite value that escaped _json_safe.
-                    msg = json.dumps(_json_safe(data), allow_nan=False)
-                    await asyncio.gather(*(c.send(msg) for c in list(clients)),
-                                         return_exceptions=True)
-                except Exception:
-                    pass  # transient, e.g. scene change
-            await asyncio.sleep(interval)
-
-    async def serve():
-        async with websockets.serve(
-            handler,
-            host,
-            port,
-            process_request=process_request,
-        ):
-            await broadcaster()
-
-    try:
-        asyncio.run(serve())
-    except Exception as e:
-        print(f"[telemetry] server stopped: {e}")
-        return False
-    return True
+    """Run the hardened, session-bound production dashboard transport."""
+    _asset_handler, server = create_telemetry_runtime(
+        dashboard_asset,
+        connect_krpc_with_retry,
+        gather_telemetry,
+        _apply_telemetry_command,
+        DASHBOARD_WEB_ROOT,
+        TELEMETRY_HZ,
+    )
+    return server(host, port)
 
 
 def main():

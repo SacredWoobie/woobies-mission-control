@@ -45,7 +45,7 @@ DASHBOARD = HERE / "web" / "index.html"
 DASHBOARD_URL = "http://127.0.0.1:8090/"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 LATEST_RELEASE_API = (
@@ -114,26 +114,40 @@ SERVICE_DLLS = (
     ("WoobiesControlStats", "Stock game statistics"),
     ("KRPC.StageStats", "Stage statistics"),
     ("KRPC.SystemHeat", "System Heat / electricity"),
+    ("KRPC.WoobiesMechJeb", "Mission planning / MechJeb bridge"),
 )
 SERVICE_TESTED_VERSIONS = {
     "WoobiesControlStats": "0.2.1",
-    "KRPC.StageStats": "0.2.1",
-    "KRPC.SystemHeat": "0.2.0",
+    "KRPC.StageStats": "0.2.5",
+    "KRPC.SystemHeat": "0.2.2",
+    "KRPC.WoobiesMechJeb": "0.8.6",
 }
-SUPERSEDED_SERVICE_DLLS = (
-    Path("KRPC.MissionOverview") / "KRPC.MissionOverview.dll",
-    Path("KRPC.VesselScience") / "KRPC.VesselScience.dll",
+SUPERSEDED_SERVICE_DLLS_BY_SERVICE = {
+    "WoobiesControlStats": (
+        Path("KRPC.MissionOverview") / "KRPC.MissionOverview.dll",
+        Path("KRPC.VesselScience") / "KRPC.VesselScience.dll",
+    ),
+    "KRPC.WoobiesMechJeb": (
+        Path("kRPC") / "KRPC.MechJeb.dll",
+    ),
+}
+SUPERSEDED_SERVICE_DLLS = tuple(
+    path
+    for paths in SUPERSEDED_SERVICE_DLLS_BY_SERVICE.values()
+    for path in paths
 )
 KSP_TESTED_VERSION = "1.12.5"
 CORE_DLL_LOCATIONS = {
     "KRPC.dll": Path("kRPC") / "KRPC.dll",
-    "KRPC.MechJeb.dll": Path("kRPC") / "KRPC.MechJeb.dll",
     "MechJeb2.dll": Path("MechJeb2") / "Plugins" / "MechJeb2.dll",
     "WoobiesControlStats.dll": (
         Path("WoobiesControlStats") / "WoobiesControlStats.dll"
     ),
     "KRPC.StageStats.dll": Path("KRPC.StageStats") / "KRPC.StageStats.dll",
     "KRPC.SystemHeat.dll": Path("KRPC.SystemHeat") / "KRPC.SystemHeat.dll",
+    "KRPC.WoobiesMechJeb.dll": (
+        Path("KRPC.WoobiesMechJeb") / "KRPC.WoobiesMechJeb.dll"
+    ),
 }
 KRPC_ADDRESS = "127.0.0.1"
 KRPC_RPC_PORT = 50000
@@ -162,16 +176,18 @@ KSP_PREREQUISITES = (
     },
     {
         "key": "krpc_mechjeb",
-        "title": "KRPC.MechJeb",
-        "relative_path": Path("kRPC") / "KRPC.MechJeb.dll",
-        "tested_version": "0.7.1",
+        "title": "Woobie's MechJeb bridge",
+        "relative_path": (
+            Path("KRPC.WoobiesMechJeb") / "KRPC.WoobiesMechJeb.dll"
+        ),
+        "tested_version": "0.8.6",
         "required": False,
     },
     {
         "key": "mechjeb",
         "title": "MechJeb 2",
         "relative_path": Path("MechJeb2") / "Plugins" / "MechJeb2.dll",
-        "tested_version": "2.14.3.0",
+        "tested_version": "2.15.3.0",
         "required": False,
     },
 )
@@ -1167,9 +1183,8 @@ def prerequisite_recommendations(inventory, configuration):
                 )
             elif key == "krpc_mechjeb":
                 fix = (
-                    f"Use CKAN to reinstall the complete kRPC {KSP_PREREQUISITES[0]['tested_version']} "
-                    f"package. Its GameData\\kRPC folder should include "
-                    f"KRPC.MechJeb {tested}."
+                    "Use Mission Control's service repair to install "
+                    f"KRPC.WoobiesMechJeb {tested}."
                 )
             else:
                 fix = (
@@ -1180,9 +1195,8 @@ def prerequisite_recommendations(inventory, configuration):
             observed = "Installed, but version metadata could not be read"
             if key == "krpc_mechjeb":
                 fix = (
-                    f"Use CKAN to reinstall kRPC {KSP_PREREQUISITES[0]['tested_version']}; "
-                    f"the complete package includes the tested KRPC.MechJeb "
-                    f"{tested} DLL."
+                    "Use Mission Control's service repair to reinstall "
+                    f"KRPC.WoobiesMechJeb {tested} from this release."
                 )
             else:
                 package = "kRPC" if key == "krpc" else "MechJeb 2"
@@ -1198,9 +1212,8 @@ def prerequisite_recommendations(inventory, configuration):
                 action = "switch"
             if key == "krpc_mechjeb":
                 fix = (
-                    f"For the tested combination, use CKAN to reinstall kRPC "
-                    f"{KSP_PREREQUISITES[0]['tested_version']}. The complete kRPC "
-                    f"package supplies KRPC.MechJeb {tested}."
+                    "Use Mission Control's service repair to replace the "
+                    f"installed bridge with KRPC.WoobiesMechJeb {tested}."
                 )
             else:
                 package = "kRPC" if key == "krpc" else "MechJeb 2"
@@ -1316,8 +1329,11 @@ def service_inventory(
             version_reader(target) if target_hash is not None else None
         )
         legacy_targets = (
-            [root / "GameData" / path for path in SUPERSEDED_SERVICE_DLLS]
-            if root is not None and folder == "WoobiesControlStats"
+            [
+                root / "GameData" / path
+                for path in SUPERSEDED_SERVICE_DLLS_BY_SERVICE.get(folder, ())
+            ]
+            if root is not None
             else []
         )
         legacy_present = [path for path in legacy_targets if path.is_file()]

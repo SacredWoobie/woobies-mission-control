@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDialogFocus } from "../deltaV/useDialogFocus";
 import type { NoteCatalogEntry, TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 
 interface NotesContinuityPreviewProps {
@@ -21,9 +22,10 @@ export function NotesContinuityPreview({
   snapshot,
 }: NotesContinuityPreviewProps) {
   const [query, setQuery] = useState("");
-  const [fontSize, setFontSize] = useState(10);
+  const [fontSize, setFontSize] = useState(14);
   const [autoFollow, setAutoFollow] = useState(true);
   const logRef = useRef<HTMLPreElement>(null);
+  const dialogRef = useDialogFocus<HTMLElement>(open, onClose);
   const available = snapshot["notes.available"] === true;
   const catalog = snapshot["notes.catalog"] ?? [];
   const selectedPath = snapshot["notes.selectedPath"] ?? "";
@@ -40,15 +42,6 @@ export function NotesContinuityPreview({
   useEffect(() => {
     if (open && autoFollow && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [autoFollow, open, selected?.modified, selected?.size, selected?.text]);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); }
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose, open]);
 
   function select(relativePath: string | null) {
     if (commandEnabled) onSendCommand({ type: "notes.select", relativePath });
@@ -71,8 +64,8 @@ export function NotesContinuityPreview({
   return (
     <>
       {open && <>
-        <button aria-label="Close Notes drawer" className="notes-drawer-backdrop" onClick={onClose} type="button" />
-        <aside aria-label="Notes continuity preview" className="notes-preview notes-drawer-full" id="notes-continuity-preview">
+        <div aria-hidden="true" className="notes-drawer-backdrop" onMouseDown={onClose} />
+        <aside aria-label="Notes continuity preview" aria-modal="true" className="notes-preview notes-drawer-full" id="notes-continuity-preview" ref={dialogRef} role="dialog" tabIndex={-1}>
           <header>
             <div><span className="notes-preview-kicker">zer0Kerbal / Notes</span><h2>{mode === "flight" ? "Active vessel log" : "Notes reference"}</h2><p>{vessel}</p></div>
             <button aria-label="Close Notes preview" onClick={onClose} type="button">×</button>
@@ -88,7 +81,7 @@ export function NotesContinuityPreview({
               {selected ? <pre className="notes-log" ref={logRef} style={{ fontSize }} tabIndex={0}>{selected.text.trim() || "(empty note)"}</pre> : <div className="notes-empty">Choose a saved note, or open the active vessel's Ship Log in Notes.</div>}
             </div>
           </div> : <div className="notes-unavailable"><strong>Notes unavailable</strong><span>{snapshot["notes.message"] || "The Notes mod folder is not available in the current telemetry feed."}</span></div>}
-          <footer><span>Saved notes remain available across Flight, VAB/SPH, and inactive scenes.</span><span className="notes-font-controls"><button aria-label="Decrease note text size" disabled={fontSize <= 8} onClick={() => setFontSize((value) => Math.max(8, value - 1))} type="button">A-</button><button onClick={() => setFontSize(10)} type="button">{fontSize}px</button><button aria-label="Increase note text size" disabled={fontSize >= 18} onClick={() => setFontSize((value) => Math.min(18, value + 1))} type="button">A+</button></span><label><input checked={autoFollow} onChange={(event) => setAutoFollow(event.target.checked)} type="checkbox" /> Auto-follow</label></footer>
+          <footer><span>Saved notes remain available across Flight, VAB/SPH, and inactive scenes.</span><span className="notes-font-controls"><button aria-label="Decrease note text size" disabled={fontSize <= 12} onClick={() => setFontSize((value) => Math.max(12, value - 1))} type="button">A-</button><button onClick={() => setFontSize(14)} type="button">{fontSize}px</button><button aria-label="Increase note text size" disabled={fontSize >= 22} onClick={() => setFontSize((value) => Math.min(22, value + 1))} type="button">A+</button></span><label><input checked={autoFollow} onChange={(event) => setAutoFollow(event.target.checked)} type="checkbox" /> Auto-follow</label></footer>
         </aside>
       </>}
     </>

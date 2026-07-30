@@ -26,7 +26,7 @@ class DllInstallRepairTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             ksp_root, package = self.make_layout(root)
-            first, second, _third = app.SERVICE_DLLS
+            first, second, *_remaining = app.SERVICE_DLLS
             first_source = package / first[0] / f"{first[0]}.dll"
             first_target = ksp_root / "GameData" / first[0] / f"{first[0]}.dll"
             first_target.parent.mkdir(parents=True)
@@ -187,7 +187,10 @@ class DllInstallRepairTests(unittest.TestCase):
             )
 
             self.assertIn("WoobiesControlStats", result["installed"])
-            self.assertEqual(len(result["removed"]), 2)
+            self.assertEqual(
+                len(result["removed"]),
+                len(app.SUPERSEDED_SERVICE_DLLS),
+            )
             for relative_path in app.SUPERSEDED_SERVICE_DLLS:
                 self.assertFalse((ksp_root / "GameData" / relative_path).exists())
                 self.assertEqual(

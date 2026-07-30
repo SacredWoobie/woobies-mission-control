@@ -12,6 +12,8 @@ param(
 
     [string]$Target = 'main',
 
+    [switch]$SkipReleaseImages,
+
     [switch]$CreateDraftRelease
 )
 
@@ -97,11 +99,24 @@ $manifest = Import-PowerShellDataFile -LiteralPath $manifestPath
 if ($manifest.ProductVersion -ne $Version) {
     throw "Release-Manifest.psd1 targets $($manifest.ProductVersion), not requested v$Version."
 }
+if ($CreateDraftRelease -and $SkipReleaseImages) {
+    throw '-SkipReleaseImages is only valid for internal package acceptance.'
+}
 
 $builderReleaseSetPath = $null
 if ([string]::IsNullOrWhiteSpace($GameDataPath)) {
-    $workspaceRoot = Split-Path $repoRoot -Parent
-    $builderRoot = Join-Path $workspaceRoot 'Woobies-KRPC-Service-Builder'
+    $repoParent = Split-Path $repoRoot -Parent
+    $workspaceCandidates = @(
+        $repoParent,
+        (Split-Path $repoParent -Parent)
+    )
+    $builderRoot = $workspaceCandidates |
+        ForEach-Object { Join-Path $_ 'Woobies-KRPC-Service-Builder' } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Container } |
+        Select-Object -First 1
+    if (-not $builderRoot) {
+        throw 'Unable to locate the sibling Woobies-KRPC-Service-Builder repository.'
+    }
     $GameDataPath = Join-Path $builderRoot 'dist\GameData'
     $builderReleaseSetPath = Join-Path $builderRoot 'Release-Set.psd1'
 }
@@ -118,14 +133,27 @@ $zipPath = Join-Path $OutputDirectory "$packageName.zip"
 $checksumPath = Join-Path $OutputDirectory "$packageName.zip.sha256"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
-    @{ Source = 'docs/images/v0.3.0/flight-dashboard-landscape.png'; Name = "$packageName.zz-01-flight-dashboard.png" },
-    @{ Source = 'docs/images/v0.3.0/mission-control-landscape.png'; Name = "$packageName.zz-02-mission-control.png" },
-    @{ Source = 'docs/images/v0.3.0/editor-vab-landscape.png'; Name = "$packageName.zz-03-vab-editor.png" },
-    @{ Source = 'docs/images/v0.3.0/launcher.png'; Name = "$packageName.zz-04-launcher.png" },
-    @{ Source = 'docs/images/v0.3.0/notes-drawer.png'; Name = "$packageName.zz-05-notes-drawer.png" }
+    @{ Source = 'docs/images/v0.4.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
+    @{ Source = 'docs/images/v0.4.0/resonant-orbit-planner.png'; Name = "$packageName.zz-02-resonant-orbit-planner.png" },
+    @{ Source = 'docs/images/v0.4.0/delta-v-planner.png'; Name = "$packageName.zz-03-delta-v-planner.png" },
+    @{ Source = 'docs/images/v0.4.0/editor-vab-mission-plan.png'; Name = "$packageName.zz-04-editor-vab-mission-plan.png" },
+    @{ Source = 'docs/images/v0.4.0/flight-dashboard-mission-planning.png'; Name = "$packageName.zz-05-flight-dashboard-mission-planning.png" }
 )
-$releaseImagePaths = @($releaseImages | ForEach-Object { Join-Path $OutputDirectory $_.Name })
-foreach ($path in @($stageRoot, $zipPath, $checksumPath, $notesPath) + $releaseImagePaths) {
+$activeReleaseImages = @(
+    if (-not $SkipReleaseImages) {
+        $releaseImages
+    }
+)
+$releaseImagePaths = @(
+    $activeReleaseImages |
+        ForEach-Object { Join-Path $OutputDirectory $_.Name }
+)
+$sourceArchiveOutputPaths = @(
+    $manifest.Services |
+        Where-Object { $_.ContainsKey('SourceArchive') } |
+        ForEach-Object { Join-Path $OutputDirectory $_.SourceArchive }
+)
+foreach ($path in @($stageRoot, $zipPath, $checksumPath, $notesPath) + $releaseImagePaths + $sourceArchiveOutputPaths) {
     Assert-SafeChildPath -Parent $OutputDirectory -Child $path
 }
 
@@ -134,6 +162,12 @@ $sourceFiles = @(
     @{ Source = 'Select Mission Control Setup.ps1'; Destination = 'Dashboard/Select Mission Control Setup.ps1' },
     @{ Source = 'ksp_dashboard_app.py'; Destination = 'Dashboard/ksp_dashboard_app.py' },
     @{ Source = 'panel_bridge.py'; Destination = 'Dashboard/panel_bridge.py' },
+    @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
+    @{ Source = 'heat.py'; Destination = 'Dashboard/heat.py' },
+    @{ Source = 'mission_planning.py'; Destination = 'Dashboard/mission_planning.py' },
+    @{ Source = 'planner_persistence.py'; Destination = 'Dashboard/planner_persistence.py' },
+    @{ Source = 'staging.py'; Destination = 'Dashboard/staging.py' },
+    @{ Source = 'telemetry_runtime.py'; Destination = 'Dashboard/telemetry_runtime.py' },
     @{ Source = 'requirements-dashboard.txt'; Destination = 'Dashboard/requirements-dashboard.txt' },
     @{ Source = 'requirements-panel.txt'; Destination = 'Dashboard/requirements-panel.txt' },
     @{ Source = 'requirements.txt'; Destination = 'Dashboard/requirements.txt' },
@@ -142,21 +176,23 @@ $sourceFiles = @(
     @{ Source = 'QUICKSTART.txt'; Destination = 'QUICKSTART.txt' },
     @{ Source = 'README.md'; Destination = 'README.md' },
     @{ Source = 'CHANGELOG.md'; Destination = 'CHANGELOG.md' },
+    @{ Source = 'THIRD_PARTY_LICENSES.md'; Destination = 'THIRD-PARTY/NOTICES.md' },
     @{ Source = 'docs/CONTROL_PAD_PROTOCOL.md'; Destination = 'docs/CONTROL_PAD_PROTOCOL.md' },
     @{ Source = 'docs/RELEASE_PROCESS.md'; Destination = 'docs/RELEASE_PROCESS.md' },
-    @{ Source = 'docs/images/v0.3.0/flight-dashboard-landscape.png'; Destination = 'docs/images/v0.3.0/flight-dashboard-landscape.png' },
-    @{ Source = 'docs/images/v0.3.0/mission-control-landscape.png'; Destination = 'docs/images/v0.3.0/mission-control-landscape.png' },
-    @{ Source = 'docs/images/v0.3.0/editor-vab-landscape.png'; Destination = 'docs/images/v0.3.0/editor-vab-landscape.png' },
-    @{ Source = 'docs/images/v0.3.0/launcher.png'; Destination = 'docs/images/v0.3.0/launcher.png' },
-    @{ Source = 'docs/images/v0.3.0/notes-drawer.png'; Destination = 'docs/images/v0.3.0/notes-drawer.png' },
     @{ Source = 'firmware/KSP_control.ino'; Destination = 'firmware/KSP_control.ino' }
 )
+foreach ($image in $activeReleaseImages) {
+    $sourceFiles += @{
+        Source = $image.Source
+        Destination = $image.Source
+    }
+}
 
 Write-Step 'Checking release metadata and source inputs'
 foreach ($file in $sourceFiles) {
     Assert-RequiredFile (Join-Path $repoRoot $file.Source)
 }
-foreach ($image in $releaseImages) {
+foreach ($image in $activeReleaseImages) {
     Assert-RequiredFile (Join-Path $repoRoot $image.Source)
     if ([System.StringComparer]::OrdinalIgnoreCase.Compare(
         [System.IO.Path]::GetFileName($zipPath),
@@ -192,6 +228,9 @@ if ($changelog -notmatch "(?m)^## v$([regex]::Escape($Version))(?:\s|$)") {
 }
 
 $serviceInputs = @()
+$serviceCompanionInputs = @()
+$sourceArchiveInputs = @()
+$sourceArchiveRoot = Join-Path (Split-Path $GameDataPath -Parent) 'source'
 foreach ($service in $manifest.Services) {
     $relative = "$($service.Folder)/$($service.File)"
     $path = Join-Path $GameDataPath $relative
@@ -201,13 +240,51 @@ foreach ($service in $manifest.Services) {
     if ($actualVersion -ne $expectedVersion) {
         throw "$($service.File) must be $expectedVersion; staged builder copy is $actualVersion."
     }
+    $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    if (
+        $service.ContainsKey('Sha256') -and
+        -not $actualHash.Equals(
+            $service.Sha256,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        throw "$($service.File) SHA-256 does not match Release-Manifest.psd1."
+    }
     $serviceInputs += @{
         Source = $relative
         Destination = "GameData/$relative"
         Folder = $service.Folder
         File = $service.File
         Version = $actualVersion.ToString()
-        Hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        Hash = $actualHash.ToLowerInvariant()
+    }
+    if ($service.ContainsKey('RequiredPackageFiles')) {
+        foreach ($requiredFile in $service.RequiredPackageFiles) {
+            $companionRelative = "$($service.Folder)/$requiredFile"
+            Assert-RequiredFile (Join-Path $GameDataPath $companionRelative)
+            $serviceCompanionInputs += @{
+                Source = $companionRelative
+                Destination = "GameData/$companionRelative"
+            }
+        }
+    }
+    if ($service.ContainsKey('SourceArchive')) {
+        $sourceArchivePath = Join-Path $sourceArchiveRoot $service.SourceArchive
+        Assert-RequiredFile $sourceArchivePath
+        $sourceArchiveHash = (
+            Get-FileHash -LiteralPath $sourceArchivePath -Algorithm SHA256
+        ).Hash
+        if (-not $sourceArchiveHash.Equals(
+            $service.SourceArchiveSha256,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+            throw "$($service.SourceArchive) SHA-256 does not match Release-Manifest.psd1."
+        }
+        $sourceArchiveInputs += @{
+            Source = $service.SourceArchive
+            Destination = "SOURCE/$($service.SourceArchive)"
+            Hash = $sourceArchiveHash.ToLowerInvariant()
+        }
     }
 }
 
@@ -251,7 +328,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 if (Test-Path -LiteralPath $stageRoot) {
     Remove-Item -LiteralPath $stageRoot -Recurse -Force
 }
-foreach ($path in @($zipPath, $checksumPath, $notesPath) + $releaseImagePaths) {
+foreach ($path in @($zipPath, $checksumPath, $notesPath) + $releaseImagePaths + $sourceArchiveOutputPaths) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Force
     }
@@ -263,6 +340,14 @@ foreach ($file in $sourceFiles) {
 }
 foreach ($service in $serviceInputs) {
     Copy-AllowlistedFile -SourceRoot $GameDataPath -StageRoot $stageRoot -Entry $service
+}
+foreach ($companion in $serviceCompanionInputs) {
+    Copy-AllowlistedFile -SourceRoot $GameDataPath -StageRoot $stageRoot -Entry $companion
+}
+foreach ($sourceArchive in $sourceArchiveInputs) {
+    Copy-AllowlistedFile -SourceRoot $sourceArchiveRoot -StageRoot $stageRoot -Entry $sourceArchive
+    Copy-Item -LiteralPath (Join-Path $sourceArchiveRoot $sourceArchive.Source) `
+        -Destination (Join-Path $OutputDirectory $sourceArchive.Source) -Force
 }
 
 $webTarget = Join-Path $stageRoot 'Dashboard\web'
@@ -292,6 +377,9 @@ $buildLines = @(
 foreach ($service in $serviceInputs) {
     $buildLines += "- $($service.Folder) $($service.Version) SHA-256 $($service.Hash)"
 }
+foreach ($sourceArchive in $sourceArchiveInputs) {
+    $buildLines += "- Corresponding source: $($sourceArchive.Source) SHA-256 $($sourceArchive.Hash)"
+}
 [System.IO.File]::WriteAllLines(
     (Join-Path $stageRoot 'BUILD-INFO.txt'),
     $buildLines,
@@ -306,7 +394,7 @@ if (-not $notesMatch.Success) {
 $notes = $notesMatch.Groups['body'].Value.Trim() + [Environment]::NewLine
 [System.IO.File]::WriteAllText($notesPath, $notes, [System.Text.UTF8Encoding]::new($false))
 
-foreach ($image in $releaseImages) {
+foreach ($image in $activeReleaseImages) {
     $source = Join-Path $repoRoot $image.Source
     $destination = Join-Path $OutputDirectory $image.Name
     Copy-Item -LiteralPath $source -Destination $destination -Force
@@ -322,7 +410,13 @@ if ($dllFiles.Count -ne $manifest.Services.Count) {
 $relativeStageFiles = @($stageFiles | ForEach-Object {
     $_.FullName.Substring($stageRoot.Length).TrimStart('\').Replace('\', '/')
 })
-$requiredEntries = @($sourceFiles.Destination + $serviceInputs.Destination + @('Dashboard/web/index.html', 'BUILD-INFO.txt'))
+$requiredEntries = @(
+    $sourceFiles.Destination +
+    $serviceInputs.Destination +
+    $serviceCompanionInputs.Destination +
+    $sourceArchiveInputs.Destination +
+    @('Dashboard/web/index.html', 'BUILD-INFO.txt')
+)
 foreach ($required in $requiredEntries) {
     if ($relativeStageFiles -notcontains $required) {
         throw "Unpacked package is missing: $required"
@@ -371,9 +465,17 @@ Write-Host "  Unpacked: $stageRoot"
 Write-Host "  ZIP:      $zipPath"
 Write-Host "  SHA-256:  $($hash.Hash.ToLowerInvariant())"
 Write-Host "  Notes:    $notesPath"
-Write-Host '  Images:'
-foreach ($imagePath in $releaseImagePaths) {
-    Write-Host "             $imagePath"
+if ($releaseImagePaths.Count -gt 0) {
+    Write-Host '  Images:'
+    foreach ($imagePath in $releaseImagePaths) {
+        Write-Host "             $imagePath"
+    }
+}
+if ($sourceArchiveOutputPaths.Count -gt 0) {
+    Write-Host '  Source:'
+    foreach ($sourceArchivePath in $sourceArchiveOutputPaths) {
+        Write-Host "             $sourceArchivePath"
+    }
 }
 
 if (-not $CreateDraftRelease) {
@@ -386,7 +488,7 @@ Write-Step 'Creating draft GitHub release'
 $releaseArguments = @(
     'release', 'create', "v$Version",
     $zipPath, $checksumPath
-) + $releaseImagePaths + @(
+) + $sourceArchiveOutputPaths + $releaseImagePaths + @(
     '--repo', $Repository,
     '--target', $Target,
     '--title', "Woobie's Mission Control v$Version",

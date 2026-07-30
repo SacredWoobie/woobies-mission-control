@@ -32,7 +32,11 @@ export function headerSnapshotsEqual(
   left: TelemetrySnapshot | null,
   right: TelemetrySnapshot | null,
 ) {
-  return fieldsEqual(left, right, ["context.mode", "v.name", "editor.craftName"]);
+  return fieldsEqual(left, right, [
+    "context.mode", "v.name", "editor.craftName", "identity.available", "game.saveFolder",
+    "v.guid", "v.persistentId", "v.rootPartPersistentId", "v.partPersistentIds",
+    "editor.craftPersistentId", "editor.rootPartPersistentId", "editor.partPersistentIds",
+  ]);
 }
 
 export function consumablesSnapshotsEqual(
@@ -42,7 +46,7 @@ export function consumablesSnapshotsEqual(
   const names = new Set([
     ...((left?.["res.names"] as string[] | undefined) ?? []),
     ...((right?.["res.names"] as string[] | undefined) ?? []),
-  ]);
+  ].filter((name) => name !== "ElectricCharge"));
   const keys = ["context.mode", "res.names", "res.stageKnown"];
   names.forEach((name) => keys.push(
     `r.resource[${name}]`,
@@ -126,7 +130,11 @@ export function notesSnapshotsEqual(
 ) {
   if (left === right) return true;
   if (!left || !right) return false;
-  const keys = new Set(["context.mode", "v.name"]);
+  const keys = new Set([
+    "context.mode", "v.name", "identity.available", "game.saveFolder",
+    "v.guid", "v.persistentId", "v.rootPartPersistentId", "v.partPersistentIds",
+    "editor.craftPersistentId", "editor.rootPartPersistentId", "editor.partPersistentIds",
+  ]);
   [...Object.keys(left), ...Object.keys(right)].forEach((key) => {
     if (key.startsWith("notes.")) keys.add(key);
   });
@@ -134,7 +142,7 @@ export function notesSnapshotsEqual(
 }
 
 export function clockSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "t.universalTime", "v.missionTime", "rt.available", "rt.hasConnection", "rt.signalDelay", "comm.krpc.canCommunicate", "comm.krpc.signalStrength"]);
+  return fieldsEqual(left, right, ["context.mode", "t.universalTime", "v.name", "v.body", "v.situationString", "v.missionTime", "rt.available", "rt.hasConnection", "rt.signalDelay", "comm.krpc.canCommunicate", "comm.krpc.signalStrength"]);
 }
 
 export function ascensionSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
@@ -150,7 +158,30 @@ export function heatSnapshotsEqual(left: TelemetrySnapshot | null, right: Teleme
 }
 
 export function electricitySnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "elec.reactors", "elec.totalGenEcPerSec", "elec.otherEcPerSec", "solar.count", "solar.outputEcPerSec", "solar.efficiency", "rtg.count", "rtg.outputEcPerSec"]);
+  return fieldsEqual(left, right, [
+    "context.mode",
+    "elec.reactors",
+    "elec.sources",
+    "elec.totalGenEcPerSec",
+    "elec.otherEcPerSec",
+    "elec.otherCount",
+    "elec.netEcPerSec",
+    "elec.drawEcPerSec",
+    "elec.flowState",
+    "solar.count",
+    "solar.outputEcPerSec",
+    "solar.efficiency",
+    "solar.forecast",
+    "rtg.count",
+    "rtg.outputEcPerSec",
+    "fuelCell.count",
+    "fuelCell.activeCount",
+    "fuelCell.outputEcPerSec",
+    "fuelCell.runtimeSeconds",
+    "fuelCell.limitingResource",
+    "r.resource[ElectricCharge]",
+    "r.resourceMax[ElectricCharge]",
+  ]);
 }
 
 export function scienceSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
@@ -166,7 +197,10 @@ export function pinnedNoteSnapshotsEqual(left: TelemetrySnapshot | null, right: 
 }
 
 export function flightAvailabilitySnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "tar.name", "notes.pinnedPath"]);
+  return fieldsEqual(left, right, [
+    "context.mode", "tar.name", "notes.pinnedPath", "identity.available", "game.saveFolder",
+    "v.name", "v.guid", "v.persistentId", "v.rootPartPersistentId", "v.partPersistentIds",
+  ]);
 }
 
 export function overviewSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
@@ -176,6 +210,12 @@ export function overviewSnapshotsEqual(left: TelemetrySnapshot | null, right: Te
     "overview.science", "overview.reputation", "overview.contractCounts",
     "overview.contracts", "overview.vessels", "overview.vesselsTruncated",
     "overview.roster", "overview.rosterAvailable", "overview.alarms",
-    "overview.alarmProviders",
+    "overview.alarmProviders", "mj.transfer.available",
+    "mj.transfer.compatibilityReady", "mj.transfer.windows.requestId",
+    "mj.transfer.windows.state", "mj.transfer.windows.origin",
+    "mj.transfer.windows.activeDestination", "mj.transfer.windows.completedCount",
+    "mj.transfer.windows.totalCount", "mj.transfer.windows.progress",
+    "mj.transfer.windows.refreshedAtUT", "mj.transfer.windows.results",
+    "mj.transfer.windows.pauseReason", "mj.transfer.windows.error",
   ]);
 }

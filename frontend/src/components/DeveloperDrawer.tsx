@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PRODUCT_VERSION } from "../buildIdentity";
 import type { SceneMode } from "../telemetry/types";
 import { useLiveDiagnostics } from "../telemetry/useLiveTelemetry";
 
@@ -56,7 +57,7 @@ export function DeveloperDrawer({
           <header>
             <div>
               <strong>Dashboard developer controls</strong>
-              <span>Development only · v0.2.3 baseline</span>
+              <span>v{PRODUCT_VERSION} development</span>
             </div>
             <button aria-label="Close dashboard developer controls" onClick={() => setOpen(false)} type="button">×</button>
           </header>

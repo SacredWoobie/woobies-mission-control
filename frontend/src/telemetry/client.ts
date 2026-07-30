@@ -1,4 +1,9 @@
-import type { TelemetryCommand, TelemetrySnapshot } from "./types";
+import type {
+  MissionPlanningPersistenceSection,
+  MissionPlanningPersistenceState,
+  TelemetryCommand,
+  TelemetrySnapshot,
+} from "./types";
 
 export type ConnectionStatus = "offline" | "connecting" | "linked" | "retrying";
 
@@ -13,6 +18,7 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
   onStatus(status: ConnectionStatus, message?: string): void;
 }
@@ -49,6 +55,68 @@ export function parseTelemetrySnapshot(raw: unknown): TelemetrySnapshot | null {
         : "flight";
 
   return { ...candidate, "context.mode": mode } as TelemetrySnapshot;
+}
+
+const persistenceSections = new Set<MissionPlanningPersistenceSection>([
+  "resonant",
+  "deltaVLibrary",
+  "deltaVDraft",
+]);
+const persistenceStatuses = new Set<MissionPlanningPersistenceState["status"]>([
+  "ok",
+  "merged",
+  "unchanged",
+  "updated",
+  "conflict",
+  "invalid",
+  "too_large",
+  "error",
+]);
+
+export function parseMissionPlanningPersistenceState(raw: unknown): MissionPlanningPersistenceState | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "mission.planning.persistence.state"
+    || typeof candidate.requestId !== "string"
+    || !persistenceSections.has(candidate.section as MissionPlanningPersistenceSection)
+    || typeof candidate.revision !== "number"
+    || !Number.isSafeInteger(candidate.revision)
+    || candidate.revision < 0
+    || !persistenceStatuses.has(candidate.status as MissionPlanningPersistenceState["status"])
+    || typeof candidate.message !== "string"
+  ) return null;
+
+  return {
+    type: "mission.planning.persistence.state",
+    requestId: candidate.requestId,
+    section: candidate.section as MissionPlanningPersistenceSection,
+    value: candidate.value,
+    revision: candidate.revision,
+    status: candidate.status as MissionPlanningPersistenceState["status"],
+    message: candidate.message,
+  };
+}
+
+function isMissionPlanningPersistenceStateMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "mission.planning.persistence.state",
+    );
+  } catch {
+    return false;
+  }
 }
 
 export class TelemetryClient {
@@ -146,6 +214,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const persistenceState = parseMissionPlanningPersistenceState(event.data);
+      if (persistenceState) {
+        this.callbacks.onPersistenceState?.(persistenceState);
+        return;
+      }
+      if (isMissionPlanningPersistenceStateMessage(event.data)) return;
       const snapshot = parseTelemetrySnapshot(event.data);
       if (snapshot) this.callbacks.onSnapshot(snapshot);
     };

@@ -23,6 +23,84 @@ def read_manifest(path):
 
 
 class ReleaseContractTests(unittest.TestCase):
+    def test_v040_release_pack_records_licenses_sources_and_screenshot_slots(self):
+        release_pack = (
+            ROOT / "tools" / "Release-Pack-v0.4.0.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('ProductVersion = "0.4.0"', release_pack)
+        expected_services = {
+            "WoobiesControlStats": (
+                "0.2.1.0",
+                "8ADFC473189A0BE978E4DFB29CE66BD734C81BC4F7496D972DE2F4DBB9E12AA4",
+            ),
+            "KRPC.StageStats": (
+                "0.2.5.0",
+                "FDCACF4BDB71551BC80FD06C2522C1C5620A5E146B4B667B8128CDF7740CF67E",
+            ),
+            "KRPC.SystemHeat": (
+                "0.2.2.0",
+                "2265CC09E391A629D5281EA0BB74B47CBC4311AD40F1B14DA9C273D0CED723EF",
+            ),
+            "KRPC.WoobiesMechJeb": (
+                "0.8.6.0",
+                "0B6EF8FDF2567F6BDD80C639C06C3707B02C6B6BDEDEF65A8DE9EEED3FF94C3A",
+            ),
+        }
+        for service, (version, sha256) in expected_services.items():
+            self.assertRegex(
+                release_pack,
+                rf'(?s)Folder = "{re.escape(service)}".*?'
+                rf'Version = "{re.escape(version)}".*?'
+                rf'Sha256 = "{sha256}"',
+            )
+
+        self.assertIn('License = "GPL-3.0-only"', release_pack)
+        self.assertIn(
+            'SourceCommit = "25e80bf1fe0da4426759e919b378488a13b93534"',
+            release_pack,
+        )
+        self.assertIn(
+            'SourceArchive = "KRPC.WoobiesMechJeb-0.8.6-source.zip"',
+            release_pack,
+        )
+        self.assertIn(
+            'SourceArchiveSha256 = '
+            '"E65E11040E9AA55F961CC1EA42F67E406CEC759FB6A9F5F69B16150DE5B871F5"',
+            release_pack,
+        )
+        self.assertIn('RequiredPackageFiles = @("LICENSE", "NOTICE.md")', release_pack)
+        self.assertIn('DashboardCreditRequired = $false', release_pack)
+        self.assertIn('Bundled = $false', release_pack)
+
+        for dependency in (
+            "React",
+            "React DOM",
+            "Scheduler",
+            "ResonantOrbitCalculator",
+            "Eric Meyer's original Resonant Orbit Calculator",
+        ):
+            self.assertIn(f'Name = "{dependency}"', release_pack)
+
+        screenshot_brief = (
+            ROOT / "docs" / "images" / "v0.4.0" / "README.md"
+        ).read_text(encoding="utf-8")
+        screenshot_names = re.findall(
+            r"\| \d \| (?:not ready|ready|captured|approved) "
+            r"\| `([^`]+\.png)` \|",
+            screenshot_brief,
+        )
+        self.assertEqual(
+            screenshot_names,
+            [
+                "space-center-overview.png",
+                "resonant-orbit-planner.png",
+                "delta-v-planner.png",
+                "editor-vab-mission-plan.png",
+                "flight-dashboard-mission-planning.png",
+            ],
+        )
+
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
             "release_launcher", ROOT / "ksp_dashboard_app.py"
@@ -71,17 +149,23 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("requirements-panel.txt", batch)
 
     def test_release_inputs_include_current_scene_images(self):
-        image_root = ROOT / "docs" / "images" / "v0.3.0"
-        required = {
-            "flight-dashboard-landscape.png",
-            "mission-control-landscape.png",
-            "editor-vab-landscape.png",
-            "launcher.png",
-            "notes-drawer.png",
-        }
-        actual = {path.name for path in image_root.glob("*.png")}
-        self.assertTrue(required.issubset(actual))
-        self.assertFalse(any(" " in name or "&" in name for name in actual))
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        screenshot_brief = (
+            ROOT / "docs" / "images" / "v0.4.0" / "README.md"
+        ).read_text(encoding="utf-8")
+        gallery_brief, supplemental_brief = screenshot_brief.split(
+            "## Supplemental documentation captures", 1
+        )
+        required = re.findall(r"`([^`]+\.png)`", gallery_brief)
+        supplemental = re.findall(r"`([^`]+\.png)`", supplemental_brief)
+        self.assertEqual(len(required), 5)
+        for name in required:
+            self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
+        for name in supplemental:
+            self.assertNotIn(f"docs/images/v0.4.0/{name}", publish_script)
+        self.assertFalse(any(" " in name or "&" in name for name in required))
 
     def test_release_assets_sort_zip_before_curated_images(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
@@ -94,22 +178,49 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(
             image_names,
             [
-                "zz-01-flight-dashboard.png",
-                "zz-02-mission-control.png",
-                "zz-03-vab-editor.png",
-                "zz-04-launcher.png",
-                "zz-05-notes-drawer.png",
+                "zz-01-space-center-overview.png",
+                "zz-02-resonant-orbit-planner.png",
+                "zz-03-delta-v-planner.png",
+                "zz-04-editor-vab-mission-plan.png",
+                "zz-05-flight-dashboard-mission-planning.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.3.0.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.0.zip"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.3.0.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.0.{name}" for name in image_names
         ]
         self.assertEqual(
             sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name
         )
         self.assertIn("$zipPath, $checksumPath", publish_script)
-        self.assertIn(") + $releaseImagePaths + @(", publish_script)
+        self.assertIn(
+            ") + $sourceArchiveOutputPaths + $releaseImagePaths + @(",
+            publish_script,
+        )
+
+    def test_release_package_includes_runtime_and_license_materials(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        for module in (
+            "electricity.py",
+            "heat.py",
+            "mission_planning.py",
+            "planner_persistence.py",
+            "staging.py",
+            "telemetry_runtime.py",
+        ):
+            self.assertIn(
+                f"Destination = 'Dashboard/{module}'",
+                publish_script,
+            )
+        self.assertIn(
+            "Destination = 'THIRD-PARTY/NOTICES.md'",
+            publish_script,
+        )
+        self.assertIn("RequiredPackageFiles", publish_script)
+        self.assertIn("SourceArchiveSha256", publish_script)
+        self.assertIn('Destination = "SOURCE/', publish_script)
 
 
 if __name__ == "__main__":

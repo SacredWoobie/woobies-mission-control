@@ -1,11 +1,12 @@
-import { useState } from "react";
 import {
   formatMissionDuration,
+  formatPercent,
   formatSignalDelay,
   formatUniversalTime,
   isFiniteNumber,
 } from "../telemetry/formatters";
 import type { SceneMode, TelemetrySnapshot } from "../telemetry/types";
+import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { Panel } from "./Panel";
 
 interface FlightStatusPanelsProps {
@@ -43,7 +44,8 @@ export function DatalinkPanel({
 }
 
 export function ClockPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
-  const [kerbin, setKerbin] = useState(true);
+  const { system, toggleSystem } = useTimeSystem();
+  const kerbin = isKerbinTime(system);
   const ut = formatUniversalTime(snapshot["t.universalTime"], kerbin);
   const met = snapshot["v.missionTime"];
   const remoteTech = snapshot["rt.available"] === true;
@@ -52,19 +54,29 @@ export function ClockPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const connected = remoteTech ? remoteConnection : stockConnection;
   const strength = snapshot["comm.krpc.signalStrength"];
   const commText = connected === true
-    ? `CONNECTED${!remoteTech && isFiniteNumber(strength) && strength > 0 ? ` · ${Math.round(strength * 100)}%` : ""}`
+    ? `CONNECTED${!remoteTech && isFiniteNumber(strength) && strength > 0 ? ` · ${formatPercent(strength * 100)}` : ""}`
     : connected === false ? "NO SIGNAL" : "—";
   const delay = snapshot["rt.available"] === false
-    ? "RemoteTech not installed"
+    ? "No command delay"
     : remoteConnection === false ? "NO CONNECTION" : formatSignalDelay(snapshot["rt.signalDelay"]);
+  const vesselName = String(snapshot["v.name"] ?? "Active vessel");
+  const vesselBody = String(snapshot["v.body"] ?? "Unknown body");
+  const situation = String(snapshot["v.situationString"] ?? "Situation unknown");
 
   return (
-    <Panel hideable id="clock" title="Time & communications">
+    <Panel id="clock" title="Flight context">
+      <div className="flight-context-identity">
+        <span className="label">Active vessel</span>
+        <strong>{vesselName}</strong>
+        <span>{vesselBody} · {situation}</span>
+      </div>
       <div className="clock-grid">
         <div className="clockcell">
-          <div className="label">Universal Time <button className="calendar-toggle" onClick={() => setKerbin((value) => !value)} type="button">[{kerbin ? "KERBIN" : "EARTH"}]</button></div>
-          <div className="big">{ut.big}</div>
-          <div className="sub">{ut.sub || "awaiting link"}</div>
+          <div className="label">Universal Time <button aria-label={`Time system: ${kerbin ? "Kerbin" : "Earth"}`} className="calendar-toggle" onClick={toggleSystem} type="button">[{kerbin ? "KERBIN" : "EARTH"}]</button></div>
+          <div className="clock-primary-row">
+            <div className="big">{ut.big}</div>
+            <div className="sub">{ut.sub || "awaiting link"}</div>
+          </div>
         </div>
         <div className="clockcell met-cell">
           <div className="label">Mission Elapsed</div>
@@ -78,7 +90,7 @@ export function ClockPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
           <span className="cs-status"><span className={`led2 ${connected === true ? "ok" : connected === false ? "bad" : ""}`} />{commText}</span>
         </div>
         <div className="cs-cell">
-          <span className="label">Signal delay <span className="label-muted">(RemoteTech via kRPC)</span></span>
+          <span className="label">Signal delay</span>
           <span className="cs-val">{delay}</span>
         </div>
       </div>

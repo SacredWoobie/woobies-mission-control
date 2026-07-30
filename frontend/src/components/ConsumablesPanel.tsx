@@ -1,4 +1,4 @@
-import { formatResourceAmount, humanizeResourceName } from "../telemetry/formatters";
+import { formatResourcePair, humanizeResourceName } from "../formatting/numbers";
 import { selectConsumables } from "../telemetry/selectors";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
@@ -16,6 +16,7 @@ function ResourceMeter({
   const percent = fraction === undefined ? 0 : Math.round(fraction * 100);
   const severity = resourceSeverity(percent);
   const hasCapacity = maximum !== undefined && maximum > 0;
+  const amount = formatResourcePair(current, maximum);
 
   return (
     <div
@@ -30,8 +31,8 @@ function ResourceMeter({
         <span className={`fill ${severity}`} style={{ width: `${percent}%` }} />
       </div>
       <span className="cap" aria-hidden="true">
-        <span>{hasCapacity ? formatResourceAmount(current, maximum) : "—"}</span>
-        <span className="k">/ {hasCapacity ? formatResourceAmount(maximum, maximum) : "—"}</span>
+        <span>{hasCapacity ? amount.value : "—"}</span>
+        <span className="k">/ {hasCapacity ? amount.capacity : "—"}</span>
       </span>
     </div>
   );
@@ -42,7 +43,7 @@ export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
   const stageKnown = snapshot["res.stageKnown"] !== false;
 
   return (
-    <Panel hideable id="cons" title="Consumables" tag="Vessel total · Current stage">
+    <Panel hideable id="cons" title="Consumables">
       <div className="col-heads" aria-hidden="true">
         <span />
         <span>Vessel total</span>

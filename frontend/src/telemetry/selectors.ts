@@ -8,7 +8,6 @@ import type {
 } from "./types";
 
 const resourceDisplayOrder = [
-  "ElectricCharge",
   "MonoPropellant",
   "LiquidFuel",
   "Oxidizer",
@@ -48,7 +47,9 @@ function resourceAmount(
 }
 
 export function selectConsumables(snapshot: TelemetrySnapshot): ConsumableViewModel[] {
-  const names = Array.isArray(snapshot["res.names"]) ? snapshot["res.names"] : [];
+  const names = Array.isArray(snapshot["res.names"])
+    ? snapshot["res.names"].filter((name) => name !== "ElectricCharge")
+    : [];
   const ordered = [
     ...resourceDisplayOrder.filter((name) => names.includes(name)),
     ...names.filter((name) => !preferredResources.has(name)),
@@ -81,6 +82,8 @@ function allStageRows(snapshot: TelemetrySnapshot): StageViewModel[] {
     deltaVVacuum: stage.dvVac,
     twrAtmosphere: stage.twrAtmo ?? stage.twr,
     twrVacuum: stage.twrVac ?? stage.twr,
+    twrStart: stage.twrStart ?? stage.twrAtmo ?? stage.twr,
+    twrEnd: stage.twrEnd ?? stage.twrStart ?? stage.twrAtmo ?? stage.twr,
     burnSeconds: stage.burn,
   }));
 }
@@ -105,23 +108,33 @@ export function selectStageSummary(
   snapshot: TelemetrySnapshot,
   condition: StageCondition,
 ): StageSummaryViewModel {
-  const rows = selectStages(snapshot, condition);
-  const rawCurrent = snapshot["stage.currentKsp"];
+  const rows = selectStages(snapshot);
+  const rawCurrent = snapshot["stage.activeKsp"] ?? snapshot["stage.currentKsp"];
   const currentKsp =
     typeof rawCurrent === "number" && Number.isFinite(rawCurrent)
       ? Math.round(rawCurrent)
       : undefined;
-  const current =
+  let current =
     currentKsp === undefined
       ? rows.reduce<StageViewModel | undefined>(
           (highest, stage) => (!highest || stage.ksp > highest.ksp ? stage : highest),
           undefined,
         )
       : rows.find((stage) => stage.ksp === currentKsp);
+  if (!current && snapshot["context.mode"] === "flight" && currentKsp !== undefined) {
+    current = rows.reduce<StageViewModel | undefined>(
+      (nearest, stage) => (
+        stage.ksp <= currentKsp && (!nearest || stage.ksp > nearest.ksp)
+          ? stage
+          : nearest
+      ),
+      undefined,
+    );
+  }
   const totalKey = condition === "vacuum" ? "stage.totalDvVac" : "stage.totalDvAtmo";
 
   return {
-    currentKsp: currentKsp ?? current?.ksp,
+    currentKsp: current?.ksp ?? currentKsp,
     current,
     totalDeltaV: numberField(snapshot, totalKey),
   };
