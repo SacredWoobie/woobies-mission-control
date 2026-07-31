@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   formatDistance,
   formatEccentricity,
@@ -14,6 +14,7 @@ import type {
   OverviewContractTelemetry,
   OverviewCrewTelemetry,
   OverviewVesselTelemetry,
+  OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "../telemetry/types";
@@ -115,7 +116,13 @@ function VesselTypeFilter({ rows, excluded, onToggle, onReset }: {
   </div>;
 }
 
-function FleetSection({ kerbin, rows }: { kerbin: boolean; rows: OverviewVesselTelemetry[] }) {
+function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResult }: {
+  commandEnabled: boolean;
+  kerbin: boolean;
+  onSendCommand(command: TelemetryCommand): boolean;
+  rows: OverviewVesselTelemetry[];
+  switchResult?: OverviewVesselSwitchResult;
+}) {
   const [query, setQuery] = useState("");
   const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set(["Debris"]));
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -124,6 +131,9 @@ function FleetSection({ kerbin, rows }: { kerbin: boolean; rows: OverviewVesselT
   const [sort, setSort] = useState("name");
   const [direction, setDirection] = useState<SortDirection>("asc");
   const [selectedVesselKey, setSelectedVesselKey] = useState("");
+  const [switchError, setSwitchError] = useState("");
+  const [switchRequestId, setSwitchRequestId] = useState("");
+  const [switchingVesselKey, setSwitchingVesselKey] = useState("");
   const trackedRows = useMemo(() => rows.filter((row) => trackedVesselTypeSet.has(row.type)), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -157,12 +167,47 @@ function FleetSection({ kerbin, rows }: { kerbin: boolean; rows: OverviewVesselT
     selected.inclination,
     selected.eccentricity,
   ].some(isFiniteNumber) || selectedHasPeriod : false;
+  const selectedKey = selected ? vesselKey(selected) : "";
+
+  useEffect(() => {
+    setSwitchError("");
+    setSwitchRequestId("");
+    setSwitchingVesselKey("");
+  }, [selectedKey]);
+
+  useEffect(() => {
+    if (!switchRequestId || switchResult?.requestId !== switchRequestId) return;
+    if (switchResult.status === "error") {
+      setSwitchError(switchResult.message);
+      setSwitchRequestId("");
+      setSwitchingVesselKey("");
+    }
+  }, [switchRequestId, switchResult]);
 
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
     if (next.has(type)) next.delete(type); else next.add(type);
     return next;
   });
+
+  const switchToSelected = () => {
+    if (!selected?.objectId || !commandEnabled || switchRequestId) return;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `vessel-switch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand({
+      type: "overview.vessel.switch",
+      requestId,
+      objectId: selected.objectId,
+      ...(selected.guid ? { expectedGuid: selected.guid } : {}),
+    });
+    if (!sent) {
+      setSwitchError("Mission Control is not connected to KSP.");
+      return;
+    }
+    setSwitchError("");
+    setSwitchRequestId(requestId);
+    setSwitchingVesselKey(selectedKey);
+  };
 
   return <section className="overview-section overview-fleet">
     <SectionHeader count={visible.length} panelId="overviewFleet" title="Active vessels">
@@ -210,6 +255,10 @@ function FleetSection({ kerbin, rows }: { kerbin: boolean; rows: OverviewVesselT
           {selectedHasPeriod && <div><span>Period</span><strong>{formatOrbitPeriod(selected.period, selected.eccentricity, kerbin)}</strong></div>}
           {isFiniteNumber(selected.eccentricity) && <div><span>Eccentricity</span><strong>{formatEccentricity(selected.eccentricity)}</strong></div>}
         </div>}
+        <div className="overview-vessel-actions">
+          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId)} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? "SWITCHING…" : "SWITCH TO VESSEL"}</button>
+          {switchError && <span className="overview-command-error" role="alert">{switchError}</span>}
+        </div>
       </article> : <div className="overview-vessel-detail overview-vessel-detail-empty"><span>Select a vessel to inspect its mission status.</span></div>}
     </div>
   </section>;
@@ -372,7 +421,7 @@ export function MissionOverview({
         (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
         contracts.length > 0 ? "" : "contracts-empty",
       ].filter(Boolean).join(" ")}>
-        {fleetVisible && <FleetSection kerbin={kerbin} rows={snapshot["overview.vessels"] ?? []} />}
+        {fleetVisible && <FleetSection commandEnabled={commandEnabled} kerbin={kerbin} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={snapshot["overview.vesselSwitchResult"]} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
         {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" />{contracts.length > 0 && <div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>}</section>}

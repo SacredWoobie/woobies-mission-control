@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { inactiveTelemetryFixture } from "../telemetry/fixtures";
-import type { TelemetrySnapshot } from "../telemetry/types";
+import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 import { MissionOverview } from "./MissionOverview";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 
@@ -17,7 +17,7 @@ function renderOverview(snapshot: TelemetrySnapshot = inactiveTelemetryFixture) 
 }
 
 describe("MissionOverview", () => {
-  it("filters and sorts the read-only fleet and roster", () => {
+  it("filters and sorts the fleet and roster", () => {
     renderOverview();
 
     expect(screen.queryByText("READ ONLY", { exact: true })).toBeNull();
@@ -225,6 +225,54 @@ describe("MissionOverview", () => {
     fireEvent.change(within(fleet).getByLabelText("SOI"), { target: { value: "Kerbin" } });
     expect(within(fleet).queryByRole("button", { name: "Select Duna Relay 1" })).toBeNull();
     expect(fleet.querySelector(".overview-vessel-detail")?.textContent).not.toContain("Duna Relay 1");
+  });
+
+  it("sends an identity-guarded vessel switch and shows a rejected result", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const view = render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    fireEvent.click(within(fleet).getByRole("button", { name: "Select Duna Relay 1" }));
+
+    const switchButton = within(fleet).getByRole("button", { name: "Switch to Duna Relay 1" });
+    fireEvent.click(switchButton);
+
+    expect(onSendCommand).toHaveBeenCalledTimes(1);
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.switch") throw new Error("Unexpected vessel switch command");
+    expect(command).toMatchObject({
+      type: "overview.vessel.switch",
+      objectId: "103",
+      expectedGuid: "mock-duna-relay-guid",
+    });
+    expect(command.requestId).toBeTruthy();
+    expect(switchButton.textContent).toBe("SWITCHING…");
+    expect(switchButton.hasAttribute("disabled")).toBe(true);
+
+    view.rerender(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={{
+          ...inactiveTelemetryFixture,
+          "overview.vesselSwitchResult": {
+            requestId: command.requestId,
+            status: "error",
+            message: "That vessel changed after it was selected.",
+          },
+        }} />
+      </PanelVisibilityProvider>,
+    );
+
+    expect(within(fleet).getByRole("alert").textContent).toContain("changed");
+    expect(within(fleet).getByRole("button", { name: "Switch to Duna Relay 1" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("disables vessel switching when the dashboard command channel is unavailable", () => {
+    renderOverview();
+    const button = screen.getByRole("button", { name: /^Switch to / });
+    expect(button.hasAttribute("disabled")).toBe(true);
   });
 
   it("keeps same-named vessels distinct using connection-scoped object IDs", () => {

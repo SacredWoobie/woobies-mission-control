@@ -25,11 +25,12 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
   </a>
 </p>
 
-At the Space Center and Tracking Station, the dashboard becomes a read-only
-program overview. It brings together funds, science, reputation, contracts,
-tracked vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms.
-The transfer-window board uses the current game's body catalog, so supported
-planet packs appear alongside the stock system.
+At the Space Center and Tracking Station, the dashboard becomes a program
+overview. It brings together funds, science, reputation, contracts, tracked
+vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms. A
+guarded action can switch KSP to the vessel selected in the fleet detail. The
+transfer-window board uses the current game's body catalog, so supported planet
+packs appear alongside the stock system.
 
 ### Mission planning
 
@@ -92,7 +93,8 @@ does not execute nodes, warp, steer, stage, or change throttle.
   porkchop selection.
 - Flight engineering for orbit, staging, resources, electrical generation,
   System Heat or stock thermal data, science, targets, and docking.
-- Read-only Space Center and Tracking Station views for the current save.
+- Space Center and Tracking Station views with guarded switching to a selected
+  vessel.
 - VAB/SPH craft totals and atmospheric or vacuum stage simulation.
 - Optional Notes, Kerbal Alarm Clock, RemoteTech, System Heat, and ESP32
   integrations without making them requirements for the rest of the dashboard.
@@ -142,9 +144,12 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
 ## Safety and local data
 
 - Dashboard telemetry, alarms, Notes, overview data, and planning calculations
-  stay read-only.
-- Transfer-node creation is the dashboard's only direct KSP write. It requires
-  a fresh preview and a second confirmation and creates exactly one node.
+  stay read-only; switching to an explicitly selected vessel changes the active
+  KSP scene but does not alter its controls.
+- Overview vessel switching validates the current connection-scoped object ID
+  and expected KSP vessel GUID before acting.
+- Transfer-node creation requires a fresh preview and a second confirmation and
+  creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple
   dashboard tabs and scenes see the same saved plans.
 - The WebSocket feed has no authentication. Keep it on `127.0.0.1`.

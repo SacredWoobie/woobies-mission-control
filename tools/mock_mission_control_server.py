@@ -142,6 +142,7 @@ def initial_note_state():
         "selected": NOTE,
         "selection_mode": "active",
         "favorite": True,
+        "vessel_switch_result": None,
     }
 
 
@@ -175,6 +176,10 @@ def build_payload(
             "isFavorite": note_state["favorite"],
         },
     ]
+    if note_state["vessel_switch_result"] is not None:
+        payload["overview.vesselSwitchResult"] = note_state[
+            "vessel_switch_result"
+        ]
 
     if scene == "editor":
         payload.update({
@@ -241,6 +246,12 @@ async def receive_commands(
             note_state["selection_mode"] = "browse" if path else "active"
         elif kind == "notes.favorite":
             note_state["favorite"] = bool(command.get("favorite"))
+        elif kind == "overview.vessel.switch":
+            note_state["vessel_switch_result"] = {
+                "requestId": str(command.get("requestId", "")),
+                "status": "error",
+                "message": "The mock dashboard cannot switch live KSP vessels.",
+            }
         else:
             await mission_planning.apply_command(command)
 

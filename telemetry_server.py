@@ -137,6 +137,7 @@ _overview_cache = {
 }
 _overview_last_poll = {key: 0.0 for key in _overview_cache}
 _overview_last_ut = None
+_overview_vessel_switch_result = None
 _mission_planning = MissionPlanningController()
 _electricity_flow = ElectricityFlowEstimator()
 
@@ -1992,6 +1993,10 @@ def _apply_telemetry_command(conn, command):
     if _mission_planning.apply_command(conn, command):
         return
 
+    if command.get("type") == "overview.vessel.switch":
+        _apply_overview_vessel_switch_command(conn, command)
+        return
+
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
         if pinned is None or pinned == "":
@@ -2337,6 +2342,84 @@ def _overview_list(obj, name):
         return []
 
 
+def _set_overview_vessel_switch_result(request_id, status, message):
+    global _overview_vessel_switch_result
+    _overview_vessel_switch_result = {
+        "requestId": request_id,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_overview_vessel_switch_command(conn, command):
+    """Switch to one exact overview vessel, rejecting stale identities."""
+    request_id = command.get("requestId")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return
+
+    def reject(message):
+        _set_overview_vessel_switch_result(request_id, "error", message)
+
+    raw_object_id = command.get("objectId")
+    if not isinstance(raw_object_id, str) or not raw_object_id.isdecimal():
+        reject("The selected vessel no longer has a valid live identity.")
+        return
+    object_id = int(raw_object_id)
+    if object_id <= 0:
+        reject("The selected vessel no longer has a valid live identity.")
+        return
+
+    expected_guid = command.get("expectedGuid")
+    if expected_guid is not None and (
+        not isinstance(expected_guid, str)
+        or not expected_guid
+        or len(expected_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        reject("The selected vessel identity is invalid.")
+        return
+
+    try:
+        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        if scene_name not in {"space center", "tracking station"}:
+            reject(
+                "Vessels can only be switched from the Space Center "
+                "or Tracking Station."
+            )
+            return
+
+        sc = conn.space_center
+        target = next((
+            vessel for vessel in _overview_list(sc, "vessels")
+            if _overview_value(vessel, "_object_id") == object_id
+        ), None)
+        if target is None:
+            reject(
+                "That vessel is no longer available. "
+                "Refresh the fleet and try again."
+            )
+            return
+
+        if expected_guid is not None:
+            current_guid = str(_overview_value(target, "id", "")).strip()
+            if current_guid != expected_guid:
+                reject(
+                    "That vessel changed after it was selected. "
+                    "Refresh the fleet and try again."
+                )
+                return
+
+        _set_overview_vessel_switch_result(
+            request_id, "accepted", "Switching to the selected vessel."
+        )
+        sc.active_vessel = target
+    except Exception:
+        reject("KSP could not switch to that vessel right now.")
+
+
 def _overview_capabilities(game_mode):
     normalized = str(game_mode or "").casefold().replace(" ", "_")
     if normalized == "career":
@@ -2616,13 +2699,15 @@ def _gather_overview_roster(conn):
 
 def _reset_overview_state():
     global _overview_cache, _overview_last_poll, _overview_last_ut
+    global _overview_vessel_switch_result
     _overview_cache = {key: {} for key in _overview_cache}
     _overview_last_poll = {key: 0.0 for key in _overview_last_poll}
     _overview_last_ut = None
+    _overview_vessel_switch_result = None
 
 
 def _gather_overview_telemetry(conn, scene, now=None):
-    """Return the read-only, independently throttled mission overview."""
+    """Return the independently throttled non-flight mission overview."""
     global _overview_last_ut
     if now is None:
         now = time.time()
@@ -2638,7 +2723,7 @@ def _gather_overview_telemetry(conn, scene, now=None):
         "flight.active": False,
         "editor.active": False,
         "overview.scene": _overview_label(scene, "Space Center"),
-        "overview.readOnly": True,
+        "overview.readOnly": False,
         "overview.refreshSeconds": {
             "economy": OVERVIEW_ECONOMY_POLL_SECONDS,
             "alarms": OVERVIEW_ALARMS_POLL_SECONDS,
@@ -2677,6 +2762,10 @@ def _gather_overview_telemetry(conn, scene, now=None):
             except Exception:
                 pass
         data.update(_overview_cache[name])
+    if _overview_vessel_switch_result is not None:
+        data["overview.vesselSwitchResult"] = dict(
+            _overview_vessel_switch_result
+        )
     return data
 
 

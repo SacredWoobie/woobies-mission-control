@@ -63,6 +63,7 @@ def fake_connection():
     )
     sc = SimpleNamespace(
         ut=1000,
+        active_vessel=None,
         game_mode="GameMode.career",
         funds=250000,
         science=42.5,
@@ -79,6 +80,7 @@ def fake_connection():
         alarm_manager=SimpleNamespace(alarms=[stock_alarm]),
     )
     return SimpleNamespace(
+        krpc=SimpleNamespace(current_game_scene="GameScene.space_center"),
         space_center=sc,
         mission_overview=MissionOverviewService(),
         kerbal_alarm_clock=SimpleNamespace(available=True, alarms=[kac_alarm]),
@@ -146,6 +148,74 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertEqual(
             [row["objectId"] for row in result["overview.vessels"]],
             ["101", "202"],
+        )
+
+    def test_switches_to_exact_object_id_after_guid_validation(self):
+        conn = fake_connection()
+        first = fake_vessel("Relay", "VesselType.relay", object_id=101)
+        second = fake_vessel("Relay", "VesselType.relay", object_id=202)
+        conn.space_center.vessels = [first, second]
+
+        telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.switch",
+            "requestId": "switch-1",
+            "objectId": "202",
+            "expectedGuid": "Relay-guid",
+        })
+
+        self.assertIs(conn.space_center.active_vessel, second)
+        payload = telemetry_server._gather_overview_telemetry(
+            conn, "GameScene.space_center", now=100
+        )
+        self.assertEqual(payload["overview.vesselSwitchResult"], {
+            "requestId": "switch-1",
+            "status": "accepted",
+            "message": "Switching to the selected vessel.",
+        })
+
+    def test_rejects_stale_guid_without_switching_vessels(self):
+        conn = fake_connection()
+        original = conn.space_center.vessels[0]
+        conn.space_center.active_vessel = original
+
+        telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.switch",
+            "requestId": "switch-stale",
+            "objectId": "2",
+            "expectedGuid": "old-guid",
+        })
+
+        self.assertIs(conn.space_center.active_vessel, original)
+        payload = telemetry_server._gather_overview_telemetry(
+            conn, "GameScene.space_center", now=100
+        )
+        self.assertEqual(
+            payload["overview.vesselSwitchResult"]["status"], "error"
+        )
+        self.assertIn(
+            "changed", payload["overview.vesselSwitchResult"]["message"]
+        )
+
+    def test_rejects_switch_outside_space_center_scenes(self):
+        conn = fake_connection()
+        conn.krpc.current_game_scene = "GameScene.flight"
+
+        telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.switch",
+            "requestId": "switch-flight",
+            "objectId": "1",
+            "expectedGuid": "Odyssey-guid",
+        })
+
+        self.assertIsNone(conn.space_center.active_vessel)
+        payload = telemetry_server._gather_overview_telemetry(
+            conn, "GameScene.space_center", now=100
+        )
+        self.assertEqual(
+            payload["overview.vesselSwitchResult"]["status"], "error"
+        )
+        self.assertIn(
+            "Space Center", payload["overview.vesselSwitchResult"]["message"]
         )
 
     def test_contract_rows_include_finite_completion_rewards(self):

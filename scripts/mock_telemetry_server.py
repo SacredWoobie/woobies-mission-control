@@ -201,7 +201,7 @@ SCENES = {
         "t.universalTime": 9_493_824,
         "overview.scene": "Tracking Station",
         "overview.gameMode": "Career",
-        "overview.readOnly": True,
+        "overview.readOnly": False,
         "overview.capabilities": {
             "funds": True,
             "science": True,
@@ -223,9 +223,9 @@ SCENES = {
             {"title": "Gather temperature data from Minmus", "type": "Science", "deadline": 11_400_000},
         ],
         "overview.vessels": [
-            {"objectId": "101", "name": "Odyssey", "type": "Ship", "situation": "Orbiting", "body": "Kerbin", "met": 134.2, "crewCount": 3, "mission": True, "apoapsisAltitude": 122_480, "periapsisAltitude": 118_920, "inclination": 0.12, "period": 2_080.4, "eccentricity": 0.0008},
+            {"objectId": "101", "guid": "mock-odyssey-guid", "name": "Odyssey", "type": "Ship", "situation": "Orbiting", "body": "Kerbin", "met": 134.2, "crewCount": 3, "mission": True, "apoapsisAltitude": 122_480, "periapsisAltitude": 118_920, "inclination": 0.12, "period": 2_080.4, "eccentricity": 0.0008},
             {"objectId": "102", "name": "Mun Surveyor", "type": "Probe", "situation": "Orbiting", "body": "Mun", "met": 282_844, "crewCount": 0, "mission": True},
-            {"objectId": "103", "name": "Duna Relay 1", "type": "Relay", "situation": "Orbiting", "body": "Duna", "met": 2_488_000, "crewCount": 0, "mission": True, "apoapsisAltitude": 2_880_420, "periapsisAltitude": 2_879_610, "inclination": 0.04, "period": 18_152.6, "eccentricity": 0.0001},
+            {"objectId": "103", "guid": "mock-duna-relay-guid", "name": "Duna Relay 1", "type": "Relay", "situation": "Orbiting", "body": "Duna", "met": 2_488_000, "crewCount": 0, "mission": True, "apoapsisAltitude": 2_880_420, "periapsisAltitude": 2_879_610, "inclination": 0.04, "period": 18_152.6, "eccentricity": 0.0001},
             {"objectId": "104", "name": "Kerbin Gateway", "type": "Station", "situation": "Orbiting", "body": "Kerbin", "met": 1_282_000, "crewCount": 6, "mission": True},
             {"objectId": "105", "name": "Minmus Hopper", "type": "Lander", "situation": "Landed", "body": "Minmus", "met": 92_300, "crewCount": 2, "mission": True},
             {"objectId": "106", "name": "Duna Pathfinder", "type": "Rover", "situation": "Landed", "body": "Duna", "met": 3_104_000, "crewCount": 0, "mission": True},
