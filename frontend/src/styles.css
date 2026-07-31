@@ -602,7 +602,7 @@ button { font: inherit; }
 .overview-roster-table thead th:nth-child(2) { width: 24%; }
 .overview-roster-table thead th:nth-child(3) { width: 18%; }
 .overview-roster-table thead th:nth-child(4), .overview-roster-table td:nth-child(4) { width: 44px; text-align: center; }
-.overview-roster-table thead th:nth-child(6), .overview-roster-table td:nth-child(6) { width: 54px; text-align: right; }
+.overview-roster-table thead th:nth-child(6), .overview-roster-table td:nth-child(6) { width: 60px; text-align: right; }
 .overview-roster-table .overview-roster-status-row th { position: static; padding: 5px 9px; box-shadow: none; background: #0b1119; }
 .overview-roster-status-row th { border-block: 1px solid var(--rule); }
 .overview-roster-status-row th > span { color: var(--slate-dim); }

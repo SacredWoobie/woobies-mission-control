@@ -309,6 +309,7 @@ describe("MissionOverview", () => {
     const valentinaRow = within(table).getByText("Valentina Kerman", { exact: true }).closest("tr")!;
 
     expect(within(table).getByText("Assignment", { exact: true })).toBeTruthy();
+    expect(within(table).getByRole("columnheader", { name: "Flights" }).textContent).toBe("FLTS");
     expect(jebRow.textContent).toContain("Odyssey");
     expect(jebRow.textContent).toContain("Pilot");
     expect(jebRow.textContent).toContain("8");

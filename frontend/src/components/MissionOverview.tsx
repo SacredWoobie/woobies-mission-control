@@ -272,7 +272,7 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
       </div></div>}
       <div className="overview-table-wrap overview-roster-table-wrap">
         {visible.length > 0 ? <table aria-label="Filtered Kerbonauts" className="overview-table overview-roster-table">
-          <thead><tr><th aria-label="Trait" className="overview-roster-trait-column" /><th>Name</th><th>Job</th><th>LV</th><th>Assignment</th><th>Flights</th></tr></thead>
+          <thead><tr><th aria-label="Trait" className="overview-roster-trait-column" /><th>Name</th><th>Job</th><th>LV</th><th>Assignment</th><th aria-label="Flights">FLTS</th></tr></thead>
           {groups.map(([groupStatus, groupRows]) => <tbody key={groupStatus}>
             <tr className="overview-roster-status-row"><th colSpan={6}><span>{groupStatus}</span><strong>{groupRows.length}</strong></th></tr>
             {groupRows.map((row) => {
