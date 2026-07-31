@@ -612,11 +612,11 @@ button { font: inherit; }
 .overview-vessel-modal > header button { display: grid; width: 27px; min-width: 27px; height: 27px; padding: 0; place-items: center; border: 0; color: #d7e2ee; background: transparent; cursor: pointer; font: 21px var(--mono); }
 .overview-vessel-modal form { display: grid; gap: 10px; padding: 12px 14px 14px; }
 .overview-vessel-modal label { display: grid; gap: 5px; }
-.overview-vessel-modal label > span { color: var(--slate-dim); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+.overview-vessel-modal label > span { color: var(--cyan); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
 .overview-vessel-modal input { width: 100%; min-width: 0; height: 34px; padding: 6px 8px; border: 1px solid #705128; border-radius: 2px; color: #eef4f8; background: #0a121a; font: 11px var(--mono); }
 .overview-vessel-modal input:focus { border-color: var(--amber); outline: 1px solid rgba(255,170,60,.28); }
 .overview-vessel-modal fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.overview-vessel-modal legend { margin-bottom: 6px; color: var(--slate-dim); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+.overview-vessel-modal legend { margin-bottom: 6px; color: var(--cyan); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
 .overview-vessel-type-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
 .overview-vessel-type-options button { display: grid; min-width: 0; min-height: 58px; padding: 7px 5px; place-items: center; gap: 5px; border: 1px solid #293946; border-radius: 2px; color: var(--slate); background: #0a121a; cursor: pointer; font: 9px var(--mono); }
 .overview-vessel-type-options button:hover, .overview-vessel-type-options button:focus-visible { border-color: var(--amber); color: var(--amber); outline: 0; }
