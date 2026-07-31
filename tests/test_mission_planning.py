@@ -744,6 +744,28 @@ class TransferCommandTests(unittest.TestCase):
         self.assertEqual(self.conn.planner.cancel_count, 0)
         self.assertEqual(payload["mj.transfer.state"], "running")
 
+    def test_transfer_window_board_waits_for_external_mechjeb_work(self):
+        for busy_state in ("running", "cancelling"):
+            with self.subTest(busy_state=busy_state):
+                extension = ControllerHarness()
+                planner = FakePlanner(state=busy_state)
+                conn = FakeConnection(planner)
+                with patch.object(planning, "_body_catalog", return_value=transfer_window_catalog()):
+                    extension.command(conn, transfer_windows_command())
+                paused = extension.gather(conn)
+
+                self.assertEqual(paused["mj.transfer.windows.state"], "paused")
+                self.assertIn("already in use", paused["mj.transfer.windows.pauseReason"])
+                self.assertEqual(planner.started, [])
+
+                planner.state = "completed"
+                running = extension.gather(conn)
+
+                self.assertEqual(running["mj.transfer.windows.state"], "running")
+                self.assertEqual(planner.started, [(
+                    "Kerbin", "Duna", 80_000.0, True,
+                )])
+
     def test_transfer_window_refresh_reports_unavailable_service(self):
         conn = FakeConnection(FakePlanner(available=False))
         with patch.object(planning, "_body_catalog", return_value=transfer_window_catalog()):

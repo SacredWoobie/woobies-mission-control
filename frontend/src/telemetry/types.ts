@@ -118,6 +118,7 @@ export interface ScienceExperimentTelemetry {
 }
 
 export interface OverviewVesselTelemetry {
+  objectId?: string;
   guid?: string;
   name: string;
   type: string;
@@ -125,11 +126,45 @@ export interface OverviewVesselTelemetry {
   body: string;
   met: number;
   crewCount: number;
+  crewNames?: string[];
+  recoverable?: boolean;
   mission: boolean;
+  apoapsisAltitude?: number;
+  periapsisAltitude?: number;
+  inclination?: number;
+  period?: number;
+  eccentricity?: number;
+}
+
+export interface OverviewVesselSwitchResult {
+  type: "overview.vessel.switch.result";
+  requestId: string;
+  status: "accepted" | "error";
+  message: string;
+}
+
+export interface OverviewVesselEditResult {
+  type: "overview.vessel.edit.result";
+  requestId: string;
+  status: "accepted" | "error";
+  message: string;
+  name?: string;
+  vesselType?: string;
+}
+
+export type OverviewVesselLifecycleAction = "recover" | "terminate";
+
+export interface OverviewVesselLifecycleResult {
+  type: "overview.vessel.lifecycle.result";
+  requestId: string;
+  action: OverviewVesselLifecycleAction;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export interface OverviewCrewTelemetry {
   name: string;
+  assignment?: string;
   status: string;
   type: string;
   trait: string;
@@ -230,6 +265,7 @@ export interface TelemetrySnapshot {
   "overview.contracts"?: OverviewContractTelemetry[];
   "overview.vessels"?: OverviewVesselTelemetry[];
   "overview.vesselsTruncated"?: boolean;
+  "overview.vesselTerminationAvailable"?: boolean;
   "overview.roster"?: OverviewCrewTelemetry[];
   "overview.rosterAvailable"?: boolean;
   "overview.alarms"?: OverviewAlarmTelemetry[];
@@ -488,6 +524,9 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
+  | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
+  | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
+  | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }
   | { type: "notes.select"; relativePath: string | null }
   | { type: "notes.pin"; relativePath: string | null }
   | { type: "notes.favorite"; relativePath: string; favorite: boolean }

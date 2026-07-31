@@ -91,6 +91,10 @@ class TelemetryRuntimeTests(unittest.TestCase):
             "Content-Security-Policy",
             "Queue(maxsize=MAX_PENDING_COMMANDS)",
             "sessions.get(ws) != session_id",
+            '"overview.vessel.switch"',
+            '"overview.vessel.edit"',
+            '"overview.vessel.lifecycle"',
+            "if isinstance(event, dict)",
             'event.get("status") in {"merged", "updated"}',
         ):
             self.assertIn(marker, source)

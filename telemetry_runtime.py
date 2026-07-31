@@ -23,6 +23,9 @@ PLANNER_COMMAND_TYPES = frozenset(
 KRPC_COMMAND_TYPES = frozenset(
     {
         "editor.conditions",
+        "overview.vessel.switch",
+        "overview.vessel.edit",
+        "overview.vessel.lifecycle",
         "notes.select",
         "notes.pin",
         "notes.favorite",
@@ -298,9 +301,14 @@ def create_telemetry_runtime(
                             break
                         if sessions.get(ws) != session_id:
                             continue
-                        await loop.run_in_executor(
+                        event = await loop.run_in_executor(
                             None, apply_command, tconn, command
                         )
+                        if isinstance(event, dict):
+                            await safe_send(
+                                ws,
+                                json.dumps(_json_safe(event), allow_nan=False),
+                            )
                     if clients:
                         data = await loop.run_in_executor(
                             None, gather_telemetry, tconn

@@ -4,6 +4,24 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Refined the Space Center and Tracking Station overview with deduplicated
+  vessel/roster details, optional save-wide orbital facts, conditional alarm
+  and crew markers, collision-safe vessel selection, a flat assignment-aware
+  crew roster, guarded one-click switching to a selected vessel, compact zero
+  states and program metrics, silent defaults for raw alarms and missing
+  deadlines, and a guarded detail-pane editor for vessel names and craft types.
+- Added contextual vessel recovery or termination from the selected-vessel
+  detail. Recovery uses KSP's stock recoverability rule; termination requires
+  WoobiesControlStats 0.2.3, an explicit destructive confirmation, and a named
+  warning for every aboard Kerbal who will be killed. Both actions revalidate
+  the vessel identity, recovery state, and exact crew roster before acting.
+  Termination passes the selected kRPC vessel object directly to the service,
+  retaining collision-safe identity when the pinned Python client omits GUIDs.
+- Made an empty transfer-window board calculate automatically once MechJeb is
+  available, wait without taking over an existing transfer-planning job, and
+  moved the manual calculate, refresh, and cancel control into the section
+  header so installed planet packs have more room for destination cards.
+
 ## v0.4.1 - Faster, resilient editor calculations
 
 - Retained the previous confirmed VAB/SPH staging analysis and craft totals

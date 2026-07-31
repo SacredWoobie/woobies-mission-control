@@ -2,6 +2,9 @@ import { TelemetryClient, type ConnectionStatus } from "./client";
 import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
+  OverviewVesselEditResult,
+  OverviewVesselLifecycleResult,
+  OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -11,6 +14,9 @@ export interface LiveTelemetryState {
   frameCount: number;
   lastFrameAt: number | null;
   message?: string;
+  overviewVesselEditResult?: OverviewVesselEditResult;
+  overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
+  overviewVesselSwitchResult?: OverviewVesselSwitchResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -44,6 +50,9 @@ export class TelemetryStore {
     private readonly createClient: (
       endpoint: string,
       callbacks: {
+        onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
+        onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
+        onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -72,6 +81,15 @@ export class TelemetryStore {
 
     this.client?.disconnect();
     this.client = this.createClient(normalized, {
+      onOverviewVesselEditResult: (overviewVesselEditResult) => {
+        this.patch({ overviewVesselEditResult });
+      },
+      onOverviewVesselLifecycleResult: (overviewVesselLifecycleResult) => {
+        this.patch({ overviewVesselLifecycleResult });
+      },
+      onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
+        this.patch({ overviewVesselSwitchResult });
+      },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
       },
@@ -85,7 +103,12 @@ export class TelemetryStore {
         this.patch({
           message,
           status,
-          ...(clearSnapshot ? { snapshot: null } : {}),
+          ...(clearSnapshot ? {
+            snapshot: null,
+            overviewVesselEditResult: undefined,
+            overviewVesselLifecycleResult: undefined,
+            overviewVesselSwitchResult: undefined,
+          } : {}),
         });
       },
     });

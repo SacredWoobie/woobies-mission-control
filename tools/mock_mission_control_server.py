@@ -142,6 +142,9 @@ def initial_note_state():
         "selected": NOTE,
         "selection_mode": "active",
         "favorite": True,
+        "vessel_switch_events": [],
+        "vessel_edit_events": [],
+        "vessel_lifecycle_events": [],
     }
 
 
@@ -175,7 +178,6 @@ def build_payload(
             "isFavorite": note_state["favorite"],
         },
     ]
-
     if scene == "editor":
         payload.update({
             "editor.body": editor_conditions["body"],
@@ -241,6 +243,28 @@ async def receive_commands(
             note_state["selection_mode"] = "browse" if path else "active"
         elif kind == "notes.favorite":
             note_state["favorite"] = bool(command.get("favorite"))
+        elif kind == "overview.vessel.switch":
+            note_state["vessel_switch_events"].append({
+                "type": "overview.vessel.switch.result",
+                "requestId": str(command.get("requestId", "")),
+                "status": "error",
+                "message": "The mock dashboard cannot switch live KSP vessels.",
+            })
+        elif kind == "overview.vessel.edit":
+            note_state["vessel_edit_events"].append({
+                "type": "overview.vessel.edit.result",
+                "requestId": str(command.get("requestId", "")),
+                "status": "error",
+                "message": "The mock dashboard cannot edit live KSP vessels.",
+            })
+        elif kind == "overview.vessel.lifecycle":
+            note_state["vessel_lifecycle_events"].append({
+                "type": "overview.vessel.lifecycle.result",
+                "requestId": str(command.get("requestId", "")),
+                "action": command.get("action", "terminate"),
+                "status": "error",
+                "message": "The mock dashboard cannot recover or terminate live KSP vessels.",
+            })
         else:
             await mission_planning.apply_command(command)
 
@@ -315,6 +339,15 @@ async def run(args):
                 )
                 for event in await mission_planning.drain_events():
                     await socket.send(json.dumps(event))
+                for event in note_state["vessel_switch_events"]:
+                    await socket.send(json.dumps(event))
+                note_state["vessel_switch_events"].clear()
+                for event in note_state["vessel_edit_events"]:
+                    await socket.send(json.dumps(event))
+                note_state["vessel_edit_events"].clear()
+                for event in note_state["vessel_lifecycle_events"]:
+                    await socket.send(json.dumps(event))
+                note_state["vessel_lifecycle_events"].clear()
                 await socket.send(json.dumps(payload))
                 frame += 1
                 await asyncio.sleep(1.0 / args.hz)

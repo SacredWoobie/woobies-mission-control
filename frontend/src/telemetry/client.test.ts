@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TelemetryClient,
   parseMissionPlanningPersistenceState,
+  parseOverviewVesselEditResult,
+  parseOverviewVesselLifecycleResult,
+  parseOverviewVesselSwitchResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -83,6 +86,80 @@ describe("parseMissionPlanningPersistenceState", () => {
       requestId: "request-3",
       section: "deltaVDraft",
       revision: -1,
+    })).toBeNull();
+  });
+});
+
+describe("parseOverviewVesselSwitchResult", () => {
+  it("accepts a typed switch result and rejects malformed events", () => {
+    expect(parseOverviewVesselSwitchResult(JSON.stringify({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "accepted",
+      message: "Switching.",
+    }))).toEqual({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "accepted",
+      message: "Switching.",
+    });
+    expect(parseOverviewVesselSwitchResult({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-2",
+      status: "unknown",
+      message: "Nope.",
+    })).toBeNull();
+  });
+});
+
+describe("parseOverviewVesselEditResult", () => {
+  it("accepts typed edit results and rejects malformed events", () => {
+    expect(parseOverviewVesselEditResult(JSON.stringify({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "Duna Relay",
+      vesselType: "Relay",
+    }))).toEqual({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "Duna Relay",
+      vesselType: "Relay",
+    });
+    expect(parseOverviewVesselEditResult({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-2",
+      status: "accepted",
+      message: "Renamed.",
+      name: 42,
+    })).toBeNull();
+  });
+});
+
+describe("parseOverviewVesselLifecycleResult", () => {
+  it("accepts typed lifecycle results and rejects malformed events", () => {
+    expect(parseOverviewVesselLifecycleResult(JSON.stringify({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "accepted",
+      message: "Terminated Odyssey.",
+    }))).toEqual({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "accepted",
+      message: "Terminated Odyssey.",
+    });
+    expect(parseOverviewVesselLifecycleResult({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-2",
+      action: "delete",
+      status: "accepted",
+      message: "Nope.",
     })).toBeNull();
   });
 });
@@ -167,6 +244,112 @@ describe("TelemetryClient", () => {
       status: "ok",
       message: "Planner persistence loaded.",
     }]);
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes vessel switch results only through the command-result callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const switchResults: OverviewVesselSwitchResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onOverviewVesselSwitchResult: (result) => switchResults.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "error",
+      message: "Unavailable.",
+    }));
+    socket.message(JSON.stringify({
+      type: "overview.vessel.switch.result",
+      requestId: "",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(switchResults).toHaveLength(1);
+    expect(switchResults[0].requestId).toBe("switch-1");
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes vessel edit results only to the originating client callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const editResults: OverviewVesselEditResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onOverviewVesselEditResult: (result) => editResults.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "Duna Relay",
+      vesselType: "Relay",
+    }));
+    socket.message(JSON.stringify({
+      type: "overview.vessel.edit.result",
+      requestId: "",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(editResults).toHaveLength(1);
+    expect(editResults[0].name).toBe("Duna Relay");
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes vessel lifecycle results only to the originating client callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const lifecycleResults: OverviewVesselLifecycleResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onOverviewVesselLifecycleResult: (result) => lifecycleResults.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "error",
+      message: "The vessel changed.",
+    }));
+    socket.message(JSON.stringify({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "",
+      action: "delete",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(lifecycleResults).toHaveLength(1);
+    expect(lifecycleResults[0].requestId).toBe("terminate-1");
     expect(snapshots).toEqual([]);
   });
 

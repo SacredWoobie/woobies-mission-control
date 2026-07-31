@@ -1,6 +1,9 @@
 import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
+  OverviewVesselEditResult,
+  OverviewVesselLifecycleResult,
+  OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -18,6 +21,9 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
+  onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
+  onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
   onStatus(status: ConnectionStatus, message?: string): void;
@@ -103,6 +109,114 @@ export function parseMissionPlanningPersistenceState(raw: unknown): MissionPlann
     status: candidate.status as MissionPlanningPersistenceState["status"],
     message: candidate.message,
   };
+}
+
+export function parseOverviewVesselSwitchResult(raw: unknown): OverviewVesselSwitchResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "overview.vessel.switch.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as OverviewVesselSwitchResult;
+}
+
+export function parseOverviewVesselEditResult(raw: unknown): OverviewVesselEditResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "overview.vessel.edit.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+    || (candidate.name !== undefined && typeof candidate.name !== "string")
+    || (candidate.vesselType !== undefined && typeof candidate.vesselType !== "string")
+  ) return null;
+  return candidate as unknown as OverviewVesselEditResult;
+}
+
+export function parseOverviewVesselLifecycleResult(raw: unknown): OverviewVesselLifecycleResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "overview.vessel.lifecycle.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.action !== "recover" && candidate.action !== "terminate")
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as OverviewVesselLifecycleResult;
+}
+
+function isOverviewVesselLifecycleResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "overview.vessel.lifecycle.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isOverviewVesselEditResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "overview.vessel.edit.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isOverviewVesselSwitchResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "overview.vessel.switch.result",
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isMissionPlanningPersistenceStateMessage(raw: unknown) {
@@ -214,6 +328,24 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const lifecycleResult = parseOverviewVesselLifecycleResult(event.data);
+      if (lifecycleResult) {
+        this.callbacks.onOverviewVesselLifecycleResult?.(lifecycleResult);
+        return;
+      }
+      if (isOverviewVesselLifecycleResultMessage(event.data)) return;
+      const editResult = parseOverviewVesselEditResult(event.data);
+      if (editResult) {
+        this.callbacks.onOverviewVesselEditResult?.(editResult);
+        return;
+      }
+      if (isOverviewVesselEditResultMessage(event.data)) return;
+      const switchResult = parseOverviewVesselSwitchResult(event.data);
+      if (switchResult) {
+        this.callbacks.onOverviewVesselSwitchResult?.(switchResult);
+        return;
+      }
+      if (isOverviewVesselSwitchResultMessage(event.data)) return;
       const persistenceState = parseMissionPlanningPersistenceState(event.data);
       if (persistenceState) {
         this.callbacks.onPersistenceState?.(persistenceState);

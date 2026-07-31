@@ -57,6 +57,47 @@ test("the wide Flight context header remains one compact row", async ({ page }) 
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
 });
 
+test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.goto("/");
+  await page.getByTitle("Dashboard developer controls").click();
+  await page.getByLabel("Telemetry fixture").getByRole("button", { name: "inactive" }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const panel = page.locator(".overview-transfer-windows");
+  const header = panel.locator(".overview-section-head");
+  const body = panel.locator(".transfer-window-body");
+  const grid = panel.locator(".overview-transfer-grid");
+  await expect(header.getByRole("button", { name: "Refresh windows" })).toBeVisible();
+  await expect(panel.locator(".transfer-window-toolbar")).toHaveCount(0);
+
+  const layout = await panel.evaluate((element) => {
+    const panelHeader = element.querySelector<HTMLElement>(".overview-section-head")!;
+    const panelBody = element.querySelector<HTMLElement>(".transfer-window-body")!;
+    const cardGrid = element.querySelector<HTMLElement>(".overview-transfer-grid")!;
+    return {
+      panelClientWidth: element.clientWidth,
+      panelScrollWidth: element.scrollWidth,
+      headerClientWidth: panelHeader.clientWidth,
+      headerScrollWidth: panelHeader.scrollWidth,
+      bodyWidth: panelBody.getBoundingClientRect().width,
+      gridWidth: cardGrid.getBoundingClientRect().width,
+    };
+  });
+  expect(layout.panelScrollWidth).toBeLessThanOrEqual(layout.panelClientWidth + 1);
+  expect(layout.headerScrollWidth).toBeLessThanOrEqual(layout.headerClientWidth + 1);
+  expect(Math.abs(layout.bodyWidth - layout.gridWidth)).toBeLessThanOrEqual(1);
+  await expect(body).toBeVisible();
+  await expect(grid).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrowHeader = await header.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(narrowHeader.scrollWidth).toBeLessThanOrEqual(narrowHeader.clientWidth + 1);
+});
+
 test("Flight staging presents both conditions without a mode toggle", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");

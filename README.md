@@ -25,9 +25,12 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
   </a>
 </p>
 
-At the Space Center and Tracking Station, the dashboard becomes a read-only
-program overview. It brings together funds, science, reputation, contracts,
-tracked vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms.
+At the Space Center and Tracking Station, the dashboard becomes a program
+overview. It brings together funds, science, reputation, contracts, tracked
+vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms. Guarded
+actions can switch to or edit the vessel selected in the fleet detail. A
+contextual confirmation can recover eligible craft through KSP's stock path or
+terminate an ineligible craft, naming any aboard Kerbals who would be killed.
 The transfer-window board uses the current game's body catalog, so supported
 planet packs appear alongside the stock system.
 
@@ -92,14 +95,16 @@ does not execute nodes, warp, steer, stage, or change throttle.
   porkchop selection.
 - Flight engineering for orbit, staging, resources, electrical generation,
   System Heat or stock thermal data, science, targets, and docking.
-- Read-only Space Center and Tracking Station views for the current save.
+- Space Center and Tracking Station views with guarded switching to a selected
+  vessel.
 - VAB/SPH craft totals and atmospheric or vacuum stage simulation.
 - Optional Notes, Kerbal Alarm Clock, RemoteTech, System Heat, and ESP32
   integrations without making them requirements for the rest of the dashboard.
 
 ## Packaged KSP services
 
-The release includes four independently versioned kRPC extensions:
+The current public v0.4.1 release includes four independently versioned kRPC
+extensions:
 
 | Service | v0.4.1 version | Purpose |
 | --- | --- | --- |
@@ -107,6 +112,11 @@ The release includes four independently versioned kRPC extensions:
 | KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
 | KRPC.SystemHeat | 0.2.2 | System Heat loops, components, and electrical integration |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
+
+The Unreleased vessel-lifecycle work selects WoobiesControlStats 0.2.3, which
+adds the guarded vessel-termination service. The source launcher's tested
+version and current release manifest reflect that development requirement;
+historical v0.4.0/v0.4.1 release packs remain pinned to their published bytes.
 
 ## Installation
 
@@ -142,9 +152,21 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
 ## Safety and local data
 
 - Dashboard telemetry, alarms, Notes, overview data, and planning calculations
-  stay read-only.
-- Transfer-node creation is the dashboard's only direct KSP write. It requires
-  a fresh preview and a second confirmation and creates exactly one node.
+  stay read-only; switching to an explicitly selected vessel changes the active
+  KSP scene but does not alter its controls.
+- Overview vessel switching validates the current connection-scoped object ID,
+  displayed vessel name, and the KSP vessel GUID when one is available before
+  acting.
+- Overview vessel edits validate the same live identity plus the displayed
+  craft type before changing a name or KSP vessel classification. The contained
+  edit dialog locks the surrounding dashboard until it is closed or submitted.
+- Vessel recovery and termination validate that identity again along with the
+  current recovery state and exact crew roster. Termination is a separate red
+  confirmation that lists every aboard Kerbal who will be killed; recovery uses
+  KSP's normal green recovery path. Either modal locks the surrounding dashboard
+  until it is closed or the request completes.
+- Transfer-node creation requires a fresh preview and a second confirmation and
+  creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple
   dashboard tabs and scenes see the same saved plans.
 - The WebSocket feed has no authentication. Keep it on `127.0.0.1`.

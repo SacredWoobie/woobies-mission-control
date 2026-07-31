@@ -1,6 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useDialogFocus } from "../deltaV/useDialogFocus";
 import {
+  formatDistance,
+  formatEccentricity,
+  formatInclination,
   formatMissionDuration,
+  formatOrbitPeriod,
   formatTelemetryNumber,
   formatUniversalTime,
   isFiniteNumber,
@@ -9,7 +14,11 @@ import type {
   OverviewAlarmTelemetry,
   OverviewContractTelemetry,
   OverviewCrewTelemetry,
+  OverviewVesselEditResult,
+  OverviewVesselLifecycleAction,
+  OverviewVesselLifecycleResult,
   OverviewVesselTelemetry,
+  OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "../telemetry/types";
@@ -24,6 +33,12 @@ const trackedVesselTypes = [
 ] as const;
 const trackedVesselTypeSet = new Set<string>(trackedVesselTypes);
 const missionOverviewPanels = new Set<DashboardPanelId>(["overviewTransfers", "overviewFleet", "overviewRoster", "overviewAlarms"]);
+const crewStatusOrder = new Map([
+  ["assigned", 0],
+  ["available", 1],
+  ["missing", 2],
+  ["dead", 3],
+]);
 
 function unique(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -37,11 +52,9 @@ function compareValues(left: string | number, right: string | number, direction:
 }
 
 function vesselKey(row: OverviewVesselTelemetry) {
-  return row.guid || `${row.name}\u0000${row.type}\u0000${row.body}`;
-}
-
-function crewKey(row: OverviewCrewTelemetry) {
-  return `${row.name}\u0000${row.type}`;
+  if (row.objectId) return `object:${row.objectId}`;
+  if (row.guid) return `guid:${row.guid}`;
+  return `legacy:${row.name}\u0000${row.type}\u0000${row.body}`;
 }
 
 function ContractRewards({ contract }: { contract: OverviewContractTelemetry }) {
@@ -107,7 +120,18 @@ function VesselTypeFilter({ rows, excluded, onToggle, onReset }: {
   </div>;
 }
 
-function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
+const maxVesselNameLength = 80;
+
+function FleetSection({ commandEnabled, editResult, kerbin, lifecycleResult, onSendCommand, rows, switchResult, terminationAvailable }: {
+  commandEnabled: boolean;
+  editResult?: OverviewVesselEditResult;
+  kerbin: boolean;
+  lifecycleResult?: OverviewVesselLifecycleResult;
+  onSendCommand(command: TelemetryCommand): boolean;
+  rows: OverviewVesselTelemetry[];
+  switchResult?: OverviewVesselSwitchResult;
+  terminationAvailable: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set(["Debris"]));
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -116,6 +140,37 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
   const [sort, setSort] = useState("name");
   const [direction, setDirection] = useState<SortDirection>("asc");
   const [selectedVesselKey, setSelectedVesselKey] = useState("");
+  const [switchError, setSwitchError] = useState("");
+  const [switchRequestId, setSwitchRequestId] = useState("");
+  const [switchingVesselKey, setSwitchingVesselKey] = useState("");
+  const [switchAccepted, setSwitchAccepted] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameType, setRenameType] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [renameNotice, setRenameNotice] = useState("");
+  const [renameRequestId, setRenameRequestId] = useState("");
+  const [lifecycleAction, setLifecycleAction] = useState<OverviewVesselLifecycleAction>("terminate");
+  const [lifecycleOpen, setLifecycleOpen] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState("");
+  const [lifecycleNotice, setLifecycleNotice] = useState("");
+  const [lifecycleRequestId, setLifecycleRequestId] = useState("");
+  const [lifecycleTarget, setLifecycleTarget] = useState<OverviewVesselTelemetry | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const lifecycleCancelRef = useRef<HTMLButtonElement>(null);
+  const closeRename = useCallback(() => {
+    setRenameOpen(false);
+    setRenameError("");
+    setRenameRequestId("");
+  }, []);
+  const renameDialogRef = useDialogFocus<HTMLElement>(renameOpen, closeRename);
+  const closeLifecycle = useCallback(() => {
+    if (lifecycleRequestId) return;
+    setLifecycleOpen(false);
+    setLifecycleError("");
+    setLifecycleTarget(null);
+  }, [lifecycleRequestId]);
+  const lifecycleDialogRef = useDialogFocus<HTMLElement>(lifecycleOpen, closeLifecycle);
   const trackedRows = useMemo(() => rows.filter((row) => trackedVesselTypeSet.has(row.type)), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -140,12 +195,233 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
     return [...next.entries()];
   }, [visible]);
   const selected = visible.find((row) => vesselKey(row) === selectedVesselKey) ?? visible[0];
+  const selectedHasPeriod = selected
+    ? isFiniteNumber(selected.period) && (!isFiniteNumber(selected.eccentricity) || selected.eccentricity < 1)
+    : false;
+  const selectedHasOrbitFacts = selected ? [
+    selected.apoapsisAltitude,
+    selected.periapsisAltitude,
+    selected.inclination,
+    selected.eccentricity,
+  ].some(isFiniteNumber) || selectedHasPeriod : false;
+  const selectedKey = selected ? vesselKey(selected) : "";
+  const selectedCrewTrusted = Boolean(
+    selected
+    && Array.isArray(selected.crewNames)
+    && selected.crewNames.length === selected.crewCount,
+  );
+  const commandBusy = Boolean(switchRequestId || renameRequestId || lifecycleRequestId);
+
+  useEffect(() => {
+    setSwitchError("");
+    setSwitchRequestId("");
+    setSwitchingVesselKey("");
+    setSwitchAccepted(false);
+    setRenameOpen(false);
+    setRenameValue("");
+    setRenameType("");
+    setRenameError("");
+    setRenameNotice("");
+    setRenameRequestId("");
+    setLifecycleOpen(false);
+    setLifecycleError("");
+    setLifecycleNotice("");
+    setLifecycleRequestId("");
+    setLifecycleTarget(null);
+  }, [selectedKey]);
+
+  useEffect(() => {
+    if (!renameOpen) return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [renameOpen]);
+
+  useEffect(() => {
+    if (lifecycleOpen) lifecycleCancelRef.current?.focus();
+  }, [lifecycleOpen]);
+
+  useEffect(() => {
+    if (!switchRequestId || switchResult?.requestId !== switchRequestId) return;
+    if (switchResult.status === "accepted") {
+      setSwitchAccepted(true);
+      setSwitchError("");
+    } else {
+      setSwitchError(switchResult.message);
+      setSwitchRequestId("");
+      setSwitchingVesselKey("");
+      setSwitchAccepted(false);
+    }
+  }, [switchRequestId, switchResult]);
+
+  useEffect(() => {
+    if (!switchRequestId) return;
+    const timeout = globalThis.setTimeout(() => {
+      setSwitchError("KSP did not complete the vessel switch. Refresh the fleet and try again.");
+      setSwitchRequestId("");
+      setSwitchingVesselKey("");
+      setSwitchAccepted(false);
+    }, 12_000);
+    return () => globalThis.clearTimeout(timeout);
+  }, [switchRequestId]);
+
+  useEffect(() => {
+    if (!renameRequestId || editResult?.requestId !== renameRequestId) return;
+    if (editResult.status === "accepted") {
+      setRenameNotice(editResult.message);
+      setRenameOpen(false);
+      setRenameError("");
+      setRenameRequestId("");
+    } else {
+      setRenameError(editResult.message);
+      setRenameRequestId("");
+    }
+  }, [editResult, renameRequestId]);
+
+  useEffect(() => {
+    if (!renameRequestId) return;
+    const timeout = globalThis.setTimeout(() => {
+      setRenameError("KSP did not answer the edit request. Check the vessel and try again.");
+      setRenameRequestId("");
+    }, 12_000);
+    return () => globalThis.clearTimeout(timeout);
+  }, [renameRequestId]);
+
+  useEffect(() => {
+    if (!lifecycleRequestId || lifecycleResult?.requestId !== lifecycleRequestId) return;
+    if (lifecycleResult.status === "accepted") {
+      setLifecycleNotice(lifecycleResult.message);
+      setLifecycleOpen(false);
+      setLifecycleError("");
+      setLifecycleRequestId("");
+      setLifecycleTarget(null);
+    } else {
+      setLifecycleError(lifecycleResult.message);
+      setLifecycleRequestId("");
+    }
+  }, [lifecycleRequestId, lifecycleResult]);
+
+  useEffect(() => {
+    if (!lifecycleRequestId) return;
+    const timeout = globalThis.setTimeout(() => {
+      setLifecycleError("KSP did not answer the vessel request. Refresh the fleet and verify its current state.");
+      setLifecycleRequestId("");
+    }, 12_000);
+    return () => globalThis.clearTimeout(timeout);
+  }, [lifecycleRequestId]);
 
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
     if (next.has(type)) next.delete(type); else next.add(type);
     return next;
   });
+
+  const switchToSelected = () => {
+    if (!selected?.objectId || !commandEnabled || switchRequestId || renameRequestId) return;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `vessel-switch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand({
+      type: "overview.vessel.switch",
+      requestId,
+      objectId: selected.objectId,
+      expectedName: selected.name,
+      ...(selected.guid ? { expectedGuid: selected.guid } : {}),
+    });
+    if (!sent) {
+      setSwitchError("Mission Control is not connected to KSP.");
+      return;
+    }
+    setSwitchError("");
+    setSwitchAccepted(false);
+    setSwitchRequestId(requestId);
+    setSwitchingVesselKey(selectedKey);
+  };
+
+  const openRename = () => {
+    if (!selected?.objectId || !commandEnabled || switchRequestId || renameRequestId) return;
+    setRenameValue(selected.name);
+    setRenameType(selected.type);
+    setRenameError("");
+    setRenameNotice("");
+    setRenameOpen(true);
+  };
+
+  const submitRename = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selected?.objectId || !commandEnabled || renameRequestId) return;
+    const newName = renameValue.trim();
+    if (!newName || newName.length > maxVesselNameLength || /[\u0000-\u001f]/.test(newName)) {
+      setRenameError(`Vessel names must be 1 to ${maxVesselNameLength} characters without line breaks or control characters.`);
+      return;
+    }
+    if (newName === selected.name && renameType === selected.type) {
+      setRenameError("Change the vessel name or type before saving.");
+      return;
+    }
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `vessel-edit-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand({
+      type: "overview.vessel.edit",
+      requestId,
+      objectId: selected.objectId,
+      expectedName: selected.name,
+      expectedType: selected.type,
+      newName,
+      newType: renameType,
+      ...(selected.guid ? { expectedGuid: selected.guid } : {}),
+    });
+    if (!sent) {
+      setRenameError("Mission Control is not connected to KSP.");
+      return;
+    }
+    setRenameError("");
+    setRenameRequestId(requestId);
+  };
+
+  const openLifecycle = () => {
+    if (
+      !selected?.objectId
+      || typeof selected.recoverable !== "boolean"
+      || !selectedCrewTrusted
+      || !commandEnabled
+      || commandBusy
+    ) return;
+    const action: OverviewVesselLifecycleAction = selected.recoverable ? "recover" : "terminate";
+    if (action === "terminate" && !terminationAvailable) return;
+    setLifecycleAction(action);
+    setLifecycleTarget({ ...selected, crewNames: [...(selected.crewNames ?? [])] });
+    setLifecycleError("");
+    setLifecycleNotice("");
+    setLifecycleOpen(true);
+  };
+
+  const submitLifecycle = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (
+      !lifecycleTarget?.objectId
+      || typeof lifecycleTarget.recoverable !== "boolean"
+      || !Array.isArray(lifecycleTarget.crewNames)
+      || !commandEnabled
+      || lifecycleRequestId
+    ) return;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `vessel-${lifecycleAction}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand({
+      type: "overview.vessel.lifecycle",
+      requestId,
+      action: lifecycleAction,
+      objectId: lifecycleTarget.objectId,
+      expectedName: lifecycleTarget.name,
+      expectedRecoverable: lifecycleTarget.recoverable,
+      expectedCrewNames: lifecycleTarget.crewNames,
+      ...(lifecycleTarget.guid ? { expectedGuid: lifecycleTarget.guid } : {}),
+    });
+    if (!sent) {
+      setLifecycleError("Mission Control is not connected to KSP.");
+      return;
+    }
+    setLifecycleError("");
+    setLifecycleRequestId(requestId);
+  };
 
   return <section className="overview-section overview-fleet">
     <SectionHeader count={visible.length} panelId="overviewFleet" title="Active vessels">
@@ -185,15 +461,58 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
         {visible.length === 0 && <p className="overview-empty">No vessels match these filters.</p>}
       </div>
       {selected ? <article aria-live="polite" className="overview-vessel-detail">
-        <header><div><strong>{selected.name}</strong><span>{selected.type}</span></div><small>{selected.situation} {selected.body} / MET {formatMissionDuration(selected.met)}</small></header>
-        <div className="overview-vessel-facts">
-          <div><span>Status</span><strong>{selected.situation}</strong></div>
-          <div><span>SOI</span><strong>{selected.body}</strong></div>
-          <div><span>Mission elapsed</span><strong>{formatMissionDuration(selected.met)}</strong></div>
-          <div><span>Crew</span><strong>{selected.crewCount}</strong></div>
-          <div><span>Craft type</span><strong>{selected.type}</strong></div>
-          <div><span>Tracking scope</span><strong>{selected.mission ? "Mission craft" : "Tracked object"}</strong></div>
+        <header><div><strong>{selected.name}</strong><span>{selected.type}</span>{!selected.mission && <span className="overview-detail-badge">Tracked object</span>}</div><small>{selected.situation} {selected.body} / MET {formatMissionDuration(selected.met)}{selected.crewCount > 0 ? ` / ${selected.crewCount} crew` : ""}</small></header>
+        {selectedHasOrbitFacts && <div className="overview-vessel-facts">
+          {isFiniteNumber(selected.apoapsisAltitude) && <div><span>Apoapsis</span><strong>{formatDistance(selected.apoapsisAltitude, "live")}</strong></div>}
+          {isFiniteNumber(selected.periapsisAltitude) && <div><span>Periapsis</span><strong>{formatDistance(selected.periapsisAltitude, "live")}</strong></div>}
+          {isFiniteNumber(selected.inclination) && <div><span>Inclination</span><strong>{formatInclination(selected.inclination)}</strong></div>}
+          {selectedHasPeriod && <div><span>Period</span><strong>{formatOrbitPeriod(selected.period, selected.eccentricity, kerbin)}</strong></div>}
+          {isFiniteNumber(selected.eccentricity) && <div><span>Eccentricity</span><strong>{formatEccentricity(selected.eccentricity)}</strong></div>}
+        </div>}
+        <div className="overview-vessel-actions">
+          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || commandBusy} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? (switchAccepted ? "SWITCH REQUESTED" : "SWITCHING…") : "SWITCH TO VESSEL"}</button>
+          <button aria-haspopup="dialog" aria-label={`Edit ${selected.name}`} className="overview-rename-vessel" disabled={!commandEnabled || !selected.objectId || commandBusy} onClick={openRename} type="button">EDIT VESSEL</button>
+          {typeof selected.recoverable === "boolean" && <button
+            aria-haspopup="dialog"
+            aria-label={`${selected.recoverable ? "Recover" : "Terminate"} ${selected.name}`}
+            className={selected.recoverable ? "overview-recover-vessel" : "overview-terminate-vessel"}
+            disabled={!commandEnabled || !selected.objectId || !selectedCrewTrusted || commandBusy || (!selected.recoverable && !terminationAvailable)}
+            onClick={openLifecycle}
+            title={!selectedCrewTrusted ? "Current crew list is unavailable" : !selected.recoverable && !terminationAvailable ? "Install the matching vessel-management service to terminate craft" : undefined}
+            type="button"
+          >{selected.recoverable ? "RECOVER VESSEL" : "TERMINATE VESSEL"}</button>}
+          {switchError && <span className="overview-command-error" role="alert">{switchError}</span>}
+          {renameNotice && <span className="overview-command-notice" role="status">{renameNotice}</span>}
+          {lifecycleNotice && <span className="overview-command-notice" role="status">{lifecycleNotice}</span>}
         </div>
+        {renameOpen && <div className="delta-v-modal-backdrop overview-vessel-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRename(); }}>
+          <section aria-labelledby="overview-rename-title" aria-modal="true" className="overview-vessel-modal" onMouseDown={(event) => event.stopPropagation()} ref={renameDialogRef} role="dialog" tabIndex={-1}>
+            <header><div><span>CRAFT MANAGEMENT</span><h3 id="overview-rename-title">Edit {selected.name}</h3></div><button aria-label="Close edit vessel dialog" onClick={closeRename} type="button">×</button></header>
+            <form onSubmit={submitRename}>
+              <label><span>Vessel name</span><input aria-describedby="overview-rename-hint" maxLength={maxVesselNameLength} onChange={(event) => setRenameValue(event.target.value)} ref={renameInputRef} value={renameValue} /></label>
+              <fieldset><legend>Vessel type</legend><div className="overview-vessel-type-options">{trackedVesselTypes.map((type) => <button aria-pressed={renameType === type} key={type} onClick={() => setRenameType(type)} type="button"><VesselTypeGlyph type={type} /><span>{type}</span></button>)}</div></fieldset>
+              <small id="overview-rename-hint">The selected craft keeps its current identity, mission time, and orbit.</small>
+              {renameError && <p className="overview-vessel-modal-error" role="alert">{renameError}</p>}
+              <footer><button onClick={closeRename} type="button">CANCEL</button><button disabled={Boolean(renameRequestId) || !renameValue.trim() || (renameValue.trim() === selected.name && renameType === selected.type)} type="submit">{renameRequestId ? "SAVING…" : "SAVE CHANGES"}</button></footer>
+            </form>
+          </section>
+        </div>}
+        {lifecycleOpen && lifecycleTarget && <div className="delta-v-modal-backdrop overview-vessel-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeLifecycle(); }}>
+          <section aria-labelledby="overview-lifecycle-title" aria-modal="true" className={`overview-vessel-modal overview-vessel-lifecycle-modal ${lifecycleAction}`} onMouseDown={(event) => event.stopPropagation()} ref={lifecycleDialogRef} role="dialog" tabIndex={-1}>
+            <header><div><span>{lifecycleAction === "recover" ? "VESSEL RECOVERY" : "DESTRUCTIVE ACTION"}</span><h3 id="overview-lifecycle-title">{lifecycleAction === "recover" ? "Recover" : "Terminate"} {lifecycleTarget.name}?</h3></div><button aria-label={`Close ${lifecycleAction} vessel dialog`} disabled={Boolean(lifecycleRequestId)} onClick={closeLifecycle} type="button">×</button></header>
+            <form onSubmit={submitLifecycle}>
+              {lifecycleAction === "recover" ? <>
+                <p className="overview-vessel-lifecycle-summary">KSP will recover this vessel and process its crew, parts, and resources normally.</p>
+                {lifecycleTarget.crewNames!.length > 0 && <section className="overview-vessel-recovery-crew"><strong>Crew returning safely</strong><ul>{lifecycleTarget.crewNames!.map((name) => <li key={name}>{name}</li>)}</ul></section>}
+              </> : <>
+                <p className="overview-vessel-lifecycle-summary">This permanently removes the vessel from the save and cannot be undone.</p>
+                {lifecycleTarget.crewNames!.length > 0 ? <section aria-labelledby="overview-termination-crew-title" className="overview-vessel-termination-crew"><strong id="overview-termination-crew-title">The following Kerbals will be killed:</strong><ul>{lifecycleTarget.crewNames!.map((name) => <li key={name}>{name}</li>)}</ul></section> : <p className="overview-vessel-uncrewed">No crew are aboard this vessel.</p>}
+              </>}
+              {lifecycleError && <p className="overview-vessel-modal-error" role="alert">{lifecycleError}</p>}
+              <footer><button disabled={Boolean(lifecycleRequestId)} onClick={closeLifecycle} ref={lifecycleCancelRef} type="button">CANCEL</button><button disabled={Boolean(lifecycleRequestId)} type="submit">{lifecycleRequestId ? (lifecycleAction === "recover" ? "RECOVERING…" : "TERMINATING…") : (lifecycleAction === "recover" ? "RECOVER VESSEL" : "TERMINATE VESSEL")}</button></footer>
+            </form>
+          </section>
+        </div>}
       </article> : <div className="overview-vessel-detail overview-vessel-detail-empty"><span>Select a vessel to inspect its mission status.</span></div>}
     </div>
   </section>;
@@ -206,17 +525,15 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
   const [trait, setTrait] = useState("all");
   const [level, setLevel] = useState("all");
   const [sort, setSort] = useState("name");
-  const [selectedCrewKey, setSelectedCrewKey] = useState("");
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     return rows.filter((row) => (
       (status === "all" || row.status === status) &&
       (trait === "all" || row.trait === trait) &&
       (level === "all" || String(row.level) === level) &&
-      (!needle || `${row.name} ${row.status} ${row.trait}`.toLocaleLowerCase().includes(needle))
+      (!needle || `${row.name} ${row.status} ${row.trait} ${row.assignment ?? ""}`.toLocaleLowerCase().includes(needle))
     )).sort((left, right) => {
       if (sort === "level") return compareValues(right.level, left.level, "asc");
-      if (sort === "experience") return compareValues(right.experience, left.experience, "asc");
       if (sort === "flights") return compareValues(right.flightCount, left.flightCount, "asc");
       const key = sort === "status" ? "status" : sort === "trait" ? "trait" : "name";
       return compareValues(left[key], right[key], "asc");
@@ -229,9 +546,12 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
       group.push(row);
       next.set(row.status, group);
     });
-    return [...next.entries()];
+    return [...next.entries()].sort(([left], [right]) => (
+      (crewStatusOrder.get(left.toLocaleLowerCase()) ?? 99)
+      - (crewStatusOrder.get(right.toLocaleLowerCase()) ?? 99)
+      || left.localeCompare(right)
+    ));
   }, [visible]);
-  const selected = visible.find((row) => crewKey(row) === selectedCrewKey) ?? visible[0];
 
   return <section className="overview-section overview-roster">
     <SectionHeader count={available ? visible.length : undefined} panelId="overviewRoster" title="Astronaut roster">
@@ -251,55 +571,46 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
         <FilterSelect label="Roster status" onChange={setStatus} value={status} values={unique(rows.map((row) => row.status))} />
         <FilterSelect label="Job" onChange={setTrait} value={trait} values={unique(rows.map((row) => row.trait))} />
         <FilterSelect label="Level" onChange={setLevel} value={level} values={unique(rows.map((row) => String(row.level)))} />
-        <label><span>Sort</span><select aria-label="Sort roster" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="status">Status</option><option value="trait">Job</option><option value="level">Level</option><option value="experience">Experience</option><option value="flights">Flights</option></select></label>
+        <label><span>Sort</span><select aria-label="Sort roster" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="status">Status</option><option value="trait">Job</option><option value="level">Level</option><option value="flights">Flights</option></select></label>
       </div></div>}
-      <div className="overview-roster-split">
-        <div aria-label="Filtered Kerbonauts" className="overview-roster-index">
-          {groups.map(([groupStatus, groupRows]) => <section className="overview-roster-group" key={groupStatus}>
-            <h3 aria-label={`${groupStatus} Kerbonauts`}>{groupStatus}<span>{groupRows.length}</span></h3>
+      <div className="overview-table-wrap overview-roster-table-wrap">
+        {visible.length > 0 ? <table aria-label="Filtered Kerbonauts" className="overview-table overview-roster-table">
+          <thead><tr><th aria-label="Trait" className="overview-roster-trait-column" /><th>Name</th><th>Job</th><th>LV</th><th>Assignment</th><th aria-label="Flights">FLTS</th></tr></thead>
+          {groups.map(([groupStatus, groupRows]) => <tbody key={groupStatus}>
+            <tr className="overview-roster-status-row"><th colSpan={6}><span>{groupStatus}</span><strong>{groupRows.length}</strong></th></tr>
             {groupRows.map((row) => {
-              const key = crewKey(row);
-              const active = selected ? crewKey(selected) === key : false;
               const fallen = row.status.toLocaleLowerCase() === "dead";
-              return <button aria-label={`Select ${row.name}`} aria-pressed={active} className={fallen ? "honor-row" : ""} key={key} onClick={() => setSelectedCrewKey(key)} type="button">
-                <span aria-hidden="true" className="overview-roster-avatar">{row.trait.slice(0, 1).toLocaleUpperCase()}</span>
-                <span>{row.name}{fallen && <span aria-label="Fallen Kerbonaut" className="honor-star" title="Fallen Kerbonaut">&#9733;</span>}</span>
-                <small>LV {row.level}</small>
-              </button>;
+              return <tr className={fallen ? "honor-row" : ""} key={`${row.name}\u0000${row.type}`}>
+                <td><span aria-hidden="true" className="overview-roster-avatar" title={row.trait}>{row.trait.slice(0, 1).toLocaleUpperCase()}</span></td>
+                <td className="overview-roster-name">{row.name}{row.veteran && <span aria-label="Orange suit" className="overview-orange-suit-dot" title="Orange suit" />}{fallen && <span aria-label="Fallen Kerbonaut" className="honor-star" title="Fallen Kerbonaut">&#9733;</span>}</td>
+                <td>{row.trait || "\u2014"}</td>
+                <td>{row.level}</td>
+                <td className={row.assignment ? "" : "overview-roster-unassigned"} title={row.assignment}>{row.assignment || "\u2014"}</td>
+                <td>{row.flightCount}</td>
+              </tr>;
             })}
-          </section>)}
-          {visible.length === 0 && <p className="overview-empty">No Kerbonauts match these filters.</p>}
-        </div>
-        {selected ? <article aria-live="polite" className={`overview-roster-detail${selected.status.toLocaleLowerCase() === "dead" ? " honor-detail" : ""}`}>
-          <header><div><strong>{selected.name}</strong><span>{selected.trait}</span></div><small>{selected.status} / {selected.flightCount} flight{selected.flightCount === 1 ? "" : "s"}</small></header>
-          <div className="overview-roster-facts">
-            <div><span>Status</span><strong>{selected.status}</strong></div>
-            <div><span>Job</span><strong>{selected.trait}</strong></div>
-            <div><span>Level</span><strong>{selected.level}</strong></div>
-            <div><span>Experience</span><strong>{formatTelemetryNumber(selected.experience)}</strong></div>
-            <div><span>Flights</span><strong>{selected.flightCount}</strong></div>
-            <div><span>Crew record</span><strong>{selected.veteran ? "Veteran" : "Standard"}</strong></div>
-          </div>
-        </article> : <div className="overview-roster-detail overview-roster-detail-empty"><span>Select a Kerbonaut to inspect their service record.</span></div>}
+          </tbody>)}
+        </table> : <p className="overview-empty">No Kerbonauts match these filters.</p>}
       </div>
     </>}
   </section>;
 }
 
 function formatAlarmType(type: string) {
-  return type.toLocaleLowerCase() === "raw" ? "Date / Time" : type;
+  const normalized = type.trim().toLocaleLowerCase();
+  return normalized === "raw" || normalized === "date / time" ? "" : type;
 }
 
 function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTelemetry[]; universalTime?: number; kerbin: boolean }) {
   const [source, setSource] = useState<"all" | "stock" | "kac">("all");
-  const hasKacAlarm = rows.some((row) => row.source.toLocaleLowerCase() === "kac");
-  const activeSource = hasKacAlarm ? source : "all";
+  const hasMultipleSources = new Set(rows.map((row) => row.source.toLocaleLowerCase())).size > 1;
+  const activeSource = hasMultipleSources ? source : "all";
   const visible = rows
     .filter((row) => activeSource === "all" || row.source.toLocaleLowerCase() === activeSource)
     .sort((left, right) => left.time - right.time);
   return <section className="overview-section overview-alarms">
     <SectionHeader count={visible.length} panelId="overviewAlarms" title="Upcoming alarms">
-      {hasKacAlarm && <div aria-label="Alarm source" className="overview-alarm-source-buttons" role="group">
+      {hasMultipleSources && <div aria-label="Alarm source" className="overview-alarm-source-buttons" role="group">
         {(["all", "stock", "kac"] as const).map((option) => <button
           aria-label={`Show ${option === "all" ? "all" : option.toUpperCase()} alarms`}
           aria-pressed={activeSource === option}
@@ -310,19 +621,32 @@ function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTele
         >{option.toUpperCase()}</button>)}
       </div>}
     </SectionHeader>
-    <div className="overview-card-list">{visible.map((row, index) => <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}><div><strong>{row.title}</strong><span>{formatAlarmType(row.type)}{row.vessel ? ` / ${row.vessel}` : ""}</span></div><div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)), kerbin)}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div><span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></article>)}</div>
-    {visible.length === 0 && <p className="overview-empty">{hasKacAlarm ? "No upcoming alarms from this source." : "No upcoming alarms."}</p>}
+    {visible.length > 0 && <div className="overview-card-list">{visible.map((row, index) => {
+      const alarmType = formatAlarmType(row.type);
+      return <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}>
+        <div><strong>{row.title}</strong>{row.vessel && <span>{row.vessel}</span>}</div>
+        <div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)), kerbin)}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div>
+        <div className="overview-alarm-badges">{alarmType && <span className="overview-alarm-type">{alarmType}</span>}<span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></div>
+      </article>;
+    })}</div>}
+    {rows.length > 0 && visible.length === 0 && <p className="overview-empty">No upcoming alarms from this source.</p>}
   </section>;
 }
 
 export function MissionOverview({
   commandEnabled = false,
+  editResult,
+  lifecycleResult,
   onSendCommand = () => false,
   snapshot,
+  switchResult,
 }: {
   commandEnabled?: boolean;
+  editResult?: OverviewVesselEditResult;
+  lifecycleResult?: OverviewVesselLifecycleResult;
   onSendCommand?(command: TelemetryCommand): boolean;
   snapshot: TelemetrySnapshot;
+  switchResult?: OverviewVesselSwitchResult;
 }) {
   const { hiddenPanels } = usePanelVisibility();
   const { system, toggleSystem } = useTimeSystem();
@@ -357,10 +681,10 @@ export function MissionOverview({
         (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
         contracts.length > 0 ? "" : "contracts-empty",
       ].filter(Boolean).join(" ")}>
-        {fleetVisible && <FleetSection rows={snapshot["overview.vessels"] ?? []} />}
+        {fleetVisible && <FleetSection commandEnabled={commandEnabled} editResult={editResult} kerbin={kerbin} lifecycleResult={lifecycleResult} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} terminationAvailable={snapshot["overview.vesselTerminationAvailable"] === true} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
-        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" /><div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} /><div className="overview-contract-time"><strong>{isFiniteNumber(contract.deadline) ? `T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}` : "NO DEADLINE"}</strong><span>{isFiniteNumber(contract.deadline) ? `UT ${Math.floor(contract.deadline).toLocaleString("en-US")}` : ""}</span></div></article>)}</div>{contracts.length === 0 && <p className="overview-empty">No active contracts.</p>}</section>}
+        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" />{contracts.length > 0 && <div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>}</section>}
       </div>}
     </div>
     {snapshot["overview.vesselsTruncated"] && <p className="overview-truncated">Fleet list limited to the first 500 tracked objects.</p>}
