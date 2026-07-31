@@ -1,3 +1,4 @@
+import math
 import unittest
 from types import SimpleNamespace
 
@@ -37,7 +38,14 @@ def fake_vessel(name="Odyssey", vessel_type="VesselType.ship", body="Kerbin"):
         name=name,
         type=vessel_type,
         situation="VesselSituation.orbiting",
-        orbit=SimpleNamespace(body=SimpleNamespace(name=body)),
+        orbit=SimpleNamespace(
+            body=SimpleNamespace(name=body),
+            apoapsis_altitude=122_480.0,
+            periapsis_altitude=118_920.0,
+            inclination=0.25,
+            period=2_080.4,
+            eccentricity=0.0008,
+        ),
         met=134.2,
         crew=[SimpleNamespace(name="Jebediah Kerman")],
     )
@@ -99,6 +107,29 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertFalse(by_name["Spent stage"]["mission"])
         self.assertEqual(by_name["Odyssey"]["body"], "Kerbin")
         self.assertEqual(by_name["Odyssey"]["guid"], "Odyssey-guid")
+        self.assertEqual(by_name["Odyssey"]["apoapsisAltitude"], 122_480.0)
+        self.assertEqual(by_name["Odyssey"]["periapsisAltitude"], 118_920.0)
+        self.assertAlmostEqual(by_name["Odyssey"]["inclination"], math.degrees(0.25))
+        self.assertEqual(by_name["Odyssey"]["period"], 2_080.4)
+        self.assertEqual(by_name["Odyssey"]["eccentricity"], 0.0008)
+
+    def test_fleet_omits_unavailable_and_non_finite_orbit_values(self):
+        vessel = fake_vessel()
+        vessel.orbit.apoapsis_altitude = float("nan")
+        vessel.orbit.periapsis_altitude = float("inf")
+        vessel.orbit.inclination = None
+        vessel.orbit.period = "unknown"
+        del vessel.orbit.eccentricity
+
+        row = telemetry_server._gather_overview_fleet(
+            SimpleNamespace(vessels=[vessel])
+        )["overview.vessels"][0]
+
+        for field in (
+            "apoapsisAltitude", "periapsisAltitude", "inclination",
+            "period", "eccentricity",
+        ):
+            self.assertNotIn(field, row)
 
     def test_contract_rows_include_finite_completion_rewards(self):
         contract = SimpleNamespace(

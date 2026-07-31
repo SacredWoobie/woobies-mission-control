@@ -589,6 +589,8 @@ button { font: inherit; }
 .overview-vessel-detail > header strong { overflow: hidden; color: var(--cyan); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .overview-vessel-detail > header span { color: #aeb9c7; font-size: 8px; }
 .overview-vessel-detail > header small { overflow: hidden; color: var(--slate-dim); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.overview-vessel-detail > header .overview-detail-badge,
+.overview-roster-detail > header .overview-detail-badge { padding: 2px 4px; border: 1px solid #5e4726; border-radius: 2px; color: var(--amber); font-size: 7px; letter-spacing: .08em; text-transform: uppercase; }
 .overview-vessel-facts { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .overview-vessel-facts > div { display: grid; min-width: 0; min-height: 39px; padding: 5px 7px; align-content: center; gap: 3px; border-radius: 3px; background: #10202b; }
 .overview-vessel-facts span { overflow: hidden; color: var(--slate-dim); font-size: 7px; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
@@ -662,6 +664,8 @@ button { font: inherit; }
 .overview-source { padding: 4px 5px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--slate) !important; font-size: 7px !important; letter-spacing: .08em; }
 .overview-source.stock { border-color: #385065; color: var(--cyan) !important; }
 .overview-source.kac { border-color: #5e4726; color: var(--amber) !important; }
+.overview-list-card > .overview-alarm-badges { align-items: center; justify-content: flex-end; flex-direction: row; gap: 5px; }
+.overview-alarm-type { padding: 5px 7px; border: 1px solid #385065; border-radius: 2px; color: var(--cyan) !important; font-size: 8px !important; letter-spacing: .05em; }
 .overview-alarm-card { min-height: 68px; padding: 11px 12px; gap: 13px; }
 .overview-alarm-card > div:first-child > strong { font-size: 12px; }
 .overview-alarm-card > div:first-child > span { font-size: 10px; }
@@ -1368,6 +1372,7 @@ button { font: inherit; }
   .overview-contract-card .overview-contract-title { grid-row: 1; grid-column: 1; }
   .overview-contract-card .overview-contract-rewards { grid-row: 2; grid-column: 1 / -1; align-items: flex-start; justify-content: flex-start; }
   .overview-contract-card .overview-contract-time { grid-row: 1; grid-column: 2; }
+  .overview-list-card > .overview-alarm-badges { grid-column: 1 / -1; justify-content: flex-start; }
   .overview-source { grid-column: 1 / -1; justify-self: start; }
 }
 

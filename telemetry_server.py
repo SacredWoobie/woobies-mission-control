@@ -2321,6 +2321,14 @@ def _overview_value(obj, name, default=None):
         return default
 
 
+def _overview_finite_float(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def _overview_list(obj, name):
     value = _overview_value(obj, name, [])
     try:
@@ -2408,6 +2416,16 @@ def _gather_overview_fleet(sc):
                 "crewCount": int(crew_count),
                 "mission": vessel_type != "Debris",
             }
+            for source, target, convert in (
+                ("apoapsis_altitude", "apoapsisAltitude", lambda value: value),
+                ("periapsis_altitude", "periapsisAltitude", lambda value: value),
+                ("inclination", "inclination", math.degrees),
+                ("period", "period", lambda value: value),
+                ("eccentricity", "eccentricity", lambda value: value),
+            ):
+                value = _overview_finite_float(_overview_value(orbit, source))
+                if value is not None:
+                    row[target] = convert(value)
             vessel_guid = str(_overview_value(vessel, "id", "")).strip()
             if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
                 row["guid"] = vessel_guid

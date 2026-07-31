@@ -1,6 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  formatDistance,
+  formatEccentricity,
+  formatInclination,
   formatMissionDuration,
+  formatOrbitPeriod,
   formatTelemetryNumber,
   formatUniversalTime,
   isFiniteNumber,
@@ -107,7 +111,7 @@ function VesselTypeFilter({ rows, excluded, onToggle, onReset }: {
   </div>;
 }
 
-function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
+function FleetSection({ kerbin, rows }: { kerbin: boolean; rows: OverviewVesselTelemetry[] }) {
   const [query, setQuery] = useState("");
   const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set(["Debris"]));
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -140,6 +144,15 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
     return [...next.entries()];
   }, [visible]);
   const selected = visible.find((row) => vesselKey(row) === selectedVesselKey) ?? visible[0];
+  const selectedHasPeriod = selected
+    ? isFiniteNumber(selected.period) && (!isFiniteNumber(selected.eccentricity) || selected.eccentricity < 1)
+    : false;
+  const selectedHasOrbitFacts = selected ? [
+    selected.apoapsisAltitude,
+    selected.periapsisAltitude,
+    selected.inclination,
+    selected.eccentricity,
+  ].some(isFiniteNumber) || selectedHasPeriod : false;
 
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
@@ -185,15 +198,14 @@ function FleetSection({ rows }: { rows: OverviewVesselTelemetry[] }) {
         {visible.length === 0 && <p className="overview-empty">No vessels match these filters.</p>}
       </div>
       {selected ? <article aria-live="polite" className="overview-vessel-detail">
-        <header><div><strong>{selected.name}</strong><span>{selected.type}</span></div><small>{selected.situation} {selected.body} / MET {formatMissionDuration(selected.met)}</small></header>
-        <div className="overview-vessel-facts">
-          <div><span>Status</span><strong>{selected.situation}</strong></div>
-          <div><span>SOI</span><strong>{selected.body}</strong></div>
-          <div><span>Mission elapsed</span><strong>{formatMissionDuration(selected.met)}</strong></div>
-          <div><span>Crew</span><strong>{selected.crewCount}</strong></div>
-          <div><span>Craft type</span><strong>{selected.type}</strong></div>
-          <div><span>Tracking scope</span><strong>{selected.mission ? "Mission craft" : "Tracked object"}</strong></div>
-        </div>
+        <header><div><strong>{selected.name}</strong><span>{selected.type}</span>{!selected.mission && <span className="overview-detail-badge">Tracked object</span>}</div><small>{selected.situation} {selected.body} / MET {formatMissionDuration(selected.met)}{selected.crewCount > 0 ? ` / ${selected.crewCount} crew` : ""}</small></header>
+        {selectedHasOrbitFacts && <div className="overview-vessel-facts">
+          {isFiniteNumber(selected.apoapsisAltitude) && <div><span>Apoapsis</span><strong>{formatDistance(selected.apoapsisAltitude, "live")}</strong></div>}
+          {isFiniteNumber(selected.periapsisAltitude) && <div><span>Periapsis</span><strong>{formatDistance(selected.periapsisAltitude, "live")}</strong></div>}
+          {isFiniteNumber(selected.inclination) && <div><span>Inclination</span><strong>{formatInclination(selected.inclination)}</strong></div>}
+          {selectedHasPeriod && <div><span>Period</span><strong>{formatOrbitPeriod(selected.period, selected.eccentricity, kerbin)}</strong></div>}
+          {isFiniteNumber(selected.eccentricity) && <div><span>Eccentricity</span><strong>{formatEccentricity(selected.eccentricity)}</strong></div>}
+        </div>}
       </article> : <div className="overview-vessel-detail overview-vessel-detail-empty"><span>Select a vessel to inspect its mission status.</span></div>}
     </div>
   </section>;
@@ -271,15 +283,10 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
           {visible.length === 0 && <p className="overview-empty">No Kerbonauts match these filters.</p>}
         </div>
         {selected ? <article aria-live="polite" className={`overview-roster-detail${selected.status.toLocaleLowerCase() === "dead" ? " honor-detail" : ""}`}>
-          <header><div><strong>{selected.name}</strong><span>{selected.trait}</span></div><small>{selected.status} / {selected.flightCount} flight{selected.flightCount === 1 ? "" : "s"}</small></header>
-          <div className="overview-roster-facts">
-            <div><span>Status</span><strong>{selected.status}</strong></div>
-            <div><span>Job</span><strong>{selected.trait}</strong></div>
-            <div><span>Level</span><strong>{selected.level}</strong></div>
+          <header><div><strong>{selected.name}</strong><span>{selected.trait}</span>{selected.veteran && <span className="overview-detail-badge">Orange suit</span>}</div><small>{selected.status} / {selected.flightCount} flight{selected.flightCount === 1 ? "" : "s"}</small></header>
+          {isFiniteNumber(selected.experience) && <div className="overview-roster-facts">
             <div><span>Experience</span><strong>{formatTelemetryNumber(selected.experience)}</strong></div>
-            <div><span>Flights</span><strong>{selected.flightCount}</strong></div>
-            <div><span>Crew record</span><strong>{selected.veteran ? "Veteran" : "Standard"}</strong></div>
-          </div>
+          </div>}
         </article> : <div className="overview-roster-detail overview-roster-detail-empty"><span>Select a Kerbonaut to inspect their service record.</span></div>}
       </div>
     </>}
@@ -287,19 +294,20 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
 }
 
 function formatAlarmType(type: string) {
-  return type.toLocaleLowerCase() === "raw" ? "Date / Time" : type;
+  const normalized = type.trim().toLocaleLowerCase();
+  return normalized === "raw" || normalized === "date / time" ? "" : type;
 }
 
 function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTelemetry[]; universalTime?: number; kerbin: boolean }) {
   const [source, setSource] = useState<"all" | "stock" | "kac">("all");
-  const hasKacAlarm = rows.some((row) => row.source.toLocaleLowerCase() === "kac");
-  const activeSource = hasKacAlarm ? source : "all";
+  const hasMultipleSources = new Set(rows.map((row) => row.source.toLocaleLowerCase())).size > 1;
+  const activeSource = hasMultipleSources ? source : "all";
   const visible = rows
     .filter((row) => activeSource === "all" || row.source.toLocaleLowerCase() === activeSource)
     .sort((left, right) => left.time - right.time);
   return <section className="overview-section overview-alarms">
     <SectionHeader count={visible.length} panelId="overviewAlarms" title="Upcoming alarms">
-      {hasKacAlarm && <div aria-label="Alarm source" className="overview-alarm-source-buttons" role="group">
+      {hasMultipleSources && <div aria-label="Alarm source" className="overview-alarm-source-buttons" role="group">
         {(["all", "stock", "kac"] as const).map((option) => <button
           aria-label={`Show ${option === "all" ? "all" : option.toUpperCase()} alarms`}
           aria-pressed={activeSource === option}
@@ -310,8 +318,15 @@ function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTele
         >{option.toUpperCase()}</button>)}
       </div>}
     </SectionHeader>
-    <div className="overview-card-list">{visible.map((row, index) => <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}><div><strong>{row.title}</strong><span>{formatAlarmType(row.type)}{row.vessel ? ` / ${row.vessel}` : ""}</span></div><div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)), kerbin)}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div><span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></article>)}</div>
-    {visible.length === 0 && <p className="overview-empty">{hasKacAlarm ? "No upcoming alarms from this source." : "No upcoming alarms."}</p>}
+    <div className="overview-card-list">{visible.map((row, index) => {
+      const alarmType = formatAlarmType(row.type);
+      return <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}>
+        <div><strong>{row.title}</strong>{row.vessel && <span>{row.vessel}</span>}</div>
+        <div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)), kerbin)}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div>
+        <div className="overview-alarm-badges">{alarmType && <span className="overview-alarm-type">{alarmType}</span>}<span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></div>
+      </article>;
+    })}</div>
+    {visible.length === 0 && <p className="overview-empty">{hasMultipleSources ? "No upcoming alarms from this source." : "No upcoming alarms."}</p>}
   </section>;
 }
 
@@ -357,10 +372,10 @@ export function MissionOverview({
         (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
         contracts.length > 0 ? "" : "contracts-empty",
       ].filter(Boolean).join(" ")}>
-        {fleetVisible && <FleetSection rows={snapshot["overview.vessels"] ?? []} />}
+        {fleetVisible && <FleetSection kerbin={kerbin} rows={snapshot["overview.vessels"] ?? []} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
-        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" /><div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} /><div className="overview-contract-time"><strong>{isFiniteNumber(contract.deadline) ? `T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}` : "NO DEADLINE"}</strong><span>{isFiniteNumber(contract.deadline) ? `UT ${Math.floor(contract.deadline).toLocaleString("en-US")}` : ""}</span></div></article>)}</div>{contracts.length === 0 && <p className="overview-empty">No active contracts.</p>}</section>}
+        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" /><div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>{contracts.length === 0 && <p className="overview-empty">No active contracts.</p>}</section>}
       </div>}
     </div>
     {snapshot["overview.vesselsTruncated"] && <p className="overview-truncated">Fleet list limited to the first 500 tracked objects.</p>}

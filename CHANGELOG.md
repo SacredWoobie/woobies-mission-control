@@ -4,6 +4,10 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Refined the Space Center and Tracking Station overview with deduplicated
+  vessel/roster details, optional save-wide orbital facts, conditional alarm
+  and crew badges, and silent defaults for raw alarms and missing deadlines.
+
 ## v0.4.1 - Faster, resilient editor calculations
 
 - Retained the previous confirmed VAB/SPH staging analysis and craft totals

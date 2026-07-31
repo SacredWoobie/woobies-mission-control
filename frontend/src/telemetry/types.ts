@@ -126,6 +126,11 @@ export interface OverviewVesselTelemetry {
   met: number;
   crewCount: number;
   mission: boolean;
+  apoapsisAltitude?: number;
+  periapsisAltitude?: number;
+  inclination?: number;
+  period?: number;
+  eccentricity?: number;
 }
 
 export interface OverviewCrewTelemetry {
