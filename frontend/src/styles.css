@@ -540,7 +540,8 @@ button { font: inherit; }
 .overview-section-actions { display: flex; min-width: 28px; align-items: center; justify-content: flex-end; gap: 8px; }
 .overview-section-actions > strong { min-width: 28px; color: var(--cyan); font-size: 20px; font-weight: 500; text-align: right; }
 .overview-header-button { min-height: 26px; padding: 3px 7px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--cyan); background: #0b1821; cursor: pointer; font: 8px var(--mono); letter-spacing: .04em; white-space: nowrap; }
-.overview-header-button:hover, .overview-header-button:focus-visible, .overview-header-button[aria-expanded="true"], .overview-header-button[aria-pressed="true"] { border-color: var(--cyan); background: #102633; outline: 0; }
+.overview-header-button:hover:not(:disabled), .overview-header-button:focus-visible, .overview-header-button[aria-expanded="true"], .overview-header-button[aria-pressed="true"] { border-color: var(--cyan); background: #102633; outline: 0; }
+.overview-header-button:disabled { opacity: .42; cursor: not-allowed; }
 .overview-alarm-source-buttons { display: flex; align-items: center; gap: 3px; }
 .overview-controls { display: grid; padding: 9px; align-items: end; grid-template-columns: minmax(135px,1.3fr) repeat(4,minmax(90px,.75fr)) auto; gap: 6px; border-bottom: 1px solid var(--rule); background: rgba(5,9,14,.45); }
 .overview-controls.fleet-controls { grid-template-columns: minmax(150px,1.4fr) repeat(3,minmax(90px,.75fr)) auto; }
@@ -690,15 +691,7 @@ button { font: inherit; }
 .overview-contract-rewards strong { color: var(--cyan); }
 .overview-contract-time { grid-column: 3; }
 .transfer-window-body { display: flex; min-width: 0; flex-direction: column; }
-.transfer-window-toolbar { display: flex; min-height: 58px; padding: 9px 12px; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--rule); background: rgba(78,201,224,.025); }
-.transfer-window-toolbar > div { display: grid; min-width: 0; gap: 3px; }
-.transfer-window-toolbar span { color: var(--cyan); font-size: 8px; letter-spacing: .12em; }
-.transfer-window-toolbar strong { color: #d7e2ee; font-size: 12px; }
-.transfer-window-toolbar small { overflow: hidden; color: var(--slate-dim); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.transfer-window-toolbar button { min-height: 29px; flex: 0 0 auto; padding: 5px 9px; border: 1px solid #315166; color: var(--cyan); background: #0b1821; cursor: pointer; font: 9px var(--mono); letter-spacing: .04em; white-space: nowrap; }
-.transfer-window-toolbar button:hover:not(:disabled), .transfer-window-toolbar button:focus-visible { border-color: var(--cyan); background: #102633; }
-.transfer-window-toolbar button:disabled { opacity: .42; cursor: not-allowed; }
-.transfer-window-status { margin: 0; color: var(--amber); font-size: 8px; letter-spacing: .04em; }
+.transfer-window-status { margin: 0; padding: 6px 12px; border-bottom: 1px solid var(--rule); color: var(--amber); background: rgba(78,201,224,.025); font-size: 8px; letter-spacing: .04em; }
 .overview-transfer-grid { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 1px; background: var(--rule); }
 .overview-transfer-card { display: grid; min-width: 0; min-height: 68px; padding: 10px 12px; align-items: center; grid-template-columns: minmax(0,1fr) auto; gap: 14px; background: var(--panel); }
 .overview-transfer-card > div { display: grid; min-width: 0; gap: 4px; }
@@ -1071,11 +1064,7 @@ button { font: inherit; }
     min-height: 0;
     flex-direction: column;
   }
-  .inactive-mode .transfer-window-body {
-    display: grid;
-    min-height: 0;
-    grid-template-columns: clamp(190px,18vw,230px) minmax(0,1fr);
-  }
+  .inactive-mode .transfer-window-body { min-height: 0; }
   .inactive-mode .overview-transfer-grid {
     display: flex;
     min-height: 0;
@@ -1084,25 +1073,6 @@ button { font: inherit; }
     align-content: stretch;
     flex-wrap: wrap;
     overscroll-behavior: contain;
-  }
-  .inactive-mode .transfer-window-toolbar {
-    min-height: 0;
-    padding: 6px 9px;
-    align-items: stretch;
-    justify-content: center;
-    border-right: 1px solid var(--rule);
-    border-bottom: 0;
-    flex-direction: column;
-    gap: 5px;
-  }
-  .inactive-mode .transfer-window-toolbar > div {
-    display: grid;
-    gap: 2px;
-  }
-  .inactive-mode .transfer-window-toolbar small { display: none; }
-  .inactive-mode .transfer-window-toolbar button {
-    min-height: 26px;
-    padding-block: 3px;
   }
   .inactive-mode .overview-transfer-card {
     min-height: 44px;
@@ -1171,7 +1141,6 @@ button { font: inherit; }
   .inactive-mode .overview-command-grid,
   .inactive-mode .overview-data-grid { gap: 6px; }
   .inactive-mode .overview-section-head { min-height: 38px; padding: 5px 9px; }
-  .inactive-mode .transfer-window-toolbar { padding: 4px 7px; }
   .inactive-mode .overview-transfer-card { min-height: 39px; padding: 4px 7px; }
   .inactive-mode .overview-transfer-grid { max-height: 79px; }
   .inactive-mode .overview-controls { padding: 5px; gap: 4px; }
@@ -1433,6 +1402,8 @@ button { font: inherit; }
 }
 
 @media (max-width: 440px) {
+  .overview-transfer-windows .overview-section-head { flex-wrap: wrap; }
+  .overview-transfer-windows .overview-section-actions { max-width: 100%; margin-left: auto; }
   .col-heads, .res-row { grid-template-columns: 70px 1fr 1fr; gap: 5px; }
   .meter .cap { padding-inline: 3px; font-size: 8px; }
   .flight-stage-hero { grid-template-columns: minmax(0,1fr); }
@@ -1484,7 +1455,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .overview-vessel-detail-empty,
 .overview-empty,
 .overview-list-card span,
-.transfer-window-toolbar small,
 .overview-transfer-card span,
 .notes-content-head span,
 .clockcell .sub,
@@ -1561,9 +1531,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .overview-empty,
 .overview-list-card strong,
 .overview-list-card span,
-.transfer-window-toolbar span,
-.transfer-window-toolbar small,
-.transfer-window-toolbar button,
 .transfer-window-status,
 .overview-transfer-card strong,
 .overview-transfer-card span,
@@ -1615,8 +1582,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .overview-controls select,
 .overview-sort-direction,
 .vessel-type-button,
-.overview-vessel-group button,
-.transfer-window-toolbar button {
+.overview-vessel-group button {
   min-height: 44px;
 }
 .panel-hide-button { width: 44px; height: 44px; min-width: 44px; flex: 0 0 44px; font-size: 22px; line-height: 1; }

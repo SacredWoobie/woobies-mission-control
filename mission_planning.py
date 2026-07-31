@@ -618,6 +618,12 @@ def _build_controller():
                 else "Another transfer-window calculation is still running."
             )
             return
+        if str(planner.state).lower() in {"running", "cancelling"}:
+            transfer_windows["state"] = "paused"
+            transfer_windows["pauseReason"] = (
+                "MechJeb transfer planning is already in use."
+            )
+            return
         if not transfer_window_queue:
             transfer_windows["state"] = (
                 "partial"

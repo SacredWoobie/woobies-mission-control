@@ -1,8 +1,14 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMissionUT } from "../deltaV/PorkchopPlotModal";
 import type { TelemetryCommand, TelemetrySnapshot, TransferWindowTelemetry } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { usePanelVisibility } from "./PanelVisibility";
+
+let autoRefreshRequestedForPage = false;
+
+export function resetTransferWindowAutoRefreshForTests() {
+  autoRefreshRequestedForPage = false;
+}
 
 function formatMinuteDuration(seconds: number, kerbin: boolean) {
   const totalMinutes = Math.max(1, Math.ceil(Math.abs(seconds) / 60));
@@ -53,8 +59,11 @@ export function TransferWindowsPanel({
   const { system } = useTimeSystem();
   const kerbin = isKerbinTime(system);
   const [sendError, setSendError] = useState("");
+  const autoRefreshAttempted = useRef(false);
   const state = snapshot["mj.transfer.windows.state"] ?? "idle";
   const requestId = snapshot["mj.transfer.windows.requestId"] ?? "";
+  const refreshedAtUT = snapshot["mj.transfer.windows.refreshedAtUT"];
+  const windowError = snapshot["mj.transfer.windows.error"];
   const origin = snapshot["mj.transfer.windows.origin"] || "Kerbin";
   const currentUT = typeof snapshot["t.universalTime"] === "number"
     && Number.isFinite(snapshot["t.universalTime"])
@@ -86,7 +95,7 @@ export function TransferWindowsPanel({
         ? `${activeDestination ? `Calculating ${origin} \u2192 ${activeDestination}` : "Preparing transfer windows"} \u00b7 ${completedCount}/${totalCount} \u00b7 ${progress}%`
         : "";
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     const nextRequestId = globalThis.crypto?.randomUUID?.()
       ?? `windows-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setSendError("");
@@ -99,7 +108,26 @@ export function TransferWindowsPanel({
     })) {
       setSendError("Unable to start the refresh because Mission Control is not linked.");
     }
-  };
+  }, [onSendCommand]);
+
+  useEffect(() => {
+    if (
+      autoRefreshAttempted.current
+      || autoRefreshRequestedForPage
+      || !commandEnabled
+      || !serviceReady
+      || state !== "idle"
+      || requestId
+      || rows.length > 0
+      || Boolean(refreshedAtUT)
+      || Boolean(windowError)
+    ) {
+      return;
+    }
+    autoRefreshAttempted.current = true;
+    autoRefreshRequestedForPage = true;
+    refresh();
+  }, [commandEnabled, refresh, refreshedAtUT, requestId, rows.length, serviceReady, state, windowError]);
   const cancel = () => {
     if (!requestId) return;
     setSendError("");
@@ -112,22 +140,15 @@ export function TransferWindowsPanel({
     <header className="overview-section-head">
       <h2>Transfer windows</h2>
       <div className="overview-section-actions">
+        {active
+          ? <button aria-label="Cancel refresh" className="overview-header-button" disabled={!commandEnabled || state === "cancelling"} onClick={cancel} title="Cancel transfer-window refresh" type="button">Cancel</button>
+          : <button aria-label={expired ? "Refresh expired windows" : rows.length ? "Refresh windows" : "Calculate windows"} className="overview-header-button" disabled={!commandEnabled || !serviceReady} onClick={refresh} title={expired ? "Refresh expired transfer windows" : rows.length ? "Refresh transfer windows" : "Calculate transfer windows"} type="button">{expired ? "Refresh expired" : rows.length ? "Refresh" : "Calculate"}</button>}
         <strong>{rows.length}</strong>
         <button aria-label="Hide Transfer windows panel" className="panel-hide-button" onClick={() => hidePanel("overviewTransfers")} title="Hide panel" type="button">{"\u2039"}</button>
       </div>
     </header>
     <div className="transfer-window-body">
-      <div className="transfer-window-toolbar">
-        <div>
-          <span>ORIGIN</span>
-          <strong>{origin}</strong>
-          <small>Best MechJeb departure across installed primary planets</small>
-        </div>
-        {active
-          ? <button disabled={!commandEnabled || state === "cancelling"} onClick={cancel} type="button">Cancel refresh</button>
-          : <button disabled={!commandEnabled || !serviceReady} onClick={refresh} type="button">{expired ? "Refresh expired windows" : rows.length ? "Refresh windows" : "Calculate windows"}</button>}
-        {statusText && <p aria-live="polite" className="transfer-window-status">{statusText}</p>}
-      </div>
+      {statusText && <p aria-live="polite" className="transfer-window-status">{statusText}</p>}
       {rows.length > 0 ? <div className="overview-transfer-grid">
         {rows.map((row) => <article className={`overview-transfer-card ${row.error ? "error" : ""}`} key={row.destination}>
           <div className="overview-transfer-route">
@@ -150,6 +171,6 @@ export function TransferWindowsPanel({
             : "Calculate windows to build a minute-accurate departure countdown board."
       }</p>}
     </div>
-    {(sendError || snapshot["mj.transfer.windows.error"]) && <p className="overview-service-warning" role="alert"><strong>Transfer-window refresh failed</strong><span>{sendError || snapshot["mj.transfer.windows.error"]}</span></p>}
+    {(sendError || windowError) && <p className="overview-service-warning" role="alert"><strong>Transfer-window refresh failed</strong><span>{sendError || windowError}</span></p>}
   </section>;
 }

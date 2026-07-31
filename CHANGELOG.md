@@ -17,6 +17,10 @@ All notable public changes will be recorded here.
   the vessel identity, recovery state, and exact crew roster before acting.
   Termination passes the selected kRPC vessel object directly to the service,
   retaining collision-safe identity when the pinned Python client omits GUIDs.
+- Made an empty transfer-window board calculate automatically once MechJeb is
+  available, wait without taking over an existing transfer-planning job, and
+  moved the manual calculate, refresh, and cancel control into the section
+  header so installed planet packs have more room for destination cards.
 
 ## v0.4.1 - Faster, resilient editor calculations
 
