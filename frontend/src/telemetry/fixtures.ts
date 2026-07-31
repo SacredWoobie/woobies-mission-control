@@ -203,6 +203,7 @@ export const editorTelemetryFixture: TelemetrySnapshot = {
   "editor.altitude": 0,
   "editor.mach": 0,
   "editor.revision": 7,
+  "editor.analysisRevision": 7,
   "editor.stable": true,
   "editor.summaryAvailable": true,
   "editor.partCount": 31,

@@ -4,6 +4,21 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.4.1 - Faster, resilient editor calculations
+
+- Retained the previous confirmed VAB/SPH staging analysis and craft totals
+  during same-craft recalculation, with explicit stale labeling and hard
+  invalidation across craft, scene, empty-craft, and MechJeb-core boundaries.
+- Added StageStats 0.2.6 editor rebuild diagnostics so staging-sequence changes
+  schedule MechJeb's normal PartSet rebuild before a fresh analysis can be
+  confirmed, including the terminal decoupler-only stage case.
+- Accelerated editor condition changes with one atomic body/altitude/Mach
+  update, compact whole-table stage snapshots, safe craft-summary reuse, and a
+  shorter coalescing delay while preserving MechJeb completion safeguards.
+- Added StageStats 0.2.7 exact editor-job generations so completed atmosphere
+  and vacuum simulations can publish immediately; ambiguous or incompatible
+  MechJeb states retain the conservative timed confirmation path.
+
 ## v0.4.0 - Mission planning and flight engineering
 
 - Added integrated mission-planning workspaces for transfer windows, selected

@@ -162,6 +162,7 @@ SCENES = {
         "editor.altitude": 0,
         "editor.mach": 0,
         "editor.revision": 7,
+        "editor.analysisRevision": 7,
         "editor.stable": True,
         "editor.summaryAvailable": True,
         "editor.partCount": 31,
@@ -271,7 +272,13 @@ SCENES = {
 }
 
 
-async def receive_commands(socket, editor_conditions, note_state):
+async def receive_commands(
+    socket,
+    editor_conditions,
+    editor_recalculation,
+    note_state,
+    recalculation_seconds,
+):
     async for raw in socket:
         try:
             command = json.loads(raw)
@@ -285,6 +292,14 @@ async def receive_commands(socket, editor_conditions, note_state):
                 if key in command:
                     editor_conditions[key] = command[key]
             editor_conditions["revision"] += 1
+            if recalculation_seconds > 0:
+                editor_recalculation["pending_until"] = (
+                    asyncio.get_running_loop().time() + recalculation_seconds
+                )
+            else:
+                editor_recalculation["analysis_revision"] = (
+                    editor_conditions["revision"]
+                )
         elif command.get("type") == "notes.pin":
             path = command.get("relativePath")
             note_state["pinned"] = (
@@ -314,6 +329,10 @@ async def run(args):
             "mach": SCENES["editor"]["editor.mach"],
             "revision": SCENES["editor"]["editor.revision"],
         }
+        editor_recalculation = {
+            "analysis_revision": editor_conditions["revision"],
+            "pending_until": 0.0,
+        }
         note_state = {
             "pinned": NOTE,
             "selected": NOTE,
@@ -321,7 +340,13 @@ async def run(args):
             "favorite": True,
         }
         receiver = asyncio.create_task(
-            receive_commands(socket, editor_conditions, note_state)
+            receive_commands(
+                socket,
+                editor_conditions,
+                editor_recalculation,
+                note_state,
+                args.editor_recalculation_seconds,
+            )
         )
         frame = 0
         try:
@@ -345,11 +370,26 @@ async def run(args):
                      "isFavorite": note_state["favorite"]},
                 ]
                 if scene == "editor":
+                    pending = (
+                        editor_recalculation["analysis_revision"]
+                        != editor_conditions["revision"]
+                        and asyncio.get_running_loop().time()
+                        < editor_recalculation["pending_until"]
+                    )
+                    if not pending:
+                        editor_recalculation["analysis_revision"] = (
+                            editor_conditions["revision"]
+                        )
                     payload.update({
                         "editor.body": editor_conditions["body"],
                         "editor.altitude": editor_conditions["altitude"],
                         "editor.mach": editor_conditions["mach"],
                         "editor.revision": editor_conditions["revision"],
+                        "editor.analysisRevision": (
+                            editor_recalculation["analysis_revision"]
+                        ),
+                        "editor.stable": not pending,
+                        "stage.pending": pending,
                     })
                 elif scene == "flight":
                     payload.update({
@@ -378,7 +418,8 @@ async def run(args):
     print(
         f"[mock-telemetry] ws://{args.host}:{args.port} "
         f"scenes={','.join(scene_names)} interval={args.interval}s "
-        f"drop_every={args.drop_every or 'off'}",
+        f"drop_every={args.drop_every or 'off'} "
+        f"editor_recalculation={args.editor_recalculation_seconds or 'off'}",
         flush=True,
     )
     async with websockets.serve(handler, args.host, args.port):
@@ -396,6 +437,15 @@ def parse_args():
         type=int,
         default=0,
         help="Close each client after N frames to exercise automatic reconnect.",
+    )
+    parser.add_argument(
+        "--editor-recalculation-seconds",
+        type=float,
+        default=0.0,
+        help=(
+            "Retain the previous editor analysis for this many seconds after "
+            "each editor.conditions command."
+        ),
     )
     return parser.parse_args()
 

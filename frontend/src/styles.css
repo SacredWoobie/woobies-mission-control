@@ -401,6 +401,7 @@ button { font: inherit; }
 .editor-state.bad { color: var(--warn); }
 .editor-recalculation-note { margin: 0; color: var(--slate-muted-text); font-size: 12px; line-height: 1.4; }
 #editorSummary .body { display: flex; flex-direction: column; gap: 11px; }
+.editor-summary-content { display: flex; flex-direction: column; gap: inherit; }
 .editor-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
 .editor-summary-value { display: flex; min-width: 0; min-height: 72px; padding: 9px 10px; justify-content: center; background: var(--panel-2); flex-direction: column; gap: 3px; }
 .editor-summary-value strong { overflow: hidden; color: var(--amber); font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
@@ -408,6 +409,22 @@ button { font: inherit; }
 .editor-summary-state { margin: 12px 0; color: var(--slate); font-size: 10px; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
 .editor-summary-state.wait { color: var(--amber); }
 .editor-summary-state.bad { color: var(--warn); }
+.editor-analysis-status {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--amber) 48%, var(--rule));
+  border-radius: 3px;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 7%, var(--panel-2));
+  font-size: 9px;
+  letter-spacing: .09em;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+}
+.editor-analysis-retained {
+  filter: saturate(.4);
+  opacity: .58;
+}
 .editor-resource-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--slate-dim); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .editor-resource-list { display: flex; flex-direction: column; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
 .editor-resource-row { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(110px, 1.5fr) minmax(125px, .7fr); gap: 10px; min-height: 30px; padding: 6px 9px; align-items: center; color: var(--slate); background: var(--panel-2); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }

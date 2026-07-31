@@ -11,6 +11,7 @@ import {
 import { selectStages, selectStageSummary } from "../telemetry/selectors";
 import type { StageViewModel, TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
+import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
 
 interface StagingPanelProps {
   snapshot: TelemetrySnapshot;
@@ -55,7 +56,12 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const atmosphere = selectStageSummary(snapshot, "atmosphere");
   const vacuum = selectStageSummary(snapshot, "vacuum");
   const unavailable = snapshot["stage.available"] === false;
-  const pending = snapshot["stage.pending"] === true;
+  const {
+    pending,
+    retained,
+    staleLabel,
+  } = useEditorAnalysisStatus(snapshot);
+  const stale = editorMode && retained;
   const activeKsp = atmosphere.currentKsp ?? vacuum.currentKsp;
   const previousActiveKsp = useRef(activeKsp);
   const [flashKsp, setFlashKsp] = useState<number>();
@@ -94,7 +100,10 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
       id="stage"
       title={editorMode ? "Editor staging analysis" : "Staging analysis"}
       tag={editorMode ? (
-        <span aria-label="Total delta-v" className="editor-stage-total-dv">
+        <span
+          aria-label="Total delta-v"
+          className={`editor-stage-total-dv${stale ? " editor-analysis-retained" : ""}`}
+        >
           <span className="editor-stage-total-label">Total Δv</span>
           <span className="editor-stage-total-value">
             <small>Atmo:</small>
@@ -108,38 +117,52 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
         </span>
       ) : undefined}
     >
-      {unavailable || pending ? (
+      {unavailable ? (
         <p className="empty-state">
-          {pending ? "Calculating staging simulation…" : "Staging simulation is not available."}
+          Staging simulation is not available.
         </p>
+      ) : pending && !stale ? (
+        <p className="empty-state">Calculating staging simulation…</p>
       ) : editorMode ? (
-        rows.length === 0 ? (
-          <p className="empty-state">No propulsive stages for this condition.</p>
-        ) : (
-          <div className="stage-table editor">
-            <div className="st-row st-head" aria-hidden="true">
-              <span>Stage</span>
-              <span>Δv Atmo</span>
-              <span>Δv Vac</span>
-              <span>TWR Atmo</span>
-              <span>TWR Vac</span>
-              <span>Burn</span>
+        <>
+          {stale && (
+            <div aria-live="polite" className="editor-analysis-status wait">
+              {staleLabel}
             </div>
-            {rows.map((stage) => {
-              const isCurrent = atmosphere.current?.ksp === stage.ksp;
-              return (
-                <div className={`st-row ${isCurrent ? "cur" : ""}`} key={stage.ksp}>
-                  <span className="sname">{isCurrent ? "▶ " : ""}S{stage.ksp}</span>
-                  <span>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
-                  <span>{formatStageDeltaV(stage.deltaVVacuum)}</span>
-                  <span>{formatTwr(stage.twrAtmosphere)}</span>
-                  <span>{formatTwr(stage.twrVacuum)}</span>
-                  <span>{formatDuration(stage.burnSeconds)}</span>
-                </div>
-              );
-            })}
-          </div>
-        )
+          )}
+          {rows.length === 0 ? (
+            <p className={`empty-state${stale ? " editor-analysis-retained" : ""}`}>
+              No propulsive stages for this condition.
+            </p>
+          ) : (
+            <div
+              aria-busy={pending}
+              className={`stage-table editor${stale ? " editor-analysis-retained" : ""}`}
+            >
+              <div className="st-row st-head" aria-hidden="true">
+                <span>Stage</span>
+                <span>Δv Atmo</span>
+                <span>Δv Vac</span>
+                <span>TWR Atmo</span>
+                <span>TWR Vac</span>
+                <span>Burn</span>
+              </div>
+              {rows.map((stage) => {
+                const isCurrent = !stale && atmosphere.current?.ksp === stage.ksp;
+                return (
+                  <div className={`st-row ${isCurrent ? "cur" : ""}`} key={stage.ksp}>
+                    <span className="sname">{isCurrent ? "▶ " : ""}S{stage.ksp}</span>
+                    <span>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
+                    <span>{formatStageDeltaV(stage.deltaVVacuum)}</span>
+                    <span>{formatTwr(stage.twrAtmosphere)}</span>
+                    <span>{formatTwr(stage.twrVacuum)}</span>
+                    <span>{formatDuration(stage.burnSeconds)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div className="flight-stage-hero">

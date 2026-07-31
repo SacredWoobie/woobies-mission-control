@@ -64,4 +64,18 @@ describe("staging selectors", () => {
       ),
     ).toEqual([1, 2]);
   });
+
+  it("pins the editor stage-visibility boundary at greater than 0.5 m/s", () => {
+    const boundary: TelemetrySnapshot = {
+      "context.mode": "editor",
+      "stage.stages": [
+        { index: 0, ksp: 0, dvAtmo: 0.5, dvVac: 0.5 },
+        { index: 1, ksp: 1, dvAtmo: 0.5001, dvVac: 0 },
+        { index: 2, ksp: 2, dvAtmo: 0, dvVac: 0.5001 },
+        { index: 3, ksp: 3, dvAtmo: 0.4, dvVac: 0.7 },
+      ],
+    };
+
+    expect(selectStages(boundary).map((stage) => stage.ksp)).toEqual([1, 2, 3]);
+  });
 });

@@ -101,6 +101,29 @@ class ReleaseContractTests(unittest.TestCase):
             ],
         )
 
+    def test_v041_release_pack_selects_committed_stagestats(self):
+        release_pack = (
+            ROOT / "tools" / "Release-Pack-v0.4.1.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('ProductVersion = "0.4.1"', release_pack)
+        self.assertRegex(
+            release_pack,
+            r'(?s)Folder = "KRPC\.StageStats".*?'
+            r'Version = "0\.2\.7\.0".*?'
+            r'Sha256 = "18AE2F6D14B63476E37F2EC052119E49C421043FDB1A63F0C9BBED05D5A265EC".*?'
+            r'SourceCommit = "f74c49fd4c335a73a4377eee71e19724356945d3"',
+        )
+        self.assertIn(
+            'SourceArchive = "KRPC.WoobiesMechJeb-0.8.6-source.zip"',
+            release_pack,
+        )
+        self.assertIn(
+            'SourceArchiveSha256 = '
+            '"E65E11040E9AA55F961CC1EA42F67E406CEC759FB6A9F5F69B16150DE5B871F5"',
+            release_pack,
+        )
+
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
             "release_launcher", ROOT / "ksp_dashboard_app.py"
@@ -185,9 +208,9 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-05-flight-dashboard-mission-planning.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.4.0.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.1.zip"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.4.0.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.1.{name}" for name in image_names
         ]
         self.assertEqual(
             sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name
