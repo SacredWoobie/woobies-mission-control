@@ -103,7 +103,8 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The release includes four independently versioned kRPC extensions:
+The current public v0.4.1 release includes four independently versioned kRPC
+extensions:
 
 | Service | v0.4.1 version | Purpose |
 | --- | --- | --- |
@@ -111,6 +112,11 @@ The release includes four independently versioned kRPC extensions:
 | KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
 | KRPC.SystemHeat | 0.2.2 | System Heat loops, components, and electrical integration |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
+
+The Unreleased vessel-lifecycle work selects WoobiesControlStats 0.2.2, which
+adds the guarded vessel-termination service. The source launcher's tested
+version and current release manifest reflect that development requirement;
+historical v0.4.0/v0.4.1 release packs remain pinned to their published bytes.
 
 ## Installation
 

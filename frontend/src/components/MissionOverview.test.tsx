@@ -504,6 +504,55 @@ describe("MissionOverview", () => {
     });
   });
 
+  it("keeps the lifecycle modal open when KSP rejects the guarded action", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const view = render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Select Odyssey" }));
+    fireEvent.click(screen.getByRole("button", { name: "Terminate Odyssey" }));
+    const dialog = screen.getByRole("dialog", { name: "Terminate Odyssey?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "TERMINATE VESSEL" }));
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.lifecycle") throw new Error("Unexpected vessel lifecycle command");
+
+    view.rerender(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled lifecycleResult={{
+          type: "overview.vessel.lifecycle.result",
+          requestId: command.requestId,
+          action: "terminate",
+          status: "error",
+          message: "That vessel's crew changed. Refresh the fleet and try again.",
+        }} onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "Terminate Odyssey?" })).toBeTruthy();
+    expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toContain("crew changed");
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "TERMINATE VESSEL" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("recovers the lifecycle modal when KSP does not answer", () => {
+    vi.useFakeTimers();
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Select Odyssey" }));
+    fireEvent.click(screen.getByRole("button", { name: "Terminate Odyssey" }));
+    const dialog = screen.getByRole("dialog", { name: "Terminate Odyssey?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "TERMINATE VESSEL" }));
+
+    act(() => vi.advanceTimersByTime(12_000));
+    expect(within(dialog).getByRole("alert").textContent).toContain("did not answer");
+    expect(within(dialog).getByRole("button", { name: "TERMINATE VESSEL" }).hasAttribute("disabled")).toBe(false);
+  });
+
   it("keeps terminate visible but disabled without matching service support", () => {
     renderOverview({
       ...inactiveTelemetryFixture,
