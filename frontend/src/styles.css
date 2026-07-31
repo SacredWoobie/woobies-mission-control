@@ -603,30 +603,30 @@ button { font: inherit; }
 .overview-rename-vessel:disabled { cursor: not-allowed; opacity: .42; }
 .overview-command-error { min-width: 0; color: #d7a29c; font-size: 8px; line-height: 1.35; }
 .overview-command-notice { min-width: 0; color: #9ccfc2; font-size: 8px; line-height: 1.35; }
-.overview-vessel-modal-backdrop { z-index: 20; padding: 8px; overflow: auto; background: rgba(2,6,9,.82); }
-.overview-vessel-modal { width: min(420px,100%); border: 1px solid #705128; border-radius: 3px; color: #d7e2ee; background: #081018; box-shadow: 0 16px 45px rgba(0,0,0,.7); }
-.overview-vessel-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 11px; border-bottom: 1px solid var(--rule); background: linear-gradient(90deg,rgba(255,170,60,.08),transparent); }
+.overview-vessel-modal-backdrop { z-index: 20; padding: 10px; overflow: auto; background: rgba(2,6,9,.82); }
+.overview-vessel-modal { width: min(480px,100%); border: 1px solid #705128; border-radius: 3px; color: #d7e2ee; background: #081018; box-shadow: 0 16px 45px rgba(0,0,0,.7); }
+.overview-vessel-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px 14px; border-bottom: 1px solid var(--rule); background: linear-gradient(90deg,rgba(255,170,60,.08),transparent); }
 .overview-vessel-modal > header div { display: grid; min-width: 0; gap: 2px; }
-.overview-vessel-modal > header span { color: var(--amber); font-size: 7px; font-weight: 700; letter-spacing: .13em; }
-.overview-vessel-modal > header h3 { margin: 0; overflow: hidden; color: #e1eaf0; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.overview-vessel-modal > header button { display: grid; width: 23px; min-width: 23px; height: 23px; padding: 0; place-items: center; border: 0; color: #d7e2ee; background: transparent; cursor: pointer; font: 19px var(--mono); }
-.overview-vessel-modal form { display: grid; gap: 7px; padding: 10px 11px; }
-.overview-vessel-modal label { display: grid; gap: 4px; }
-.overview-vessel-modal label > span { color: var(--slate-dim); font-size: 7px; letter-spacing: .1em; text-transform: uppercase; }
-.overview-vessel-modal input { width: 100%; min-width: 0; height: 30px; padding: 5px 7px; border: 1px solid #705128; border-radius: 2px; color: #eef4f8; background: #0a121a; font: 10px var(--mono); }
+.overview-vessel-modal > header span { color: var(--amber); font-size: 8px; font-weight: 700; letter-spacing: .13em; }
+.overview-vessel-modal > header h3 { margin: 0; overflow: hidden; color: #e1eaf0; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.overview-vessel-modal > header button { display: grid; width: 27px; min-width: 27px; height: 27px; padding: 0; place-items: center; border: 0; color: #d7e2ee; background: transparent; cursor: pointer; font: 21px var(--mono); }
+.overview-vessel-modal form { display: grid; gap: 10px; padding: 12px 14px 14px; }
+.overview-vessel-modal label { display: grid; gap: 5px; }
+.overview-vessel-modal label > span { color: var(--slate-dim); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+.overview-vessel-modal input { width: 100%; min-width: 0; height: 34px; padding: 6px 8px; border: 1px solid #705128; border-radius: 2px; color: #eef4f8; background: #0a121a; font: 11px var(--mono); }
 .overview-vessel-modal input:focus { border-color: var(--amber); outline: 1px solid rgba(255,170,60,.28); }
 .overview-vessel-modal fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.overview-vessel-modal legend { margin-bottom: 4px; color: var(--slate-dim); font-size: 7px; letter-spacing: .1em; text-transform: uppercase; }
-.overview-vessel-type-options { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; }
-.overview-vessel-type-options button { display: grid; min-width: 0; min-height: 31px; padding: 3px 2px; place-items: center; gap: 2px; border: 1px solid #293946; border-radius: 2px; color: var(--slate); background: #0a121a; cursor: pointer; font: 6px var(--mono); }
+.overview-vessel-modal legend { margin-bottom: 6px; color: var(--slate-dim); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+.overview-vessel-type-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.overview-vessel-type-options button { display: grid; min-width: 0; min-height: 58px; padding: 7px 5px; place-items: center; gap: 5px; border: 1px solid #293946; border-radius: 2px; color: var(--slate); background: #0a121a; cursor: pointer; font: 9px var(--mono); }
 .overview-vessel-type-options button:hover, .overview-vessel-type-options button:focus-visible { border-color: var(--amber); color: var(--amber); outline: 0; }
 .overview-vessel-type-options button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); background: #2a1d0e; }
-.overview-vessel-type-options svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.overview-vessel-type-options svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .overview-vessel-type-options span { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
-.overview-vessel-modal form > small { color: var(--slate-dim); font-size: 7px; line-height: 1.4; }
+.overview-vessel-modal form > small { color: var(--slate-dim); font-size: 8px; line-height: 1.4; }
 .overview-vessel-modal-error { margin: 0; color: #d7a29c; font-size: 8px; line-height: 1.35; }
-.overview-vessel-modal footer { display: flex; justify-content: flex-end; gap: 7px; margin-top: 2px; }
-.overview-vessel-modal footer button { min-height: 27px; padding: 5px 8px; border: 1px solid #315166; color: var(--slate); background: #0b1821; cursor: pointer; font: 8px var(--mono); }
+.overview-vessel-modal footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.overview-vessel-modal footer button { min-height: 31px; padding: 6px 10px; border: 1px solid #315166; color: var(--slate); background: #0b1821; cursor: pointer; font: 9px var(--mono); }
 .overview-vessel-modal footer button:last-child { border-color: var(--amber); color: #160e04; background: var(--amber); }
 .overview-vessel-modal footer button:disabled { cursor: not-allowed; opacity: .42; }
 .overview-vessel-detail-empty { display: grid; color: var(--slate-dim); font-size: 9px; place-items: center; text-align: center; }
