@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
 
@@ -8,7 +8,7 @@ interface EditorContextPanelProps {
   snapshot: TelemetrySnapshot;
 }
 
-const autoRecalculateDelayMs = 500;
+const autoRecalculateDelayMs = 150;
 
 function finiteNonnegativeOrUndefined(value: string) {
   if (!value.trim()) return undefined;
@@ -29,6 +29,7 @@ export function EditorContextPanel({
   const [mach, setMach] = useState(telemetryMach);
   const [dirty, setDirty] = useState(false);
   const [sentAtRevision, setSentAtRevision] = useState<number | null>(null);
+  const autoRecalculateTimeout = useRef<number | null>(null);
   const bodies = useMemo(() => {
     const reported = snapshot["editor.bodies"];
     const values = Array.isArray(reported) ? reported.filter((value): value is string => typeof value === "string") : [];
@@ -62,6 +63,10 @@ export function EditorContextPanel({
   }
 
   const submit = useCallback((force = false) => {
+    if (autoRecalculateTimeout.current !== null) {
+      window.clearTimeout(autoRecalculateTimeout.current);
+      autoRecalculateTimeout.current = null;
+    }
     if (!commandEnabled || unavailable || !conditionsValid) return;
     const command: Extract<TelemetryCommand, { type: "editor.conditions" }> = {
       type: "editor.conditions",
@@ -81,8 +86,16 @@ export function EditorContextPanel({
 
   useEffect(() => {
     if (!dirty || !commandEnabled || unavailable || !conditionsValid) return;
-    const timeout = window.setTimeout(() => submit(false), autoRecalculateDelayMs);
-    return () => window.clearTimeout(timeout);
+    autoRecalculateTimeout.current = window.setTimeout(() => {
+      autoRecalculateTimeout.current = null;
+      submit(false);
+    }, autoRecalculateDelayMs);
+    return () => {
+      if (autoRecalculateTimeout.current !== null) {
+        window.clearTimeout(autoRecalculateTimeout.current);
+        autoRecalculateTimeout.current = null;
+      }
+    };
   }, [commandEnabled, conditionsValid, dirty, submit, unavailable]);
 
   function onKeyDown(event: React.KeyboardEvent) {

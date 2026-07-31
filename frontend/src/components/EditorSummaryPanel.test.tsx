@@ -36,6 +36,7 @@ describe("EditorSummaryPanel", () => {
   it("distinguishes a recalculation from an outdated StageStats service", () => {
     const view = render(<EditorSummaryPanel snapshot={{
       ...editorTelemetryFixture,
+      "editor.analysisRevision": undefined,
       "editor.stable": false,
       "stage.pending": true,
     }} />);
@@ -46,5 +47,20 @@ describe("EditorSummaryPanel", () => {
       "editor.summaryAvailable": false,
     }} />);
     expect(screen.getByText(/Updated StageStats service required/)).toBeTruthy();
+  });
+
+  it("retains dimmed craft totals while the next revision is pending", () => {
+    const { container } = render(<EditorSummaryPanel snapshot={{
+      ...editorTelemetryFixture,
+      "editor.revision": 8,
+      "editor.analysisRevision": 7,
+      "editor.stable": false,
+      "stage.pending": true,
+    }} />);
+
+    expect(screen.getByText("Previous confirmed values — recalculating")).toBeTruthy();
+    expect(screen.getByText("18,742 kg", { exact: true })).toBeTruthy();
+    expect(container.querySelector("#editorSummary .editor-analysis-retained")).toBeTruthy();
+    expect(screen.queryByText("Recalculating craft totals…")).toBeNull();
   });
 });

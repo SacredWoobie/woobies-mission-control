@@ -86,6 +86,36 @@ class StagingExtensionTests(unittest.TestCase):
 
         self.assertEqual(enriched["stage.activeKsp"], 0)
 
+    def test_stage_visibility_requires_either_delta_v_to_exceed_point_five(self):
+        class BoundaryStageStats:
+            def stage_ksp_stage(self, index):
+                return index
+
+            def stage_twr(self, index, vacuum):
+                return 1.0
+
+            def stage_burnout_twr(self, index, vacuum):
+                return 1.0
+
+            def stage_burn_time(self, index, vacuum):
+                return [10.0, 20.0, 30.0, 40.0][index]
+
+        result = {
+            "stage.currentKsp": 3,
+            "stage.stages": [
+                {"index": 0, "ksp": 0, "dvAtmo": 0.5, "dvVac": 0.5},
+                {"index": 1, "ksp": 1, "dvAtmo": 0.5001, "dvVac": 0.0},
+                {"index": 2, "ksp": 2, "dvAtmo": 0.0, "dvVac": 0.5001},
+                {"index": 3, "ksp": 3, "dvAtmo": 0.4, "dvVac": 0.7},
+            ],
+        }
+
+        enriched = staging.enrich_stage_result(BoundaryStageStats(), result)
+
+        self.assertEqual(enriched["stage.unpoweredCount"], 1)
+        self.assertEqual(enriched["stage.activeKsp"], 3)
+        self.assertEqual(enriched["stage.totalBurnSeconds"], 90.0)
+
 
 if __name__ == "__main__":
     unittest.main()

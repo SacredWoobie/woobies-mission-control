@@ -144,7 +144,7 @@ describe("Dashboard lifecycle", () => {
 
   it("renders the complete flight dashboard and restores hidden panels from the left rail", () => {
     const firstView = render(<App />);
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.0 · Development")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.1 · Development")).toBeTruthy();
     ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target", "Pinned note"].forEach((heading) => {
       expect(screen.getByText(heading, { exact: true })).toBeTruthy();
     });
@@ -327,7 +327,7 @@ describe("Dashboard lifecycle", () => {
     fireEvent.change(screen.getByLabelText("Mach", { exact: true }), {
       target: { value: "0.8" },
     });
-    act(() => vi.advanceTimersByTime(499));
+    act(() => vi.advanceTimersByTime(149));
     expect(firstSocket.sent).toHaveLength(commandsBeforeEditorChange);
     act(() => vi.advanceTimersByTime(1));
     fireEvent.click(screen.getByRole("button", { name: "Recalculate now" }));
@@ -355,7 +355,7 @@ describe("Dashboard lifecycle", () => {
     fireEvent.change(screen.getByLabelText("Reference body", { exact: true }), {
       target: { value: "Duna" },
     });
-    act(() => vi.advanceTimersByTime(500));
+    act(() => vi.advanceTimersByTime(150));
     expect(JSON.parse(firstSocket.sent.at(-1)!)).toEqual({
       type: "editor.conditions",
       body: "Duna",

@@ -31,12 +31,12 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-For Mission Control v0.4.0, the selected set is:
+For Mission Control v0.4.1, the selected set is:
 
 | Service | Release |
 | --- | --- |
 | WoobiesControlStats | 0.2.1 |
-| KRPC.StageStats | 0.2.5 |
+| KRPC.StageStats | 0.2.7 |
 | KRPC.SystemHeat | 0.2.2 |
 | KRPC.WoobiesMechJeb | 0.8.6 |
 
@@ -65,14 +65,14 @@ Before the screenshot session, build an internal acceptance package without
 image assets:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.0 -SkipReleaseImages
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.1 -SkipReleaseImages
 ```
 
 The switch is rejected when `-CreateDraftRelease` is present. After all five
 screenshots are approved, run the final package command without the switch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.1
 ```
 
 The packager:
@@ -111,8 +111,10 @@ Before creating a GitHub draft:
 - follow `docs/images/v0.4.0/README.md` one scenario at a time and approve all
   five full-resolution screenshots.
 
-The five release screenshots are stored with the v0.4.0 documentation. If the
-launcher or dashboard changes after acceptance testing, refresh the affected
+The five release screenshots remain stored with the v0.4.0 documentation.
+Version 0.4.1 reuses that approved gallery because the stable dashboard layouts
+shown there are unchanged; the recalculation state is transient. If a later
+launcher or dashboard change makes an image inaccurate, refresh the affected
 image before the draft release is created.
 
 ## 5. Create a private draft release
@@ -120,11 +122,11 @@ image before the draft release is created.
 After committing, pushing, and confirming that `main` matches `origin/main`:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.0 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.1 -CreateDraftRelease
 ```
 
 This creates a draft GitHub Release and uploads the ZIP, checksum, GPL source
 archive, and five curated screenshots. The screenshot filenames use a `.zz-01`
-through `.zz-05` suffix so `Woobies-Mission-Control-v0.4.0.zip` remains the
+through `.zz-05` suffix so `Woobies-Mission-Control-v0.4.1.zip` remains the
 first release asset. Review the draft, its generated notes, asset ordering,
 source archive, and final screenshots before publishing it.

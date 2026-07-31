@@ -1,5 +1,5 @@
 @{
-    ProductVersion = "0.4.0"
+    ProductVersion = "0.4.1"
     Services = @(
         @{
             Folder = "WoobiesControlStats"
@@ -11,8 +11,8 @@
         @{
             Folder = "KRPC.StageStats"
             File = "KRPC.StageStats.dll"
-            Version = "0.2.5.0"
-            Sha256 = "FDCACF4BDB71551BC80FD06C2522C1C5620A5E146B4B667B8128CDF7740CF67E"
+            Version = "0.2.7.0"
+            Sha256 = "18AE2F6D14B63476E37F2EC052119E49C421043FDB1A63F0C9BBED05D5A265EC"
             License = "MIT"
         }
         @{

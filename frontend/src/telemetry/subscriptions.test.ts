@@ -4,6 +4,7 @@ import {
   clockSnapshotsEqual,
   consumablesSnapshotsEqual,
   editorSnapshotsEqual,
+  editorSummarySnapshotsEqual,
   electricitySnapshotsEqual,
   flightAvailabilitySnapshotsEqual,
   headerSnapshotsEqual,
@@ -91,6 +92,22 @@ describe("panel telemetry subscriptions", () => {
       ...editorTelemetryFixture,
       "editor.altitude": 10_000,
     })).toBe(false);
+  });
+
+  it("delivers editor revision and analysis provenance changes to both analysis panels", () => {
+    const nextRevision = {
+      ...editorTelemetryFixture,
+      "editor.revision": 8,
+    };
+    const nextAnalysis = {
+      ...editorTelemetryFixture,
+      "editor.analysisRevision": 8,
+    };
+
+    expect(stagingSnapshotsEqual(editorTelemetryFixture, nextRevision)).toBe(false);
+    expect(editorSummarySnapshotsEqual(editorTelemetryFixture, nextRevision)).toBe(false);
+    expect(stagingSnapshotsEqual(editorTelemetryFixture, nextAnalysis)).toBe(false);
+    expect(editorSummarySnapshotsEqual(editorTelemetryFixture, nextAnalysis)).toBe(false);
   });
 
   it("invalidates mission-plan subscriptions when the active vessel identity changes", () => {

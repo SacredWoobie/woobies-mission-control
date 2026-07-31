@@ -6,6 +6,7 @@ import {
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
 import { resourceSeverity } from "./resourceMeter";
+import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
 
 function formatMass(value: unknown) {
   if (!isFiniteNumber(value)) return "—";
@@ -35,16 +36,79 @@ function SummaryValue({ label, value, note }: { label: string; value: string; no
   );
 }
 
-export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
-  const available = snapshot["editor.summaryAvailable"];
-  const calculating = snapshot["editor.stable"] === false || snapshot["stage.pending"] === true;
+function EditorSummaryContent({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const names = Array.isArray(snapshot["editor.res.names"])
     ? snapshot["editor.res.names"].filter((name): name is string => typeof name === "string")
     : [];
 
   return (
+    <>
+      <div className="editor-summary-grid">
+        <SummaryValue label="Wet mass" value={formatMass(snapshot["editor.wetMass"])} />
+        <SummaryValue label="Dry mass" value={formatMass(snapshot["editor.dryMass"])} />
+        <SummaryValue label="Resource mass" value={formatMass(snapshot["editor.resourceMass"])} />
+        <SummaryValue label="Parts" value={formatCount(snapshot["editor.partCount"])} />
+        <SummaryValue label="Stages" value={formatCount(snapshot["editor.stageCount"])} />
+        <SummaryValue label="Crew capacity" value={formatCount(snapshot["editor.crewCapacity"])} />
+        <SummaryValue label="Total cost" value={formatFunds(snapshot["editor.totalCost"])} />
+        <SummaryValue label="Resource cost" value={formatFunds(snapshot["editor.resourceCost"])} />
+      </div>
+      <div className="editor-resource-head">
+        <span className="label">Resources aboard</span>
+        <span>{names.length} {names.length === 1 ? "type" : "types"}</span>
+      </div>
+      {names.length === 0 ? (
+        <p className="editor-resources-empty">No stored resources on this craft.</p>
+      ) : (
+        <div className="editor-resource-list">
+          {names.map((name) => {
+            const amount = snapshot[`editor.res[${name}]`];
+            const maximum = snapshot[`editor.resMax[${name}]`];
+            const current = isFiniteNumber(amount) ? amount : undefined;
+            const capacity = isFiniteNumber(maximum) ? maximum : undefined;
+            const percent = capacity && capacity > 0 && current !== undefined
+              ? Math.max(0, Math.min(100, Math.round(current / capacity * 100)))
+              : 0;
+            const severity = resourceSeverity(percent);
+            const formatted = formatResourcePair(current, capacity);
+            return (
+              <div className="editor-resource-row" key={name}>
+                <span title={name}>{humanizeResourceName(name)}</span>
+                <div
+                  aria-label={`${percent}% full`}
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={percent}
+                  className="editor-resource-meter"
+                  role="meter"
+                >
+                  <span className={`fill ${severity}`} style={{ width: `${percent}%` }} />
+                </div>
+                <span className="editor-resource-amount">
+                  {formatted.value}
+                  <small>/ {formatted.capacity}</small>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+  const available = snapshot["editor.summaryAvailable"];
+  const {
+    pending,
+    retained,
+    staleLabel,
+  } = useEditorAnalysisStatus(snapshot);
+  const retainedSummary = retained && available === true;
+
+  return (
     <Panel id="editorSummary" title="Craft summary" tag="VAB · SPH · build totals">
-      {calculating ? (
+      {pending && !retainedSummary ? (
         <p className="editor-summary-state wait">Recalculating craft totals…</p>
       ) : available === false ? (
         <p className="editor-summary-state bad">
@@ -54,56 +118,17 @@ export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }
         <p className="editor-summary-state">Awaiting editor craft summary…</p>
       ) : (
         <>
-          <div className="editor-summary-grid">
-            <SummaryValue label="Wet mass" value={formatMass(snapshot["editor.wetMass"])} />
-            <SummaryValue label="Dry mass" value={formatMass(snapshot["editor.dryMass"])} />
-            <SummaryValue label="Resource mass" value={formatMass(snapshot["editor.resourceMass"])} />
-            <SummaryValue label="Parts" value={formatCount(snapshot["editor.partCount"])} />
-            <SummaryValue label="Stages" value={formatCount(snapshot["editor.stageCount"])} />
-            <SummaryValue label="Crew capacity" value={formatCount(snapshot["editor.crewCapacity"])} />
-            <SummaryValue label="Total cost" value={formatFunds(snapshot["editor.totalCost"])} />
-            <SummaryValue label="Resource cost" value={formatFunds(snapshot["editor.resourceCost"])} />
-          </div>
-          <div className="editor-resource-head">
-            <span className="label">Resources aboard</span>
-            <span>{names.length} {names.length === 1 ? "type" : "types"}</span>
-          </div>
-          {names.length === 0 ? (
-            <p className="editor-resources-empty">No stored resources on this craft.</p>
-          ) : (
-            <div className="editor-resource-list">
-              {names.map((name) => {
-                const amount = snapshot[`editor.res[${name}]`];
-                const maximum = snapshot[`editor.resMax[${name}]`];
-                const current = isFiniteNumber(amount) ? amount : undefined;
-                const capacity = isFiniteNumber(maximum) ? maximum : undefined;
-                const percent = capacity && capacity > 0 && current !== undefined
-                  ? Math.max(0, Math.min(100, Math.round(current / capacity * 100)))
-                  : 0;
-                const severity = resourceSeverity(percent);
-                const formatted = formatResourcePair(current, capacity);
-                return (
-                  <div className="editor-resource-row" key={name}>
-                    <span title={name}>{humanizeResourceName(name)}</span>
-                    <div
-                      aria-label={`${percent}% full`}
-                      aria-valuemax={100}
-                      aria-valuemin={0}
-                      aria-valuenow={percent}
-                      className="editor-resource-meter"
-                      role="meter"
-                    >
-                      <span className={`fill ${severity}`} style={{ width: `${percent}%` }} />
-                    </div>
-                    <span className="editor-resource-amount">
-                      {formatted.value}
-                      <small>/ {formatted.capacity}</small>
-                    </span>
-                  </div>
-                );
-              })}
+          {retainedSummary && (
+            <div aria-live="polite" className="editor-analysis-status wait">
+              {staleLabel}
             </div>
           )}
+          <div
+            aria-busy={pending}
+            className={`editor-summary-content${retainedSummary ? " editor-analysis-retained" : ""}`}
+          >
+            <EditorSummaryContent snapshot={snapshot} />
+          </div>
         </>
       )}
     </Panel>

@@ -107,13 +107,22 @@ _notes_favorites = None
 # editor_stable flag; the server also requires two matching snapshots before
 # publishing a changed craft/environment to the dashboard.
 _editor_revision = None
+_editor_identity = None
+_editor_analysis_revision = None
+_editor_analysis_identity = None
+_editor_analysis_craft_revision = None
 _editor_bodies_cache = []
 _editor_stage_cache = {}
 _editor_stage_last_poll = 0.0
 _editor_stage_candidate = None
 _editor_stage_candidate_hits = 0
 _editor_summary_cache = {}
+_editor_summary_candidate = {}
 _editor_summary_last_poll = 0.0
+_editor_rebuild_cache = {}
+_editor_rebuild_token = None
+_editor_rebuild_ready = True
+_editor_rebuild_trace_last = None
 _telemetry_mode = None
 
 # The mission-control overview deliberately uses independent polling tiers.
@@ -1046,11 +1055,12 @@ def _gather_target(conn, vessel):
 # Per-stage delta-V via the custom KRPC.StageStats service (MechJeb's sim).
 #
 # The service indexes stages by ARRAY INDEX: index 0 is the final/upper stage.
-# A complete MechJeb result includes every KSP staging slot, including
-# zero-thrust decoupler/fairing stages. Therefore a vessel at currentStage N
-# must have N+1 result rows, indexed S0 through SN. A shorter result is an async
-# partial (or a stale module after a scene change), not a propulsive-only table.
-# Reject it so the dashboard never disguises missing stages as S0/S4, etc.
+# A complete flight result includes every KSP staging slot, including
+# zero-thrust decoupler/fairing stages. In the editor, MechJeb can also append
+# one empty virtual slot above the highest inverseStage assigned to a part.
+# StageStats 0.2.6+ exposes rebuild provenance, so after that provenance is
+# verified we accept MechJeb's explicit contiguous KSPStage sequence as the
+# table authority. Older services retain the strict currentStage + 1 check.
 #
 #   ksp_number(index) = current_ksp - ((count - 1) - index)
 #                     = index + (current_ksp - (count - 1))
@@ -1059,7 +1069,152 @@ def _gather_target(conn, vessel):
 # The custom service pumps MechJeb's async sim on every read. Prime it, allow
 # MechJeb's 100 ms flight refresh window to complete, then take one snapshot.
 # ---------------------------------------------------------------------------
-def _gather_stages(conn, source="flight"):
+_EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS = {1: 11, 2: 12}
+_EDITOR_STAGE_SNAPSHOT_ROW_WIDTH = 7
+
+
+def _snapshot_integer(value, label):
+    number = float(value)
+    if not math.isfinite(number) or not number.is_integer():
+        raise ValueError(f"Invalid editor snapshot {label}: {value!r}")
+    return int(number)
+
+
+def _parse_editor_stage_snapshot(payload):
+    """Decode one atomic StageStats 0.2.6+ editor-table response."""
+    values = [float(value) for value in payload]
+    if len(values) < min(_EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS.values()):
+        raise ValueError("Editor stage snapshot header is truncated")
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("Editor stage snapshot contains a non-finite value")
+
+    schema = _snapshot_integer(values[0], "schema")
+    if schema not in _EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS:
+        raise ValueError(f"Unsupported editor stage snapshot schema: {schema}")
+    expected_header_width = _EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS[schema]
+    header_width = _snapshot_integer(values[1], "header width")
+    row_width = _snapshot_integer(values[2], "row width")
+    if header_width != expected_header_width:
+        raise ValueError("Editor stage snapshot header width is incompatible")
+    if row_width != _EDITOR_STAGE_SNAPSHOT_ROW_WIDTH:
+        raise ValueError("Editor stage snapshot row width is incompatible")
+    editor_revision = _snapshot_integer(values[3], "editor revision")
+    craft_revision = _snapshot_integer(values[4], "craft revision")
+    stage_revision = _snapshot_integer(values[5], "staging revision")
+    rebuild_revision = _snapshot_integer(values[6], "rebuild revision")
+    if schema >= 2:
+        simulation_revision = _snapshot_integer(
+            values[7], "simulation revision"
+        )
+        stable_offset = 8
+    else:
+        simulation_revision = None
+        stable_offset = 7
+    stable_value = _snapshot_integer(values[stable_offset], "stable flag")
+    if stable_value not in (0, 1):
+        raise ValueError("Editor stage snapshot stable flag must be 0 or 1")
+    editor_max_stage = _snapshot_integer(
+        values[stable_offset + 1], "editor max stage"
+    )
+    atmo_count = _snapshot_integer(
+        values[stable_offset + 2], "atmosphere row count"
+    )
+    vac_count = _snapshot_integer(
+        values[stable_offset + 3], "vacuum row count"
+    )
+    if atmo_count < 0 or vac_count < 0:
+        raise ValueError("Editor stage snapshot row count is negative")
+    if atmo_count != vac_count:
+        raise ValueError("Editor stage snapshot tables are misaligned")
+    count = atmo_count
+
+    expected_length = (
+        header_width +
+        count * _EDITOR_STAGE_SNAPSHOT_ROW_WIDTH
+    )
+    if len(values) != expected_length:
+        raise ValueError(
+            "Editor stage snapshot length does not match its row count"
+        )
+
+    rows = []
+    total_atmo = total_vac = 0.0
+    for index in range(count):
+        offset = (
+            header_width +
+            index * _EDITOR_STAGE_SNAPSHOT_ROW_WIDTH
+        )
+        ksp_stage = _snapshot_integer(values[offset], "KSP stage")
+        dv_atmo = values[offset + 1]
+        dv_vac = values[offset + 2]
+        twr_atmo = values[offset + 3]
+        twr_vac = values[offset + 4]
+        twr_end = values[offset + 5]
+        burn = values[offset + 6]
+        total_atmo += dv_atmo
+        total_vac += dv_vac
+        rows.append({
+            "index": index,
+            "ksp": ksp_stage,
+            "dvAtmo": round(dv_atmo, 1),
+            "dvVac": round(dv_vac, 1),
+            "twr": round(twr_atmo, 2),
+            "twrAtmo": round(twr_atmo, 2),
+            "twrVac": round(twr_vac, 2),
+            "twrStart": round(twr_atmo, 2),
+            "twrEnd": round(twr_end, 2),
+            "burn": round(burn, 1),
+        })
+
+    ksp_stages = [row["ksp"] for row in rows]
+    if ksp_stages != list(range(count)):
+        raise ValueError(
+            "Editor stage snapshot KSP stages are not contiguous from S0"
+        )
+    expected_counts = {max(0, editor_max_stage + 1)}
+    if editor_max_stage >= 0:
+        expected_counts.add(editor_max_stage + 2)
+    if count not in expected_counts:
+        raise ValueError(
+            "Editor stage snapshot row count does not match KSP staging"
+        )
+
+    result = {
+        "stage.available": True,
+        "stage.complete": True,
+        "stage.count": count,
+        "stage.currentKsp": ksp_stages[-1] if ksp_stages else -1,
+        "stage.mapping": "atomic",
+        "stage.snapshotSchema": schema,
+        "stage.snapshotEditorRevision": editor_revision,
+        "stage.snapshotCraftRevision": craft_revision,
+        "stage.snapshotStageSequenceRevision": stage_revision,
+        "stage.snapshotPartSetRebuildRevision": rebuild_revision,
+        "stage.snapshotSimulationRevision": simulation_revision,
+        "stage.snapshotStable": stable_value == 1,
+        "stage.snapshotEditorMaxStage": editor_max_stage,
+        "stage.stages": rows,
+        "stage.totalDvAtmo": round(total_atmo, 1),
+        "stage.totalDvVac": round(total_vac, 1),
+    }
+    return enrich_stage_result(None, result)
+
+
+def _gather_atomic_editor_stages(service, completion_proven=False):
+    """Prime and read one aligned MechJeb editor table per RPC response."""
+    if not completion_proven:
+        service.editor_stage_snapshot()
+        time.sleep(STAGE_SETTLE_SECONDS)
+    return _parse_editor_stage_snapshot(service.editor_stage_snapshot())
+
+
+def _gather_stages(
+    conn,
+    source="flight",
+    editor_rebuild_verified=False,
+    prefer_atomic_editor_snapshot=False,
+    atomic_editor_completion_proven=False,
+):
     try:
         ss = conn.stage_stats
     except Exception as exc:
@@ -1077,6 +1232,37 @@ def _gather_stages(conn, source="flight"):
         return {}
 
     out = {"stage.available": True}
+    if source == "editor" and prefer_atomic_editor_snapshot:
+        try:
+            result = _gather_atomic_editor_stages(
+                ss,
+                completion_proven=atomic_editor_completion_proven,
+            )
+            _stage_trace(
+                "atomic_editor_sample",
+                source=source,
+                count=result.get("stage.count"),
+                currentKsp=result.get("stage.currentKsp"),
+                editorRevision=result.get(
+                    "stage.snapshotEditorRevision"
+                ),
+                stable=result.get("stage.snapshotStable"),
+                complete=True,
+            )
+            return result
+        except AttributeError:
+            # Early StageStats 0.2.6 prototypes before the additive snapshot
+            # procedure retain the verified explicit-stage fallback below.
+            pass
+        except Exception as exc:
+            _stage_trace(
+                "atomic_editor_sample_error",
+                source=source,
+                error=type(exc).__name__,
+                message=str(exc),
+            )
+            return {}
+
     try:
         # The first call collects the previous completed result and requests a
         # new asynchronous simulation. Waiting past MechJeb's 100 ms refresh
@@ -1085,17 +1271,30 @@ def _gather_stages(conn, source="flight"):
         prime_count = int(ss.stage_count())
         time.sleep(STAGE_SETTLE_SECONDS)
         count = int(ss.stage_count())
-        current_ksp = int(ss.current_stage())
+        raw_current_ksp = int(ss.current_stage())
+        current_ksp = raw_current_ksp
+        explicit_ksp_stages = None
 
-        # The MechJeb table is indexed S0..S(current). A smaller table is a
-        # transient/incomplete simulation. Publish an explicitly empty snapshot
-        # rather than relabeling two surviving rows as non-contiguous stages or
-        # continuing to show rows from the previous staging state.
+        if source == "editor" and editor_rebuild_verified and count > 0:
+            try:
+                candidate_stages = [
+                    int(ss.stage_ksp_stage(index))
+                    for index in range(count)
+                ]
+                if candidate_stages == list(range(count)):
+                    explicit_ksp_stages = candidate_stages
+                    current_ksp = candidate_stages[-1]
+            except Exception:
+                explicit_ksp_stages = None
+
+        # Outside the verified 0.2.6+ editor path, a count mismatch remains a
+        # transient/incomplete simulation and must fail closed.
         expected_count = max(0, current_ksp + 1)
         if count != expected_count:
             _stage_trace(
                 "service_sample", source=source, primeCount=prime_count,
                 count=count, currentKsp=current_ksp,
+                rawCurrentKsp=raw_current_ksp,
                 expectedCount=expected_count, complete=False,
             )
             return {
@@ -1109,7 +1308,11 @@ def _gather_stages(conn, source="flight"):
         out["stage.count"] = count
         out["stage.currentKsp"] = current_ksp
         out["stage.complete"] = True
-        out["stage.mapping"] = "complete"
+        out["stage.mapping"] = (
+            "explicit"
+            if explicit_ksp_stages is not None
+            else "complete"
+        )
         stages = []
         total_atmo = total_vac = 0.0
         for i in range(count):
@@ -1121,7 +1324,11 @@ def _gather_stages(conn, source="flight"):
             total_vac += dv_vac
             stages.append({
                 "index": i,
-                "ksp": i,
+                "ksp": (
+                    explicit_ksp_stages[i]
+                    if explicit_ksp_stages is not None
+                    else i
+                ),
                 "dvAtmo": round(dv_atmo, 1),
                 "dvVac": round(dv_vac, 1),
                 # Keep `twr` as the atmospheric alias so released dashboards
@@ -1138,13 +1345,18 @@ def _gather_stages(conn, source="flight"):
         # If staging or a scene change happened while the individual RPCs were
         # being read, discard the mixed snapshot and retry on the next poll.
         final_count = int(ss.stage_count())
-        final_current_ksp = int(ss.current_stage())
-        if final_count != count or final_current_ksp != current_ksp:
+        final_raw_current_ksp = int(ss.current_stage())
+        if (
+            final_count != count or
+            final_raw_current_ksp != raw_current_ksp
+        ):
             _stage_trace(
                 "mixed_service_sample", source=source,
                 primeCount=prime_count, count=count,
-                currentKsp=current_ksp, finalCount=final_count,
-                finalCurrentKsp=final_current_ksp,
+                currentKsp=current_ksp,
+                rawCurrentKsp=raw_current_ksp,
+                finalCount=final_count,
+                finalRawCurrentKsp=final_raw_current_ksp,
             )
             return {
                 "stage.available": True,
@@ -1154,6 +1366,7 @@ def _gather_stages(conn, source="flight"):
         _stage_trace(
             "service_sample", source=source, primeCount=prime_count,
             count=count, currentKsp=current_ksp,
+            rawCurrentKsp=raw_current_ksp,
             expectedCount=expected_count, complete=True, rows=len(stages),
         )
     except Exception as exc:
@@ -1182,17 +1395,301 @@ def _stage_signature(result):
     )
 
 
-def _reset_editor_stage_state(revision=None):
-    global _editor_revision, _editor_stage_cache, _editor_stage_last_poll
+def _editor_snapshot_matches(result, revision, diagnostics):
+    """Require an atomic table header to match the surrounding diagnostics."""
+    if result.get("stage.snapshotSchema") is None:
+        return True
+    snapshot_schema = result.get("stage.snapshotSchema")
+    return (
+        snapshot_schema in _EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS
+        and result.get("stage.snapshotEditorRevision") == revision
+        and result.get("stage.snapshotCraftRevision") ==
+            diagnostics.get("editor.craftRevision")
+        and result.get("stage.snapshotStageSequenceRevision") ==
+            diagnostics.get("editor.stageSequenceRevision")
+        and result.get("stage.snapshotPartSetRebuildRevision") ==
+            diagnostics.get("editor.partSetRebuildRevision")
+        and (
+            snapshot_schema < 2 or
+            result.get("stage.snapshotSimulationRevision") ==
+                diagnostics.get("editor.simulationRevision")
+        )
+        and result.get("stage.snapshotStable") is True
+    )
+
+
+def _editor_completion_proven(revision, diagnostics, result=None):
+    """Return true only for a frozen StageStats schema-2 job generation."""
+    proven = (
+        diagnostics.get("editor.rebuildDiagnosticsSchema") == 2
+        and diagnostics.get("editor.simulationTrackingSupported") is True
+        and not diagnostics.get("editor.simulationTrackingError")
+        and diagnostics.get("editor.simulationRevision") == revision
+    )
+    if result is None:
+        return proven
+    return (
+        proven
+        and result.get("stage.snapshotSchema") == 2
+        and result.get("stage.snapshotSimulationRevision") == revision
+    )
+
+
+def _drop_editor_analysis_candidates():
     global _editor_stage_candidate, _editor_stage_candidate_hits
-    global _editor_summary_cache, _editor_summary_last_poll
-    _editor_revision = revision
-    _editor_stage_cache = {}
-    _editor_stage_last_poll = 0.0
+    global _editor_summary_candidate, _editor_summary_last_poll
     _editor_stage_candidate = None
     _editor_stage_candidate_hits = 0
-    _editor_summary_cache = {}
+    _editor_summary_candidate = {}
     _editor_summary_last_poll = 0.0
+
+
+def _clear_editor_candidates():
+    global _editor_stage_last_poll
+    global _editor_rebuild_cache, _editor_rebuild_token
+    global _editor_rebuild_ready
+    _editor_stage_last_poll = 0.0
+    _editor_rebuild_cache = {}
+    _editor_rebuild_token = None
+    _editor_rebuild_ready = True
+    _drop_editor_analysis_candidates()
+
+
+def _editor_rebuild_diagnostics(service):
+    """Read the optional StageStats 0.2.6+ editor rebuild contract.
+
+    A missing schema is the supported StageStats 0.2.5 compatibility path.
+    Once a supported schema is present, any staging revision after zero must
+    have a matching successful rebuild-scheduling revision before fresh
+    editor analysis can be published.
+    """
+    try:
+        schema = int(service.editor_rebuild_diagnostics_schema)
+    except AttributeError:
+        return {}, None, True
+    except Exception as exc:
+        error = "diagnostics_schema_" + type(exc).__name__
+        data = {
+            "editor.partSetRebuildSupported": False,
+            "editor.partSetRebuildError": error,
+        }
+        return data, ("schema_error", error), False
+
+    data = {"editor.rebuildDiagnosticsSchema": schema}
+    if schema not in (1, 2):
+        data["editor.partSetRebuildError"] = "unsupported_schema"
+        return data, ("schema", schema), False
+
+    try:
+        craft_revision = int(service.editor_craft_revision)
+        stage_revision = int(service.editor_stage_sequence_revision)
+        rebuild_revision = int(service.editor_part_set_rebuild_revision)
+        rebuild_supported = bool(
+            service.editor_part_set_rebuild_supported
+        )
+        rebuild_error = str(
+            service.editor_part_set_rebuild_error or ""
+        )
+        last_change = str(service.editor_last_change or "")
+        fingerprint = str(service.editor_staging_fingerprint or "")
+        part_counts = tuple(
+            int(value) for value in service.editor_stage_part_counts()
+        )
+        if schema >= 2:
+            simulation_tracking_supported = bool(
+                service.editor_simulation_tracking_supported
+            )
+            simulation_tracking_error = str(
+                service.editor_simulation_tracking_error or ""
+            )
+            simulation_started_revision = int(
+                service.editor_simulation_started_revision
+            )
+            simulation_revision = int(
+                service.editor_simulation_revision
+            )
+        else:
+            simulation_tracking_supported = False
+            simulation_tracking_error = ""
+            simulation_started_revision = None
+            simulation_revision = None
+    except Exception as exc:
+        error = "diagnostics_read_" + type(exc).__name__
+        data.update({
+            "editor.partSetRebuildSupported": False,
+            "editor.partSetRebuildError": error,
+        })
+        return data, ("read_error", error), False
+
+    data.update({
+        "editor.craftRevision": craft_revision,
+        "editor.stageSequenceRevision": stage_revision,
+        "editor.partSetRebuildRevision": rebuild_revision,
+        "editor.partSetRebuildSupported": rebuild_supported,
+        "editor.partSetRebuildError": rebuild_error,
+        "editor.lastChange": last_change,
+        "editor.stagingFingerprint": fingerprint,
+        "editor.stagePartCounts": list(part_counts),
+    })
+    if schema >= 2:
+        data.update({
+            "editor.simulationTrackingSupported":
+                simulation_tracking_supported,
+            "editor.simulationTrackingError":
+                simulation_tracking_error,
+            "editor.simulationStartedRevision":
+                simulation_started_revision,
+            "editor.simulationRevision": simulation_revision,
+        })
+    token = (
+        schema,
+        craft_revision,
+        stage_revision,
+        rebuild_revision,
+        rebuild_supported,
+        rebuild_error,
+        fingerprint,
+        part_counts,
+        simulation_tracking_supported,
+        simulation_tracking_error,
+        simulation_started_revision,
+        simulation_revision,
+    )
+    ready = (
+        stage_revision == 0 or (
+            rebuild_supported and
+            rebuild_revision == stage_revision and
+            not rebuild_error
+        )
+    )
+    return data, token, ready
+
+
+_EDITOR_REBUILD_FIELDS = (
+    "editor.rebuildDiagnosticsSchema",
+    "editor.craftRevision",
+    "editor.stageSequenceRevision",
+    "editor.partSetRebuildRevision",
+    "editor.partSetRebuildSupported",
+    "editor.partSetRebuildError",
+    "editor.lastChange",
+    "editor.stagingFingerprint",
+    "editor.stagePartCounts",
+    "editor.simulationTrackingSupported",
+    "editor.simulationTrackingError",
+    "editor.simulationStartedRevision",
+    "editor.simulationRevision",
+)
+
+
+def _replace_editor_rebuild_data(data, diagnostics):
+    """Replace, rather than merge, one internally consistent diagnostic read."""
+    for key in _EDITOR_REBUILD_FIELDS:
+        data.pop(key, None)
+    data.update(diagnostics)
+
+
+def _trace_editor_rebuild(diagnostics, ready):
+    """Trace editor rebuild transitions without logging every telemetry tick."""
+    global _editor_rebuild_trace_last
+    if not diagnostics:
+        signature = ("legacy",)
+    else:
+        signature = (
+            diagnostics.get("editor.rebuildDiagnosticsSchema"),
+            diagnostics.get("editor.craftRevision"),
+            diagnostics.get("editor.stageSequenceRevision"),
+            diagnostics.get("editor.partSetRebuildRevision"),
+            diagnostics.get("editor.partSetRebuildSupported"),
+            diagnostics.get("editor.partSetRebuildError"),
+            diagnostics.get("editor.simulationTrackingSupported"),
+            diagnostics.get("editor.simulationTrackingError"),
+            diagnostics.get("editor.simulationRevision"),
+            diagnostics.get("editor.stagingFingerprint"),
+            ready,
+        )
+    if signature == _editor_rebuild_trace_last:
+        return
+    _editor_rebuild_trace_last = signature
+    _stage_trace(
+        "editor_rebuild_transition",
+        ready=ready,
+        diagnostics=diagnostics,
+    )
+
+
+def _reset_editor_stage_state(revision=None, identity=None):
+    """Hard-reset all editor analysis state at a context boundary."""
+    global _editor_revision, _editor_identity
+    global _editor_analysis_revision, _editor_analysis_identity
+    global _editor_analysis_craft_revision
+    global _editor_stage_cache, _editor_summary_cache
+    global _editor_rebuild_trace_last
+    _editor_revision = revision
+    _editor_identity = identity
+    _editor_analysis_revision = None
+    _editor_analysis_identity = None
+    _editor_analysis_craft_revision = None
+    _editor_stage_cache = {}
+    _editor_summary_cache = {}
+    _editor_rebuild_trace_last = None
+    _clear_editor_candidates()
+
+
+def _begin_editor_revision(revision, identity):
+    """Start a revision while retaining only same-craft published analysis."""
+    global _editor_revision, _editor_identity
+    global _editor_analysis_revision, _editor_analysis_identity
+    global _editor_analysis_craft_revision
+    global _editor_stage_cache, _editor_summary_cache
+    retain_published = (
+        _editor_analysis_revision is not None
+        and identity is not None
+        and identity == _editor_analysis_identity
+    )
+    _editor_revision = revision
+    _editor_identity = identity
+    _clear_editor_candidates()
+    if not retain_published:
+        _editor_analysis_revision = None
+        _editor_analysis_identity = None
+        _editor_analysis_craft_revision = None
+        _editor_stage_cache = {}
+        _editor_summary_cache = {}
+
+
+def _editor_craft_identity(service):
+    """Return the existing StageStats editor identity, or None fail-closed."""
+    try:
+        raw_save_folder = service.game_save_folder
+        raw_craft_id = service.editor_craft_persistent_id
+        raw_root_id = service.editor_root_part_persistent_id
+    except Exception:
+        return None
+    if raw_save_folder is None or raw_craft_id is None or raw_root_id is None:
+        return None
+    save_folder = str(raw_save_folder).strip()
+    craft_id = str(raw_craft_id).strip()
+    root_id = str(raw_root_id).strip()
+    if not save_folder or not craft_id or not root_id:
+        return None
+    return save_folder, craft_id, root_id
+
+
+def _attach_editor_analysis(data, revision, force_pending=False):
+    """Attach the last atomically published editor analysis bundle."""
+    if _editor_summary_cache:
+        data.update(_editor_summary_cache)
+    if _editor_stage_cache:
+        data.update(_editor_stage_cache)
+    if _editor_analysis_revision is not None:
+        data["editor.analysisRevision"] = _editor_analysis_revision
+    data["stage.pending"] = (
+        force_pending
+        or _editor_analysis_revision is None
+        or _editor_analysis_revision != revision
+    )
+    return data
 
 
 def _gather_editor_summary(service):
@@ -1236,10 +1733,15 @@ def _gather_editor_summary(service):
 
 def _gather_editor_telemetry(conn, facility):
     """Gather the focused VAB/SPH payload from KRPC.StageStats."""
-    global _editor_revision, _editor_bodies_cache
+    global _editor_revision, _editor_identity, _editor_bodies_cache
+    global _editor_analysis_revision, _editor_analysis_identity
+    global _editor_analysis_craft_revision
     global _editor_stage_cache, _editor_stage_last_poll
     global _editor_stage_candidate, _editor_stage_candidate_hits
-    global _editor_summary_cache, _editor_summary_last_poll
+    global _editor_summary_cache, _editor_summary_candidate
+    global _editor_summary_last_poll
+    global _editor_rebuild_cache, _editor_rebuild_token
+    global _editor_rebuild_ready
 
     data = {
         "context.mode": "editor",
@@ -1252,6 +1754,7 @@ def _gather_editor_telemetry(conn, facility):
     try:
         service = conn.stage_stats
     except Exception:
+        _reset_editor_stage_state()
         data["stage.available"] = False
         data["stage.pending"] = False
         return data
@@ -1259,6 +1762,7 @@ def _gather_editor_telemetry(conn, facility):
     try:
         revision = int(service.editor_revision)
         stable = bool(service.editor_stable)
+        available = bool(service.available)
         data.update({
             "editor.craftName": (
                 service.editor_craft_name or "Untitled Space Craft"
@@ -1268,9 +1772,20 @@ def _gather_editor_telemetry(conn, facility):
             "editor.mach": service.editor_mach,
             "editor.revision": revision,
             "editor.stable": stable,
+            "stage.available": available,
         })
     except Exception:
-        return data  # editor scene/service is still loading
+        _reset_editor_stage_state()
+        data["stage.available"] = False
+        data["stage.pending"] = False
+        return data
+
+    if not available:
+        _reset_editor_stage_state(revision)
+        data["stage.pending"] = False
+        return data
+
+    identity = _editor_craft_identity(service)
 
     if not _editor_bodies_cache:
         try:
@@ -1279,48 +1794,191 @@ def _gather_editor_telemetry(conn, facility):
             pass
     data["editor.bodies"] = _editor_bodies_cache
 
-    if revision != _editor_revision:
-        _reset_editor_stage_state(revision)
-
-    if not stable:
-        return data
+    if revision != _editor_revision or identity != _editor_identity:
+        _begin_editor_revision(revision, identity)
 
     now = time.time()
-    summary_unavailable = _editor_summary_cache.get(
+    completion_signal = False
+    if (
+        _editor_analysis_revision != revision
+        and _editor_rebuild_cache.get(
+            "editor.rebuildDiagnosticsSchema"
+        ) == 2
+    ):
+        try:
+            completion_signal = (
+                int(service.editor_simulation_revision) == revision
+            )
+        except Exception:
+            completion_signal = False
+    stage_poll_due = (
+        now - _editor_stage_last_poll >= STAGE_POLL_SECONDS
+        or completion_signal
+    )
+    if stage_poll_due:
+        _editor_stage_last_poll = now
+        (
+            _editor_rebuild_cache,
+            _editor_rebuild_token,
+            _editor_rebuild_ready,
+        ) = _editor_rebuild_diagnostics(service)
+        _trace_editor_rebuild(
+            _editor_rebuild_cache, _editor_rebuild_ready
+        )
+    _replace_editor_rebuild_data(data, _editor_rebuild_cache)
+
+    if not stable:
+        return _attach_editor_analysis(data, revision)
+
+    if not _editor_rebuild_ready:
+        _drop_editor_analysis_candidates()
+        return _attach_editor_analysis(data, revision, force_pending=True)
+
+    condition_change = (
+        _editor_rebuild_cache.get("editor.lastChange") == "conditions"
+    )
+    if (
+        condition_change and
+        not _editor_summary_candidate and
+        _editor_summary_cache and
+        identity == _editor_analysis_identity and
+        _editor_rebuild_cache.get("editor.craftRevision") ==
+            _editor_analysis_craft_revision
+    ):
+        # Reference body/altitude/Mach do not change craft mass, resources,
+        # cost, crew, or stage count. Reuse the confirmed same-craft summary
+        # while only the MechJeb table is being reconfirmed.
+        _editor_summary_candidate = dict(_editor_summary_cache)
+        _editor_summary_last_poll = now
+
+    summary_unavailable = _editor_summary_candidate.get(
         "editor.summaryAvailable"
     ) is False
-    if not _editor_summary_cache or (
+    if not _editor_summary_candidate or (
         summary_unavailable and
         now - _editor_summary_last_poll >= EDITOR_SUMMARY_RETRY_SECONDS
     ):
         _editor_summary_last_poll = now
-        _editor_summary_cache = _gather_editor_summary(service)
-    data.update(_editor_summary_cache)
+        _editor_summary_candidate = _gather_editor_summary(service)
 
-    if now - _editor_stage_last_poll >= STAGE_POLL_SECONDS:
-        _editor_stage_last_poll = now
+    if _editor_summary_candidate.get("editor.summaryAvailable") is False:
+        return _attach_editor_analysis(data, revision, force_pending=True)
+
+    if stage_poll_due:
         try:
-            result = _gather_stages(conn, "editor")
-            signature = _stage_signature(result)
-            if signature is None:
+            result = _gather_stages(
+                conn,
+                "editor",
+                editor_rebuild_verified=(
+                    _editor_rebuild_ready and
+                    _editor_rebuild_cache.get(
+                        "editor.rebuildDiagnosticsSchema"
+                    ) in (1, 2)
+                ),
+                prefer_atomic_editor_snapshot=(
+                    _editor_rebuild_cache.get(
+                        "editor.rebuildDiagnosticsSchema"
+                    ) in (1, 2)
+                ),
+                atomic_editor_completion_proven=(
+                    _editor_completion_proven(
+                        revision, _editor_rebuild_cache
+                    )
+                ),
+            )
+            if not _editor_snapshot_matches(
+                result, revision, _editor_rebuild_cache
+            ):
+                _drop_editor_analysis_candidates()
+                return _attach_editor_analysis(
+                    data, revision, force_pending=True
+                )
+            stage_signature = _stage_signature(result)
+            signature = (
+                (stage_signature, _editor_rebuild_token)
+                if stage_signature is not None
+                else None
+            )
+            if stage_signature is None:
                 if result.get("stage.available") is False:
+                    _reset_editor_stage_state(revision)
+                    data["stage.available"] = False
+                    data["stage.pending"] = False
+                    return data
+            elif stage_signature is not None:
+                if signature == _editor_stage_candidate:
+                    _editor_stage_candidate_hits += 1
+                else:
+                    _editor_stage_candidate = signature
+                    _editor_stage_candidate_hits = 1
+                required_hits = (
+                    1
+                    if _editor_completion_proven(
+                        revision, _editor_rebuild_cache, result
+                    )
+                    else 2
+                )
+                if _editor_stage_candidate_hits >= required_hits:
+                    final_revision = int(service.editor_revision)
+                    final_stable = bool(service.editor_stable)
+                    final_available = bool(service.available)
+                    final_identity = _editor_craft_identity(service)
+                    final_rebuild_data, final_rebuild_token, final_ready = (
+                        _editor_rebuild_diagnostics(service)
+                    )
+                    _editor_rebuild_cache = final_rebuild_data
+                    _editor_rebuild_token = final_rebuild_token
+                    _editor_rebuild_ready = final_ready
+                    _replace_editor_rebuild_data(
+                        data, final_rebuild_data
+                    )
+                    _trace_editor_rebuild(final_rebuild_data, final_ready)
+                    data["editor.revision"] = final_revision
+                    data["editor.stable"] = final_stable
+                    if not final_available:
+                        _reset_editor_stage_state(final_revision)
+                        data["stage.available"] = False
+                        data["stage.pending"] = False
+                        return data
+                    if final_identity != identity:
+                        _reset_editor_stage_state(final_revision, final_identity)
+                        return _attach_editor_analysis(
+                            data, final_revision, force_pending=True
+                        )
+                    if final_revision != revision or not final_stable:
+                        _drop_editor_analysis_candidates()
+                        return _attach_editor_analysis(
+                            data, final_revision, force_pending=True
+                        )
+                    if (
+                        not final_ready or
+                        final_rebuild_token != signature[1]
+                    ):
+                        _drop_editor_analysis_candidates()
+                        return _attach_editor_analysis(
+                            data, final_revision, force_pending=True
+                        )
+                    if (
+                        required_hits == 1
+                        and not _editor_completion_proven(
+                            final_revision, final_rebuild_data, result
+                        )
+                    ):
+                        _drop_editor_analysis_candidates()
+                        return _attach_editor_analysis(
+                            data, final_revision, force_pending=True
+                        )
                     _editor_stage_cache = result
-                    _editor_stage_candidate = None
-                    _editor_stage_candidate_hits = 0
-            elif signature == _editor_stage_candidate:
-                _editor_stage_candidate_hits += 1
-                if _editor_stage_candidate_hits >= 2:
-                    _editor_stage_cache = result
-            else:
-                _editor_stage_candidate = signature
-                _editor_stage_candidate_hits = 1
+                    _editor_summary_cache = _editor_summary_candidate
+                    _editor_analysis_revision = revision
+                    _editor_analysis_identity = identity
+                    _editor_analysis_craft_revision = (
+                        final_rebuild_data.get("editor.craftRevision")
+                    )
         except Exception:
             pass
 
-    if _editor_stage_cache:
-        data.update(_editor_stage_cache)
-        data["stage.pending"] = False
-    return data
+    return _attach_editor_analysis(data, revision)
 
 
 def _apply_telemetry_command(conn, command):
@@ -1399,15 +2057,36 @@ def _apply_telemetry_command(conn, command):
             return
 
         service = conn.stage_stats
-        if "body" in command:
-            service.editor_body = str(command["body"])
-        if "altitude" in command:
-            altitude = float(command["altitude"])
-            if math.isfinite(altitude):
+        body = (
+            str(command["body"])
+            if "body" in command
+            else str(service.editor_body)
+        )
+        altitude = (
+            float(command["altitude"])
+            if "altitude" in command
+            else float(service.editor_altitude)
+        )
+        mach = (
+            float(command["mach"])
+            if "mach" in command
+            else float(service.editor_mach)
+        )
+        if (
+            not body or
+            not math.isfinite(altitude) or altitude < 0 or
+            not math.isfinite(mach) or mach < 0
+        ):
+            return
+        try:
+            service.set_editor_conditions(body, altitude, mach)
+        except AttributeError:
+            # StageStats 0.2.5 compatibility path.
+            if "body" in command:
+                service.editor_body = body
+            if "altitude" in command:
                 service.editor_altitude = altitude
-        if "mach" in command:
-            mach = float(command["mach"])
-            if math.isfinite(mach):
+            if "mach" in command:
                 service.editor_mach = mach
     except (TypeError, ValueError):
         pass
