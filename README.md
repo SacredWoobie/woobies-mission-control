@@ -1,16 +1,16 @@
 # Woobie's Mission Control
 
-Current release: **v0.4.1**
+Current release: **v0.4.2**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.4.1 makes VAB/SPH staging analysis faster and more resilient. It
-retains the last confirmed same-craft values while MechJeb recalculates,
-handles terminal decoupler-only stages, and publishes completed condition
-changes sooner without weakening the editor safety checks introduced in 0.4.0.
+Version 0.4.2 turns the Space Center overview into a practical vessel-management
+screen. It adds collision-safe craft selection, guarded switching, renaming and
+type changes, contextual recovery or termination with crew-loss warnings, and
+automatic transfer-window population when MechJeb is available.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -20,8 +20,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.4.0/space-center-overview.png">
-    <img src="docs/images/v0.4.0/space-center-overview.png" width="900" alt="Mission Control overview with program totals, contracts, tracked vessels, Kerbonauts, alarms, and transfer windows">
+  <a href="docs/images/v0.4.2/space-center-overview.png">
+    <img src="docs/images/v0.4.2/space-center-overview.png" width="900" alt="Mission Control overview with program totals, contracts, tracked vessels, Kerbonauts, alarms, transfer windows, and vessel-management actions">
   </a>
 </p>
 
@@ -103,20 +103,18 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The current public v0.4.1 release includes four independently versioned kRPC
+The current public v0.4.2 release includes four independently versioned kRPC
 extensions:
 
-| Service | v0.4.1 version | Purpose |
+| Service | v0.4.2 version | Purpose |
 | --- | --- | --- |
-| WoobiesControlStats | 0.2.1 | Roster, stored science, stock thermal data, and KAC bridge recovery |
+| WoobiesControlStats | 0.2.3 | Roster, stored science, stock thermal data, KAC bridge recovery, and guarded vessel termination |
 | KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
 | KRPC.SystemHeat | 0.2.2 | System Heat loops, components, and electrical integration |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
 
-The Unreleased vessel-lifecycle work selects WoobiesControlStats 0.2.3, which
-adds the guarded vessel-termination service. The source launcher's tested
-version and current release manifest reflect that development requirement;
-historical v0.4.0/v0.4.1 release packs remain pinned to their published bytes.
+Historical v0.4.0 and v0.4.1 release packs remain pinned to their published
+service bytes and provenance.
 
 ## Installation
 

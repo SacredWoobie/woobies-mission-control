@@ -2,7 +2,7 @@
 
 All notable public changes will be recorded here.
 
-## Unreleased
+## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated
   vessel/roster details, optional save-wide orbital facts, conditional alarm

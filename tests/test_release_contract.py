@@ -124,6 +124,20 @@ class ReleaseContractTests(unittest.TestCase):
             release_pack,
         )
 
+    def test_v042_release_pack_selects_vessel_management_service(self):
+        release_pack = (
+            ROOT / "tools" / "Release-Pack-v0.4.2.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('ProductVersion = "0.4.2"', release_pack)
+        self.assertRegex(
+            release_pack,
+            r'(?s)Folder = "WoobiesControlStats".*?'
+            r'Version = "0\.2\.3\.0".*?'
+            r'Sha256 = "CB5E720A3FA7EDF64CC09C946F749006B737ACE8881682D8F76AC6C8B1E99F22".*?'
+            r'SourceCommit = "c655ae1806af21d8420278e386c9b4e99964c32c"',
+        )
+
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
             "release_launcher", ROOT / "ksp_dashboard_app.py"
@@ -184,7 +198,10 @@ class ReleaseContractTests(unittest.TestCase):
         required = re.findall(r"`([^`]+\.png)`", gallery_brief)
         supplemental = re.findall(r"`([^`]+\.png)`", supplemental_brief)
         self.assertEqual(len(required), 5)
-        for name in required:
+        self.assertIn(
+            "docs/images/v0.4.2/space-center-overview.png", publish_script
+        )
+        for name in required[1:]:
             self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
         for name in supplemental:
             self.assertNotIn(f"docs/images/v0.4.0/{name}", publish_script)
@@ -208,9 +225,9 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-05-flight-dashboard-mission-planning.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.4.1.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.2.zip"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.4.1.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.2.{name}" for name in image_names
         ]
         self.assertEqual(
             sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name
