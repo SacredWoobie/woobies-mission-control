@@ -155,6 +155,8 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         first = fake_vessel("Relay", "VesselType.relay", object_id=101)
         second = fake_vessel("Relay", "VesselType.relay", object_id=202)
         conn.space_center.vessels = [first, second]
+        telemetry_server._overview_last_poll["fleet"] = 500.0
+        telemetry_server._overview_last_poll["roster"] = 500.0
 
         result = telemetry_server._apply_telemetry_command(conn, {
             "type": "overview.vessel.switch",
@@ -227,6 +229,154 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "error")
         self.assertIn("valid live identity", result["message"])
+
+    def test_edits_exact_object_id_and_returns_typed_result(self):
+        conn = fake_connection()
+        first = fake_vessel("Relay", "VesselType.relay", object_id=101)
+        second = fake_vessel("Relay", "VesselType.relay", object_id=202)
+        conn.space_center.vessels = [first, second]
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.edit",
+            "requestId": "edit-1",
+            "objectId": "202",
+            "expectedName": "Relay",
+            "expectedType": "Relay",
+            "expectedGuid": "Relay-guid",
+            "newName": "Duna Relay",
+            "newType": "Probe",
+        })
+
+        self.assertEqual(first.name, "Relay")
+        self.assertEqual(second.name, "Duna Relay")
+        self.assertEqual(second.type, telemetry_server.KRPCVesselType.probe)
+        self.assertEqual(telemetry_server._overview_last_poll["fleet"], 0.0)
+        self.assertEqual(telemetry_server._overview_last_poll["roster"], 0.0)
+        self.assertEqual(result, {
+            "type": "overview.vessel.edit.result",
+            "requestId": "edit-1",
+            "status": "accepted",
+            "message": "Saved Duna Relay as Probe.",
+            "name": "Duna Relay",
+            "vesselType": "Probe",
+        })
+
+    def test_rejects_edit_when_selected_details_are_stale(self):
+        conn = fake_connection()
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.edit",
+            "requestId": "edit-stale",
+            "objectId": "1",
+            "expectedName": "Old Odyssey",
+            "expectedType": "Ship",
+            "newName": "New Odyssey",
+            "newType": "Relay",
+        })
+
+        self.assertEqual(conn.space_center.vessels[0].name, "Odyssey")
+        self.assertEqual(result["status"], "error")
+        self.assertIn("changed", result["message"])
+
+    def test_rejects_invalid_or_unchanged_edit_values(self):
+        conn = fake_connection()
+        base = {
+            "type": "overview.vessel.edit",
+            "objectId": "1",
+            "expectedName": "Odyssey",
+            "expectedType": "Ship",
+            "newType": "Ship",
+        }
+
+        invalid = telemetry_server._apply_telemetry_command(conn, {
+            **base, "requestId": "edit-invalid", "newName": "Bad\nName",
+        })
+        unchanged = telemetry_server._apply_telemetry_command(conn, {
+            **base, "requestId": "edit-unchanged", "newName": "Odyssey",
+        })
+        invalid_type = telemetry_server._apply_telemetry_command(conn, {
+            **base,
+            "requestId": "edit-invalid-type",
+            "newName": "Odyssey",
+            "newType": "Flag",
+        })
+
+        self.assertEqual(invalid["status"], "error")
+        self.assertIn("control characters", invalid["message"])
+        self.assertEqual(unchanged["status"], "error")
+        self.assertIn("Change", unchanged["message"])
+        self.assertEqual(invalid_type["status"], "error")
+        self.assertIn("valid vessel type", invalid_type["message"])
+
+    def test_changes_type_without_requiring_a_rename(self):
+        conn = fake_connection()
+        vessel = conn.space_center.vessels[0]
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.edit",
+            "requestId": "edit-type-only",
+            "objectId": "1",
+            "expectedName": "Odyssey",
+            "expectedType": "Ship",
+            "newName": "Odyssey",
+            "newType": "Relay",
+        })
+
+        self.assertEqual(vessel.name, "Odyssey")
+        self.assertEqual(vessel.type, telemetry_server.KRPCVesselType.relay)
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual(result["vesselType"], "Relay")
+
+    def test_rejects_edit_outside_space_center_scenes(self):
+        conn = fake_connection()
+        conn.krpc.current_game_scene = "GameScene.flight"
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.edit",
+            "requestId": "edit-flight",
+            "objectId": "1",
+            "expectedName": "Odyssey",
+            "expectedType": "Ship",
+            "newName": "Odyssey Prime",
+            "newType": "Ship",
+        })
+
+        self.assertEqual(conn.space_center.vessels[0].name, "Odyssey")
+        self.assertEqual(result["status"], "error")
+        self.assertIn("Space Center", result["message"])
+
+    def test_rolls_back_type_when_rename_setter_fails(self):
+        class FailingNameVessel:
+            _object_id = 301
+            id = "failure-guid"
+            type = telemetry_server.KRPCVesselType.ship
+
+            @property
+            def name(self):
+                return "Failure Test"
+
+            @name.setter
+            def name(self, _value):
+                raise RuntimeError("rename failed")
+
+        conn = fake_connection()
+        vessel = FailingNameVessel()
+        conn.space_center.vessels = [vessel]
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.edit",
+            "requestId": "edit-rollback",
+            "objectId": "301",
+            "expectedName": "Failure Test",
+            "expectedType": "Ship",
+            "expectedGuid": "failure-guid",
+            "newName": "Failure Test Prime",
+            "newType": "Relay",
+        })
+
+        self.assertEqual(vessel.type, telemetry_server.KRPCVesselType.ship)
+        self.assertEqual(result["status"], "error")
+        self.assertIn("verify", result["message"])
 
     def test_contract_rows_include_finite_completion_rewards(self):
         contract = SimpleNamespace(

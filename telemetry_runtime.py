@@ -24,6 +24,7 @@ KRPC_COMMAND_TYPES = frozenset(
     {
         "editor.conditions",
         "overview.vessel.switch",
+        "overview.vessel.edit",
         "notes.select",
         "notes.pin",
         "notes.favorite",

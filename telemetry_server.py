@@ -28,6 +28,7 @@ from http import HTTPStatus
 from pathlib import Path
 
 import krpc
+from krpc.services.spacecenter import VesselType as KRPCVesselType
 
 from electricity import ElectricityFlowEstimator, generation_remainder
 from heat import enrich_system_heat_result
@@ -65,10 +66,22 @@ OVERVIEW_FLEET_POLL_SECONDS = 5.0
 OVERVIEW_CONTRACTS_POLL_SECONDS = 10.0
 OVERVIEW_ROSTER_POLL_SECONDS = 15.0
 OVERVIEW_MAX_VESSELS = 500
+OVERVIEW_MAX_VESSEL_NAME_LENGTH = 80
 OVERVIEW_TRACKED_VESSEL_TYPES = frozenset({
     "Debris", "Probe", "Rover", "Lander", "Ship", "Station", "Base",
     "Plane", "Relay",
 })
+OVERVIEW_EDITABLE_VESSEL_TYPES = {
+    "Base": KRPCVesselType.base,
+    "Debris": KRPCVesselType.debris,
+    "Lander": KRPCVesselType.lander,
+    "Plane": KRPCVesselType.plane,
+    "Probe": KRPCVesselType.probe,
+    "Relay": KRPCVesselType.relay,
+    "Rover": KRPCVesselType.rover,
+    "Ship": KRPCVesselType.ship,
+    "Station": KRPCVesselType.station,
+}
 STAGE_TRACE_ENABLED = os.environ.get("WOOBIE_STAGE_TRACE", "").casefold() in {
     "1", "true", "yes", "on",
 }
@@ -1995,6 +2008,9 @@ def _apply_telemetry_command(conn, command):
     if command.get("type") == "overview.vessel.switch":
         return _apply_overview_vessel_switch_command(conn, command)
 
+    if command.get("type") == "overview.vessel.edit":
+        return _apply_overview_vessel_edit_command(conn, command)
+
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
         if pinned is None or pinned == "":
@@ -2429,6 +2445,156 @@ def _apply_overview_vessel_switch_command(conn, command):
         )
     except Exception:
         return reject("KSP could not switch to that vessel right now.")
+
+
+def _overview_vessel_edit_result(
+    request_id, status, message, name=None, vessel_type=None
+):
+    result = {
+        "type": "overview.vessel.edit.result",
+        "requestId": request_id,
+        "status": status,
+        "message": message,
+    }
+    if name is not None:
+        result["name"] = name
+    if vessel_type is not None:
+        result["vesselType"] = vessel_type
+    return result
+
+
+def _apply_overview_vessel_edit_command(conn, command):
+    """Edit one exact overview vessel, rejecting stale identities."""
+    request_id = command.get("requestId")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return None
+
+    def reject(message):
+        return _overview_vessel_edit_result(request_id, "error", message)
+
+    raw_object_id = command.get("objectId")
+    if (
+        not isinstance(raw_object_id, str)
+        or not raw_object_id.isdecimal()
+        or len(raw_object_id) > 20
+    ):
+        return reject("The selected vessel no longer has a valid live identity.")
+    object_id = int(raw_object_id)
+    if object_id <= 0:
+        return reject("The selected vessel no longer has a valid live identity.")
+
+    expected_name = command.get("expectedName")
+    if (
+        not isinstance(expected_name, str)
+        or not expected_name
+        or len(expected_name) > 256
+    ):
+        return reject("The selected vessel identity is invalid.")
+
+    expected_guid = command.get("expectedGuid")
+    if expected_guid is not None and (
+        not isinstance(expected_guid, str)
+        or not expected_guid
+        or len(expected_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("The selected vessel identity is invalid.")
+
+    expected_type = command.get("expectedType")
+    if expected_type not in OVERVIEW_EDITABLE_VESSEL_TYPES:
+        return reject("The selected vessel type is invalid.")
+
+    proposed_name = command.get("newName")
+    if not isinstance(proposed_name, str):
+        return reject("Enter a valid vessel name.")
+    new_name = proposed_name.strip()
+    if (
+        not new_name
+        or len(new_name) > OVERVIEW_MAX_VESSEL_NAME_LENGTH
+        or any(ord(character) < 32 for character in new_name)
+    ):
+        return reject(
+            f"Vessel names must be 1 to {OVERVIEW_MAX_VESSEL_NAME_LENGTH} "
+            "characters without line breaks or control characters."
+        )
+    new_type = command.get("newType")
+    if new_type not in OVERVIEW_EDITABLE_VESSEL_TYPES:
+        return reject("Select a valid vessel type.")
+    if new_name == expected_name and new_type == expected_type:
+        return reject("Change the vessel name or type before saving.")
+
+    try:
+        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        if scene_name not in {"space center", "tracking station"}:
+            return reject(
+                "Vessels can only be edited from the Space Center "
+                "or Tracking Station."
+            )
+
+        sc = conn.space_center
+        target = next((
+            vessel for vessel in _overview_list(sc, "vessels")
+            if _overview_value(vessel, "_object_id") == object_id
+        ), None)
+        if target is None:
+            return reject(
+                "That vessel is no longer available. "
+                "Refresh the fleet and try again."
+            )
+
+        current_name = str(_overview_value(target, "name", "")).strip()
+        if current_name != expected_name:
+            return reject(
+                "That vessel changed after it was selected. "
+                "Refresh the fleet and try again."
+            )
+        if expected_guid is not None:
+            current_guid = str(_overview_value(target, "id", "")).strip()
+            if current_guid != expected_guid:
+                return reject(
+                    "That vessel changed after it was selected. "
+                    "Refresh the fleet and try again."
+                )
+        current_type_value = _overview_value(target, "type")
+        current_type = _overview_label(current_type_value, "Unknown")
+        if current_type != expected_type:
+            return reject(
+                "That vessel changed after it was selected. "
+                "Refresh the fleet and try again."
+            )
+
+        try:
+            if new_type != current_type:
+                target.type = OVERVIEW_EDITABLE_VESSEL_TYPES[new_type]
+            if new_name != current_name:
+                target.name = new_name
+        except Exception:
+            try:
+                target.type = current_type_value
+                target.name = current_name
+            except Exception:
+                pass
+            return reject(
+                "KSP could not save all vessel changes. "
+                "Refresh the fleet and verify its current details."
+            )
+
+        saved_name = str(_overview_value(target, "name", new_name)).strip() or new_name
+        saved_type = _overview_label(_overview_value(target, "type"), new_type)
+        _overview_last_poll["fleet"] = 0.0
+        _overview_last_poll["roster"] = 0.0
+        return _overview_vessel_edit_result(
+            request_id,
+            "accepted",
+            f"Saved {saved_name} as {saved_type}.",
+            saved_name,
+            saved_type,
+        )
+    except Exception:
+        return reject("KSP could not edit that vessel right now.")
 
 
 def _overview_capabilities(game_mode):

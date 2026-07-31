@@ -8,8 +8,8 @@ All notable public changes will be recorded here.
   vessel/roster details, optional save-wide orbital facts, conditional alarm
   and crew markers, collision-safe vessel selection, a flat assignment-aware
   crew roster, guarded one-click switching to a selected vessel, compact zero
-  states and program metrics, and silent defaults for raw alarms and missing
-  deadlines.
+  states and program metrics, silent defaults for raw alarms and missing
+  deadlines, and a guarded detail-pane editor for vessel names and craft types.
 
 ## v0.4.1 - Faster, resilient editor calculations
 

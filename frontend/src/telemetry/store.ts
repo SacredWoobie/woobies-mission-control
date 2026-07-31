@@ -2,6 +2,7 @@ import { TelemetryClient, type ConnectionStatus } from "./client";
 import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
+  OverviewVesselEditResult,
   OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -12,6 +13,7 @@ export interface LiveTelemetryState {
   frameCount: number;
   lastFrameAt: number | null;
   message?: string;
+  overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
@@ -46,6 +48,7 @@ export class TelemetryStore {
     private readonly createClient: (
       endpoint: string,
       callbacks: {
+        onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -75,6 +78,9 @@ export class TelemetryStore {
 
     this.client?.disconnect();
     this.client = this.createClient(normalized, {
+      onOverviewVesselEditResult: (overviewVesselEditResult) => {
+        this.patch({ overviewVesselEditResult });
+      },
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
       },
@@ -91,7 +97,11 @@ export class TelemetryStore {
         this.patch({
           message,
           status,
-          ...(clearSnapshot ? { snapshot: null, overviewVesselSwitchResult: undefined } : {}),
+          ...(clearSnapshot ? {
+            snapshot: null,
+            overviewVesselEditResult: undefined,
+            overviewVesselSwitchResult: undefined,
+          } : {}),
         });
       },
     });

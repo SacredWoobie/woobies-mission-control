@@ -232,11 +232,17 @@ function LiveTargetPanel() { const snapshot = useLiveFlightSnapshot(targetSnapsh
 function LivePinnedNotePanel() { const snapshot = useLiveFlightSnapshot(pinnedNoteSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["notes.pinned"] ? <PinnedNotePanel commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={snapshot} /> : null; }
 function LiveMissionOverview() {
   const liveState = useLiveTelemetrySelector(
-    (state) => ({ snapshot: state.snapshot, switchResult: state.overviewVesselSwitchResult }),
-    (left, right) => overviewSnapshotsEqual(left.snapshot, right.snapshot) && left.switchResult === right.switchResult,
+    (state) => ({
+      editResult: state.overviewVesselEditResult,
+      snapshot: state.snapshot,
+      switchResult: state.overviewVesselSwitchResult,
+    }),
+    (left, right) => overviewSnapshotsEqual(left.snapshot, right.snapshot)
+      && left.editResult === right.editResult
+      && left.switchResult === right.switchResult,
   );
   return liveState.snapshot?.["context.mode"] === "inactive"
-    ? <MissionOverview commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} switchResult={liveState.switchResult} />
+    ? <MissionOverview commandEnabled editResult={liveState.editResult} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} switchResult={liveState.switchResult} />
     : null;
 }
 

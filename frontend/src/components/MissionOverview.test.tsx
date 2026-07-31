@@ -300,6 +300,120 @@ describe("MissionOverview", () => {
     expect(switchButton.hasAttribute("disabled")).toBe(false);
   });
 
+  it("edits a vessel name and type in a detail-contained modal that locks the dashboard", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const view = render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    fireEvent.click(within(fleet).getByRole("button", { name: "Select Duna Relay 1" }));
+    const editButton = within(fleet).getByRole("button", { name: "Edit Duna Relay 1" });
+
+    editButton.focus();
+    fireEvent.click(editButton);
+    let dialog = screen.getByRole("dialog", { name: "Edit Duna Relay 1" });
+    const detail = fleet.querySelector(".overview-vessel-detail")!;
+    const nameInput = within(dialog).getByRole("textbox", { name: "Vessel name" });
+    expect(detail.contains(dialog)).toBe(true);
+    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(true);
+    expect(nameInput.getAttribute("value")).toBe("Duna Relay 1");
+    expect(document.activeElement).toBe(nameInput);
+    expect(within(dialog).getByRole("button", { name: "Relay" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(editButton);
+    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(false);
+
+    fireEvent.click(editButton);
+    dialog = screen.getByRole("dialog", { name: "Edit Duna Relay 1" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Vessel name" }), { target: { value: "Duna Relay Prime" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Probe" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "SAVE CHANGES" }));
+
+    expect(onSendCommand).toHaveBeenCalledTimes(1);
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.edit") throw new Error("Unexpected vessel edit command");
+    expect(command).toMatchObject({
+      type: "overview.vessel.edit",
+      objectId: "103",
+      expectedName: "Duna Relay 1",
+      expectedType: "Relay",
+      expectedGuid: "mock-duna-relay-guid",
+      newName: "Duna Relay Prime",
+      newType: "Probe",
+    });
+
+    view.rerender(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled editResult={{
+          type: "overview.vessel.edit.result",
+          requestId: command.requestId,
+          status: "accepted",
+          message: "Saved Duna Relay Prime as Probe.",
+          name: "Duna Relay Prime",
+          vesselType: "Probe",
+        }} onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(fleet).getByRole("status").textContent).toContain("Duna Relay Prime as Probe");
+    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(false);
+  });
+
+  it("recovers the edit modal when KSP does not answer", () => {
+    vi.useFakeTimers();
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Edit / }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Relay" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "SAVE CHANGES" }));
+
+    act(() => vi.advanceTimersByTime(12_000));
+    expect(within(dialog).getByRole("alert").textContent).toContain("did not answer");
+    expect(within(dialog).getByRole("button", { name: "SAVE CHANGES" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("keeps the edit modal open when KSP rejects the guarded change", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const view = render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    const editButton = screen.getByRole("button", { name: /^Edit / });
+    fireEvent.click(editButton);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Relay" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "SAVE CHANGES" }));
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.edit") throw new Error("Unexpected vessel edit command");
+
+    view.rerender(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled editResult={{
+          type: "overview.vessel.edit.result",
+          requestId: command.requestId,
+          status: "error",
+          message: "That vessel changed after it was selected.",
+        }} onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toContain("changed");
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close edit vessel dialog" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("disables vessel switching when the dashboard command channel is unavailable", () => {
     renderOverview();
     const button = screen.getByRole("button", { name: /^Switch to / });

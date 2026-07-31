@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useDialogFocus } from "../deltaV/useDialogFocus";
 import {
   formatDistance,
   formatEccentricity,
@@ -13,6 +14,7 @@ import type {
   OverviewAlarmTelemetry,
   OverviewContractTelemetry,
   OverviewCrewTelemetry,
+  OverviewVesselEditResult,
   OverviewVesselTelemetry,
   OverviewVesselSwitchResult,
   TelemetryCommand,
@@ -116,8 +118,11 @@ function VesselTypeFilter({ rows, excluded, onToggle, onReset }: {
   </div>;
 }
 
-function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResult }: {
+const maxVesselNameLength = 80;
+
+function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows, switchResult }: {
   commandEnabled: boolean;
+  editResult?: OverviewVesselEditResult;
   kerbin: boolean;
   onSendCommand(command: TelemetryCommand): boolean;
   rows: OverviewVesselTelemetry[];
@@ -135,6 +140,19 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
   const [switchRequestId, setSwitchRequestId] = useState("");
   const [switchingVesselKey, setSwitchingVesselKey] = useState("");
   const [switchAccepted, setSwitchAccepted] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameType, setRenameType] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [renameNotice, setRenameNotice] = useState("");
+  const [renameRequestId, setRenameRequestId] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const closeRename = useCallback(() => {
+    setRenameOpen(false);
+    setRenameError("");
+    setRenameRequestId("");
+  }, []);
+  const renameDialogRef = useDialogFocus<HTMLElement>(renameOpen, closeRename);
   const trackedRows = useMemo(() => rows.filter((row) => trackedVesselTypeSet.has(row.type)), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -175,7 +193,19 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
     setSwitchRequestId("");
     setSwitchingVesselKey("");
     setSwitchAccepted(false);
+    setRenameOpen(false);
+    setRenameValue("");
+    setRenameType("");
+    setRenameError("");
+    setRenameNotice("");
+    setRenameRequestId("");
   }, [selectedKey]);
+
+  useEffect(() => {
+    if (!renameOpen) return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [renameOpen]);
 
   useEffect(() => {
     if (!switchRequestId || switchResult?.requestId !== switchRequestId) return;
@@ -201,6 +231,28 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
     return () => globalThis.clearTimeout(timeout);
   }, [switchRequestId]);
 
+  useEffect(() => {
+    if (!renameRequestId || editResult?.requestId !== renameRequestId) return;
+    if (editResult.status === "accepted") {
+      setRenameNotice(editResult.message);
+      setRenameOpen(false);
+      setRenameError("");
+      setRenameRequestId("");
+    } else {
+      setRenameError(editResult.message);
+      setRenameRequestId("");
+    }
+  }, [editResult, renameRequestId]);
+
+  useEffect(() => {
+    if (!renameRequestId) return;
+    const timeout = globalThis.setTimeout(() => {
+      setRenameError("KSP did not answer the edit request. Check the vessel and try again.");
+      setRenameRequestId("");
+    }, 12_000);
+    return () => globalThis.clearTimeout(timeout);
+  }, [renameRequestId]);
+
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
     if (next.has(type)) next.delete(type); else next.add(type);
@@ -208,7 +260,7 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
   });
 
   const switchToSelected = () => {
-    if (!selected?.objectId || !commandEnabled || switchRequestId) return;
+    if (!selected?.objectId || !commandEnabled || switchRequestId || renameRequestId) return;
     const requestId = globalThis.crypto?.randomUUID?.()
       ?? `vessel-switch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const sent = onSendCommand({
@@ -226,6 +278,47 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
     setSwitchAccepted(false);
     setSwitchRequestId(requestId);
     setSwitchingVesselKey(selectedKey);
+  };
+
+  const openRename = () => {
+    if (!selected?.objectId || !commandEnabled || switchRequestId || renameRequestId) return;
+    setRenameValue(selected.name);
+    setRenameType(selected.type);
+    setRenameError("");
+    setRenameNotice("");
+    setRenameOpen(true);
+  };
+
+  const submitRename = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selected?.objectId || !commandEnabled || renameRequestId) return;
+    const newName = renameValue.trim();
+    if (!newName || newName.length > maxVesselNameLength || /[\u0000-\u001f]/.test(newName)) {
+      setRenameError(`Vessel names must be 1 to ${maxVesselNameLength} characters without line breaks or control characters.`);
+      return;
+    }
+    if (newName === selected.name && renameType === selected.type) {
+      setRenameError("Change the vessel name or type before saving.");
+      return;
+    }
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `vessel-edit-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand({
+      type: "overview.vessel.edit",
+      requestId,
+      objectId: selected.objectId,
+      expectedName: selected.name,
+      expectedType: selected.type,
+      newName,
+      newType: renameType,
+      ...(selected.guid ? { expectedGuid: selected.guid } : {}),
+    });
+    if (!sent) {
+      setRenameError("Mission Control is not connected to KSP.");
+      return;
+    }
+    setRenameError("");
+    setRenameRequestId(requestId);
   };
 
   return <section className="overview-section overview-fleet">
@@ -275,9 +368,23 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
           {isFiniteNumber(selected.eccentricity) && <div><span>Eccentricity</span><strong>{formatEccentricity(selected.eccentricity)}</strong></div>}
         </div>}
         <div className="overview-vessel-actions">
-          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId)} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? (switchAccepted ? "SWITCH REQUESTED" : "SWITCHING…") : "SWITCH TO VESSEL"}</button>
+          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId || renameRequestId)} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? (switchAccepted ? "SWITCH REQUESTED" : "SWITCHING…") : "SWITCH TO VESSEL"}</button>
+          <button aria-haspopup="dialog" aria-label={`Edit ${selected.name}`} className="overview-rename-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId || renameRequestId)} onClick={openRename} type="button">EDIT VESSEL</button>
           {switchError && <span className="overview-command-error" role="alert">{switchError}</span>}
+          {renameNotice && <span className="overview-command-notice" role="status">{renameNotice}</span>}
         </div>
+        {renameOpen && <div className="delta-v-modal-backdrop overview-vessel-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRename(); }}>
+          <section aria-labelledby="overview-rename-title" aria-modal="true" className="overview-vessel-modal" onMouseDown={(event) => event.stopPropagation()} ref={renameDialogRef} role="dialog" tabIndex={-1}>
+            <header><div><span>CRAFT MANAGEMENT</span><h3 id="overview-rename-title">Edit {selected.name}</h3></div><button aria-label="Close edit vessel dialog" onClick={closeRename} type="button">×</button></header>
+            <form onSubmit={submitRename}>
+              <label><span>Vessel name</span><input aria-describedby="overview-rename-hint" maxLength={maxVesselNameLength} onChange={(event) => setRenameValue(event.target.value)} ref={renameInputRef} value={renameValue} /></label>
+              <fieldset><legend>Vessel type</legend><div className="overview-vessel-type-options">{trackedVesselTypes.map((type) => <button aria-pressed={renameType === type} key={type} onClick={() => setRenameType(type)} type="button"><VesselTypeGlyph type={type} /><span>{type}</span></button>)}</div></fieldset>
+              <small id="overview-rename-hint">The selected craft keeps its current identity, mission time, and orbit.</small>
+              {renameError && <p className="overview-vessel-modal-error" role="alert">{renameError}</p>}
+              <footer><button onClick={closeRename} type="button">CANCEL</button><button disabled={Boolean(renameRequestId) || !renameValue.trim() || (renameValue.trim() === selected.name && renameType === selected.type)} type="submit">{renameRequestId ? "SAVING…" : "SAVE CHANGES"}</button></footer>
+            </form>
+          </section>
+        </div>}
       </article> : <div className="overview-vessel-detail overview-vessel-detail-empty"><span>Select a vessel to inspect its mission status.</span></div>}
     </div>
   </section>;
@@ -400,11 +507,13 @@ function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTele
 
 export function MissionOverview({
   commandEnabled = false,
+  editResult,
   onSendCommand = () => false,
   snapshot,
   switchResult,
 }: {
   commandEnabled?: boolean;
+  editResult?: OverviewVesselEditResult;
   onSendCommand?(command: TelemetryCommand): boolean;
   snapshot: TelemetrySnapshot;
   switchResult?: OverviewVesselSwitchResult;
@@ -442,7 +551,7 @@ export function MissionOverview({
         (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
         contracts.length > 0 ? "" : "contracts-empty",
       ].filter(Boolean).join(" ")}>
-        {fleetVisible && <FleetSection commandEnabled={commandEnabled} kerbin={kerbin} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} />}
+        {fleetVisible && <FleetSection commandEnabled={commandEnabled} editResult={editResult} kerbin={kerbin} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
         {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" />{contracts.length > 0 && <div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>}</section>}

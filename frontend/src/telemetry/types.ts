@@ -141,6 +141,15 @@ export interface OverviewVesselSwitchResult {
   message: string;
 }
 
+export interface OverviewVesselEditResult {
+  type: "overview.vessel.edit.result";
+  requestId: string;
+  status: "accepted" | "error";
+  message: string;
+  name?: string;
+  vesselType?: string;
+}
+
 export interface OverviewCrewTelemetry {
   name: string;
   assignment?: string;
@@ -503,6 +512,7 @@ export interface MissionPlanningPersistenceState {
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
+  | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "notes.select"; relativePath: string | null }
   | { type: "notes.pin"; relativePath: string | null }
   | { type: "notes.favorite"; relativePath: string; favorite: boolean }

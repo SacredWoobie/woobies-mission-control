@@ -1,6 +1,7 @@
 import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
+  OverviewVesselEditResult,
   OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -19,6 +20,7 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
   onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -126,6 +128,43 @@ export function parseOverviewVesselSwitchResult(raw: unknown): OverviewVesselSwi
     || typeof candidate.message !== "string"
   ) return null;
   return candidate as unknown as OverviewVesselSwitchResult;
+}
+
+export function parseOverviewVesselEditResult(raw: unknown): OverviewVesselEditResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "overview.vessel.edit.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+    || (candidate.name !== undefined && typeof candidate.name !== "string")
+    || (candidate.vesselType !== undefined && typeof candidate.vesselType !== "string")
+  ) return null;
+  return candidate as unknown as OverviewVesselEditResult;
+}
+
+function isOverviewVesselEditResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "overview.vessel.edit.result",
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isOverviewVesselSwitchResultMessage(raw: unknown) {
@@ -251,6 +290,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const editResult = parseOverviewVesselEditResult(event.data);
+      if (editResult) {
+        this.callbacks.onOverviewVesselEditResult?.(editResult);
+        return;
+      }
+      if (isOverviewVesselEditResultMessage(event.data)) return;
       const switchResult = parseOverviewVesselSwitchResult(event.data);
       if (switchResult) {
         this.callbacks.onOverviewVesselSwitchResult?.(switchResult);

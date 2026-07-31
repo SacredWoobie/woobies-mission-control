@@ -92,6 +92,7 @@ class TelemetryRuntimeTests(unittest.TestCase):
             "Queue(maxsize=MAX_PENDING_COMMANDS)",
             "sessions.get(ws) != session_id",
             '"overview.vessel.switch"',
+            '"overview.vessel.edit"',
             "if isinstance(event, dict)",
             'event.get("status") in {"merged", "updated"}',
         ):

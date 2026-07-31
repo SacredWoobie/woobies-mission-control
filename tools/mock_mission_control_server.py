@@ -143,6 +143,7 @@ def initial_note_state():
         "selection_mode": "active",
         "favorite": True,
         "vessel_switch_events": [],
+        "vessel_edit_events": [],
     }
 
 
@@ -248,6 +249,13 @@ async def receive_commands(
                 "status": "error",
                 "message": "The mock dashboard cannot switch live KSP vessels.",
             })
+        elif kind == "overview.vessel.edit":
+            note_state["vessel_edit_events"].append({
+                "type": "overview.vessel.edit.result",
+                "requestId": str(command.get("requestId", "")),
+                "status": "error",
+                "message": "The mock dashboard cannot edit live KSP vessels.",
+            })
         else:
             await mission_planning.apply_command(command)
 
@@ -325,6 +333,9 @@ async def run(args):
                 for event in note_state["vessel_switch_events"]:
                     await socket.send(json.dumps(event))
                 note_state["vessel_switch_events"].clear()
+                for event in note_state["vessel_edit_events"]:
+                    await socket.send(json.dumps(event))
+                note_state["vessel_edit_events"].clear()
                 await socket.send(json.dumps(payload))
                 frame += 1
                 await asyncio.sleep(1.0 / args.hz)

@@ -2,12 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TelemetryClient,
   parseMissionPlanningPersistenceState,
+  parseOverviewVesselEditResult,
   parseOverviewVesselSwitchResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -106,6 +107,33 @@ describe("parseOverviewVesselSwitchResult", () => {
       requestId: "switch-2",
       status: "unknown",
       message: "Nope.",
+    })).toBeNull();
+  });
+});
+
+describe("parseOverviewVesselEditResult", () => {
+  it("accepts typed edit results and rejects malformed events", () => {
+    expect(parseOverviewVesselEditResult(JSON.stringify({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "Duna Relay",
+      vesselType: "Relay",
+    }))).toEqual({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "Duna Relay",
+      vesselType: "Relay",
+    });
+    expect(parseOverviewVesselEditResult({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-2",
+      status: "accepted",
+      message: "Renamed.",
+      name: 42,
     })).toBeNull();
   });
 });
@@ -224,6 +252,42 @@ describe("TelemetryClient", () => {
 
     expect(switchResults).toHaveLength(1);
     expect(switchResults[0].requestId).toBe("switch-1");
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes vessel edit results only to the originating client callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const editResults: OverviewVesselEditResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onOverviewVesselEditResult: (result) => editResults.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "Duna Relay",
+      vesselType: "Relay",
+    }));
+    socket.message(JSON.stringify({
+      type: "overview.vessel.edit.result",
+      requestId: "",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(editResults).toHaveLength(1);
+    expect(editResults[0].name).toBe("Duna Relay");
     expect(snapshots).toEqual([]);
   });
 

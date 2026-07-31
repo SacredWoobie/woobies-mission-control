@@ -3,6 +3,7 @@ import { TelemetryStore } from "./store";
 import type { ConnectionStatus } from "./client";
 import type {
   MissionPlanningPersistenceState,
+  OverviewVesselEditResult,
   OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -11,6 +12,7 @@ import type {
 describe("TelemetryStore", () => {
   it("clears stale snapshots on connection loss and exposes reconnect state", () => {
     let callbacks: {
+      onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -36,16 +38,26 @@ describe("TelemetryStore", () => {
       status: "accepted",
       message: "Switching.",
     });
+    callbacks!.onOverviewVesselEditResult?.({
+      type: "overview.vessel.edit.result",
+      requestId: "edit-1",
+      status: "accepted",
+      message: "Renamed.",
+      name: "New Odyssey",
+      vesselType: "Relay",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
+    expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
       message: "Connection dropped",
       snapshot: null,
       overviewVesselSwitchResult: undefined,
+      overviewVesselEditResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);
@@ -59,6 +71,7 @@ describe("TelemetryStore", () => {
 
   it("broadcasts persistence state and sends typed persistence commands", () => {
     let callbacks: {
+      onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;

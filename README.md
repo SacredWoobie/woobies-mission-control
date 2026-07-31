@@ -149,6 +149,9 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
 - Overview vessel switching validates the current connection-scoped object ID,
   displayed vessel name, and the KSP vessel GUID when one is available before
   acting.
+- Overview vessel edits validate the same live identity plus the displayed
+  craft type before changing a name or KSP vessel classification. The contained
+  edit dialog locks the surrounding dashboard until it is closed or submitted.
 - Transfer-node creation requires a fresh preview and a second confirmation and
   creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple
