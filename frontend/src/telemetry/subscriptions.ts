@@ -226,7 +226,6 @@ export function overviewSnapshotsEqual(left: TelemetrySnapshot | null, right: Te
     "overview.readOnly", "overview.capabilities", "overview.funds",
     "overview.science", "overview.reputation", "overview.contractCounts",
     "overview.contracts", "overview.vessels", "overview.vesselsTruncated",
-    "overview.vesselSwitchResult",
     "overview.roster", "overview.rosterAvailable", "overview.alarms",
     "overview.alarmProviders", "mj.transfer.available",
     "mj.transfer.compatibilityReady", "mj.transfer.windows.requestId",

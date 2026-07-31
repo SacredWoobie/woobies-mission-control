@@ -3,6 +3,7 @@ import { TelemetryStore } from "./store";
 import type { ConnectionStatus } from "./client";
 import type {
   MissionPlanningPersistenceState,
+  OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -10,6 +11,7 @@ import type {
 describe("TelemetryStore", () => {
   it("clears stale snapshots on connection loss and exposes reconnect state", () => {
     let callbacks: {
+      onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;
@@ -28,14 +30,22 @@ describe("TelemetryStore", () => {
     expect(connect).toHaveBeenCalledOnce();
     callbacks!.onStatus("linked");
     callbacks!.onSnapshot({ "context.mode": "flight", "v.name": "Odyssey" });
+    callbacks!.onOverviewVesselSwitchResult?.({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "accepted",
+      message: "Switching.",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
+    expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
       message: "Connection dropped",
       snapshot: null,
+      overviewVesselSwitchResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);
@@ -49,6 +59,7 @@ describe("TelemetryStore", () => {
 
   it("broadcasts persistence state and sends typed persistence commands", () => {
     let callbacks: {
+      onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;

@@ -137,7 +137,6 @@ _overview_cache = {
 }
 _overview_last_poll = {key: 0.0 for key in _overview_cache}
 _overview_last_ut = None
-_overview_vessel_switch_result = None
 _mission_planning = MissionPlanningController()
 _electricity_flow = ElectricityFlowEstimator()
 
@@ -1994,8 +1993,7 @@ def _apply_telemetry_command(conn, command):
         return
 
     if command.get("type") == "overview.vessel.switch":
-        _apply_overview_vessel_switch_command(conn, command)
-        return
+        return _apply_overview_vessel_switch_command(conn, command)
 
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
@@ -2342,9 +2340,9 @@ def _overview_list(obj, name):
         return []
 
 
-def _set_overview_vessel_switch_result(request_id, status, message):
-    global _overview_vessel_switch_result
-    _overview_vessel_switch_result = {
+def _overview_vessel_switch_result(request_id, status, message):
+    return {
+        "type": "overview.vessel.switch.result",
         "requestId": request_id,
         "status": status,
         "message": message,
@@ -2359,19 +2357,21 @@ def _apply_overview_vessel_switch_command(conn, command):
         or not request_id
         or len(request_id) > MAX_ACTION_ID_LENGTH
     ):
-        return
+        return None
 
     def reject(message):
-        _set_overview_vessel_switch_result(request_id, "error", message)
+        return _overview_vessel_switch_result(request_id, "error", message)
 
     raw_object_id = command.get("objectId")
-    if not isinstance(raw_object_id, str) or not raw_object_id.isdecimal():
-        reject("The selected vessel no longer has a valid live identity.")
-        return
+    if (
+        not isinstance(raw_object_id, str)
+        or not raw_object_id.isdecimal()
+        or len(raw_object_id) > 20
+    ):
+        return reject("The selected vessel no longer has a valid live identity.")
     object_id = int(raw_object_id)
     if object_id <= 0:
-        reject("The selected vessel no longer has a valid live identity.")
-        return
+        return reject("The selected vessel no longer has a valid live identity.")
 
     expected_guid = command.get("expectedGuid")
     if expected_guid is not None and (
@@ -2379,17 +2379,23 @@ def _apply_overview_vessel_switch_command(conn, command):
         or not expected_guid
         or len(expected_guid) > MAX_ACTION_ID_LENGTH
     ):
-        reject("The selected vessel identity is invalid.")
-        return
+        return reject("The selected vessel identity is invalid.")
+
+    expected_name = command.get("expectedName")
+    if expected_name is not None and (
+        not isinstance(expected_name, str)
+        or not expected_name
+        or len(expected_name) > 256
+    ):
+        return reject("The selected vessel identity is invalid.")
 
     try:
         scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
-            reject(
+            return reject(
                 "Vessels can only be switched from the Space Center "
                 "or Tracking Station."
             )
-            return
 
         sc = conn.space_center
         target = next((
@@ -2397,27 +2403,32 @@ def _apply_overview_vessel_switch_command(conn, command):
             if _overview_value(vessel, "_object_id") == object_id
         ), None)
         if target is None:
-            reject(
+            return reject(
                 "That vessel is no longer available. "
                 "Refresh the fleet and try again."
             )
-            return
 
         if expected_guid is not None:
             current_guid = str(_overview_value(target, "id", "")).strip()
             if current_guid != expected_guid:
-                reject(
+                return reject(
                     "That vessel changed after it was selected. "
                     "Refresh the fleet and try again."
                 )
-                return
+        if expected_name is not None:
+            current_name = str(_overview_value(target, "name", "")).strip()
+            if current_name != expected_name:
+                return reject(
+                    "That vessel changed after it was selected. "
+                    "Refresh the fleet and try again."
+                )
 
-        _set_overview_vessel_switch_result(
+        sc.active_vessel = target
+        return _overview_vessel_switch_result(
             request_id, "accepted", "Switching to the selected vessel."
         )
-        sc.active_vessel = target
     except Exception:
-        reject("KSP could not switch to that vessel right now.")
+        return reject("KSP could not switch to that vessel right now.")
 
 
 def _overview_capabilities(game_mode):
@@ -2699,11 +2710,9 @@ def _gather_overview_roster(conn):
 
 def _reset_overview_state():
     global _overview_cache, _overview_last_poll, _overview_last_ut
-    global _overview_vessel_switch_result
     _overview_cache = {key: {} for key in _overview_cache}
     _overview_last_poll = {key: 0.0 for key in _overview_last_poll}
     _overview_last_ut = None
-    _overview_vessel_switch_result = None
 
 
 def _gather_overview_telemetry(conn, scene, now=None):
@@ -2762,10 +2771,6 @@ def _gather_overview_telemetry(conn, scene, now=None):
             except Exception:
                 pass
         data.update(_overview_cache[name])
-    if _overview_vessel_switch_result is not None:
-        data["overview.vesselSwitchResult"] = dict(
-            _overview_vessel_switch_result
-        )
     return data
 
 

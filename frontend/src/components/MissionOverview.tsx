@@ -134,6 +134,7 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
   const [switchError, setSwitchError] = useState("");
   const [switchRequestId, setSwitchRequestId] = useState("");
   const [switchingVesselKey, setSwitchingVesselKey] = useState("");
+  const [switchAccepted, setSwitchAccepted] = useState(false);
   const trackedRows = useMemo(() => rows.filter((row) => trackedVesselTypeSet.has(row.type)), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -173,16 +174,32 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
     setSwitchError("");
     setSwitchRequestId("");
     setSwitchingVesselKey("");
+    setSwitchAccepted(false);
   }, [selectedKey]);
 
   useEffect(() => {
     if (!switchRequestId || switchResult?.requestId !== switchRequestId) return;
-    if (switchResult.status === "error") {
+    if (switchResult.status === "accepted") {
+      setSwitchAccepted(true);
+      setSwitchError("");
+    } else {
       setSwitchError(switchResult.message);
       setSwitchRequestId("");
       setSwitchingVesselKey("");
+      setSwitchAccepted(false);
     }
   }, [switchRequestId, switchResult]);
+
+  useEffect(() => {
+    if (!switchRequestId) return;
+    const timeout = globalThis.setTimeout(() => {
+      setSwitchError("KSP did not complete the vessel switch. Refresh the fleet and try again.");
+      setSwitchRequestId("");
+      setSwitchingVesselKey("");
+      setSwitchAccepted(false);
+    }, 12_000);
+    return () => globalThis.clearTimeout(timeout);
+  }, [switchRequestId]);
 
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
@@ -198,6 +215,7 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
       type: "overview.vessel.switch",
       requestId,
       objectId: selected.objectId,
+      expectedName: selected.name,
       ...(selected.guid ? { expectedGuid: selected.guid } : {}),
     });
     if (!sent) {
@@ -205,6 +223,7 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
       return;
     }
     setSwitchError("");
+    setSwitchAccepted(false);
     setSwitchRequestId(requestId);
     setSwitchingVesselKey(selectedKey);
   };
@@ -256,7 +275,7 @@ function FleetSection({ commandEnabled, kerbin, onSendCommand, rows, switchResul
           {isFiniteNumber(selected.eccentricity) && <div><span>Eccentricity</span><strong>{formatEccentricity(selected.eccentricity)}</strong></div>}
         </div>}
         <div className="overview-vessel-actions">
-          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId)} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? "SWITCHING…" : "SWITCH TO VESSEL"}</button>
+          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId)} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? (switchAccepted ? "SWITCH REQUESTED" : "SWITCHING…") : "SWITCH TO VESSEL"}</button>
           {switchError && <span className="overview-command-error" role="alert">{switchError}</span>}
         </div>
       </article> : <div className="overview-vessel-detail overview-vessel-detail-empty"><span>Select a vessel to inspect its mission status.</span></div>}
@@ -383,10 +402,12 @@ export function MissionOverview({
   commandEnabled = false,
   onSendCommand = () => false,
   snapshot,
+  switchResult,
 }: {
   commandEnabled?: boolean;
   onSendCommand?(command: TelemetryCommand): boolean;
   snapshot: TelemetrySnapshot;
+  switchResult?: OverviewVesselSwitchResult;
 }) {
   const { hiddenPanels } = usePanelVisibility();
   const { system, toggleSystem } = useTimeSystem();
@@ -421,7 +442,7 @@ export function MissionOverview({
         (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
         contracts.length > 0 ? "" : "contracts-empty",
       ].filter(Boolean).join(" ")}>
-        {fleetVisible && <FleetSection commandEnabled={commandEnabled} kerbin={kerbin} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={snapshot["overview.vesselSwitchResult"]} />}
+        {fleetVisible && <FleetSection commandEnabled={commandEnabled} kerbin={kerbin} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
         {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" />{contracts.length > 0 && <div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>}</section>}

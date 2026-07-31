@@ -230,7 +230,15 @@ function LiveSciencePanel() { const snapshot = useLiveFlightSnapshot(scienceSnap
 function LiveStagingPanel() { const snapshot = useLiveFlightSnapshot(stagingSnapshotsEqual); return snapshot && snapshot["context.mode"] !== "inactive" ? <StagingPanel snapshot={snapshot} /> : null; }
 function LiveTargetPanel() { const snapshot = useLiveFlightSnapshot(targetSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : null; }
 function LivePinnedNotePanel() { const snapshot = useLiveFlightSnapshot(pinnedNoteSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["notes.pinned"] ? <PinnedNotePanel commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={snapshot} /> : null; }
-function LiveMissionOverview() { const snapshot = useLiveTelemetrySelector((state) => state.snapshot, overviewSnapshotsEqual); return snapshot?.["context.mode"] === "inactive" ? <MissionOverview commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={snapshot} /> : null; }
+function LiveMissionOverview() {
+  const liveState = useLiveTelemetrySelector(
+    (state) => ({ snapshot: state.snapshot, switchResult: state.overviewVesselSwitchResult }),
+    (left, right) => overviewSnapshotsEqual(left.snapshot, right.snapshot) && left.switchResult === right.switchResult,
+  );
+  return liveState.snapshot?.["context.mode"] === "inactive"
+    ? <MissionOverview commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} switchResult={liveState.switchResult} />
+    : null;
+}
 
 function LiveFlightDashboard() {
   const availability = useLiveFlightSnapshot(flightAvailabilitySnapshotsEqual);

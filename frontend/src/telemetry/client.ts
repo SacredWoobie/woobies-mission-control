@@ -1,6 +1,7 @@
 import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
+  OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -18,6 +19,7 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
   onStatus(status: ConnectionStatus, message?: string): void;
@@ -103,6 +105,41 @@ export function parseMissionPlanningPersistenceState(raw: unknown): MissionPlann
     status: candidate.status as MissionPlanningPersistenceState["status"],
     message: candidate.message,
   };
+}
+
+export function parseOverviewVesselSwitchResult(raw: unknown): OverviewVesselSwitchResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "overview.vessel.switch.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as OverviewVesselSwitchResult;
+}
+
+function isOverviewVesselSwitchResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "overview.vessel.switch.result",
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isMissionPlanningPersistenceStateMessage(raw: unknown) {
@@ -214,6 +251,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const switchResult = parseOverviewVesselSwitchResult(event.data);
+      if (switchResult) {
+        this.callbacks.onOverviewVesselSwitchResult?.(switchResult);
+        return;
+      }
+      if (isOverviewVesselSwitchResultMessage(event.data)) return;
       const persistenceState = parseMissionPlanningPersistenceState(event.data);
       if (persistenceState) {
         this.callbacks.onPersistenceState?.(persistenceState);

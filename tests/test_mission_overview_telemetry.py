@@ -156,7 +156,7 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         second = fake_vessel("Relay", "VesselType.relay", object_id=202)
         conn.space_center.vessels = [first, second]
 
-        telemetry_server._apply_telemetry_command(conn, {
+        result = telemetry_server._apply_telemetry_command(conn, {
             "type": "overview.vessel.switch",
             "requestId": "switch-1",
             "objectId": "202",
@@ -164,10 +164,8 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         })
 
         self.assertIs(conn.space_center.active_vessel, second)
-        payload = telemetry_server._gather_overview_telemetry(
-            conn, "GameScene.space_center", now=100
-        )
-        self.assertEqual(payload["overview.vesselSwitchResult"], {
+        self.assertEqual(result, {
+            "type": "overview.vessel.switch.result",
             "requestId": "switch-1",
             "status": "accepted",
             "message": "Switching to the selected vessel.",
@@ -178,7 +176,7 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         original = conn.space_center.vessels[0]
         conn.space_center.active_vessel = original
 
-        telemetry_server._apply_telemetry_command(conn, {
+        result = telemetry_server._apply_telemetry_command(conn, {
             "type": "overview.vessel.switch",
             "requestId": "switch-stale",
             "objectId": "2",
@@ -186,21 +184,30 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         })
 
         self.assertIs(conn.space_center.active_vessel, original)
-        payload = telemetry_server._gather_overview_telemetry(
-            conn, "GameScene.space_center", now=100
-        )
-        self.assertEqual(
-            payload["overview.vesselSwitchResult"]["status"], "error"
-        )
-        self.assertIn(
-            "changed", payload["overview.vesselSwitchResult"]["message"]
-        )
+        self.assertEqual(result["status"], "error")
+        self.assertIn("changed", result["message"])
+
+    def test_rejects_stale_name_when_krpc_guid_is_unavailable(self):
+        conn = fake_connection()
+        vessel = conn.space_center.vessels[0]
+        del vessel.id
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.switch",
+            "requestId": "switch-stale-name",
+            "objectId": "1",
+            "expectedName": "Old Odyssey",
+        })
+
+        self.assertIsNone(conn.space_center.active_vessel)
+        self.assertEqual(result["status"], "error")
+        self.assertIn("changed", result["message"])
 
     def test_rejects_switch_outside_space_center_scenes(self):
         conn = fake_connection()
         conn.krpc.current_game_scene = "GameScene.flight"
 
-        telemetry_server._apply_telemetry_command(conn, {
+        result = telemetry_server._apply_telemetry_command(conn, {
             "type": "overview.vessel.switch",
             "requestId": "switch-flight",
             "objectId": "1",
@@ -208,15 +215,18 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         })
 
         self.assertIsNone(conn.space_center.active_vessel)
-        payload = telemetry_server._gather_overview_telemetry(
-            conn, "GameScene.space_center", now=100
-        )
-        self.assertEqual(
-            payload["overview.vesselSwitchResult"]["status"], "error"
-        )
-        self.assertIn(
-            "Space Center", payload["overview.vesselSwitchResult"]["message"]
-        )
+        self.assertEqual(result["status"], "error")
+        self.assertIn("Space Center", result["message"])
+
+    def test_rejects_unbounded_object_id_before_integer_conversion(self):
+        result = telemetry_server._apply_telemetry_command(fake_connection(), {
+            "type": "overview.vessel.switch",
+            "requestId": "switch-huge",
+            "objectId": "9" * 21,
+        })
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("valid live identity", result["message"])
 
     def test_contract_rows_include_finite_completion_rewards(self):
         contract = SimpleNamespace(

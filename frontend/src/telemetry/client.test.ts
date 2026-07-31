@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TelemetryClient,
   parseMissionPlanningPersistenceState,
+  parseOverviewVesselSwitchResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -83,6 +84,28 @@ describe("parseMissionPlanningPersistenceState", () => {
       requestId: "request-3",
       section: "deltaVDraft",
       revision: -1,
+    })).toBeNull();
+  });
+});
+
+describe("parseOverviewVesselSwitchResult", () => {
+  it("accepts a typed switch result and rejects malformed events", () => {
+    expect(parseOverviewVesselSwitchResult(JSON.stringify({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "accepted",
+      message: "Switching.",
+    }))).toEqual({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "accepted",
+      message: "Switching.",
+    });
+    expect(parseOverviewVesselSwitchResult({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-2",
+      status: "unknown",
+      message: "Nope.",
     })).toBeNull();
   });
 });
@@ -167,6 +190,40 @@ describe("TelemetryClient", () => {
       status: "ok",
       message: "Planner persistence loaded.",
     }]);
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes vessel switch results only through the command-result callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const switchResults: OverviewVesselSwitchResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onOverviewVesselSwitchResult: (result) => switchResults.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "overview.vessel.switch.result",
+      requestId: "switch-1",
+      status: "error",
+      message: "Unavailable.",
+    }));
+    socket.message(JSON.stringify({
+      type: "overview.vessel.switch.result",
+      requestId: "",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(switchResults).toHaveLength(1);
+    expect(switchResults[0].requestId).toBe("switch-1");
     expect(snapshots).toEqual([]);
   });
 

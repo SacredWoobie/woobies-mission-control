@@ -146,8 +146,9 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
 - Dashboard telemetry, alarms, Notes, overview data, and planning calculations
   stay read-only; switching to an explicitly selected vessel changes the active
   KSP scene but does not alter its controls.
-- Overview vessel switching validates the current connection-scoped object ID
-  and expected KSP vessel GUID before acting.
+- Overview vessel switching validates the current connection-scoped object ID,
+  displayed vessel name, and the KSP vessel GUID when one is available before
+  acting.
 - Transfer-node creation requires a fresh preview and a second confirmation and
   creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple
