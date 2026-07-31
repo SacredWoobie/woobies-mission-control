@@ -136,6 +136,7 @@ export interface OverviewVesselTelemetry {
 
 export interface OverviewCrewTelemetry {
   name: string;
+  assignment?: string;
   status: string;
   type: string;
   trait: string;

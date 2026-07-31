@@ -2553,6 +2553,27 @@ def _gather_overview_alarms(conn, sc):
     }
 
 
+def _overview_crew_assignments(sc):
+    assignments = {}
+    for vessel in _overview_list(sc, "vessels"):
+        try:
+            vessel_name = str(
+                _overview_value(vessel, "name", "") or ""
+            ).strip()
+            if not vessel_name:
+                continue
+            for member in _overview_list(vessel, "crew"):
+                member_name = str(
+                    _overview_value(member, "name", "") or ""
+                ).strip()
+                if member_name:
+                    assignments.setdefault(member_name.casefold(), vessel_name)
+        except Exception:
+            # One half-loaded vessel should not hide valid assignments.
+            continue
+    return assignments
+
+
 def _gather_overview_roster(conn):
     try:
         service = conn.mission_overview
@@ -2573,6 +2594,14 @@ def _gather_overview_roster(conn):
             {name: values[index] for name, values in columns.items()}
             for index in range(count)
         ]
+        try:
+            assignments = _overview_crew_assignments(conn.space_center)
+        except Exception:
+            assignments = {}
+        for row in rows:
+            assignment = assignments.get(str(row["name"]).casefold())
+            if assignment:
+                row["assignment"] = assignment
         rows.sort(key=lambda row: str(row["name"]).casefold())
         return {
             "overview.rosterAvailable": True,

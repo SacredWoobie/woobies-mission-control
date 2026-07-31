@@ -28,6 +28,12 @@ const trackedVesselTypes = [
 ] as const;
 const trackedVesselTypeSet = new Set<string>(trackedVesselTypes);
 const missionOverviewPanels = new Set<DashboardPanelId>(["overviewTransfers", "overviewFleet", "overviewRoster", "overviewAlarms"]);
+const crewStatusOrder = new Map([
+  ["assigned", 0],
+  ["available", 1],
+  ["missing", 2],
+  ["dead", 3],
+]);
 
 function unique(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -44,10 +50,6 @@ function vesselKey(row: OverviewVesselTelemetry) {
   if (row.objectId) return `object:${row.objectId}`;
   if (row.guid) return `guid:${row.guid}`;
   return `legacy:${row.name}\u0000${row.type}\u0000${row.body}`;
-}
-
-function crewKey(row: OverviewCrewTelemetry) {
-  return `${row.name}\u0000${row.type}`;
 }
 
 function ContractRewards({ contract }: { contract: OverviewContractTelemetry }) {
@@ -220,17 +222,15 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
   const [trait, setTrait] = useState("all");
   const [level, setLevel] = useState("all");
   const [sort, setSort] = useState("name");
-  const [selectedCrewKey, setSelectedCrewKey] = useState("");
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     return rows.filter((row) => (
       (status === "all" || row.status === status) &&
       (trait === "all" || row.trait === trait) &&
       (level === "all" || String(row.level) === level) &&
-      (!needle || `${row.name} ${row.status} ${row.trait}`.toLocaleLowerCase().includes(needle))
+      (!needle || `${row.name} ${row.status} ${row.trait} ${row.assignment ?? ""}`.toLocaleLowerCase().includes(needle))
     )).sort((left, right) => {
       if (sort === "level") return compareValues(right.level, left.level, "asc");
-      if (sort === "experience") return compareValues(right.experience, left.experience, "asc");
       if (sort === "flights") return compareValues(right.flightCount, left.flightCount, "asc");
       const key = sort === "status" ? "status" : sort === "trait" ? "trait" : "name";
       return compareValues(left[key], right[key], "asc");
@@ -243,9 +243,12 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
       group.push(row);
       next.set(row.status, group);
     });
-    return [...next.entries()];
+    return [...next.entries()].sort(([left], [right]) => (
+      (crewStatusOrder.get(left.toLocaleLowerCase()) ?? 99)
+      - (crewStatusOrder.get(right.toLocaleLowerCase()) ?? 99)
+      || left.localeCompare(right)
+    ));
   }, [visible]);
-  const selected = visible.find((row) => crewKey(row) === selectedCrewKey) ?? visible[0];
 
   return <section className="overview-section overview-roster">
     <SectionHeader count={available ? visible.length : undefined} panelId="overviewRoster" title="Astronaut roster">
@@ -265,31 +268,26 @@ function RosterSection({ available, rows }: { available: boolean; rows: Overview
         <FilterSelect label="Roster status" onChange={setStatus} value={status} values={unique(rows.map((row) => row.status))} />
         <FilterSelect label="Job" onChange={setTrait} value={trait} values={unique(rows.map((row) => row.trait))} />
         <FilterSelect label="Level" onChange={setLevel} value={level} values={unique(rows.map((row) => String(row.level)))} />
-        <label><span>Sort</span><select aria-label="Sort roster" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="status">Status</option><option value="trait">Job</option><option value="level">Level</option><option value="experience">Experience</option><option value="flights">Flights</option></select></label>
+        <label><span>Sort</span><select aria-label="Sort roster" onChange={(event) => setSort(event.target.value)} value={sort}><option value="name">Name</option><option value="status">Status</option><option value="trait">Job</option><option value="level">Level</option><option value="flights">Flights</option></select></label>
       </div></div>}
-      <div className="overview-roster-split">
-        <div aria-label="Filtered Kerbonauts" className="overview-roster-index">
-          {groups.map(([groupStatus, groupRows]) => <section className="overview-roster-group" key={groupStatus}>
-            <h3 aria-label={`${groupStatus} Kerbonauts`}>{groupStatus}<span>{groupRows.length}</span></h3>
+      <div className="overview-table-wrap overview-roster-table-wrap">
+        {visible.length > 0 ? <table aria-label="Filtered Kerbonauts" className="overview-table overview-roster-table">
+          <thead><tr><th aria-label="Trait" className="overview-roster-trait-column" /><th>Name</th><th>Job</th><th>LV</th><th>Assignment</th><th>Flights</th></tr></thead>
+          {groups.map(([groupStatus, groupRows]) => <tbody key={groupStatus}>
+            <tr className="overview-roster-status-row"><th colSpan={6}><span>{groupStatus}</span><strong>{groupRows.length}</strong></th></tr>
             {groupRows.map((row) => {
-              const key = crewKey(row);
-              const active = selected ? crewKey(selected) === key : false;
               const fallen = row.status.toLocaleLowerCase() === "dead";
-              return <button aria-label={`Select ${row.name}`} aria-pressed={active} className={fallen ? "honor-row" : ""} key={key} onClick={() => setSelectedCrewKey(key)} type="button">
-                <span aria-hidden="true" className="overview-roster-avatar">{row.trait.slice(0, 1).toLocaleUpperCase()}</span>
-                <span>{row.name}{fallen && <span aria-label="Fallen Kerbonaut" className="honor-star" title="Fallen Kerbonaut">&#9733;</span>}</span>
-                <small>LV {row.level}</small>
-              </button>;
+              return <tr className={fallen ? "honor-row" : ""} key={`${row.name}\u0000${row.type}`}>
+                <td><span aria-hidden="true" className="overview-roster-avatar" title={row.trait}>{row.trait.slice(0, 1).toLocaleUpperCase()}</span></td>
+                <td className="overview-roster-name">{row.name}{row.veteran && <span aria-label="Orange suit" className="overview-orange-suit-dot" title="Orange suit" />}{fallen && <span aria-label="Fallen Kerbonaut" className="honor-star" title="Fallen Kerbonaut">&#9733;</span>}</td>
+                <td>{row.trait || "\u2014"}</td>
+                <td>{row.level}</td>
+                <td className={row.assignment ? "" : "overview-roster-unassigned"} title={row.assignment}>{row.assignment || "\u2014"}</td>
+                <td>{row.flightCount}</td>
+              </tr>;
             })}
-          </section>)}
-          {visible.length === 0 && <p className="overview-empty">No Kerbonauts match these filters.</p>}
-        </div>
-        {selected ? <article aria-live="polite" className={`overview-roster-detail${selected.status.toLocaleLowerCase() === "dead" ? " honor-detail" : ""}`}>
-          <header><div><strong>{selected.name}</strong><span>{selected.trait}</span>{selected.veteran && <span className="overview-detail-badge">Orange suit</span>}</div><small>{selected.status} / {selected.flightCount} flight{selected.flightCount === 1 ? "" : "s"}</small></header>
-          {isFiniteNumber(selected.experience) && <div className="overview-roster-facts">
-            <div><span>Experience</span><strong>{formatTelemetryNumber(selected.experience)}</strong></div>
-          </div>}
-        </article> : <div className="overview-roster-detail overview-roster-detail-empty"><span>Select a Kerbonaut to inspect their service record.</span></div>}
+          </tbody>)}
+        </table> : <p className="overview-empty">No Kerbonauts match these filters.</p>}
       </div>
     </>}
   </section>;
@@ -320,15 +318,15 @@ function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTele
         >{option.toUpperCase()}</button>)}
       </div>}
     </SectionHeader>
-    <div className="overview-card-list">{visible.map((row, index) => {
+    {visible.length > 0 && <div className="overview-card-list">{visible.map((row, index) => {
       const alarmType = formatAlarmType(row.type);
       return <article className="overview-list-card overview-alarm-card" key={`${row.source}-${row.time}-${row.title}-${index}`}>
         <div><strong>{row.title}</strong>{row.vessel && <span>{row.vessel}</span>}</div>
         <div className="overview-alarm-time"><strong>T- {formatMissionDuration(Math.max(0, row.time - (universalTime ?? row.time)), kerbin)}</strong><span>UT {Math.floor(row.time).toLocaleString("en-US")}</span></div>
         <div className="overview-alarm-badges">{alarmType && <span className="overview-alarm-type">{alarmType}</span>}<span className={`overview-source ${row.source.toLocaleLowerCase()}`}>{row.source}</span></div>
       </article>;
-    })}</div>
-    {visible.length === 0 && <p className="overview-empty">{hasMultipleSources ? "No upcoming alarms from this source." : "No upcoming alarms."}</p>}
+    })}</div>}
+    {rows.length > 0 && visible.length === 0 && <p className="overview-empty">No upcoming alarms from this source.</p>}
   </section>;
 }
 
@@ -377,7 +375,7 @@ export function MissionOverview({
         {fleetVisible && <FleetSection kerbin={kerbin} rows={snapshot["overview.vessels"] ?? []} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
-        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" /><div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>{contracts.length === 0 && <p className="overview-empty">No active contracts.</p>}</section>}
+        {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" />{contracts.length > 0 && <div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>}</section>}
       </div>}
     </div>
     {snapshot["overview.vesselsTruncated"] && <p className="overview-truncated">Fleet list limited to the first 500 tracked objects.</p>}

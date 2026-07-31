@@ -181,7 +181,9 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
     def test_reads_complete_roster_from_read_only_custom_service(self):
         result = telemetry_server._gather_overview_roster(fake_connection())
         self.assertTrue(result["overview.rosterAvailable"])
+        self.assertEqual(result["overview.roster"][0]["assignment"], "Odyssey")
         self.assertEqual(result["overview.roster"][1]["status"], "Dead")
+        self.assertNotIn("assignment", result["overview.roster"][1])
         self.assertEqual(result["overview.roster"][1]["flightCount"], 11)
 
     def test_poll_tiers_cache_slow_data_but_keep_ut_current(self):

@@ -589,36 +589,29 @@ button { font: inherit; }
 .overview-vessel-detail > header strong { overflow: hidden; color: var(--cyan); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .overview-vessel-detail > header span { color: #aeb9c7; font-size: 8px; }
 .overview-vessel-detail > header small { overflow: hidden; color: var(--slate-dim); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.overview-vessel-detail > header .overview-detail-badge,
-.overview-roster-detail > header .overview-detail-badge { padding: 2px 4px; border: 1px solid #5e4726; border-radius: 2px; color: var(--amber); font-size: 7px; letter-spacing: .08em; text-transform: uppercase; }
+.overview-vessel-detail > header .overview-detail-badge { padding: 2px 4px; border: 1px solid #5e4726; border-radius: 2px; color: var(--amber); font-size: 7px; letter-spacing: .08em; text-transform: uppercase; }
 .overview-vessel-facts { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .overview-vessel-facts > div { display: grid; min-width: 0; min-height: 39px; padding: 5px 7px; align-content: center; gap: 3px; border-radius: 3px; background: #10202b; }
 .overview-vessel-facts span { overflow: hidden; color: var(--slate-dim); font-size: 7px; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .overview-vessel-facts strong { overflow: hidden; color: #d4dee8; font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .overview-vessel-detail-empty { display: grid; color: var(--slate-dim); font-size: 9px; place-items: center; text-align: center; }
-.overview-roster-split { display: grid; min-width: 0; min-height: 180px; max-height: clamp(220px,38vh,420px); overflow: hidden; grid-template-columns: minmax(180px,.72fr) minmax(240px,1.28fr); grid-template-rows: minmax(0,1fr); background: var(--panel-2); }
-.overview-roster-index { min-width: 0; min-height: 0; overflow: auto; border-right: 1px solid var(--rule); background: #080d14; scrollbar-gutter: stable; overscroll-behavior: contain; }
-.overview-roster-group h3 { display: flex; min-height: 25px; margin: 0; padding: 6px 9px 4px; align-items: center; justify-content: space-between; color: var(--slate-dim); background: #080d14; font-size: 8px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
-.overview-roster-group h3 span { color: var(--cyan); font-variant-numeric: tabular-nums; }
-.overview-roster-group button { display: grid; width: 100%; min-width: 0; min-height: 31px; padding: 5px 12px 5px 8px; align-items: center; grid-template-columns: 18px minmax(0,1fr) minmax(30px,auto); gap: 7px; overflow: hidden; border: 0; border-left: 2px solid transparent; color: #b8c5d3; background: transparent; cursor: pointer; font: 9px var(--mono); text-align: left; }
-.overview-roster-group button:hover, .overview-roster-group button:focus-visible { color: var(--cyan); background: rgba(78,201,224,.055); outline: 0; }
-.overview-roster-group button[aria-pressed="true"] { border-left-color: var(--cyan); color: var(--cyan); background: rgba(78,201,224,.12); }
-.overview-roster-group button > span, .overview-roster-group button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.overview-roster-group button small { color: #91a1b4; font-size: 8px; text-align: right; }
-.overview-roster-group .overview-roster-avatar { display: grid; width: 17px; height: 17px; place-items: center; border: 1px solid #315166; border-radius: 50%; color: var(--cyan); background: #10202b; font-size: 8px; }
-.overview-roster-detail { min-width: 0; min-height: 0; padding: 9px 10px; overflow: auto; background: linear-gradient(145deg,rgba(78,201,224,.035),transparent 56%), var(--panel-2); overscroll-behavior: contain; }
-.overview-roster-detail > header { display: grid; min-width: 0; margin-bottom: 7px; gap: 3px; }
-.overview-roster-detail > header > div { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
-.overview-roster-detail > header strong { overflow: hidden; color: var(--cyan); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.overview-roster-detail > header span { color: #aeb9c7; font-size: 8px; }
-.overview-roster-detail > header small { overflow: hidden; color: var(--slate-dim); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.overview-roster-facts { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
-.overview-roster-facts > div { display: grid; min-width: 0; min-height: 39px; padding: 5px 7px; align-content: center; gap: 3px; border-radius: 3px; background: #10202b; }
-.overview-roster-facts span { overflow: hidden; color: var(--slate-dim); font-size: 7px; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-.overview-roster-facts strong { overflow: hidden; color: #d4dee8; font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.overview-roster-detail-empty { display: grid; color: var(--slate-dim); font-size: 9px; place-items: center; text-align: center; }
-.overview-roster-group button.honor-row { color: #c4a476; }
-.overview-roster-detail.honor-detail > header strong { color: #c4a476; }
+.overview-roster-table-wrap { min-height: 180px; max-height: clamp(220px,38vh,420px); background: #080d14; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.overview-roster-table { min-width: 600px; table-layout: fixed; }
+.overview-roster-table thead th { position: sticky; z-index: 2; top: 0; box-shadow: 0 1px 0 var(--rule); }
+.overview-roster-table thead th:nth-child(1), .overview-roster-table td:nth-child(1) { width: 34px; padding-inline: 8px 2px; }
+.overview-roster-table thead th:nth-child(2) { width: 24%; }
+.overview-roster-table thead th:nth-child(3) { width: 18%; }
+.overview-roster-table thead th:nth-child(4), .overview-roster-table td:nth-child(4) { width: 44px; text-align: center; }
+.overview-roster-table thead th:nth-child(6), .overview-roster-table td:nth-child(6) { width: 54px; text-align: right; }
+.overview-roster-table .overview-roster-status-row th { position: static; padding: 5px 9px; box-shadow: none; background: #0b1119; }
+.overview-roster-status-row th { border-block: 1px solid var(--rule); }
+.overview-roster-status-row th > span { color: var(--slate-dim); }
+.overview-roster-status-row th > strong { float: right; color: var(--cyan); font-size: 9px; font-weight: 500; }
+.overview-roster-avatar { display: grid; width: 17px; height: 17px; place-items: center; border: 1px solid #315166; border-radius: 50%; color: var(--cyan); background: #10202b; font-size: 8px; }
+.overview-roster-name { color: var(--cyan) !important; }
+.honor-row .overview-roster-name { color: #c4a476 !important; }
+.overview-orange-suit-dot { display: inline-block; width: 5px; height: 5px; margin-left: 6px; border: 1px solid #e6a749; border-radius: 50%; background: var(--amber); vertical-align: 1px; }
+.overview-roster-unassigned { color: var(--slate-dim) !important; }
 .honor-row td { color: #8f8172; }
 .honor-row td:first-child { color: #c4a476; }
 .honor-star { margin-left: 6px; color: var(--amber); font-size: 9px; }
@@ -1002,6 +995,14 @@ button { font: inherit; }
     gap: 8px;
   }
   .inactive-mode .overview-command-grid.without-transfers { grid-template-rows: minmax(0,1fr); }
+  .inactive-mode .overview-metrics {
+    width: max-content;
+    max-width: 100%;
+    justify-self: start;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(175px,max-content);
+    grid-auto-flow: column;
+  }
   .inactive-mode .overview-transfer-windows,
   .inactive-mode .overview-fleet,
   .inactive-mode .overview-roster,
@@ -1091,10 +1092,7 @@ button { font: inherit; }
     overscroll-behavior: contain;
   }
   .inactive-mode .overview-vessel-split { max-height: none; overflow: hidden; flex: 1 1 auto; }
-  .inactive-mode .overview-roster-split { min-height: 0; max-height: none; overflow: hidden; flex: 1 1 auto; }
-  .inactive-mode .overview-roster-detail { padding: 7px 8px; }
-  .inactive-mode .overview-roster-detail > header { margin-bottom: 5px; }
-  .inactive-mode .overview-roster-facts > div { min-height: 36px; padding: 4px 6px; }
+  .inactive-mode .overview-roster-table-wrap { min-height: 0; max-height: none; flex: 1 1 auto; }
   .inactive-mode .overview-alarms .overview-card-list,
   .inactive-mode .overview-contracts .overview-card-list {
     min-height: 0;
@@ -1161,7 +1159,6 @@ button { font: inherit; }
   }
   .inactive-mode .overview-data-grid > .overview-section { grid-area: auto; grid-column: auto; }
   .inactive-mode .overview-vessel-split,
-  .inactive-mode .overview-roster-split,
   .inactive-mode .overview-data-grid .overview-table-wrap { max-height: 360px; flex: none; }
 }
 
@@ -1181,7 +1178,8 @@ button { font: inherit; }
 @media (min-width: 1600px) {
   .inactive-mode .overview-transfer-card { flex-basis: 160px; }
   .inactive-mode .overview-vessel-group button,
-  .inactive-mode .overview-roster-group button { min-height: 38px; padding-block: 4px; }
+  .inactive-mode .overview-roster-table th,
+  .inactive-mode .overview-roster-table td { padding-block: 5px; }
   .inactive-mode .overview-metrics > div { min-height: 0; padding: 5px 10px; gap: 1px; }
   .inactive-mode .overview-metrics .calendar-toggle { min-width: 0; min-height: 22px; padding-inline: 3px; }
   .inactive-mode .overview-section-head { min-height: 45px; padding: 4px 10px; }
@@ -1342,8 +1340,7 @@ button { font: inherit; }
   .editor-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-vessel-split { max-height: none; grid-template-columns: 1fr; grid-template-rows: minmax(180px,38vh) auto; }
   .overview-vessel-index { border-right: 0; border-bottom: 1px solid var(--rule); }
-  .overview-roster-split { max-height: none; grid-template-columns: 1fr; grid-template-rows: minmax(180px,38vh) auto; }
-  .overview-roster-index { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .overview-roster-table-wrap { max-height: 360px; }
   .stage-table.editor { overflow-x: auto; }
   .stage-table.editor .st-row { min-width: 590px; }
   .asc-top { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
@@ -1426,10 +1423,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .overview-vessel-detail > header small,
 .overview-vessel-facts span,
 .overview-vessel-detail-empty,
-.overview-roster-group h3,
-.overview-roster-detail > header small,
-.overview-roster-facts span,
-.overview-roster-detail-empty,
 .overview-empty,
 .overview-list-card span,
 .transfer-window-toolbar small,
@@ -1506,12 +1499,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .overview-vessel-detail > header small,
 .overview-vessel-facts span,
 .overview-vessel-facts strong,
-.overview-roster-group h3,
-.overview-roster-group button,
-.overview-roster-detail > header span,
-.overview-roster-detail > header small,
-.overview-roster-facts span,
-.overview-roster-facts strong,
 .overview-empty,
 .overview-list-card strong,
 .overview-list-card span,
@@ -1570,7 +1557,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .overview-sort-direction,
 .vessel-type-button,
 .overview-vessel-group button,
-.overview-roster-group button,
 .transfer-window-toolbar button {
   min-height: 44px;
 }

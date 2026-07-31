@@ -60,7 +60,7 @@ describe("MissionOverview", () => {
     expect(within(roster).queryByLabelText("Roster status")).toBeNull();
     fireEvent.click(within(roster).getByRole("button", { name: "Roster filters" }));
     fireEvent.change(within(roster).getByLabelText("Roster status"), { target: { value: "Dead" } });
-    expect(within(roster).getByRole("button", { name: "Select Valentina Kerman" })).toBeTruthy();
+    expect(within(roster).getByText("Valentina Kerman", { exact: true })).toBeTruthy();
     expect(within(roster).getByLabelText("Fallen Kerbonaut")).toBeTruthy();
     expect(within(roster).queryByText("Bill Kerman", { exact: true })).toBeNull();
   });
@@ -150,6 +150,23 @@ describe("MissionOverview", () => {
     expect(within(contracts).getByText("+185,000", { exact: true })).toBeTruthy();
     expect(within(contracts).getByText("+22", { exact: true })).toBeTruthy();
     expect(within(contracts).getByText("+8", { exact: true })).toBeTruthy();
+  });
+
+  it("collapses true zero-state alarm and contract bodies", () => {
+    renderOverview({
+      ...inactiveTelemetryFixture,
+      "overview.alarms": [],
+      "overview.contracts": [],
+    });
+    const alarms = screen.getByRole("heading", { name: "Upcoming alarms" }).closest("section")!;
+    const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
+
+    expect(within(alarms).getByText("0", { exact: true })).toBeTruthy();
+    expect(within(contracts).getByText("0", { exact: true })).toBeTruthy();
+    expect(alarms.querySelector(".overview-card-list")).toBeNull();
+    expect(contracts.querySelector(".overview-card-list")).toBeNull();
+    expect(within(alarms).queryByText("No upcoming alarms.", { exact: true })).toBeNull();
+    expect(within(contracts).queryByText("No active contracts.", { exact: true })).toBeNull();
   });
 
   it("leaves a missing contract deadline silent", () => {
@@ -284,31 +301,29 @@ describe("MissionOverview", () => {
     expect(within(facts).queryByText("Period", { exact: true })).toBeNull();
   });
 
-  it("uses a status-grouped Kerbonaut index to drive one selected service record", () => {
+  it("shows a status-grouped flat Kerbonaut table with assignments", () => {
     renderOverview();
     const roster = screen.getByRole("heading", { name: "Astronaut roster" }).closest("section")!;
-    const valentina = within(roster).getByRole("button", { name: "Select Valentina Kerman" });
+    const table = within(roster).getByRole("table", { name: "Filtered Kerbonauts" });
+    const jebRow = within(table).getByText("Jebediah Kerman", { exact: true }).closest("tr")!;
+    const valentinaRow = within(table).getByText("Valentina Kerman", { exact: true }).closest("tr")!;
 
-    fireEvent.click(valentina);
-
-    expect(valentina.getAttribute("aria-pressed")).toBe("true");
-    const detail = roster.querySelector<HTMLElement>(".overview-roster-detail")!;
-    const facts = detail.querySelector<HTMLElement>(".overview-roster-facts")!;
-    expect(detail.textContent).toContain("Valentina Kerman");
-    expect(detail.textContent).toContain("Pilot");
-    expect(within(detail).getByText("Orange suit", { exact: true })).toBeTruthy();
-    expect(within(facts).getByText("Experience", { exact: true })).toBeTruthy();
-    expect(within(facts).queryByText("Status", { exact: true })).toBeNull();
-    expect(within(facts).queryByText("Job", { exact: true })).toBeNull();
-    expect(within(facts).queryByText("Level", { exact: true })).toBeNull();
-    expect(within(facts).queryByText("Flights", { exact: true })).toBeNull();
-    expect(within(facts).queryByText("Crew record", { exact: true })).toBeNull();
-    expect(within(roster).getByRole("heading", { name: "Dead Kerbonauts" })).toBeTruthy();
+    expect(within(table).getByText("Assignment", { exact: true })).toBeTruthy();
+    expect(jebRow.textContent).toContain("Odyssey");
+    expect(jebRow.textContent).toContain("Pilot");
+    expect(jebRow.textContent).toContain("8");
+    expect(within(jebRow).getByLabelText("Orange suit")).toBeTruthy();
+    expect(valentinaRow.textContent).toContain("\u2014");
+    expect(within(valentinaRow).getByLabelText("Fallen Kerbonaut")).toBeTruthy();
+    expect(within(roster).queryByText("Experience", { exact: true })).toBeNull();
+    expect(within(roster).queryByRole("button", { name: "Select Valentina Kerman" })).toBeNull();
+    expect(within(table).getByText("Assigned", { exact: true })).toBeTruthy();
+    expect(within(table).getByText("Available", { exact: true })).toBeTruthy();
+    expect(within(table).getByText("Dead", { exact: true })).toBeTruthy();
 
     fireEvent.click(within(roster).getByRole("button", { name: "Roster filters" }));
     fireEvent.change(within(roster).getByLabelText("Job"), { target: { value: "Engineer" } });
-    expect(within(roster).queryByRole("button", { name: "Select Valentina Kerman" })).toBeNull();
-    expect(roster.querySelector(".overview-roster-detail")?.textContent).not.toContain("Valentina Kerman");
+    expect(within(roster).queryByText("Valentina Kerman", { exact: true })).toBeNull();
   });
 
   it("collapses and restores the four optional overview panels with instrument icons", () => {
