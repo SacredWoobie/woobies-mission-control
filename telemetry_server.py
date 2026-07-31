@@ -2426,6 +2426,17 @@ def _gather_overview_fleet(sc):
                 value = _overview_finite_float(_overview_value(orbit, source))
                 if value is not None:
                     row[target] = convert(value)
+            # kRPC class proxies carry a connection-scoped object handle. It is
+            # unique for the lifetime of this telemetry connection, which is
+            # enough to distinguish same-named vessels in the home overview.
+            # Do not treat it as KSP's persistent vessel GUID.
+            vessel_object_id = _overview_value(vessel, "_object_id")
+            if (
+                isinstance(vessel_object_id, int)
+                and not isinstance(vessel_object_id, bool)
+                and vessel_object_id > 0
+            ):
+                row["objectId"] = str(vessel_object_id)
             vessel_guid = str(_overview_value(vessel, "id", "")).strip()
             if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
                 row["guid"] = vessel_guid

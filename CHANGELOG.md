@@ -6,7 +6,8 @@ All notable public changes will be recorded here.
 
 - Refined the Space Center and Tracking Station overview with deduplicated
   vessel/roster details, optional save-wide orbital facts, conditional alarm
-  and crew badges, and silent defaults for raw alarms and missing deadlines.
+  and crew badges, collision-safe vessel selection, and silent defaults for raw
+  alarms and missing deadlines.
 
 ## v0.4.1 - Faster, resilient editor calculations
 

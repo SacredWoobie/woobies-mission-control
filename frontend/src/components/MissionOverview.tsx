@@ -41,7 +41,9 @@ function compareValues(left: string | number, right: string | number, direction:
 }
 
 function vesselKey(row: OverviewVesselTelemetry) {
-  return row.guid || `${row.name}\u0000${row.type}\u0000${row.body}`;
+  if (row.objectId) return `object:${row.objectId}`;
+  if (row.guid) return `guid:${row.guid}`;
+  return `legacy:${row.name}\u0000${row.type}\u0000${row.body}`;
 }
 
 function crewKey(row: OverviewCrewTelemetry) {

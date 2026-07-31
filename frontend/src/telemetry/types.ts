@@ -118,6 +118,7 @@ export interface ScienceExperimentTelemetry {
 }
 
 export interface OverviewVesselTelemetry {
+  objectId?: string;
   guid?: string;
   name: string;
   type: string;

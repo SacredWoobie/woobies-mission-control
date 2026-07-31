@@ -32,8 +32,11 @@ class MissionOverviewService:
     def roster_flight_counts(self): return [5, 11]
 
 
-def fake_vessel(name="Odyssey", vessel_type="VesselType.ship", body="Kerbin"):
+def fake_vessel(
+    name="Odyssey", vessel_type="VesselType.ship", body="Kerbin", object_id=1
+):
     return SimpleNamespace(
+        _object_id=object_id,
         id=f"{name}-guid",
         name=name,
         type=vessel_type,
@@ -65,12 +68,12 @@ def fake_connection():
         science=42.5,
         reputation=71.2,
         vessels=[
-            fake_vessel(),
-            fake_vessel("Spent stage", "VesselType.debris"),
-            fake_vessel("Jebediah Kerman", "VesselType.eva"),
-            fake_vessel("KSC Flag", "VesselType.flag"),
-            fake_vessel("Comet SWM-204", "VesselType.space_object"),
-            fake_vessel("Mystery object", "VesselType.unknown"),
+            fake_vessel(object_id=1),
+            fake_vessel("Spent stage", "VesselType.debris", object_id=2),
+            fake_vessel("Jebediah Kerman", "VesselType.eva", object_id=3),
+            fake_vessel("KSC Flag", "VesselType.flag", object_id=4),
+            fake_vessel("Comet SWM-204", "VesselType.space_object", object_id=5),
+            fake_vessel("Mystery object", "VesselType.unknown", object_id=6),
         ],
         contract_manager=manager,
         alarm_manager=SimpleNamespace(alarms=[stock_alarm]),
@@ -106,6 +109,7 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertTrue(by_name["Odyssey"]["mission"])
         self.assertFalse(by_name["Spent stage"]["mission"])
         self.assertEqual(by_name["Odyssey"]["body"], "Kerbin")
+        self.assertEqual(by_name["Odyssey"]["objectId"], "1")
         self.assertEqual(by_name["Odyssey"]["guid"], "Odyssey-guid")
         self.assertEqual(by_name["Odyssey"]["apoapsisAltitude"], 122_480.0)
         self.assertEqual(by_name["Odyssey"]["periapsisAltitude"], 118_920.0)
@@ -130,6 +134,19 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
             "period", "eccentricity",
         ):
             self.assertNotIn(field, row)
+
+    def test_fleet_assigns_distinct_object_ids_to_same_named_vessels(self):
+        result = telemetry_server._gather_overview_fleet(SimpleNamespace(
+            vessels=[
+                fake_vessel("Relay", "VesselType.relay", object_id=101),
+                fake_vessel("Relay", "VesselType.relay", object_id=202),
+            ]
+        ))
+
+        self.assertEqual(
+            [row["objectId"] for row in result["overview.vessels"]],
+            ["101", "202"],
+        )
 
     def test_contract_rows_include_finite_completion_rewards(self):
         contract = SimpleNamespace(

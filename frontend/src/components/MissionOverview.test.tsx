@@ -210,12 +210,12 @@ describe("MissionOverview", () => {
     expect(fleet.querySelector(".overview-vessel-detail")?.textContent).not.toContain("Duna Relay 1");
   });
 
-  it("keeps same-named vessels distinct when telemetry provides vessel GUIDs", () => {
+  it("keeps same-named vessels distinct using connection-scoped object IDs", () => {
     renderOverview({
       ...inactiveTelemetryFixture,
       "overview.vessels": [
-        { guid: "vessel-a", name: "Relay", type: "Relay", situation: "Orbiting", body: "Kerbin", met: 100, crewCount: 0, mission: true },
-        { guid: "vessel-b", name: "Relay", type: "Relay", situation: "Orbiting", body: "Kerbin", met: 200, crewCount: 0, mission: true },
+        { objectId: "101", guid: "shared-guid", name: "Relay", type: "Relay", situation: "Orbiting", body: "Kerbin", met: 100, crewCount: 0, mission: true },
+        { objectId: "202", guid: "shared-guid", name: "Relay", type: "Relay", situation: "Orbiting", body: "Kerbin", met: 200, crewCount: 0, mission: true },
       ],
     });
     const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
@@ -227,6 +227,34 @@ describe("MissionOverview", () => {
     fireEvent.click(relays[1]);
     expect(relays[0].getAttribute("aria-pressed")).toBe("false");
     expect(relays[1].getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("falls back to the first visible vessel when object identities change", () => {
+    const firstSnapshot: TelemetrySnapshot = {
+      ...inactiveTelemetryFixture,
+      "overview.vessels": [
+        { objectId: "101", name: "Alpha", type: "Relay", situation: "Orbiting", body: "Kerbin", met: 100, crewCount: 0, mission: true },
+        { objectId: "202", name: "Beta", type: "Relay", situation: "Orbiting", body: "Kerbin", met: 200, crewCount: 0, mission: true },
+      ],
+    };
+    const view = renderOverview(firstSnapshot);
+    fireEvent.click(screen.getByRole("button", { name: "Select Beta" }));
+    expect(screen.getByRole("button", { name: "Select Beta" }).getAttribute("aria-pressed")).toBe("true");
+
+    view.rerender(
+      <PanelVisibilityProvider>
+        <MissionOverview snapshot={{
+          ...firstSnapshot,
+          "overview.vessels": [
+            { ...firstSnapshot["overview.vessels"]![0], objectId: "303" },
+            { ...firstSnapshot["overview.vessels"]![1], objectId: "404" },
+          ],
+        }} />
+      </PanelVisibilityProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Select Alpha" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Select Beta" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("omits period for an unbound vessel while retaining finite trajectory facts", () => {
