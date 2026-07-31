@@ -12,9 +12,11 @@ All notable public changes will be recorded here.
   deadlines, and a guarded detail-pane editor for vessel names and craft types.
 - Added contextual vessel recovery or termination from the selected-vessel
   detail. Recovery uses KSP's stock recoverability rule; termination requires
-  WoobiesControlStats 0.2.2, an explicit destructive confirmation, and a named
+  WoobiesControlStats 0.2.3, an explicit destructive confirmation, and a named
   warning for every aboard Kerbal who will be killed. Both actions revalidate
   the vessel identity, recovery state, and exact crew roster before acting.
+  Termination passes the selected kRPC vessel object directly to the service,
+  retaining collision-safe identity when the pinned Python client omits GUIDs.
 
 ## v0.4.1 - Faster, resilient editor calculations
 

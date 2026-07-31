@@ -386,7 +386,7 @@ function FleetSection({ commandEnabled, editResult, kerbin, lifecycleResult, onS
       || commandBusy
     ) return;
     const action: OverviewVesselLifecycleAction = selected.recoverable ? "recover" : "terminate";
-    if (action === "terminate" && (!terminationAvailable || !selected.guid)) return;
+    if (action === "terminate" && !terminationAvailable) return;
     setLifecycleAction(action);
     setLifecycleTarget({ ...selected, crewNames: [...(selected.crewNames ?? [])] });
     setLifecycleError("");
@@ -476,7 +476,7 @@ function FleetSection({ commandEnabled, editResult, kerbin, lifecycleResult, onS
             aria-haspopup="dialog"
             aria-label={`${selected.recoverable ? "Recover" : "Terminate"} ${selected.name}`}
             className={selected.recoverable ? "overview-recover-vessel" : "overview-terminate-vessel"}
-            disabled={!commandEnabled || !selected.objectId || !selectedCrewTrusted || commandBusy || (!selected.recoverable && (!terminationAvailable || !selected.guid))}
+            disabled={!commandEnabled || !selected.objectId || !selectedCrewTrusted || commandBusy || (!selected.recoverable && !terminationAvailable)}
             onClick={openLifecycle}
             title={!selectedCrewTrusted ? "Current crew list is unavailable" : !selected.recoverable && !terminationAvailable ? "Install the matching vessel-management service to terminate craft" : undefined}
             type="button"

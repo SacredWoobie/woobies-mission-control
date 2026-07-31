@@ -4,8 +4,8 @@
         @{
             Folder = "WoobiesControlStats"
             File = "WoobiesControlStats.dll"
-            Version = "0.2.2.0"
-            Sha256 = "E86879CC8F678FDA4D190512FE135E4ADA9A6008FE27DF844511A566B7E70399"
+            Version = "0.2.3.0"
+            Sha256 = "CB5E720A3FA7EDF64CC09C946F749006B737ACE8881682D8F76AC6C8B1E99F22"
             License = "MIT"
         }
         @{

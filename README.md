@@ -113,7 +113,7 @@ extensions:
 | KRPC.SystemHeat | 0.2.2 | System Heat loops, components, and electrical integration |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
 
-The Unreleased vessel-lifecycle work selects WoobiesControlStats 0.2.2, which
+The Unreleased vessel-lifecycle work selects WoobiesControlStats 0.2.3, which
 adds the guarded vessel-termination service. The source launcher's tested
 version and current release manifest reflect that development requirement;
 historical v0.4.0/v0.4.1 release packs remain pinned to their published bytes.

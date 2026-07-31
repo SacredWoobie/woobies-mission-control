@@ -2681,8 +2681,6 @@ def _apply_overview_vessel_lifecycle_command(conn, command):
         or len(expected_guid) > MAX_ACTION_ID_LENGTH
     ):
         return reject("The selected vessel identity is invalid.")
-    if action == "terminate" and expected_guid is None:
-        return reject("KSP did not provide a persistent identity for that vessel.")
 
     expected_recoverable = command.get("expectedRecoverable")
     if not isinstance(expected_recoverable, bool):
@@ -2726,12 +2724,13 @@ def _apply_overview_vessel_lifecycle_command(conn, command):
                 "That vessel changed after it was selected. "
                 "Refresh the fleet and try again."
             )
-        current_guid = str(_overview_value(target, "id", "")).strip()
-        if expected_guid is not None and current_guid != expected_guid:
-            return reject(
-                "That vessel changed after it was selected. "
-                "Refresh the fleet and try again."
-            )
+        if expected_guid is not None:
+            current_guid = str(_overview_value(target, "id", "")).strip()
+            if current_guid != expected_guid:
+                return reject(
+                    "That vessel changed after it was selected. "
+                    "Refresh the fleet and try again."
+                )
 
         current_recoverable = _overview_value(target, "recoverable")
         if not isinstance(current_recoverable, bool):
@@ -2763,7 +2762,7 @@ def _apply_overview_vessel_lifecycle_command(conn, command):
             if not bool(service.available):
                 return reject("Vessel termination support is not available in KSP.")
             service.terminate_vessel(
-                current_guid, current_name, current_crew_names
+                target, current_name, current_crew_names
             )
             message = f"Terminated {current_name}."
 

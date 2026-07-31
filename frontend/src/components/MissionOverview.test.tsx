@@ -553,6 +553,31 @@ describe("MissionOverview", () => {
     expect(within(dialog).getByRole("button", { name: "TERMINATE VESSEL" }).hasAttribute("disabled")).toBe(false);
   });
 
+  it("terminates by exact connection object when the Python client exposes no GUID", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    const button = screen.getByRole("button", { name: "Terminate Duna Pathfinder" });
+    expect(button.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(button);
+    const dialog = screen.getByRole("dialog", { name: "Terminate Duna Pathfinder?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "TERMINATE VESSEL" }));
+
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.lifecycle") throw new Error("Unexpected vessel lifecycle command");
+    expect(command).toMatchObject({
+      action: "terminate",
+      objectId: "106",
+      expectedName: "Duna Pathfinder",
+      expectedRecoverable: false,
+      expectedCrewNames: [],
+    });
+    expect(command.expectedGuid).toBeUndefined();
+  });
+
   it("keeps terminate visible but disabled without matching service support", () => {
     renderOverview({
       ...inactiveTelemetryFixture,

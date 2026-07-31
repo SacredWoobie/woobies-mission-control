@@ -117,7 +117,7 @@ SERVICE_DLLS = (
     ("KRPC.WoobiesMechJeb", "Mission planning / MechJeb bridge"),
 )
 SERVICE_TESTED_VERSIONS = {
-    "WoobiesControlStats": "0.2.2",
+    "WoobiesControlStats": "0.2.3",
     "KRPC.StageStats": "0.2.7",
     "KRPC.SystemHeat": "0.2.2",
     "KRPC.WoobiesMechJeb": "0.8.6",

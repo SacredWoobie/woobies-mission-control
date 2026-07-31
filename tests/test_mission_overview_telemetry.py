@@ -38,9 +38,9 @@ class VesselManagementService:
     def __init__(self):
         self.termination_calls = []
 
-    def terminate_vessel(self, vessel_guid, expected_name, expected_crew_names):
+    def terminate_vessel(self, vessel, expected_name, expected_crew_names):
         self.termination_calls.append(
-            (vessel_guid, expected_name, list(expected_crew_names))
+            (vessel, expected_name, list(expected_crew_names))
         )
 
 
@@ -448,16 +448,16 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
             "action": "terminate",
             "objectId": "808",
             "expectedName": "Odyssey",
-            "expectedGuid": "Odyssey-guid",
             "expectedRecoverable": False,
             "expectedCrewNames": ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"],
         })
 
-        self.assertEqual(conn.vessel_management.termination_calls, [(
-            "Odyssey-guid",
-            "Odyssey",
-            ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"],
-        )])
+        self.assertEqual(len(conn.vessel_management.termination_calls), 1)
+        call = conn.vessel_management.termination_calls[0]
+        self.assertIs(call[0], vessel)
+        self.assertEqual(call[1:], (
+            "Odyssey", ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"]
+        ))
         self.assertEqual(result["status"], "accepted")
         self.assertEqual(result["action"], "terminate")
 
