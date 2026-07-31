@@ -15,6 +15,8 @@ import type {
   OverviewContractTelemetry,
   OverviewCrewTelemetry,
   OverviewVesselEditResult,
+  OverviewVesselLifecycleAction,
+  OverviewVesselLifecycleResult,
   OverviewVesselTelemetry,
   OverviewVesselSwitchResult,
   TelemetryCommand,
@@ -120,13 +122,15 @@ function VesselTypeFilter({ rows, excluded, onToggle, onReset }: {
 
 const maxVesselNameLength = 80;
 
-function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows, switchResult }: {
+function FleetSection({ commandEnabled, editResult, kerbin, lifecycleResult, onSendCommand, rows, switchResult, terminationAvailable }: {
   commandEnabled: boolean;
   editResult?: OverviewVesselEditResult;
   kerbin: boolean;
+  lifecycleResult?: OverviewVesselLifecycleResult;
   onSendCommand(command: TelemetryCommand): boolean;
   rows: OverviewVesselTelemetry[];
   switchResult?: OverviewVesselSwitchResult;
+  terminationAvailable: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [excludedTypes, setExcludedTypes] = useState<Set<string>>(() => new Set(["Debris"]));
@@ -146,13 +150,27 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
   const [renameError, setRenameError] = useState("");
   const [renameNotice, setRenameNotice] = useState("");
   const [renameRequestId, setRenameRequestId] = useState("");
+  const [lifecycleAction, setLifecycleAction] = useState<OverviewVesselLifecycleAction>("terminate");
+  const [lifecycleOpen, setLifecycleOpen] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState("");
+  const [lifecycleNotice, setLifecycleNotice] = useState("");
+  const [lifecycleRequestId, setLifecycleRequestId] = useState("");
+  const [lifecycleTarget, setLifecycleTarget] = useState<OverviewVesselTelemetry | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const lifecycleCancelRef = useRef<HTMLButtonElement>(null);
   const closeRename = useCallback(() => {
     setRenameOpen(false);
     setRenameError("");
     setRenameRequestId("");
   }, []);
   const renameDialogRef = useDialogFocus<HTMLElement>(renameOpen, closeRename);
+  const closeLifecycle = useCallback(() => {
+    if (lifecycleRequestId) return;
+    setLifecycleOpen(false);
+    setLifecycleError("");
+    setLifecycleTarget(null);
+  }, [lifecycleRequestId]);
+  const lifecycleDialogRef = useDialogFocus<HTMLElement>(lifecycleOpen, closeLifecycle);
   const trackedRows = useMemo(() => rows.filter((row) => trackedVesselTypeSet.has(row.type)), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -187,6 +205,12 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
     selected.eccentricity,
   ].some(isFiniteNumber) || selectedHasPeriod : false;
   const selectedKey = selected ? vesselKey(selected) : "";
+  const selectedCrewTrusted = Boolean(
+    selected
+    && Array.isArray(selected.crewNames)
+    && selected.crewNames.length === selected.crewCount,
+  );
+  const commandBusy = Boolean(switchRequestId || renameRequestId || lifecycleRequestId);
 
   useEffect(() => {
     setSwitchError("");
@@ -199,6 +223,11 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
     setRenameError("");
     setRenameNotice("");
     setRenameRequestId("");
+    setLifecycleOpen(false);
+    setLifecycleError("");
+    setLifecycleNotice("");
+    setLifecycleRequestId("");
+    setLifecycleTarget(null);
   }, [selectedKey]);
 
   useEffect(() => {
@@ -206,6 +235,10 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
     renameInputRef.current?.focus();
     renameInputRef.current?.select();
   }, [renameOpen]);
+
+  useEffect(() => {
+    if (lifecycleOpen) lifecycleCancelRef.current?.focus();
+  }, [lifecycleOpen]);
 
   useEffect(() => {
     if (!switchRequestId || switchResult?.requestId !== switchRequestId) return;
@@ -252,6 +285,29 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
     }, 12_000);
     return () => globalThis.clearTimeout(timeout);
   }, [renameRequestId]);
+
+  useEffect(() => {
+    if (!lifecycleRequestId || lifecycleResult?.requestId !== lifecycleRequestId) return;
+    if (lifecycleResult.status === "accepted") {
+      setLifecycleNotice(lifecycleResult.message);
+      setLifecycleOpen(false);
+      setLifecycleError("");
+      setLifecycleRequestId("");
+      setLifecycleTarget(null);
+    } else {
+      setLifecycleError(lifecycleResult.message);
+      setLifecycleRequestId("");
+    }
+  }, [lifecycleRequestId, lifecycleResult]);
+
+  useEffect(() => {
+    if (!lifecycleRequestId) return;
+    const timeout = globalThis.setTimeout(() => {
+      setLifecycleError("KSP did not answer the vessel request. Refresh the fleet and verify its current state.");
+      setLifecycleRequestId("");
+    }, 12_000);
+    return () => globalThis.clearTimeout(timeout);
+  }, [lifecycleRequestId]);
 
   const toggleType = (type: string) => setExcludedTypes((current) => {
     const next = new Set(current);
@@ -321,6 +377,52 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
     setRenameRequestId(requestId);
   };
 
+  const openLifecycle = () => {
+    if (
+      !selected?.objectId
+      || typeof selected.recoverable !== "boolean"
+      || !selectedCrewTrusted
+      || !commandEnabled
+      || commandBusy
+    ) return;
+    const action: OverviewVesselLifecycleAction = selected.recoverable ? "recover" : "terminate";
+    if (action === "terminate" && (!terminationAvailable || !selected.guid)) return;
+    setLifecycleAction(action);
+    setLifecycleTarget({ ...selected, crewNames: [...(selected.crewNames ?? [])] });
+    setLifecycleError("");
+    setLifecycleNotice("");
+    setLifecycleOpen(true);
+  };
+
+  const submitLifecycle = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (
+      !lifecycleTarget?.objectId
+      || typeof lifecycleTarget.recoverable !== "boolean"
+      || !Array.isArray(lifecycleTarget.crewNames)
+      || !commandEnabled
+      || lifecycleRequestId
+    ) return;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `vessel-${lifecycleAction}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand({
+      type: "overview.vessel.lifecycle",
+      requestId,
+      action: lifecycleAction,
+      objectId: lifecycleTarget.objectId,
+      expectedName: lifecycleTarget.name,
+      expectedRecoverable: lifecycleTarget.recoverable,
+      expectedCrewNames: lifecycleTarget.crewNames,
+      ...(lifecycleTarget.guid ? { expectedGuid: lifecycleTarget.guid } : {}),
+    });
+    if (!sent) {
+      setLifecycleError("Mission Control is not connected to KSP.");
+      return;
+    }
+    setLifecycleError("");
+    setLifecycleRequestId(requestId);
+  };
+
   return <section className="overview-section overview-fleet">
     <SectionHeader count={visible.length} panelId="overviewFleet" title="Active vessels">
       <button
@@ -368,10 +470,20 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
           {isFiniteNumber(selected.eccentricity) && <div><span>Eccentricity</span><strong>{formatEccentricity(selected.eccentricity)}</strong></div>}
         </div>}
         <div className="overview-vessel-actions">
-          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId || renameRequestId)} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? (switchAccepted ? "SWITCH REQUESTED" : "SWITCHING…") : "SWITCH TO VESSEL"}</button>
-          <button aria-haspopup="dialog" aria-label={`Edit ${selected.name}`} className="overview-rename-vessel" disabled={!commandEnabled || !selected.objectId || Boolean(switchRequestId || renameRequestId)} onClick={openRename} type="button">EDIT VESSEL</button>
+          <button aria-label={`Switch to ${selected.name}`} className="overview-switch-vessel" disabled={!commandEnabled || !selected.objectId || commandBusy} onClick={switchToSelected} type="button">{switchingVesselKey === selectedKey ? (switchAccepted ? "SWITCH REQUESTED" : "SWITCHING…") : "SWITCH TO VESSEL"}</button>
+          <button aria-haspopup="dialog" aria-label={`Edit ${selected.name}`} className="overview-rename-vessel" disabled={!commandEnabled || !selected.objectId || commandBusy} onClick={openRename} type="button">EDIT VESSEL</button>
+          {typeof selected.recoverable === "boolean" && <button
+            aria-haspopup="dialog"
+            aria-label={`${selected.recoverable ? "Recover" : "Terminate"} ${selected.name}`}
+            className={selected.recoverable ? "overview-recover-vessel" : "overview-terminate-vessel"}
+            disabled={!commandEnabled || !selected.objectId || !selectedCrewTrusted || commandBusy || (!selected.recoverable && (!terminationAvailable || !selected.guid))}
+            onClick={openLifecycle}
+            title={!selectedCrewTrusted ? "Current crew list is unavailable" : !selected.recoverable && !terminationAvailable ? "Install the matching vessel-management service to terminate craft" : undefined}
+            type="button"
+          >{selected.recoverable ? "RECOVER VESSEL" : "TERMINATE VESSEL"}</button>}
           {switchError && <span className="overview-command-error" role="alert">{switchError}</span>}
           {renameNotice && <span className="overview-command-notice" role="status">{renameNotice}</span>}
+          {lifecycleNotice && <span className="overview-command-notice" role="status">{lifecycleNotice}</span>}
         </div>
         {renameOpen && <div className="delta-v-modal-backdrop overview-vessel-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRename(); }}>
           <section aria-labelledby="overview-rename-title" aria-modal="true" className="overview-vessel-modal" onMouseDown={(event) => event.stopPropagation()} ref={renameDialogRef} role="dialog" tabIndex={-1}>
@@ -382,6 +494,22 @@ function FleetSection({ commandEnabled, editResult, kerbin, onSendCommand, rows,
               <small id="overview-rename-hint">The selected craft keeps its current identity, mission time, and orbit.</small>
               {renameError && <p className="overview-vessel-modal-error" role="alert">{renameError}</p>}
               <footer><button onClick={closeRename} type="button">CANCEL</button><button disabled={Boolean(renameRequestId) || !renameValue.trim() || (renameValue.trim() === selected.name && renameType === selected.type)} type="submit">{renameRequestId ? "SAVING…" : "SAVE CHANGES"}</button></footer>
+            </form>
+          </section>
+        </div>}
+        {lifecycleOpen && lifecycleTarget && <div className="delta-v-modal-backdrop overview-vessel-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeLifecycle(); }}>
+          <section aria-labelledby="overview-lifecycle-title" aria-modal="true" className={`overview-vessel-modal overview-vessel-lifecycle-modal ${lifecycleAction}`} onMouseDown={(event) => event.stopPropagation()} ref={lifecycleDialogRef} role="dialog" tabIndex={-1}>
+            <header><div><span>{lifecycleAction === "recover" ? "VESSEL RECOVERY" : "DESTRUCTIVE ACTION"}</span><h3 id="overview-lifecycle-title">{lifecycleAction === "recover" ? "Recover" : "Terminate"} {lifecycleTarget.name}?</h3></div><button aria-label={`Close ${lifecycleAction} vessel dialog`} disabled={Boolean(lifecycleRequestId)} onClick={closeLifecycle} type="button">×</button></header>
+            <form onSubmit={submitLifecycle}>
+              {lifecycleAction === "recover" ? <>
+                <p className="overview-vessel-lifecycle-summary">KSP will recover this vessel and process its crew, parts, and resources normally.</p>
+                {lifecycleTarget.crewNames!.length > 0 && <section className="overview-vessel-recovery-crew"><strong>Crew returning safely</strong><ul>{lifecycleTarget.crewNames!.map((name) => <li key={name}>{name}</li>)}</ul></section>}
+              </> : <>
+                <p className="overview-vessel-lifecycle-summary">This permanently removes the vessel from the save and cannot be undone.</p>
+                {lifecycleTarget.crewNames!.length > 0 ? <section aria-labelledby="overview-termination-crew-title" className="overview-vessel-termination-crew"><strong id="overview-termination-crew-title">The following Kerbals will be killed:</strong><ul>{lifecycleTarget.crewNames!.map((name) => <li key={name}>{name}</li>)}</ul></section> : <p className="overview-vessel-uncrewed">No crew are aboard this vessel.</p>}
+              </>}
+              {lifecycleError && <p className="overview-vessel-modal-error" role="alert">{lifecycleError}</p>}
+              <footer><button disabled={Boolean(lifecycleRequestId)} onClick={closeLifecycle} ref={lifecycleCancelRef} type="button">CANCEL</button><button disabled={Boolean(lifecycleRequestId)} type="submit">{lifecycleRequestId ? (lifecycleAction === "recover" ? "RECOVERING…" : "TERMINATING…") : (lifecycleAction === "recover" ? "RECOVER VESSEL" : "TERMINATE VESSEL")}</button></footer>
             </form>
           </section>
         </div>}
@@ -508,12 +636,14 @@ function AlarmSection({ rows, universalTime, kerbin }: { rows: OverviewAlarmTele
 export function MissionOverview({
   commandEnabled = false,
   editResult,
+  lifecycleResult,
   onSendCommand = () => false,
   snapshot,
   switchResult,
 }: {
   commandEnabled?: boolean;
   editResult?: OverviewVesselEditResult;
+  lifecycleResult?: OverviewVesselLifecycleResult;
   onSendCommand?(command: TelemetryCommand): boolean;
   snapshot: TelemetrySnapshot;
   switchResult?: OverviewVesselSwitchResult;
@@ -551,7 +681,7 @@ export function MissionOverview({
         (snapshot["overview.alarms"]?.length ?? 0) > 0 ? "" : "alarms-empty",
         contracts.length > 0 ? "" : "contracts-empty",
       ].filter(Boolean).join(" ")}>
-        {fleetVisible && <FleetSection commandEnabled={commandEnabled} editResult={editResult} kerbin={kerbin} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} />}
+        {fleetVisible && <FleetSection commandEnabled={commandEnabled} editResult={editResult} kerbin={kerbin} lifecycleResult={lifecycleResult} onSendCommand={onSendCommand} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} terminationAvailable={snapshot["overview.vesselTerminationAvailable"] === true} />}
         {rosterVisible && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
         {alarmsVisible && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
         {capabilities.contracts && <section className="overview-section overview-contracts"><SectionHeader count={contracts.length} title="Active contracts" />{contracts.length > 0 && <div className="overview-card-list">{contracts.map((contract, index) => <article className="overview-list-card overview-contract-card" key={`${contract.title}-${index}`}><div className="overview-contract-title"><strong>{contract.title}</strong></div><ContractRewards contract={contract} />{isFiniteNumber(contract.deadline) && <div className="overview-contract-time"><strong>{`T- ${formatMissionDuration(Math.max(0, contract.deadline - (snapshot["t.universalTime"] ?? contract.deadline)), kerbin)}`}</strong><span>{`UT ${Math.floor(contract.deadline).toLocaleString("en-US")}`}</span></div>}</article>)}</div>}</section>}

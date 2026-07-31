@@ -67,6 +67,8 @@ OVERVIEW_CONTRACTS_POLL_SECONDS = 10.0
 OVERVIEW_ROSTER_POLL_SECONDS = 15.0
 OVERVIEW_MAX_VESSELS = 500
 OVERVIEW_MAX_VESSEL_NAME_LENGTH = 80
+OVERVIEW_MAX_VESSEL_CREW = 256
+OVERVIEW_MAX_KERBAL_NAME_LENGTH = 128
 OVERVIEW_TRACKED_VESSEL_TYPES = frozenset({
     "Debris", "Probe", "Rover", "Lander", "Ship", "Station", "Base",
     "Plane", "Relay",
@@ -2011,6 +2013,9 @@ def _apply_telemetry_command(conn, command):
     if command.get("type") == "overview.vessel.edit":
         return _apply_overview_vessel_edit_command(conn, command)
 
+    if command.get("type") == "overview.vessel.lifecycle":
+        return _apply_overview_vessel_lifecycle_command(conn, command)
+
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
         if pinned is None or pinned == "":
@@ -2356,6 +2361,26 @@ def _overview_list(obj, name):
         return []
 
 
+def _overview_crew_names(vessel):
+    """Return an exact bounded crew list, or None when it cannot be trusted."""
+    try:
+        members = list(getattr(vessel, "crew") or [])
+    except Exception:
+        return None
+    if len(members) > OVERVIEW_MAX_VESSEL_CREW:
+        return None
+    names = []
+    for member in members:
+        try:
+            name = str(member.name or "").strip()
+        except Exception:
+            return None
+        if not name or len(name) > OVERVIEW_MAX_KERBAL_NAME_LENGTH:
+            return None
+        names.append(name)
+    return names
+
+
 def _overview_vessel_switch_result(request_id, status, message):
     return {
         "type": "overview.vessel.switch.result",
@@ -2597,6 +2622,164 @@ def _apply_overview_vessel_edit_command(conn, command):
         return reject("KSP could not edit that vessel right now.")
 
 
+def _overview_vessel_lifecycle_result(
+    request_id, action, status, message
+):
+    return {
+        "type": "overview.vessel.lifecycle.result",
+        "requestId": request_id,
+        "action": action,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_overview_vessel_lifecycle_command(conn, command):
+    """Recover or terminate one exact vessel after a fresh identity check."""
+    request_id = command.get("requestId")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return None
+
+    action = command.get("action")
+    result_action = action if action in {"recover", "terminate"} else "terminate"
+
+    def reject(message):
+        return _overview_vessel_lifecycle_result(
+            request_id, result_action, "error", message
+        )
+
+    if action not in {"recover", "terminate"}:
+        return reject("Select a valid vessel lifecycle action.")
+
+    raw_object_id = command.get("objectId")
+    if (
+        not isinstance(raw_object_id, str)
+        or not raw_object_id.isdecimal()
+        or len(raw_object_id) > 20
+    ):
+        return reject("The selected vessel no longer has a valid live identity.")
+    object_id = int(raw_object_id)
+    if object_id <= 0:
+        return reject("The selected vessel no longer has a valid live identity.")
+
+    expected_name = command.get("expectedName")
+    if (
+        not isinstance(expected_name, str)
+        or not expected_name
+        or len(expected_name) > OVERVIEW_MAX_VESSEL_NAME_LENGTH
+    ):
+        return reject("The selected vessel identity is invalid.")
+
+    expected_guid = command.get("expectedGuid")
+    if expected_guid is not None and (
+        not isinstance(expected_guid, str)
+        or not expected_guid
+        or len(expected_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("The selected vessel identity is invalid.")
+    if action == "terminate" and expected_guid is None:
+        return reject("KSP did not provide a persistent identity for that vessel.")
+
+    expected_recoverable = command.get("expectedRecoverable")
+    if not isinstance(expected_recoverable, bool):
+        return reject("The selected vessel recovery state is unavailable.")
+
+    expected_crew_names = command.get("expectedCrewNames")
+    if (
+        not isinstance(expected_crew_names, list)
+        or len(expected_crew_names) > OVERVIEW_MAX_VESSEL_CREW
+        or any(
+            not isinstance(name, str)
+            or not name
+            or len(name) > OVERVIEW_MAX_KERBAL_NAME_LENGTH
+            for name in expected_crew_names
+        )
+    ):
+        return reject("The selected vessel crew list is unavailable.")
+
+    try:
+        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        if scene_name not in {"space center", "tracking station"}:
+            return reject(
+                "Vessels can only be recovered or terminated from the "
+                "Space Center or Tracking Station."
+            )
+
+        sc = conn.space_center
+        target = next((
+            vessel for vessel in _overview_list(sc, "vessels")
+            if _overview_value(vessel, "_object_id") == object_id
+        ), None)
+        if target is None:
+            return reject(
+                "That vessel is no longer available. "
+                "Refresh the fleet and try again."
+            )
+
+        current_name = str(_overview_value(target, "name", "")).strip()
+        if current_name != expected_name:
+            return reject(
+                "That vessel changed after it was selected. "
+                "Refresh the fleet and try again."
+            )
+        current_guid = str(_overview_value(target, "id", "")).strip()
+        if expected_guid is not None and current_guid != expected_guid:
+            return reject(
+                "That vessel changed after it was selected. "
+                "Refresh the fleet and try again."
+            )
+
+        current_recoverable = _overview_value(target, "recoverable")
+        if not isinstance(current_recoverable, bool):
+            return reject("KSP could not verify whether that vessel is recoverable.")
+        if current_recoverable != expected_recoverable:
+            return reject(
+                "That vessel's recovery state changed. Refresh the fleet and try again."
+            )
+
+        current_crew_names = _overview_crew_names(target)
+        if current_crew_names is None:
+            return reject("KSP could not verify that vessel's current crew.")
+        if sorted(current_crew_names) != sorted(expected_crew_names):
+            return reject(
+                "That vessel's crew changed. Refresh the fleet and try again."
+            )
+
+        if action == "recover":
+            if not current_recoverable:
+                return reject("That vessel is no longer recoverable.")
+            target.recover()
+            message = f"Recovered {current_name}."
+        else:
+            if current_recoverable:
+                return reject(
+                    "That vessel is recoverable and must be recovered instead."
+                )
+            service = conn.vessel_management
+            if not bool(service.available):
+                return reject("Vessel termination support is not available in KSP.")
+            service.terminate_vessel(
+                current_guid, current_name, current_crew_names
+            )
+            message = f"Terminated {current_name}."
+
+        _overview_last_poll["fleet"] = 0.0
+        _overview_last_poll["roster"] = 0.0
+        return _overview_vessel_lifecycle_result(
+            request_id, action, "accepted", message
+        )
+    except Exception:
+        verb = "recovery" if action == "recover" else "termination"
+        return reject(
+            f"KSP could not confirm vessel {verb}. "
+            "Refresh the fleet and verify its current state."
+        )
+
+
 def _overview_capabilities(game_mode):
     normalized = str(game_mode or "").casefold().replace(" ", "_")
     if normalized == "career":
@@ -2663,9 +2846,10 @@ def _gather_overview_fleet(sc):
             orbit = _overview_value(vessel, "orbit")
             body = _overview_value(orbit, "body")
             body_name = _overview_value(body, "name", "Unknown")
+            crew_names = _overview_crew_names(vessel)
             crew_count = _overview_value(vessel, "crew_count")
             if crew_count is None:
-                crew_count = len(_overview_list(vessel, "crew"))
+                crew_count = len(crew_names) if crew_names is not None else 0
             met = _overview_value(vessel, "met", 0.0)
             row = {
                 "name": _overview_value(vessel, "name", "Unnamed vessel"),
@@ -2676,6 +2860,11 @@ def _gather_overview_fleet(sc):
                 "crewCount": int(crew_count),
                 "mission": vessel_type != "Debris",
             }
+            if crew_names is not None:
+                row["crewNames"] = crew_names
+            recoverable = _overview_value(vessel, "recoverable")
+            if isinstance(recoverable, bool):
+                row["recoverable"] = recoverable
             for source, target, convert in (
                 ("apoapsis_altitude", "apoapsisAltitude", lambda value: value),
                 ("periapsis_altitude", "periapsisAltitude", lambda value: value),
@@ -2916,6 +3105,13 @@ def _gather_overview_telemetry(conn, scene, now=None):
         _overview_last_ut = current_ut
     except Exception:
         return data
+
+    try:
+        data["overview.vesselTerminationAvailable"] = bool(
+            conn.vessel_management.available
+        )
+    except Exception:
+        data["overview.vesselTerminationAvailable"] = False
 
     tiers = (
         ("economy", OVERVIEW_ECONOMY_POLL_SECONDS,

@@ -2,6 +2,7 @@ import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
+  OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -21,6 +22,7 @@ export interface WebSocketTransport {
 
 interface TelemetryClientCallbacks {
   onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
+  onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
   onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -151,6 +153,42 @@ export function parseOverviewVesselEditResult(raw: unknown): OverviewVesselEditR
     || (candidate.vesselType !== undefined && typeof candidate.vesselType !== "string")
   ) return null;
   return candidate as unknown as OverviewVesselEditResult;
+}
+
+export function parseOverviewVesselLifecycleResult(raw: unknown): OverviewVesselLifecycleResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "overview.vessel.lifecycle.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.action !== "recover" && candidate.action !== "terminate")
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as OverviewVesselLifecycleResult;
+}
+
+function isOverviewVesselLifecycleResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "overview.vessel.lifecycle.result",
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isOverviewVesselEditResultMessage(raw: unknown) {
@@ -290,6 +328,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const lifecycleResult = parseOverviewVesselLifecycleResult(event.data);
+      if (lifecycleResult) {
+        this.callbacks.onOverviewVesselLifecycleResult?.(lifecycleResult);
+        return;
+      }
+      if (isOverviewVesselLifecycleResultMessage(event.data)) return;
       const editResult = parseOverviewVesselEditResult(event.data);
       if (editResult) {
         this.callbacks.onOverviewVesselEditResult?.(editResult);

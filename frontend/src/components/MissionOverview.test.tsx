@@ -414,6 +414,107 @@ describe("MissionOverview", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("warns exactly which Kerbals a termination will kill and sends their guarded roster", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const view = render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    fireEvent.click(within(fleet).getByRole("button", { name: "Select Odyssey" }));
+    const terminateButton = within(fleet).getByRole("button", { name: "Terminate Odyssey" });
+
+    terminateButton.focus();
+    fireEvent.click(terminateButton);
+    let dialog = screen.getByRole("dialog", { name: "Terminate Odyssey?" });
+    const detail = fleet.querySelector(".overview-vessel-detail")!;
+    expect(detail.contains(dialog)).toBe(true);
+    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(true);
+    expect(within(dialog).getByText("The following Kerbals will be killed:", { exact: true })).toBeTruthy();
+    for (const name of ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"]) {
+      expect(within(dialog).getByText(name, { exact: true })).toBeTruthy();
+    }
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "CANCEL" }));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(terminateButton);
+
+    fireEvent.click(terminateButton);
+    dialog = screen.getByRole("dialog", { name: "Terminate Odyssey?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "TERMINATE VESSEL" }));
+
+    expect(onSendCommand).toHaveBeenCalledTimes(1);
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.lifecycle") throw new Error("Unexpected vessel lifecycle command");
+    expect(command).toMatchObject({
+      action: "terminate",
+      objectId: "101",
+      expectedName: "Odyssey",
+      expectedGuid: "mock-odyssey-guid",
+      expectedRecoverable: false,
+      expectedCrewNames: ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"],
+    });
+
+    view.rerender(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled lifecycleResult={{
+          type: "overview.vessel.lifecycle.result",
+          requestId: command.requestId,
+          action: "terminate",
+          status: "accepted",
+          message: "Terminated Odyssey.",
+        }} onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(fleet).getByRole("status").textContent).toContain("Terminated Odyssey");
+    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(false);
+  });
+
+  it("offers stock recovery in green and confirms the returning crew", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    render(
+      <PanelVisibilityProvider>
+        <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
+      </PanelVisibilityProvider>,
+    );
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    fireEvent.click(within(fleet).getByRole("button", { name: "Select KSC Survey Plane" }));
+    const recoverButton = within(fleet).getByRole("button", { name: "Recover KSC Survey Plane" });
+    expect(recoverButton.classList.contains("overview-recover-vessel")).toBe(true);
+    fireEvent.click(recoverButton);
+
+    const dialog = screen.getByRole("dialog", { name: "Recover KSC Survey Plane?" });
+    expect(within(dialog).getByText("Crew returning safely", { exact: true })).toBeTruthy();
+    expect(within(dialog).getByText("Valentina Kerman", { exact: true })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "RECOVER VESSEL" }));
+
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "overview.vessel.lifecycle") throw new Error("Unexpected vessel lifecycle command");
+    expect(command).toMatchObject({
+      action: "recover",
+      objectId: "107",
+      expectedName: "KSC Survey Plane",
+      expectedGuid: "mock-ksc-plane-guid",
+      expectedRecoverable: true,
+      expectedCrewNames: ["Valentina Kerman"],
+    });
+  });
+
+  it("keeps terminate visible but disabled without matching service support", () => {
+    renderOverview({
+      ...inactiveTelemetryFixture,
+      "overview.vesselTerminationAvailable": false,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Select Odyssey" }));
+    const button = screen.getByRole("button", { name: "Terminate Odyssey" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("title")).toContain("vessel-management service");
+  });
+
   it("disables vessel switching when the dashboard command channel is unavailable", () => {
     renderOverview();
     const button = screen.getByRole("button", { name: /^Switch to / });

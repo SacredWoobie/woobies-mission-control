@@ -3,6 +3,7 @@ import type {
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
+  OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -14,6 +15,7 @@ export interface LiveTelemetryState {
   lastFrameAt: number | null;
   message?: string;
   overviewVesselEditResult?: OverviewVesselEditResult;
+  overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
@@ -49,6 +51,7 @@ export class TelemetryStore {
       endpoint: string,
       callbacks: {
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
+        onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -81,6 +84,9 @@ export class TelemetryStore {
       onOverviewVesselEditResult: (overviewVesselEditResult) => {
         this.patch({ overviewVesselEditResult });
       },
+      onOverviewVesselLifecycleResult: (overviewVesselLifecycleResult) => {
+        this.patch({ overviewVesselLifecycleResult });
+      },
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
       },
@@ -100,6 +106,7 @@ export class TelemetryStore {
           ...(clearSnapshot ? {
             snapshot: null,
             overviewVesselEditResult: undefined,
+            overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
           } : {}),
         });

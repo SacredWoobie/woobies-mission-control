@@ -234,15 +234,17 @@ function LiveMissionOverview() {
   const liveState = useLiveTelemetrySelector(
     (state) => ({
       editResult: state.overviewVesselEditResult,
+      lifecycleResult: state.overviewVesselLifecycleResult,
       snapshot: state.snapshot,
       switchResult: state.overviewVesselSwitchResult,
     }),
     (left, right) => overviewSnapshotsEqual(left.snapshot, right.snapshot)
       && left.editResult === right.editResult
+      && left.lifecycleResult === right.lifecycleResult
       && left.switchResult === right.switchResult,
   );
   return liveState.snapshot?.["context.mode"] === "inactive"
-    ? <MissionOverview commandEnabled editResult={liveState.editResult} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} switchResult={liveState.switchResult} />
+    ? <MissionOverview commandEnabled editResult={liveState.editResult} lifecycleResult={liveState.lifecycleResult} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} switchResult={liveState.switchResult} />
     : null;
 }
 

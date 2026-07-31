@@ -32,10 +32,23 @@ class MissionOverviewService:
     def roster_flight_counts(self): return [5, 11]
 
 
+class VesselManagementService:
+    available = True
+
+    def __init__(self):
+        self.termination_calls = []
+
+    def terminate_vessel(self, vessel_guid, expected_name, expected_crew_names):
+        self.termination_calls.append(
+            (vessel_guid, expected_name, list(expected_crew_names))
+        )
+
+
 def fake_vessel(
-    name="Odyssey", vessel_type="VesselType.ship", body="Kerbin", object_id=1
+    name="Odyssey", vessel_type="VesselType.ship", body="Kerbin", object_id=1,
+    crew_names=None, recoverable=False,
 ):
-    return SimpleNamespace(
+    vessel = SimpleNamespace(
         _object_id=object_id,
         id=f"{name}-guid",
         name=name,
@@ -50,8 +63,15 @@ def fake_vessel(
             eccentricity=0.0008,
         ),
         met=134.2,
-        crew=[SimpleNamespace(name="Jebediah Kerman")],
+        crew=[
+            SimpleNamespace(name=crew_name)
+            for crew_name in (crew_names if crew_names is not None else ["Jebediah Kerman"])
+        ],
+        recoverable=recoverable,
+        recovered=False,
     )
+    vessel.recover = lambda: setattr(vessel, "recovered", True)
+    return vessel
 
 
 def fake_connection():
@@ -83,6 +103,7 @@ def fake_connection():
         krpc=SimpleNamespace(current_game_scene="GameScene.space_center"),
         space_center=sc,
         mission_overview=MissionOverviewService(),
+        vessel_management=VesselManagementService(),
         kerbal_alarm_clock=SimpleNamespace(available=True, alarms=[kac_alarm]),
     )
 
@@ -113,6 +134,8 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertEqual(by_name["Odyssey"]["body"], "Kerbin")
         self.assertEqual(by_name["Odyssey"]["objectId"], "1")
         self.assertEqual(by_name["Odyssey"]["guid"], "Odyssey-guid")
+        self.assertEqual(by_name["Odyssey"]["crewNames"], ["Jebediah Kerman"])
+        self.assertFalse(by_name["Odyssey"]["recoverable"])
         self.assertEqual(by_name["Odyssey"]["apoapsisAltitude"], 122_480.0)
         self.assertEqual(by_name["Odyssey"]["periapsisAltitude"], 118_920.0)
         self.assertAlmostEqual(by_name["Odyssey"]["inclination"], math.degrees(0.25))
@@ -378,6 +401,128 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("verify", result["message"])
 
+    def test_recovers_exact_recoverable_vessel_with_guarded_crew_snapshot(self):
+        conn = fake_connection()
+        vessel = fake_vessel(
+            "KSC Survey Plane", "VesselType.plane", object_id=707,
+            crew_names=["Valentina Kerman"], recoverable=True,
+        )
+        conn.space_center.vessels = [vessel]
+        telemetry_server._overview_last_poll["fleet"] = 500.0
+        telemetry_server._overview_last_poll["roster"] = 500.0
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.lifecycle",
+            "requestId": "recover-1",
+            "action": "recover",
+            "objectId": "707",
+            "expectedName": "KSC Survey Plane",
+            "expectedGuid": "KSC Survey Plane-guid",
+            "expectedRecoverable": True,
+            "expectedCrewNames": ["Valentina Kerman"],
+        })
+
+        self.assertTrue(vessel.recovered)
+        self.assertEqual(conn.vessel_management.termination_calls, [])
+        self.assertEqual(telemetry_server._overview_last_poll["fleet"], 0.0)
+        self.assertEqual(telemetry_server._overview_last_poll["roster"], 0.0)
+        self.assertEqual(result, {
+            "type": "overview.vessel.lifecycle.result",
+            "requestId": "recover-1",
+            "action": "recover",
+            "status": "accepted",
+            "message": "Recovered KSC Survey Plane.",
+        })
+
+    def test_terminates_exact_vessel_with_guid_name_and_crew_guards(self):
+        conn = fake_connection()
+        vessel = fake_vessel(
+            object_id=808,
+            crew_names=["Jebediah Kerman", "Bill Kerman", "Bob Kerman"],
+        )
+        conn.space_center.vessels = [vessel]
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.lifecycle",
+            "requestId": "terminate-1",
+            "action": "terminate",
+            "objectId": "808",
+            "expectedName": "Odyssey",
+            "expectedGuid": "Odyssey-guid",
+            "expectedRecoverable": False,
+            "expectedCrewNames": ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"],
+        })
+
+        self.assertEqual(conn.vessel_management.termination_calls, [(
+            "Odyssey-guid",
+            "Odyssey",
+            ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"],
+        )])
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual(result["action"], "terminate")
+
+    def test_rejects_termination_when_crew_changed_after_confirmation_opened(self):
+        conn = fake_connection()
+        vessel = fake_vessel(object_id=909, crew_names=["Jebediah Kerman", "Bill Kerman"])
+        conn.space_center.vessels = [vessel]
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.lifecycle",
+            "requestId": "terminate-stale-crew",
+            "action": "terminate",
+            "objectId": "909",
+            "expectedName": "Odyssey",
+            "expectedGuid": "Odyssey-guid",
+            "expectedRecoverable": False,
+            "expectedCrewNames": ["Jebediah Kerman"],
+        })
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("crew changed", result["message"])
+        self.assertEqual(conn.vessel_management.termination_calls, [])
+
+    def test_rejects_lifecycle_request_when_recovery_state_is_stale(self):
+        conn = fake_connection()
+        vessel = fake_vessel(object_id=1001, crew_names=[], recoverable=True)
+        conn.space_center.vessels = [vessel]
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.lifecycle",
+            "requestId": "terminate-stale-state",
+            "action": "terminate",
+            "objectId": "1001",
+            "expectedName": "Odyssey",
+            "expectedGuid": "Odyssey-guid",
+            "expectedRecoverable": False,
+            "expectedCrewNames": [],
+        })
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("recovery state changed", result["message"])
+        self.assertFalse(vessel.recovered)
+        self.assertEqual(conn.vessel_management.termination_calls, [])
+
+    def test_rejects_termination_when_custom_service_is_unavailable(self):
+        conn = fake_connection()
+        vessel = fake_vessel(object_id=1101, crew_names=[])
+        conn.space_center.vessels = [vessel]
+        conn.vessel_management.available = False
+
+        result = telemetry_server._apply_telemetry_command(conn, {
+            "type": "overview.vessel.lifecycle",
+            "requestId": "terminate-unavailable",
+            "action": "terminate",
+            "objectId": "1101",
+            "expectedName": "Odyssey",
+            "expectedGuid": "Odyssey-guid",
+            "expectedRecoverable": False,
+            "expectedCrewNames": [],
+        })
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("not available", result["message"])
+        self.assertEqual(conn.vessel_management.termination_calls, [])
+
     def test_contract_rows_include_finite_completion_rewards(self):
         contract = SimpleNamespace(
             title="Point a dish out from Kerbin",
@@ -421,6 +566,7 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         first = telemetry_server._gather_overview_telemetry(conn, "GameScene.space_center", now=100)
         self.assertEqual(first["overview.funds"], 250000)
         self.assertEqual(first["t.universalTime"], 1000)
+        self.assertTrue(first["overview.vesselTerminationAvailable"])
 
         conn.space_center.funds = 300000
         conn.space_center.ut = 1001

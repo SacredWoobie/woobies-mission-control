@@ -93,6 +93,7 @@ class TelemetryRuntimeTests(unittest.TestCase):
             "sessions.get(ws) != session_id",
             '"overview.vessel.switch"',
             '"overview.vessel.edit"',
+            '"overview.vessel.lifecycle"',
             "if isinstance(event, dict)",
             'event.get("status") in {"merged", "updated"}',
         ):

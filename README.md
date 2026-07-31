@@ -27,10 +27,12 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 
 At the Space Center and Tracking Station, the dashboard becomes a program
 overview. It brings together funds, science, reputation, contracts, tracked
-vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms. A
-guarded action can switch KSP to the vessel selected in the fleet detail. The
-transfer-window board uses the current game's body catalog, so supported planet
-packs appear alongside the stock system.
+vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms. Guarded
+actions can switch to or edit the vessel selected in the fleet detail. A
+contextual confirmation can recover eligible craft through KSP's stock path or
+terminate an ineligible craft, naming any aboard Kerbals who would be killed.
+The transfer-window board uses the current game's body catalog, so supported
+planet packs appear alongside the stock system.
 
 ### Mission planning
 
@@ -152,6 +154,11 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
 - Overview vessel edits validate the same live identity plus the displayed
   craft type before changing a name or KSP vessel classification. The contained
   edit dialog locks the surrounding dashboard until it is closed or submitted.
+- Vessel recovery and termination validate that identity again along with the
+  current recovery state and exact crew roster. Termination is a separate red
+  confirmation that lists every aboard Kerbal who will be killed; recovery uses
+  KSP's normal green recovery path. Either modal locks the surrounding dashboard
+  until it is closed or the request completes.
 - Transfer-node creation requires a fresh preview and a second confirmation and
   creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple

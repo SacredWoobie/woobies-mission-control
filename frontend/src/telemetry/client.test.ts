@@ -3,12 +3,13 @@ import {
   TelemetryClient,
   parseMissionPlanningPersistenceState,
   parseOverviewVesselEditResult,
+  parseOverviewVesselLifecycleResult,
   parseOverviewVesselSwitchResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -134,6 +135,31 @@ describe("parseOverviewVesselEditResult", () => {
       status: "accepted",
       message: "Renamed.",
       name: 42,
+    })).toBeNull();
+  });
+});
+
+describe("parseOverviewVesselLifecycleResult", () => {
+  it("accepts typed lifecycle results and rejects malformed events", () => {
+    expect(parseOverviewVesselLifecycleResult(JSON.stringify({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "accepted",
+      message: "Terminated Odyssey.",
+    }))).toEqual({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "accepted",
+      message: "Terminated Odyssey.",
+    });
+    expect(parseOverviewVesselLifecycleResult({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-2",
+      action: "delete",
+      status: "accepted",
+      message: "Nope.",
     })).toBeNull();
   });
 });
@@ -288,6 +314,42 @@ describe("TelemetryClient", () => {
 
     expect(editResults).toHaveLength(1);
     expect(editResults[0].name).toBe("Duna Relay");
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes vessel lifecycle results only to the originating client callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const lifecycleResults: OverviewVesselLifecycleResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onOverviewVesselLifecycleResult: (result) => lifecycleResults.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "error",
+      message: "The vessel changed.",
+    }));
+    socket.message(JSON.stringify({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "",
+      action: "delete",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(lifecycleResults).toHaveLength(1);
+    expect(lifecycleResults[0].requestId).toBe("terminate-1");
     expect(snapshots).toEqual([]);
   });
 

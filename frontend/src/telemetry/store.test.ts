@@ -4,6 +4,7 @@ import type { ConnectionStatus } from "./client";
 import type {
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
+  OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -13,6 +14,7 @@ describe("TelemetryStore", () => {
   it("clears stale snapshots on connection loss and exposes reconnect state", () => {
     let callbacks: {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
+      onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -46,11 +48,19 @@ describe("TelemetryStore", () => {
       name: "New Odyssey",
       vesselType: "Relay",
     });
+    callbacks!.onOverviewVesselLifecycleResult?.({
+      type: "overview.vessel.lifecycle.result",
+      requestId: "terminate-1",
+      action: "terminate",
+      status: "accepted",
+      message: "Terminated Odyssey.",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
+    expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
@@ -58,6 +68,7 @@ describe("TelemetryStore", () => {
       snapshot: null,
       overviewVesselSwitchResult: undefined,
       overviewVesselEditResult: undefined,
+      overviewVesselLifecycleResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);
@@ -72,6 +83,7 @@ describe("TelemetryStore", () => {
   it("broadcasts persistence state and sends typed persistence commands", () => {
     let callbacks: {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
+      onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
