@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Corrected Flight docking-port targets to show the target vessel name and the
+  selected port part's relative speed instead of a generic port label with no
+  speed value.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated

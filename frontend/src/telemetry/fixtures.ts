@@ -170,7 +170,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   ],
   "sci.krpc.backend": "VesselScience",
   "career.science": 384.7,
-  "tar.name": "Odyssey Station",
+  "tar.name": "Odyssey Station Docking Port",
   "tar.type": "dockingport",
   "tar.distance": 184.6,
   "tar.o.relativeVelocity": 2.3,

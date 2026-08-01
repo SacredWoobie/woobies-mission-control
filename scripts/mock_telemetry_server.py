@@ -137,7 +137,7 @@ SCENES = {
              "value": 18.5, "transmit": 11.3},
         ],
         "career.science": 384.7,
-        "tar.name": "Mock Odyssey Station",
+        "tar.name": "Mock Odyssey Station Docking Port",
         "tar.type": "dockingport",
         "tar.distance": 184.6,
         "tar.o.relativeVelocity": 2.3,

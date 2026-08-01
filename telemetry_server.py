@@ -1004,11 +1004,21 @@ def _gather_target(conn, vessel):
     tgt = None
     ttype = ""
     tport = None
+    target_part = None
+    target_vessel = None
 
     try:
         tport = sc.target_docking_port
         if tport is not None:
             tgt, ttype = tport, "dockingport"
+            try:
+                target_part = tport.part
+            except Exception:
+                target_part = None
+            try:
+                target_vessel = target_part.vessel
+            except Exception:
+                target_vessel = None
     except Exception:
         pass
     if tgt is None:
@@ -1029,27 +1039,40 @@ def _gather_target(conn, vessel):
     if tgt is None:
         return {"tar.name": ""}   # explicit "no target" -- dashboard hides the panel
 
-    try:
-        out["tar.name"] = tgt.name
-    except Exception:
-        out["tar.name"] = ttype
+    if ttype == "dockingport":
+        try:
+            vessel_name = str(target_vessel.name).strip()
+        except Exception:
+            vessel_name = ""
+        out["tar.name"] = (
+            f"{vessel_name} Docking Port" if vessel_name else "Docking Port"
+        )
+    else:
+        try:
+            out["tar.name"] = tgt.name
+        except Exception:
+            out["tar.name"] = ttype
     out["tar.type"] = ttype
 
     # Distance / relative velocity, expressed in OUR vessel's frame.
     try:
         vref = vessel.reference_frame
-        out["tar.distance"] = _mag(tgt.position(vref))
-        out["tar.o.relativeVelocity"] = _mag(tgt.velocity(vref))
+    except Exception:
+        vref = None
+    try:
+        if vref is not None:
+            out["tar.distance"] = _mag(tgt.position(vref))
+    except Exception:
+        pass
+    try:
+        velocity_src = target_part if ttype == "dockingport" else tgt
+        if velocity_src is not None and vref is not None:
+            out["tar.o.relativeVelocity"] = _mag(velocity_src.velocity(vref))
     except Exception:
         pass
 
     # Target's own orbit. A docking port has no .orbit -- climb to its vessel.
-    orbit_src = tgt
-    if ttype == "dockingport":
-        try:
-            orbit_src = tport.part.vessel
-        except Exception:
-            orbit_src = None
+    orbit_src = target_vessel if ttype == "dockingport" else tgt
     try:
         o = orbit_src.orbit if orbit_src is not None else None
         if o is not None:
