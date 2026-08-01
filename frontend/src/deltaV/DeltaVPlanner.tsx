@@ -366,8 +366,8 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     });
   };
 
-  const parkingAltitudesValid = (start.endpoint === "surface"
-      || Number.isFinite(start.parkingAltitude) && start.parkingAltitude >= minimumParkingAltitude(origin))
+  const parkingAltitudesValid = Number.isFinite(start.parkingAltitude)
+    && start.parkingAltitude >= minimumParkingAltitude(origin)
     && resolvedStops.every((stop) => stop.endpoint === "surface"
       || Number.isFinite(stop.parkingAltitude) && stop.parkingAltitude >= minimumParkingAltitude(stop.body));
   const serialRoute = useMemo(() => ({
@@ -599,7 +599,10 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     });
   };
   const endpointSummary = (endpoint: MissionEndpoint) => endpoint === "surface" ? "surface" : "parking orbit";
-  const profileSummary = `${liveCatalogActive ? "Live KSP catalog" : "Offline fallback"} · ${origin.name} ${endpointSummary(start.endpoint)}${resolvedStops.map((stop) => ` → ${stop.body.name} ${endpointSummary(stop.endpoint)}`).join("")}`;
+  const startSummary = start.endpoint === "surface"
+    ? `${origin.name} surface → ${formatDistance(start.parkingAltitude, unit)} parking orbit`
+    : `${origin.name} ${formatDistance(start.parkingAltitude, unit)} parking orbit`;
+  const profileSummary = `${liveCatalogActive ? "Live KSP catalog" : "Offline fallback"} · ${startSummary}${resolvedStops.map((stop) => ` → ${stop.body.name} ${endpointSummary(stop.endpoint)}`).join("")}`;
   const serviceReady = telemetry?.["mj.transfer.available"] === true && telemetry?.["mj.transfer.compatibilityReady"] === true;
   const backendRequestIsActive = Boolean(activeTransferRequestId) && telemetryRequestId === activeTransferRequestId;
   const transferRunning = connection.status === "linked" && Boolean(activeTransferRequestId) && (!backendRequestIsActive || transferState === "starting" || transferState === "running" || transferState === "cancelling");
@@ -873,7 +876,7 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
       {!startLocked && <div className={`delta-v-location-row delta-v-start-row endpoint-${start.endpoint}`}>
         <BodySelect bodies={bodies} label="Start" onChange={selectStart} value={origin.name} />
         <EndpointControl body={origin} endpoint={start.endpoint} groupName="mission-start" label="Start from" onChange={(endpoint) => setStart((current) => ({ ...current, endpoint }))} />
-        {start.endpoint === "orbit" && <ParkingAltitudeInput body={origin} label="Start parking altitude" onChange={(parkingAltitude) => setStart((current) => ({ ...current, parkingAltitude }))} unit={unit} value={start.parkingAltitude} />}
+        <ParkingAltitudeInput body={origin} label={start.endpoint === "surface" ? "Launch parking altitude" : "Start parking altitude"} onChange={(parkingAltitude) => setStart((current) => ({ ...current, parkingAltitude }))} unit={unit} value={start.parkingAltitude} />
       </div>}
       {startLocked && <div className={`delta-v-location-row delta-v-stop-builder ${editingStopId ? "editing" : ""} ${nextStopBody ? `endpoint-${nextStop.endpoint}` : ""}`}>
         <BodySelect bodies={bodies} label={editingStopId ? "Edit stop" : "Next stop"} onChange={selectNextStop} placeholder="Choose next body…" value={nextStop.bodyName} />

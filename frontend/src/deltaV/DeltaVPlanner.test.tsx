@@ -87,11 +87,12 @@ describe("delta-v planner drawer", () => {
     expect(screen.queryByRole("radio", { name: "Stock + OPM" })).toBeNull();
     expect(screen.getByRole("combobox", { name: "Start" })).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "Next stop" })).toBeNull();
-    expect(screen.queryByRole("spinbutton", { name: "Start parking altitude" })).toBeNull();
+    const launchParkingAltitude = screen.getByRole("spinbutton", { name: "Launch parking altitude" }) as HTMLInputElement;
+    expect(launchParkingAltitude.value).toBe("80");
     const addNextStop = screen.getByRole("button", { name: /Add next stop/ }) as HTMLButtonElement;
     expect(addNextStop.disabled).toBe(false);
     expect((screen.getByRole("button", { name: "RESET PLAN" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Offline fallback.*Kerbin surface$/)).toBeTruthy();
+    expect(screen.getByText(/Offline fallback.*Kerbin surface.*80.0.*km parking orbit$/)).toBeTruthy();
     expect(screen.queryByText("Body model")).toBeNull();
     expect(screen.queryByText("Transfer time")).toBeNull();
     expect(screen.getByRole("alert").textContent).toContain("Add at least one next stop");
@@ -399,6 +400,39 @@ describe("delta-v planner drawer", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add next stop/ }));
     fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
     expect(screen.getByText("Total mission budget")).toBeTruthy();
+  });
+
+  it("rejects a surface launch parking orbit inside the atmosphere", () => {
+    localStorage.clear();
+    render(<ResonantOrbitProvider><DeltaVTool onOpen={() => undefined} /></ResonantOrbitProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
+
+    const originAltitude = screen.getByRole("spinbutton", { name: "Launch parking altitude" });
+    fireEvent.change(originAltitude, { target: { value: "10" } });
+    expect(document.getElementById("launch-parking-altitude-help")?.textContent).toBe("Minimum valid orbit is 71.0\u2009km");
+    expect(originAltitude.getAttribute("aria-invalid")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: /Add next stop/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
+
+    expect(screen.queryByText("Total mission budget")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Calculate ideal windows" })).toBeNull();
+  });
+
+  it("lets a surface start choose its launch parking orbit without a same-body stop", () => {
+    localStorage.clear();
+    render(<ResonantOrbitProvider><DeltaVTool onOpen={() => undefined} /></ResonantOrbitProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
+
+    const altitude = screen.getByRole("spinbutton", { name: "Launch parking altitude" });
+    fireEvent.change(altitude, { target: { value: "100" } });
+    expect(screen.getByText(/Offline fallback.*Kerbin surface.*100.*km parking orbit$/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Add next stop/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
+
+    expect(screen.getByText("Total mission budget")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit stop 1" })).toBeNull();
   });
 
   it("collapses the mission profile into a compact route summary", () => {

@@ -7,6 +7,8 @@ All notable public changes will be recorded here.
 - Corrected Flight docking-port targets to show the target vessel name and the
   selected port part's relative speed instead of a generic port label with no
   speed value.
+- Let surface-start Delta-V plans choose their launch parking altitude directly
+  in the starting step instead of requiring a redundant same-body orbit stop.
 
 ## v0.4.2 - Mission Control vessel management
 
