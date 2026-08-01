@@ -7,6 +7,7 @@ import type {
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   ScienceAlarmResult,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -18,6 +19,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onScienceAlarmResult?(result: ScienceAlarmResult): void;
+      onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;
@@ -65,6 +67,13 @@ describe("TelemetryStore", () => {
       message: "KAC alarm set.",
       provider: "kac",
     });
+    callbacks!.onScienceLabTransmitResult?.({
+      type: "science.lab.transmit.result",
+      requestId: "transmit-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "Transmit Science invoked.",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
@@ -72,6 +81,7 @@ describe("TelemetryStore", () => {
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
     expect(store.getSnapshot().scienceAlarmResult?.provider).toBe("kac");
+    expect(store.getSnapshot().scienceLabTransmitResult?.requestId).toBe("transmit-1");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
@@ -81,6 +91,7 @@ describe("TelemetryStore", () => {
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
       scienceAlarmResult: undefined,
+      scienceLabTransmitResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);

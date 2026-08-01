@@ -6,6 +6,7 @@ import type {
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   ScienceAlarmResult,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -19,6 +20,7 @@ export interface LiveTelemetryState {
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
   scienceAlarmResult?: ScienceAlarmResult;
+  scienceLabTransmitResult?: ScienceLabTransmitResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -56,6 +58,7 @@ export class TelemetryStore {
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
         onScienceAlarmResult?(result: ScienceAlarmResult): void;
+        onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -96,6 +99,9 @@ export class TelemetryStore {
       onScienceAlarmResult: (scienceAlarmResult) => {
         this.patch({ scienceAlarmResult });
       },
+      onScienceLabTransmitResult: (scienceLabTransmitResult) => {
+        this.patch({ scienceLabTransmitResult });
+      },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
       },
@@ -115,6 +121,7 @@ export class TelemetryStore {
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
             scienceAlarmResult: undefined,
+            scienceLabTransmitResult: undefined,
           } : {}),
         });
       },
@@ -125,6 +132,7 @@ export class TelemetryStore {
       lastFrameAt: null,
       message: undefined,
       scienceAlarmResult: undefined,
+      scienceLabTransmitResult: undefined,
       snapshot: null,
       status: "connecting",
     });

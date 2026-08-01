@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useDialogFocus } from "../deltaV/useDialogFocus";
 import { formatScienceColumn, formatScienceInline, isFiniteNumber } from "../formatting/numbers";
 import type {
+  ScienceAlarmAction,
   ScienceAlarmProvider,
   ScienceAlarmProviderPreference,
   ScienceAlarmResult,
   ScienceExperimentTelemetry,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "../telemetry/types";
@@ -14,16 +16,26 @@ import { selectScience, type ScienceLabViewModel } from "./scienceModel";
 
 const SCIENCE_ALARM_SETTINGS_KEY = "wmc-science-alarm-defaults-v1";
 type ScienceAlarmLead = 1800 | 3600;
+type SciencePanelCommand = Extract<TelemetryCommand, { type: "science.alarm.create" | "science.lab.transmit" }>;
 
 interface ScienceAlarmDefaults {
   provider: ScienceAlarmProviderPreference;
   leadSeconds: ScienceAlarmLead;
+  kacAction: ScienceAlarmAction;
 }
 
 const defaultScienceAlarmSettings: ScienceAlarmDefaults = {
   provider: "auto",
   leadSeconds: 3600,
+  kacAction: "kill_warp",
 };
+
+const scienceAlarmActions: Array<{ label: string; value: ScienceAlarmAction }> = [
+  { label: "KILL WARP", value: "kill_warp" },
+  { label: "PAUSE GAME", value: "pause_game" },
+  { label: "MESSAGE ONLY", value: "message_only" },
+  { label: "DO NOTHING", value: "do_nothing" },
+];
 
 function readScienceAlarmSettings(): ScienceAlarmDefaults {
   if (typeof localStorage === "undefined") return defaultScienceAlarmSettings;
@@ -32,6 +44,9 @@ function readScienceAlarmSettings(): ScienceAlarmDefaults {
     return {
       provider: parsed?.provider === "kac" || parsed?.provider === "stock" ? parsed.provider : "auto",
       leadSeconds: parsed?.leadSeconds === 1800 ? 1800 : 3600,
+      kacAction: scienceAlarmActions.some(({ value }) => value === parsed?.kacAction)
+        ? parsed!.kacAction as ScienceAlarmAction
+        : "kill_warp",
     };
   } catch {
     return defaultScienceAlarmSettings;
@@ -130,18 +145,22 @@ export function SciencePanel({
   commandEnabled = false,
   onSendCommand = () => false,
   snapshot,
+  transmitResult,
 }: {
   alarmResult?: ScienceAlarmResult;
   commandEnabled?: boolean;
-  onSendCommand?(command: Extract<TelemetryCommand, { type: "science.alarm.create" }>): boolean;
+  onSendCommand?(command: SciencePanelCommand): boolean;
   snapshot: TelemetrySnapshot;
+  transmitResult?: ScienceLabTransmitResult;
 }) {
   const model = selectScience(snapshot);
   const [alarmSettings, setAlarmSettings] = useState(readScienceAlarmSettings);
   const [draftProvider, setDraftProvider] = useState<ScienceAlarmProviderPreference>(alarmSettings.provider);
   const [draftLeadSeconds, setDraftLeadSeconds] = useState<ScienceAlarmLead>(alarmSettings.leadSeconds);
+  const [draftKacAction, setDraftKacAction] = useState<ScienceAlarmAction>(alarmSettings.kacAction);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pending, setPending] = useState<{ labId: string; requestId: string } | null>(null);
+  const [transmitPending, setTransmitPending] = useState<{ labId: string; requestId: string } | null>(null);
   const [feedback, setFeedback] = useState<{ labId: string; message: string; status: "accepted" | "error" } | null>(null);
   const providers = snapshot["sci.alarmProviders"] ?? { kac: false, stock: false };
   const selectedProvider = resolvedAlarmProvider(alarmSettings.provider, providers);
@@ -155,6 +174,12 @@ export function SciencePanel({
   }, [alarmResult, pending]);
 
   useEffect(() => {
+    if (!transmitPending || transmitResult?.requestId !== transmitPending.requestId) return;
+    setFeedback({ labId: transmitResult.labId, message: transmitResult.message, status: transmitResult.status });
+    setTransmitPending(null);
+  }, [transmitPending, transmitResult]);
+
+  useEffect(() => {
     if (!pending) return;
     const timer = globalThis.setTimeout(() => {
       setFeedback({ labId: pending.labId, message: "The alarm request did not receive a response.", status: "error" });
@@ -163,14 +188,30 @@ export function SciencePanel({
     return () => globalThis.clearTimeout(timer);
   }, [pending]);
 
+  useEffect(() => {
+    if (!transmitPending) return;
+    const timer = globalThis.setTimeout(() => {
+      setFeedback({ labId: transmitPending.labId, message: "The transmit request did not receive a response.", status: "error" });
+      setTransmitPending(null);
+    }, 10_000);
+    return () => globalThis.clearTimeout(timer);
+  }, [transmitPending]);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = globalThis.setTimeout(() => setFeedback(null), 10_000);
+    return () => globalThis.clearTimeout(timer);
+  }, [feedback]);
+
   const openSettings = () => {
     setDraftProvider(alarmSettings.provider);
     setDraftLeadSeconds(alarmSettings.leadSeconds);
+    setDraftKacAction(alarmSettings.kacAction);
     setSettingsOpen(true);
   };
 
   const saveSettings = () => {
-    const next = { provider: draftProvider, leadSeconds: draftLeadSeconds };
+    const next = { provider: draftProvider, leadSeconds: draftLeadSeconds, kacAction: draftKacAction };
     setAlarmSettings(next);
     try {
       localStorage.setItem(SCIENCE_ALARM_SETTINGS_KEY, JSON.stringify(next));
@@ -181,7 +222,7 @@ export function SciencePanel({
   };
 
   const createAlarm = (lab: ScienceLabViewModel) => {
-    if (!commandEnabled || !selectedProvider || lab.etaKind !== "finite" || !isFiniteNumber(lab.etaSeconds) || pending) return;
+    if (!commandEnabled || !selectedProvider || !["finite", "depleted"].includes(lab.etaKind) || !isFiniteNumber(lab.etaSeconds) || pending) return;
     const requestId = globalThis.crypto?.randomUUID?.()
       ?? `science-alarm-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const command: Extract<TelemetryCommand, { type: "science.alarm.create" }> = {
@@ -190,10 +231,28 @@ export function SciencePanel({
       labId: lab.id,
       provider: alarmSettings.provider,
       leadSeconds: alarmSettings.leadSeconds,
+      kacAction: alarmSettings.kacAction,
     };
     setFeedback(null);
     if (onSendCommand(command)) {
       setPending({ labId: lab.id, requestId });
+    } else {
+      setFeedback({ labId: lab.id, message: "The dashboard command link is unavailable.", status: "error" });
+    }
+  };
+
+  const transmitLabScience = (lab: ScienceLabViewModel) => {
+    if (!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1e-6 || transmitPending) return;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `science-transmit-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const command: Extract<TelemetryCommand, { type: "science.lab.transmit" }> = {
+      type: "science.lab.transmit",
+      requestId,
+      labId: lab.id,
+    };
+    setFeedback(null);
+    if (onSendCommand(command)) {
+      setTransmitPending({ labId: lab.id, requestId });
     } else {
       setFeedback({ labId: lab.id, message: "The dashboard command link is unavailable.", status: "error" });
     }
@@ -223,21 +282,31 @@ export function SciencePanel({
       {model.labTelemetryAvailable ? (
         model.labs.length > 0
           ? <div className="sci-lab-list" aria-label="Science laboratories">{model.labs.map((lab) => {
-            const alarmEligible = lab.etaKind === "finite" && isFiniteNumber(lab.etaSeconds);
+            const alarmEligible = (lab.etaKind === "finite" || lab.etaKind === "depleted") && isFiniteNumber(lab.etaSeconds);
             const waiting = pending?.labId === lab.id;
+            const transmitting = transmitPending?.labId === lab.id;
             const labFeedback = feedback?.labId === lab.id ? feedback : null;
             return <LabCard
-              alarmControls={<div className="sci-alarm-controls">
+              alarmControls={<div className="sci-lab-controls">
                 <button
-                  className="sci-alarm-create"
-                  disabled={!commandEnabled || !selectedProvider || !alarmEligible || Boolean(pending)}
-                  onClick={() => createAlarm(lab)}
-                  title={!alarmEligible ? "A finite completion estimate is required" : !selectedProvider ? "No selected alarm provider is available" : "Create a one-shot science capacity alarm"}
+                  className="sci-transmit-science"
+                  disabled={!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1e-6 || Boolean(transmitPending)}
+                  onClick={() => transmitLabScience(lab)}
+                  title="Invoke this lab's stock Transmit Science action"
                   type="button"
-                >{waiting ? "SETTING…" : "SET ALARM"}</button>
-                <button aria-haspopup="dialog" aria-label="Science alarm settings" className="sci-alarm-settings" onClick={openSettings} title="Science alarm defaults" type="button">
-                  <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9.7 2h4.6l.6 2.1 1.5.9 2.1-.5 2.3 4-1.5 1.6v1.8l1.5 1.6-2.3 4-2.1-.5-1.5.9-.6 2.1H9.7l-.6-2.1-1.5-.9-2.1.5-2.3-4 1.5-1.6V9.1L3.2 7.5l2.3-4 2.1.5 1.5-.9L9.7 2Zm2.3 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z" /></svg>
-                </button>
+                >{transmitting ? "TRANSMITTING…" : "TRANSMIT SCIENCE"}</button>
+                <div className="sci-alarm-controls">
+                  <button
+                    className="sci-alarm-create"
+                    disabled={!commandEnabled || !selectedProvider || !alarmEligible || Boolean(pending)}
+                    onClick={() => createAlarm(lab)}
+                    title={!alarmEligible ? "A finite completion estimate is required" : !selectedProvider ? "No selected alarm provider is available" : "Create a one-shot science capacity alarm"}
+                    type="button"
+                  >{waiting ? "SETTING…" : "SET ALARM"}</button>
+                  <button aria-haspopup="dialog" aria-label="Science alarm settings" className="sci-alarm-settings" onClick={openSettings} title="Science alarm defaults" type="button">
+                    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9.7 2h4.6l.6 2.1 1.5.9 2.1-.5 2.3 4-1.5 1.6v1.8l1.5 1.6-2.3 4-2.1-.5-1.5.9-.6 2.1H9.7l-.6-2.1-1.5-.9-2.1.5-2.3-4 1.5-1.6V9.1L3.2 7.5l2.3-4 2.1.5 1.5-.9L9.7 2Zm2.3 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z" /></svg>
+                  </button>
+                </div>
               </div>}
               alarmFeedback={labFeedback && <div className={`sci-alarm-feedback ${labFeedback.status}`} role={labFeedback.status === "error" ? "alert" : "status"}>{labFeedback.message}</div>}
               key={lab.id}
@@ -276,7 +345,10 @@ export function SciencePanel({
               <button aria-pressed={draftLeadSeconds === 1800} onClick={() => setDraftLeadSeconds(1800)} type="button">30 MIN</button>
               <button aria-pressed={draftLeadSeconds === 3600} onClick={() => setDraftLeadSeconds(3600)} type="button">1 HOUR</button>
             </div></fieldset>
-            <small>Alarms are created once from the current estimate and are not rescheduled automatically. KAC shows a message; Stock also stops time warp.</small>
+            <fieldset><legend>KAC alarm action</legend><div className="sci-alarm-options action">
+              {scienceAlarmActions.map(({ label, value }) => <button aria-pressed={draftKacAction === value} key={value} onClick={() => setDraftKacAction(value)} type="button">{label}</button>)}
+            </div></fieldset>
+            <small>Alarms are created once from the current estimate and are not rescheduled automatically. Stock alarms always stop time warp.</small>
           </div>
           <footer><button onClick={closeSettings} type="button">CANCEL</button><button onClick={saveSettings} type="button">SAVE DEFAULTS</button></footer>
         </section>

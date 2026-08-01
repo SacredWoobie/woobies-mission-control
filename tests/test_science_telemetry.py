@@ -91,7 +91,12 @@ class AlarmManager:
 
 class KacService:
     AlarmType = SimpleNamespace(raw="raw")
-    AlarmAction = SimpleNamespace(message_only="message_only")
+    AlarmAction = SimpleNamespace(
+        kill_warp="kill_warp",
+        pause_game="pause_game",
+        message_only="message_only",
+        do_nothing="do_nothing",
+    )
 
     def __init__(self, available=True):
         self.available = available
@@ -144,15 +149,15 @@ class ScienceTelemetryTests(unittest.TestCase):
         self.assertEqual(lab["etaKind"], "full")
         self.assertEqual(lab["etaSeconds"], 0.0)
 
-    def test_reports_insufficient_data_instead_of_inventing_an_eta(self):
+    def test_estimates_practical_depletion_when_data_cannot_fill_the_lab(self):
         service = LabService()
         service.lab_data_stored = lambda: [40.0]
         result = telemetry_server._gather_science_labs(service)
 
         lab = result["sci.krpc.labs"][0]
         self.assertEqual(lab["state"], "researching")
-        self.assertEqual(lab["etaKind"], "insufficient-data")
-        self.assertNotIn("etaSeconds", lab)
+        self.assertEqual(lab["etaKind"], "depleted")
+        self.assertAlmostEqual(lab["etaSeconds"], 562_601.4, delta=1.0)
 
     def test_preserves_stored_science_with_an_older_service(self):
         service = LabService()
@@ -182,6 +187,7 @@ class ScienceTelemetryTests(unittest.TestCase):
             "labId": "42:1",
             "provider": "auto",
             "leadSeconds": 3600,
+            "kacAction": "kill_warp",
         })
 
         self.assertEqual(result["status"], "accepted")
@@ -194,24 +200,28 @@ class ScienceTelemetryTests(unittest.TestCase):
         self.assertAlmostEqual(trigger_ut, result["triggerUT"], delta=0.1)
         self.assertIs(alarm.vessel, vessel)
         self.assertIn("60-minute lead", alarm.notes)
-        self.assertEqual(alarm.action, "message_only")
+        self.assertEqual(alarm.action, "kill_warp")
 
     def test_falls_back_to_stock_vessel_alarm_when_kac_is_unavailable(self):
         conn, vessel, manager, kac = alarm_connection(kac_available=False)
+        conn.vessel_science.lab_data_stored = lambda: [40.0]
         result = telemetry_server._apply_science_alarm_command(conn, {
             "type": "science.alarm.create",
             "requestId": "alarm-2",
             "labId": "42:1",
             "provider": "auto",
             "leadSeconds": 1800,
+            "kacAction": "kill_warp",
         })
 
         self.assertEqual(result["provider"], "stock")
+        self.assertIn("data depletion", result["message"])
         self.assertEqual(len(kac.created), 0)
         delay, linked_vessel, title, description = manager.created[0]
-        self.assertAlmostEqual(delay, 208_060.3, delta=1.0)
+        self.assertAlmostEqual(delay, 560_801.4, delta=1.0)
         self.assertIs(linked_vessel, vessel)
-        self.assertIn("science lab", title)
+        self.assertIn("research nearly complete", title)
+        self.assertIn("practical data-depletion cutoff", description)
         self.assertIn("30-minute lead", description)
 
     def test_rejects_a_stale_lab_without_creating_an_alarm(self):
@@ -222,11 +232,46 @@ class ScienceTelemetryTests(unittest.TestCase):
             "labId": "missing",
             "provider": "auto",
             "leadSeconds": 3600,
+            "kacAction": "kill_warp",
         })
 
         self.assertEqual(result["status"], "error")
         self.assertEqual(manager.created, [])
         self.assertEqual(kac.created, [])
+
+    def test_invokes_only_the_selected_labs_stock_transmit_event(self):
+        service = LabService()
+        transmitted = []
+        service.transmit_lab_science = lambda lab_id: not transmitted.append(lab_id)
+        result = telemetry_server._apply_science_lab_transmit_command(
+            SimpleNamespace(vessel_science=service),
+            {
+                "type": "science.lab.transmit",
+                "requestId": "transmit-1",
+                "labId": "42:1",
+            },
+        )
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual(transmitted, ["42:1"])
+        self.assertIn("Transmit Science invoked", result["message"])
+
+    def test_does_not_invoke_stock_transmit_when_the_lab_has_no_science(self):
+        service = LabService()
+        service.lab_science_stored = lambda: [0.0]
+        transmitted = []
+        service.transmit_lab_science = lambda lab_id: transmitted.append(lab_id)
+        result = telemetry_server._apply_science_lab_transmit_command(
+            SimpleNamespace(vessel_science=service),
+            {
+                "type": "science.lab.transmit",
+                "requestId": "transmit-2",
+                "labId": "42:1",
+            },
+        )
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(transmitted, [])
 
 
 if __name__ == "__main__":

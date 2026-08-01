@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
 import type { ScienceLabTelemetry, TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 import { SciencePanel } from "./SciencePanel";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 beforeEach(() => localStorage.clear());
 
 function renderPanel(snapshot: TelemetrySnapshot) {
@@ -109,13 +112,16 @@ describe("SciencePanel", () => {
     const dialog = screen.getByRole("dialog", { name: "Alarm defaults" });
     expect(within(dialog).getByRole("button", { name: "AUTO" }).getAttribute("aria-pressed")).toBe("true");
     expect(within(dialog).getByRole("button", { name: "1 HOUR" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(dialog).getByRole("button", { name: "KILL WARP" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(within(dialog).getByRole("button", { name: "STOCK" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "30 MIN" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "PAUSE GAME" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "SAVE DEFAULTS" }));
 
     expect(JSON.parse(localStorage.getItem("wmc-science-alarm-defaults-v1") ?? "null")).toEqual({
       provider: "stock",
       leadSeconds: 1800,
+      kacAction: "pause_game",
     });
     fireEvent.click(screen.getByRole("button", { name: "SET ALARM" }));
     expect(onSendCommand).toHaveBeenCalledTimes(1);
@@ -124,6 +130,7 @@ describe("SciencePanel", () => {
       labId: "42001:1",
       provider: "stock",
       leadSeconds: 1800,
+      kacAction: "pause_game",
     });
     const sentCommand = onSendCommand.mock.calls[0][0];
     if (sentCommand.type !== "science.alarm.create") throw new Error("Expected a science alarm command.");
@@ -150,9 +157,49 @@ describe("SciencePanel", () => {
     const base = flightTelemetryFixture["sci.krpc.labs"]?.[0] as ScienceLabTelemetry;
     render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={() => true} snapshot={{
       ...flightTelemetryFixture,
-      "sci.krpc.labs": [{ ...base, etaKind: "insufficient-data", etaSeconds: undefined }],
+      "sci.krpc.labs": [{ ...base, etaKind: "stopped", etaSeconds: undefined }],
     }} /></PanelVisibilityProvider>);
 
     expect(screen.getByRole("button", { name: "SET ALARM" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("invokes stock Transmit Science for the selected lab and clears feedback", () => {
+    vi.useFakeTimers();
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const { rerender } = render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={onSendCommand} snapshot={flightTelemetryFixture} /></PanelVisibilityProvider>);
+
+    fireEvent.click(screen.getByRole("button", { name: "TRANSMIT SCIENCE" }));
+    const sentCommand = onSendCommand.mock.calls[0][0];
+    expect(sentCommand).toMatchObject({
+      type: "science.lab.transmit",
+      labId: "42001:1",
+    });
+    if (sentCommand.type !== "science.lab.transmit") throw new Error("Expected a science lab transmit command.");
+
+    rerender(<PanelVisibilityProvider><SciencePanel
+      commandEnabled
+      onSendCommand={onSendCommand}
+      snapshot={flightTelemetryFixture}
+      transmitResult={{
+        type: "science.lab.transmit.result",
+        requestId: sentCommand.requestId,
+        labId: sentCommand.labId,
+        status: "accepted",
+        message: "Transmit Science invoked for lab.",
+      }}
+    /></PanelVisibilityProvider>);
+    expect(screen.getByRole("status").textContent).toContain("Transmit Science invoked");
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("disables Transmit Science when the selected lab has no stored science", () => {
+    const base = flightTelemetryFixture["sci.krpc.labs"]?.[0] as ScienceLabTelemetry;
+    render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={() => true} snapshot={{
+      ...flightTelemetryFixture,
+      "sci.krpc.labs": [{ ...base, scienceStored: 0 }],
+    }} /></PanelVisibilityProvider>);
+
+    expect(screen.getByRole("button", { name: "TRANSMIT SCIENCE" }).hasAttribute("disabled")).toBe(true);
   });
 });

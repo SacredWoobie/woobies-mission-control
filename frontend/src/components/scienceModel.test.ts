@@ -34,6 +34,20 @@ describe("selectScience", () => {
     expect(model.labs[0].sciencePerDay).toBe(0);
   });
 
+  it("labels a finite practical depletion ETA without claiming the lab will fill", () => {
+    const model = selectScience({
+      ...flightTelemetryFixture,
+      "sci.krpc.labs": [{
+        ...(flightTelemetryFixture["sci.krpc.labs"]?.[0]!),
+        etaKind: "depleted",
+        etaSeconds: 562_636.7,
+      }],
+    });
+
+    expect(model.labs[0].guidance).toBe("data spent in 26d 0h");
+    expect(model.labs[0].tone).toBe("warn");
+  });
+
   it("distinguishes an older service from a capable vessel with no labs", () => {
     const legacy = selectScience({ "context.mode": "flight" });
     const noLabs = selectScience({

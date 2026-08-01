@@ -59,16 +59,16 @@ function statePresentation(
 ): Pick<ScienceLabViewModel, "statusLabel" | "activityLabel" | "guidance" | "tone"> {
   switch (state) {
     case "researching": {
-      const duration = lab.etaKind === "finite" ? formatLabDuration(lab.etaSeconds, daySeconds) : "";
+      const duration = lab.etaKind === "finite" || lab.etaKind === "depleted"
+        ? formatLabDuration(lab.etaSeconds, daySeconds)
+        : "";
       return {
         statusLabel: "RESEARCHING",
         activityLabel: "research active",
         guidance: duration
-          ? `full in ${duration}`
-          : lab.etaKind === "insufficient-data"
-            ? "insufficient data to fill"
-            : "rate available",
-        tone: lab.etaKind === "insufficient-data" ? "warn" : "ok",
+          ? `${lab.etaKind === "depleted" ? "data spent" : "full"} in ${duration}`
+          : "rate available",
+        tone: lab.etaKind === "depleted" ? "warn" : "ok",
       };
     }
     case "science-full":

@@ -1006,6 +1006,9 @@ button { font: inherit; }
 .sci-lab-caption > div:first-child span:last-child { color: var(--cyan); text-align: right; }
 .sci-lab-card.warn .sci-lab-caption > div:first-child span:last-child { color: var(--amber); }
 .sci-lab-card.danger .sci-lab-caption > div:first-child span:last-child { color: var(--warn); }
+.sci-lab-controls { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 4px; }
+.sci-transmit-science { height: 25px; min-width: 104px; padding: 4px 7px; border: 1px solid #315166; border-radius: 2px; color: var(--cyan); background: #0b1821; cursor: pointer; font: 8px var(--mono); letter-spacing: .05em; }
+.sci-transmit-science:disabled { cursor: not-allowed; opacity: .38; }
 .sci-alarm-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 .sci-alarm-controls button { height: 25px; border: 1px solid #315166; border-radius: 2px; color: var(--cyan); background: #0b1821; cursor: pointer; font: 8px var(--mono); letter-spacing: .07em; }
 .sci-alarm-controls button:disabled { cursor: not-allowed; opacity: .38; }
@@ -1026,6 +1029,7 @@ button { font: inherit; }
 .sci-alarm-modal legend { margin-bottom: 6px; }
 .sci-alarm-options { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
 .sci-alarm-options.lead { grid-template-columns: repeat(2,1fr); }
+.sci-alarm-options.action { grid-template-columns: repeat(2,1fr); }
 .sci-alarm-options button { min-height: 31px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--slate); background: #0a121a; cursor: pointer; font: 9px var(--mono); }
 .sci-alarm-options button[aria-pressed="true"] { border-color: var(--cyan); color: #061115; background: var(--cyan); }
 .sci-alarm-options button:disabled { cursor: not-allowed; opacity: .35; }
@@ -1688,7 +1692,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .sci-lab-caption { align-items: flex-start; flex-direction: column; gap: 3px; }
   .sci-lab-caption > div:first-child { width: 100%; }
   .sci-lab-caption > div:first-child span:last-child { text-align: left; }
-  .sci-alarm-controls { align-self: flex-end; }
+  .sci-lab-controls { align-self: flex-end; flex-wrap: wrap; }
   .heat-entity-main { padding-right: 7px; gap: 5px; }
   .heat-entity-topline { grid-template-columns: minmax(48px,1fr) minmax(30px,48px) auto 52px; gap: 5px; }
   .heat-temperature-value, .heat-net-flux, .heat-ratio-value { font-size: 8px; }

@@ -12,7 +12,9 @@ All notable public changes will be recorded here.
   estimate of when each active lab will reach its science capacity.
 - Added one-shot lab-capacity alarms with saved 30- or 60-minute lead defaults;
   automatic provider selection prefers Kerbal Alarm Clock and falls back to
-  KSP's stock alarm manager.
+  KSP's stock alarm manager, with configurable KAC alarm actions.
+- Added a per-lab control that invokes KSP's stock `Transmit Science` action
+  for accumulated lab science only; stored experiment data is never included.
 
 ## v0.4.2 - Mission Control vessel management
 

@@ -127,7 +127,7 @@ export type ScienceLabState =
   | "stalled"
   | "unavailable";
 
-export type ScienceLabEtaKind = ScienceLabState | "finite" | "full" | "insufficient-data";
+export type ScienceLabEtaKind = ScienceLabState | "finite" | "depleted" | "full";
 
 export interface ScienceLabTelemetry {
   id: string;
@@ -155,6 +155,7 @@ export interface ScienceLabTelemetry {
 
 export type ScienceAlarmProviderPreference = "auto" | "kac" | "stock";
 export type ScienceAlarmProvider = "kac" | "stock";
+export type ScienceAlarmAction = "kill_warp" | "pause_game" | "message_only" | "do_nothing";
 
 export interface ScienceAlarmResult {
   type: "science.alarm.create.result";
@@ -165,6 +166,14 @@ export interface ScienceAlarmResult {
   provider?: ScienceAlarmProvider;
   triggerUT?: number;
   leadSeconds?: number;
+}
+
+export interface ScienceLabTransmitResult {
+  type: "science.lab.transmit.result";
+  requestId: string;
+  labId: string;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export interface OverviewVesselTelemetry {
@@ -581,7 +590,8 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
-  | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600 }
+  | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
+  | { type: "science.lab.transmit"; requestId: string; labId: string }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }
