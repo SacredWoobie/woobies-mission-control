@@ -2159,6 +2159,147 @@ def _optional_service_list(service, method_name):
         return []
 
 
+def _science_lab_number(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+def _science_lab_state(row):
+    science = row["scienceStored"]
+    science_capacity = row["scienceCapacity"]
+    data = row["dataStored"]
+    if not row["converterAvailable"]:
+        return "unavailable"
+    if science_capacity > 0 and science >= science_capacity - 1e-3:
+        return "science-full"
+    if data <= 1e-6:
+        return "no-data"
+    if row["scientistCount"] <= 0 or row["scientistFactor"] <= 0:
+        return "no-scientist"
+    if not row["operational"] or row["crewCount"] + 1e-6 < row["crewRequired"]:
+        return "insufficient-crew"
+    if not row["researchEnabled"]:
+        return "stopped"
+    if row["calculatedSciencePerDay"] <= 0:
+        return "stalled"
+    return "researching"
+
+
+def _science_lab_eta(row, day_seconds):
+    state = row["state"]
+    if state == "science-full":
+        return "full", 0.0
+    if state != "researching":
+        return state, None
+
+    science = row["scienceStored"]
+    science_capacity = row["scienceCapacity"]
+    data = row["dataStored"]
+    multiplier = row["scienceMultiplier"]
+    rate = row["calculatedSciencePerDay"]
+    if day_seconds <= 0 or science_capacity <= 0 or data <= 0 or multiplier <= 0 or rate <= 0:
+        return "unavailable", None
+
+    science_needed = max(0.0, science_capacity - science)
+    potential_science = multiplier * data
+    if science_needed <= 1e-6:
+        return "full", 0.0
+    if science_needed >= potential_science - 1e-6:
+        return "insufficient-data", None
+
+    remaining_potential = potential_science - science_needed
+    try:
+        seconds = (
+            day_seconds * potential_science / rate
+            * math.log(potential_science / remaining_potential)
+        )
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return "unavailable", None
+    if not math.isfinite(seconds) or seconds < 0:
+        return "unavailable", None
+    return "finite", seconds
+
+
+def _gather_science_labs(service):
+    try:
+        reported_count = max(0, int(service.lab_count()))
+        day_seconds = max(0, int(service.lab_day_seconds()))
+        failed_count = max(0, int(service.failed_lab_count()))
+        columns = {
+            "ids": list(service.lab_ids()),
+            "titles": list(service.lab_part_titles()),
+            "dataStored": list(service.lab_data_stored()),
+            "dataCapacity": list(service.lab_data_capacities()),
+            "scienceStored": list(service.lab_science_stored()),
+            "scienceCapacity": list(service.lab_science_capacities()),
+            "calculatedSciencePerDay": list(service.lab_calculated_science_rates()),
+            "scienceMultiplier": list(service.lab_science_multipliers()),
+            "crewCount": list(service.lab_crew_counts()),
+            "scientistCount": list(service.lab_scientist_counts()),
+            "crewRequired": list(service.lab_crew_required()),
+            "scientistFactor": list(service.lab_scientist_factors()),
+            "converterAvailable": list(service.lab_converters_available()),
+            "researchEnabled": list(service.lab_research_enabled()),
+            "operational": list(service.lab_operational()),
+            "converterStatus": list(service.lab_converter_statuses()),
+            "lastTimeFactor": list(service.lab_last_time_factors()),
+        }
+    except Exception:
+        # Older WoobiesControlStats builds have no lab procedures. Omit the
+        # capability instead of claiming that the vessel has no labs.
+        return None
+
+    aligned_count = min([reported_count] + [len(values) for values in columns.values()])
+    rows = []
+    for index in range(aligned_count):
+        row = {
+            "id": str(columns["ids"][index] or f"lab-{index}"),
+            "title": str(columns["titles"][index] or "Science lab"),
+            "dataStored": _science_lab_number(columns["dataStored"][index]),
+            "dataCapacity": _science_lab_number(columns["dataCapacity"][index]),
+            "scienceStored": _science_lab_number(columns["scienceStored"][index]),
+            "scienceCapacity": _science_lab_number(columns["scienceCapacity"][index]),
+            "calculatedSciencePerDay": _science_lab_number(
+                columns["calculatedSciencePerDay"][index]
+            ),
+            "scienceMultiplier": _science_lab_number(columns["scienceMultiplier"][index]),
+            "crewCount": max(0, int(_science_lab_number(columns["crewCount"][index]))),
+            "scientistCount": max(
+                0, int(_science_lab_number(columns["scientistCount"][index]))
+            ),
+            "crewRequired": max(0.0, _science_lab_number(columns["crewRequired"][index])),
+            "scientistFactor": max(
+                0.0, _science_lab_number(columns["scientistFactor"][index])
+            ),
+            "converterAvailable": bool(columns["converterAvailable"][index]),
+            "researchEnabled": bool(columns["researchEnabled"][index]),
+            "operational": bool(columns["operational"][index]),
+            "converterStatus": str(columns["converterStatus"][index] or ""),
+            "lastTimeFactor": _science_lab_number(columns["lastTimeFactor"][index]),
+        }
+        row["state"] = _science_lab_state(row)
+        row["sciencePerDay"] = (
+            row["calculatedSciencePerDay"] if row["state"] == "researching" else 0.0
+        )
+        eta_kind, eta_seconds = _science_lab_eta(row, day_seconds)
+        row["etaKind"] = eta_kind
+        if eta_seconds is not None:
+            row["etaSeconds"] = round(eta_seconds, 1)
+        rows.append(row)
+
+    return {
+        "sci.krpc.labTelemetryAvailable": True,
+        "sci.krpc.labDaySeconds": day_seconds,
+        "sci.krpc.labCount": reported_count,
+        "sci.krpc.failedLabCount": failed_count,
+        "sci.krpc.malformedLabCount": max(0, reported_count - aligned_count),
+        "sci.krpc.labs": rows,
+    }
+
+
 def _gather_science(conn, vessel):
     try:
         service = conn.vessel_science
@@ -2210,6 +2351,10 @@ def _gather_science(conn, vessel):
             "sci.krpc.experiments": rows,
             "sci.krpc.backend": "VesselScience",
         }
+
+        labs = _gather_science_labs(service)
+        if labs is not None:
+            result.update(labs)
 
         for key, method_name in (
             ("sci.krpc.containerCount", "container_count"),

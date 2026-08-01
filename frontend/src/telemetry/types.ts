@@ -117,6 +117,42 @@ export interface ScienceExperimentTelemetry {
   sourceKind?: string;
 }
 
+export type ScienceLabState =
+  | "researching"
+  | "science-full"
+  | "no-data"
+  | "no-scientist"
+  | "insufficient-crew"
+  | "stopped"
+  | "stalled"
+  | "unavailable";
+
+export type ScienceLabEtaKind = ScienceLabState | "finite" | "full" | "insufficient-data";
+
+export interface ScienceLabTelemetry {
+  id: string;
+  title: string;
+  dataStored?: number;
+  dataCapacity?: number;
+  scienceStored?: number;
+  scienceCapacity?: number;
+  calculatedSciencePerDay?: number;
+  sciencePerDay?: number;
+  scienceMultiplier?: number;
+  crewCount?: number;
+  scientistCount?: number;
+  crewRequired?: number;
+  scientistFactor?: number;
+  converterAvailable?: boolean;
+  researchEnabled?: boolean;
+  operational?: boolean;
+  converterStatus?: string;
+  lastTimeFactor?: number;
+  state: ScienceLabState;
+  etaKind: ScienceLabEtaKind;
+  etaSeconds?: number;
+}
+
 export interface OverviewVesselTelemetry {
   objectId?: string;
   guid?: string;
@@ -421,6 +457,12 @@ export interface TelemetrySnapshot {
   "sci.krpc.count"?: number;
   "sci.krpc.experiments"?: ScienceExperimentTelemetry[];
   "sci.krpc.backend"?: string;
+  "sci.krpc.labTelemetryAvailable"?: boolean;
+  "sci.krpc.labDaySeconds"?: number;
+  "sci.krpc.labCount"?: number;
+  "sci.krpc.failedLabCount"?: number;
+  "sci.krpc.malformedLabCount"?: number;
+  "sci.krpc.labs"?: ScienceLabTelemetry[];
   "career.science"?: number;
   "tar.name"?: string;
   "tar.type"?: string;

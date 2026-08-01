@@ -2,6 +2,15 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Reworked the Flight science panel to match the dashboard's newer instrument
+  styling, with a recoverable-science overview and one compact status card per
+  onboard research laboratory.
+- Added stock-compatible laboratory telemetry for stored data and science,
+  crew and scientist readiness, current science production, and a decay-aware
+  estimate of when each active lab will reach its science capacity.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated
