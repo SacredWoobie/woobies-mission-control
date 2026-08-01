@@ -139,7 +139,7 @@
 .delta-v-controls { display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; padding: 9px 16px 11px; }
 .delta-v-location-row, .delta-v-mission-row { display: grid; grid-template-columns: minmax(150px,.9fr) minmax(220px,1.15fr) minmax(170px,.95fr); gap: 9px; }
 .delta-v-location-row { align-items: start; }
-.delta-v-location-row.endpoint-surface { grid-template-columns: minmax(150px,.9fr) minmax(220px,2.1fr); }
+.delta-v-stop-builder.endpoint-surface { grid-template-columns: minmax(150px,.9fr) minmax(220px,2.1fr); }
 .delta-v-mission-row { grid-template-columns: repeat(4,minmax(0,1fr)); align-items: start; }
 .delta-v-mission-row.one-way { grid-template-columns: minmax(280px,360px) minmax(130px,180px) minmax(0,1fr); }
 .delta-v-location-row > label, .delta-v-location-row > fieldset, .delta-v-mission-row > label, .delta-v-mission-row > fieldset { min-width: 0; margin: 0; }
@@ -752,6 +752,8 @@
   .resonant-library-list article { grid-template-columns: 1fr; }
   .resonant-library-actions { justify-content: flex-start; }
   .delta-v-controls { grid-template-columns: minmax(0,1fr); }
+  .delta-v-start-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .delta-v-start-row > :last-child { grid-column: 1 / -1; }
   .delta-v-mission-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-mission-row.one-way { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-mission-row.one-way .delta-v-add-stop-row { margin-top: 0; grid-column: 1 / -1; justify-self: start; }
@@ -775,6 +777,8 @@
   .resonant-plot, .resonant-plot canvas { min-height: 285px; height: 285px; }
   .resonant-result-grid { grid-template-columns: 1fr; }
   .delta-v-launch-target-grid { grid-template-columns: 1fr; }
+  .delta-v-start-row { grid-template-columns: 1fr; }
+  .delta-v-start-row > :last-child { grid-column: auto; }
 }
 
 @media (max-width: 440px) {
@@ -783,7 +787,7 @@
   .resonant-plot-hud { top: 9px; right: 9px; }
   .resonant-plot-hud > div { min-width: 160px; }
   .delta-v-controls, .delta-v-stat-grid { grid-template-columns: 1fr; }
-  .delta-v-location-row, .delta-v-mission-row { grid-template-columns: 1fr; }
+  .delta-v-location-row, .delta-v-location-row.endpoint-surface, .delta-v-mission-row { grid-template-columns: 1fr; }
   .delta-v-mission-row.one-way { grid-template-columns: 1fr; }
   .delta-v-empty-stop { grid-column: auto; }
   .delta-v-add-stop-row { align-items: flex-start; flex-direction: column; }

@@ -2,6 +2,11 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Let surface-start Delta-V plans choose their launch parking altitude directly
+  in the starting step instead of requiring a redundant same-body orbit stop.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated
