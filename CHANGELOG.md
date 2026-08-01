@@ -10,6 +10,9 @@ All notable public changes will be recorded here.
 - Added stock-compatible laboratory telemetry for stored data and science,
   crew and scientist readiness, current science production, and a decay-aware
   estimate of when each active lab will reach its science capacity.
+- Added one-shot lab-capacity alarms with saved 30- or 60-minute lead defaults;
+  automatic provider selection prefers Kerbal Alarm Clock and falls back to
+  KSP's stock alarm manager.
 
 ## v0.4.2 - Mission Control vessel management
 

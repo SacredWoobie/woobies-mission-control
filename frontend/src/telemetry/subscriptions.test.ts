@@ -75,6 +75,10 @@ describe("panel telemetry subscriptions", () => {
         scienceStored: 3.1,
       }],
     })).toBe(false);
+    expect(scienceSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      "sci.alarmProviders": { kac: false, stock: true },
+    })).toBe(false);
   });
 
   it("hands ElectricCharge updates from Consumables to Electricity", () => {

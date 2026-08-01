@@ -139,6 +139,7 @@ SCENES = {
         "sci.krpc.labTelemetryAvailable": True,
         "sci.krpc.labDaySeconds": 21600,
         "sci.krpc.labCount": 1,
+        "sci.alarmProviders": {"kac": True, "stock": True},
         "sci.krpc.failedLabCount": 0,
         "sci.krpc.malformedLabCount": 0,
         "sci.krpc.labs": [{

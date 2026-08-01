@@ -5,6 +5,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ScienceAlarmResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -17,6 +18,7 @@ export interface LiveTelemetryState {
   overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
+  scienceAlarmResult?: ScienceAlarmResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -53,6 +55,7 @@ export class TelemetryStore {
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+        onScienceAlarmResult?(result: ScienceAlarmResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -90,6 +93,9 @@ export class TelemetryStore {
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
       },
+      onScienceAlarmResult: (scienceAlarmResult) => {
+        this.patch({ scienceAlarmResult });
+      },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
       },
@@ -108,6 +114,7 @@ export class TelemetryStore {
             overviewVesselEditResult: undefined,
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
+            scienceAlarmResult: undefined,
           } : {}),
         });
       },
@@ -117,6 +124,7 @@ export class TelemetryStore {
       frameCount: 0,
       lastFrameAt: null,
       message: undefined,
+      scienceAlarmResult: undefined,
       snapshot: null,
       status: "connecting",
     });

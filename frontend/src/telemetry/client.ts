@@ -4,6 +4,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ScienceAlarmResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -21,6 +22,7 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onScienceAlarmResult?(result: ScienceAlarmResult): void;
   onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
   onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
   onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
@@ -177,6 +179,45 @@ export function parseOverviewVesselLifecycleResult(raw: unknown): OverviewVessel
   return candidate as unknown as OverviewVesselLifecycleResult;
 }
 
+export function parseScienceAlarmResult(raw: unknown): ScienceAlarmResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "science.alarm.create.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.labId !== "string"
+    || !candidate.labId
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+    || (candidate.provider !== undefined && candidate.provider !== "kac" && candidate.provider !== "stock")
+    || (candidate.triggerUT !== undefined && typeof candidate.triggerUT !== "number")
+    || (candidate.leadSeconds !== undefined && candidate.leadSeconds !== 1800 && candidate.leadSeconds !== 3600)
+  ) return null;
+  return candidate as unknown as ScienceAlarmResult;
+}
+
+function isScienceAlarmResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "science.alarm.create.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isOverviewVesselLifecycleResultMessage(raw: unknown) {
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -328,6 +369,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const scienceAlarmResult = parseScienceAlarmResult(event.data);
+      if (scienceAlarmResult) {
+        this.callbacks.onScienceAlarmResult?.(scienceAlarmResult);
+        return;
+      }
+      if (isScienceAlarmResultMessage(event.data)) return;
       const lifecycleResult = parseOverviewVesselLifecycleResult(event.data);
       if (lifecycleResult) {
         this.callbacks.onOverviewVesselLifecycleResult?.(lifecycleResult);

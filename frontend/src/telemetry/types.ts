@@ -153,6 +153,20 @@ export interface ScienceLabTelemetry {
   etaSeconds?: number;
 }
 
+export type ScienceAlarmProviderPreference = "auto" | "kac" | "stock";
+export type ScienceAlarmProvider = "kac" | "stock";
+
+export interface ScienceAlarmResult {
+  type: "science.alarm.create.result";
+  requestId: string;
+  labId: string;
+  status: "accepted" | "error";
+  message: string;
+  provider?: ScienceAlarmProvider;
+  triggerUT?: number;
+  leadSeconds?: number;
+}
+
 export interface OverviewVesselTelemetry {
   objectId?: string;
   guid?: string;
@@ -463,6 +477,7 @@ export interface TelemetrySnapshot {
   "sci.krpc.failedLabCount"?: number;
   "sci.krpc.malformedLabCount"?: number;
   "sci.krpc.labs"?: ScienceLabTelemetry[];
+  "sci.alarmProviders"?: Record<ScienceAlarmProvider, boolean>;
   "career.science"?: number;
   "tar.name"?: string;
   "tar.type"?: string;
@@ -566,6 +581,7 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
+  | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600 }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }

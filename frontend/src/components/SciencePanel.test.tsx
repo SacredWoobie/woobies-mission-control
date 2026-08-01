@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
-import type { ScienceLabTelemetry, TelemetrySnapshot } from "../telemetry/types";
+import type { ScienceLabTelemetry, TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 import { SciencePanel } from "./SciencePanel";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 
 afterEach(cleanup);
+beforeEach(() => localStorage.clear());
 
 function renderPanel(snapshot: TelemetrySnapshot) {
   return render(<PanelVisibilityProvider><SciencePanel snapshot={snapshot} /></PanelVisibilityProvider>);
@@ -98,5 +99,60 @@ describe("SciencePanel", () => {
 
     expect(screen.getByText((_, element) => element?.textContent === "12.0 / 7.0 tx")).toBeTruthy();
     expect(screen.getByText("Goo canister · 4 data", { exact: true })).toBeTruthy();
+  });
+
+  it("persists alarm defaults and sends one manual alarm command", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const { rerender } = render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={onSendCommand} snapshot={flightTelemetryFixture} /></PanelVisibilityProvider>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Science alarm settings" }));
+    const dialog = screen.getByRole("dialog", { name: "Alarm defaults" });
+    expect(within(dialog).getByRole("button", { name: "AUTO" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(dialog).getByRole("button", { name: "1 HOUR" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(dialog).getByRole("button", { name: "STOCK" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "30 MIN" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "SAVE DEFAULTS" }));
+
+    expect(JSON.parse(localStorage.getItem("wmc-science-alarm-defaults-v1") ?? "null")).toEqual({
+      provider: "stock",
+      leadSeconds: 1800,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "SET ALARM" }));
+    expect(onSendCommand).toHaveBeenCalledTimes(1);
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({
+      type: "science.alarm.create",
+      labId: "42001:1",
+      provider: "stock",
+      leadSeconds: 1800,
+    });
+    const sentCommand = onSendCommand.mock.calls[0][0];
+    if (sentCommand.type !== "science.alarm.create") throw new Error("Expected a science alarm command.");
+    const requestId = sentCommand.requestId;
+    rerender(<PanelVisibilityProvider><SciencePanel
+      alarmResult={{
+        type: "science.alarm.create.result",
+        requestId,
+        labId: "42001:1",
+        status: "accepted",
+        message: "Stock alarm set 30 minutes before estimated capacity.",
+        provider: "stock",
+        triggerUT: 10_000,
+        leadSeconds: 1800,
+      }}
+      commandEnabled
+      onSendCommand={onSendCommand}
+      snapshot={flightTelemetryFixture}
+    /></PanelVisibilityProvider>);
+    expect(screen.getByRole("status").textContent).toContain("Stock alarm set");
+  });
+
+  it("disables alarm creation when the lab has no finite ETA", () => {
+    const base = flightTelemetryFixture["sci.krpc.labs"]?.[0] as ScienceLabTelemetry;
+    render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={() => true} snapshot={{
+      ...flightTelemetryFixture,
+      "sci.krpc.labs": [{ ...base, etaKind: "insufficient-data", etaSeconds: undefined }],
+    }} /></PanelVisibilityProvider>);
+
+    expect(screen.getByRole("button", { name: "SET ALARM" }).hasAttribute("disabled")).toBe(true);
   });
 });

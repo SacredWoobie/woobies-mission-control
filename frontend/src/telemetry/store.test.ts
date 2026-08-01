@@ -6,6 +6,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ScienceAlarmResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -16,6 +17,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+      onScienceAlarmResult?(result: ScienceAlarmResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;
@@ -55,12 +57,21 @@ describe("TelemetryStore", () => {
       status: "accepted",
       message: "Terminated Odyssey.",
     });
+    callbacks!.onScienceAlarmResult?.({
+      type: "science.alarm.create.result",
+      requestId: "alarm-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "KAC alarm set.",
+      provider: "kac",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
+    expect(store.getSnapshot().scienceAlarmResult?.provider).toBe("kac");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
@@ -69,6 +80,7 @@ describe("TelemetryStore", () => {
       overviewVesselSwitchResult: undefined,
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
+      scienceAlarmResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);

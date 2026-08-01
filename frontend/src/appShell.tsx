@@ -226,7 +226,16 @@ function LiveClockPanel() { const snapshot = useLiveFlightSnapshot(clockSnapshot
 function LiveConsumablesPanel() { const snapshot = useLiveFlightSnapshot(consumablesSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ConsumablesPanel snapshot={snapshot} /> : null; }
 function LiveElectricityPanel() { const snapshot = useLiveFlightSnapshot(electricitySnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ElectricityPanel snapshot={snapshot} /> : null; }
 function LiveHeatPanel() { const snapshot = useLiveFlightSnapshot(heatSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <HeatPanel snapshot={snapshot} /> : null; }
-function LiveSciencePanel() { const snapshot = useLiveFlightSnapshot(scienceSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <SciencePanel snapshot={snapshot} /> : null; }
+function LiveSciencePanel() {
+  const liveState = useLiveTelemetrySelector(
+    (state) => ({ alarmResult: state.scienceAlarmResult, snapshot: state.snapshot }),
+    (left, right) => scienceSnapshotsEqual(left.snapshot, right.snapshot)
+      && left.alarmResult === right.alarmResult,
+  );
+  return liveState.snapshot?.["context.mode"] === "flight"
+    ? <SciencePanel alarmResult={liveState.alarmResult} commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} />
+    : null;
+}
 function LiveStagingPanel() { const snapshot = useLiveFlightSnapshot(stagingSnapshotsEqual); return snapshot && snapshot["context.mode"] !== "inactive" ? <StagingPanel snapshot={snapshot} /> : null; }
 function LiveTargetPanel() { const snapshot = useLiveFlightSnapshot(targetSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : null; }
 function LivePinnedNotePanel() { const snapshot = useLiveFlightSnapshot(pinnedNoteSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["notes.pinned"] ? <PinnedNotePanel commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={snapshot} /> : null; }

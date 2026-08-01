@@ -23,6 +23,7 @@ PLANNER_COMMAND_TYPES = frozenset(
 KRPC_COMMAND_TYPES = frozenset(
     {
         "editor.conditions",
+        "science.alarm.create",
         "overview.vessel.switch",
         "overview.vessel.edit",
         "overview.vessel.lifecycle",

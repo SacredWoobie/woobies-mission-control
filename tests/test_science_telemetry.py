@@ -80,6 +80,44 @@ class LabService:
         return [1.0]
 
 
+class AlarmManager:
+    def __init__(self):
+        self.created = []
+
+    def add_vessel_alarm(self, delay, vessel, title, description):
+        self.created.append((delay, vessel, title, description))
+        return SimpleNamespace(id=17)
+
+
+class KacService:
+    AlarmType = SimpleNamespace(raw="raw")
+    AlarmAction = SimpleNamespace(message_only="message_only")
+
+    def __init__(self, available=True):
+        self.available = available
+        self.created = []
+
+    def create_alarm(self, alarm_type, title, trigger_ut):
+        alarm = SimpleNamespace(vessel=None, notes="", action=None)
+        self.created.append((alarm_type, title, trigger_ut, alarm))
+        return alarm
+
+
+def alarm_connection(kac_available=True):
+    vessel = SimpleNamespace(name="Odyssey")
+    manager = AlarmManager()
+    kac = KacService(kac_available)
+    return SimpleNamespace(
+        vessel_science=LabService(),
+        kerbal_alarm_clock=kac,
+        space_center=SimpleNamespace(
+            active_vessel=vessel,
+            alarm_manager=manager,
+            ut=9_493_824.0,
+        ),
+    ), vessel, manager, kac
+
+
 class ScienceTelemetryTests(unittest.TestCase):
     def test_emits_decay_aware_lab_eta_for_reference_craft(self):
         result = telemetry_server._gather_science(
@@ -135,6 +173,60 @@ class ScienceTelemetryTests(unittest.TestCase):
 
         self.assertEqual(result["sci.krpc.labs"], [])
         self.assertEqual(result["sci.krpc.malformedLabCount"], 1)
+
+    def test_creates_kac_alarm_from_a_fresh_eta_with_manual_lead(self):
+        conn, vessel, manager, kac = alarm_connection()
+        result = telemetry_server._apply_science_alarm_command(conn, {
+            "type": "science.alarm.create",
+            "requestId": "alarm-1",
+            "labId": "42:1",
+            "provider": "auto",
+            "leadSeconds": 3600,
+        })
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual(result["provider"], "kac")
+        self.assertAlmostEqual(result["triggerUT"], 9_700_084.3, delta=1.0)
+        self.assertEqual(len(manager.created), 0)
+        alarm_type, title, trigger_ut, alarm = kac.created[0]
+        self.assertEqual(alarm_type, "raw")
+        self.assertIn("Odyssey science lab", title)
+        self.assertAlmostEqual(trigger_ut, result["triggerUT"], delta=0.1)
+        self.assertIs(alarm.vessel, vessel)
+        self.assertIn("60-minute lead", alarm.notes)
+        self.assertEqual(alarm.action, "message_only")
+
+    def test_falls_back_to_stock_vessel_alarm_when_kac_is_unavailable(self):
+        conn, vessel, manager, kac = alarm_connection(kac_available=False)
+        result = telemetry_server._apply_science_alarm_command(conn, {
+            "type": "science.alarm.create",
+            "requestId": "alarm-2",
+            "labId": "42:1",
+            "provider": "auto",
+            "leadSeconds": 1800,
+        })
+
+        self.assertEqual(result["provider"], "stock")
+        self.assertEqual(len(kac.created), 0)
+        delay, linked_vessel, title, description = manager.created[0]
+        self.assertAlmostEqual(delay, 208_060.3, delta=1.0)
+        self.assertIs(linked_vessel, vessel)
+        self.assertIn("science lab", title)
+        self.assertIn("30-minute lead", description)
+
+    def test_rejects_a_stale_lab_without_creating_an_alarm(self):
+        conn, _vessel, manager, kac = alarm_connection()
+        result = telemetry_server._apply_science_alarm_command(conn, {
+            "type": "science.alarm.create",
+            "requestId": "alarm-3",
+            "labId": "missing",
+            "provider": "auto",
+            "leadSeconds": 3600,
+        })
+
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(manager.created, [])
+        self.assertEqual(kac.created, [])
 
 
 if __name__ == "__main__":

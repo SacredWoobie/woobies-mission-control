@@ -2007,6 +2007,9 @@ def _apply_telemetry_command(conn, command):
     if _mission_planning.apply_command(conn, command):
         return
 
+    if command.get("type") == "science.alarm.create":
+        return _apply_science_alarm_command(conn, command)
+
     if command.get("type") == "overview.vessel.switch":
         return _apply_overview_vessel_switch_command(conn, command)
 
@@ -2167,6 +2170,137 @@ def _science_lab_number(value, default=0.0):
     return number if math.isfinite(number) else default
 
 
+def _science_alarm_capabilities(conn):
+    providers = {"kac": False, "stock": False}
+    try:
+        providers["stock"] = conn.space_center.alarm_manager is not None
+    except Exception:
+        pass
+    try:
+        providers["kac"] = bool(conn.kerbal_alarm_clock.available)
+    except Exception:
+        pass
+    return providers
+
+
+def _science_alarm_result(
+        request_id, lab_id, status, message, provider=None,
+        trigger_ut=None, lead_seconds=None):
+    result = {
+        "type": "science.alarm.create.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "status": status,
+        "message": message,
+    }
+    if provider in ("kac", "stock"):
+        result["provider"] = provider
+    if trigger_ut is not None:
+        result["triggerUT"] = trigger_ut
+    if lead_seconds is not None:
+        result["leadSeconds"] = lead_seconds
+    return result
+
+
+def _apply_science_alarm_command(conn, command):
+    """Create one manually scheduled alarm from a freshly computed lab ETA."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    preference = command.get("provider")
+    lead_seconds = command.get("leadSeconds")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+        or preference not in ("auto", "kac", "stock")
+        or lead_seconds not in (1800, 3600)
+    ):
+        return None
+
+    def reject(message):
+        return _science_alarm_result(
+            request_id, lab_id, "error", message,
+            lead_seconds=lead_seconds,
+        )
+
+    try:
+        sc = conn.space_center
+        vessel = sc.active_vessel
+        if vessel is None:
+            return reject("No active Flight vessel is available.")
+        labs = _gather_science_labs(conn.vessel_science)
+        if labs is None:
+            return reject("Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return reject("The selected science lab is no longer aboard.")
+        if lab.get("state") != "researching" or lab.get("etaKind") != "finite":
+            return reject("The selected science lab no longer has a finite completion estimate.")
+        eta_seconds = _science_lab_number(lab.get("etaSeconds"), -1.0)
+        current_ut = _science_lab_number(sc.ut, -1.0)
+        if eta_seconds <= 0 or current_ut < 0:
+            return reject("The science alarm time could not be calculated.")
+
+        providers = _science_alarm_capabilities(conn)
+        if preference == "auto":
+            provider = "kac" if providers["kac"] else "stock" if providers["stock"] else None
+        else:
+            provider = preference if providers[preference] else None
+        if provider is None:
+            label = "KAC" if preference == "kac" else "Stock" if preference == "stock" else "KAC or Stock"
+            return reject(f"{label} alarm creation is unavailable.")
+
+        trigger_delay = max(60.0, eta_seconds - lead_seconds)
+        trigger_ut = current_ut + trigger_delay
+        vessel_name = str(getattr(vessel, "name", "Vessel") or "Vessel").strip()[:80]
+        lab_title = str(lab.get("title") or "Science lab").strip()[:100]
+        title = f"{vessel_name} science lab nearly full"
+        description = (
+            f"{lab_title} is estimated to reach science capacity at UT "
+            f"{current_ut + eta_seconds:.1f}. Created by Woobie's Mission Control "
+            f"with a {lead_seconds // 60}-minute lead from the current lab state."
+        )
+
+        if provider == "kac":
+            kac = conn.kerbal_alarm_clock
+            alarm = kac.create_alarm(kac.AlarmType.raw, title, trigger_ut)
+            try:
+                alarm.vessel = vessel
+            except Exception:
+                pass
+            try:
+                alarm.notes = description
+            except Exception:
+                pass
+            try:
+                alarm.action = kac.AlarmAction.message_only
+            except Exception:
+                pass
+        else:
+            sc.alarm_manager.add_vessel_alarm(
+                trigger_delay, vessel, title, description,
+            )
+
+        return _science_alarm_result(
+            request_id,
+            lab_id,
+            "accepted",
+            f"{provider.upper() if provider == 'kac' else 'Stock'} alarm set "
+            f"{lead_seconds // 60} minutes before estimated capacity.",
+            provider=provider,
+            trigger_ut=round(trigger_ut, 1),
+            lead_seconds=lead_seconds,
+        )
+    except Exception as error:
+        return reject(f"The science alarm could not be created: {error}")
+
+
 def _science_lab_state(row):
     science = row["scienceStored"]
     science_capacity = row["scienceCapacity"]
@@ -2301,10 +2435,15 @@ def _gather_science_labs(service):
 
 
 def _gather_science(conn, vessel):
+    alarm_capabilities = {
+        "sci.alarmProviders": _science_alarm_capabilities(conn),
+    }
     try:
         service = conn.vessel_science
         if not service.available:
-            return _gather_science_stock(vessel)
+            result = _gather_science_stock(vessel)
+            result.update(alarm_capabilities)
+            return result
 
         titles = list(service.titles())
         values = list(service.science_values())
@@ -2365,9 +2504,12 @@ def _gather_science(conn, vessel):
                 result[key] = getattr(service, method_name)()
             except Exception:
                 pass
+        result.update(alarm_capabilities)
         return result
     except Exception:
-        return _gather_science_stock(vessel)
+        result = _gather_science_stock(vessel)
+        result.update(alarm_capabilities)
+        return result
 
 
 # ---------------------------------------------------------------------------

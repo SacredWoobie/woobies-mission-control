@@ -94,6 +94,7 @@ class TelemetryRuntimeTests(unittest.TestCase):
             '"overview.vessel.switch"',
             '"overview.vessel.edit"',
             '"overview.vessel.lifecycle"',
+            '"science.alarm.create"',
             "if isinstance(event, dict)",
             'event.get("status") in {"merged", "updated"}',
         ):

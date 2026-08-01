@@ -172,6 +172,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "sci.krpc.labTelemetryAvailable": true,
   "sci.krpc.labDaySeconds": 21_600,
   "sci.krpc.labCount": 1,
+  "sci.alarmProviders": { kac: true, stock: true },
   "sci.krpc.failedLabCount": 0,
   "sci.krpc.malformedLabCount": 0,
   "sci.krpc.labs": [{
