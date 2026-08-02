@@ -24,6 +24,9 @@ All notable public changes will be recorded here.
   invokes the selected converter's matching stock PAW action.
 - Fixed engine alternator generation remaining falsely elevated after a burn
   followed immediately by time warp.
+- Tightened the wide Flight status columns to their content like Mission
+  Control's program metrics. Signal Delay now disappears when RemoteTech is not
+  the active communications provider.
 
 ## v0.4.2 - Mission Control vessel management
 

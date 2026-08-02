@@ -804,7 +804,8 @@ button { font: inherit; }
 .met-cell .big { color: var(--cyan); }
 .calendar-toggle { padding: 0; border: 0; color: var(--slate-dim); background: transparent; cursor: pointer; font: inherit; letter-spacing: inherit; }
 .calendar-toggle:hover { color: var(--cyan); }
-.comms-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border-top: 1px solid var(--rule); background: var(--rule); }
+.comms-strip { display: grid; grid-template-columns: minmax(0,1fr); gap: 1px; border-top: 1px solid var(--rule); background: var(--rule); }
+.comms-strip.remote-tech { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .cs-cell { display: flex; min-width: 0; padding: 8px 12px; background: var(--panel); flex-direction: column; gap: 4px; }
 .cs-status { display: flex; align-items: center; gap: 7px; font-size: 15px; letter-spacing: .04em; }
 .cs-val { overflow: hidden; color: var(--cyan); font-size: 16px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
@@ -1293,29 +1294,41 @@ button { font: inherit; }
     font-size: 20px;
   }
   .inactive-mode .overview-section-head .overview-header-button { min-height: 36px; padding: 4px 7px; font-size: 11px; }
-  .status-strip { position: relative; display: grid; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 1px; background: var(--rule); }
+  .status-strip {
+    --flight-status-grid-width: 963px;
+    position: relative;
+    display: block;
+    width: calc(var(--flight-status-grid-width) + 2px);
+    max-width: 100%;
+    overflow: hidden;
+    align-self: flex-start;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--rule);
+  }
+  .status-strip:has(.flight-context-grid.remote-tech) { --flight-status-grid-width: 1139px; }
   .status-strip > .panel { border: 0; border-radius: 0; }
   .status-strip #clock {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(5,minmax(0,1fr));
+    display: block;
+    width: var(--flight-status-grid-width);
+    max-width: none;
   }
   .status-strip #clock > .body {
-    display: grid;
+    width: var(--flight-status-grid-width);
+    max-width: none;
     min-width: 0;
     padding: 0;
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(5,minmax(0,1fr));
   }
-  .status-strip #clock .flight-context-identity { grid-column: 1; }
-  .status-strip #clock .clock-grid {
-    grid-column: 2 / 4;
-    grid-template-columns: repeat(2,minmax(0,1fr));
+  .status-strip #clock .flight-context-grid {
+    display: grid;
+    width: var(--flight-status-grid-width);
+    max-width: none;
+    grid-template-columns: 240px 300px 220px 200px;
+    gap: 1px;
+    background: var(--rule);
   }
-  .status-strip #clock .comms-strip {
-    grid-column: 4 / 6;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-  }
+  .status-strip #clock .flight-context-grid.remote-tech { grid-template-columns: 240px 300px 220px 200px 175px; }
+  .status-strip #clock .clock-grid, .status-strip #clock .comms-strip { display: contents; }
   .status-strip #clock > h2 { display: none; }
   .status-strip .flight-context-identity, .status-strip .clockcell, .status-strip .cs-cell { min-width: 0; padding: 4px 10px; border: 0; background: var(--panel); justify-content: flex-start; }
   .status-strip .clockcell { display: flex; flex-direction: column; }
@@ -1450,7 +1463,7 @@ button { font: inherit; }
   .throttle-col { width: 100%; flex-direction: row; grid-column: 1; }
   .thr-track { width: 100%; height: 18px; }
   .thr-fill { top: 0; right: auto; width: var(--throttle-width, 0); height: auto !important; }
-  .spark-row, .clock-grid, .comms-strip { grid-template-columns: 1fr; }
+  .spark-row, .clock-grid, .comms-strip, .comms-strip.remote-tech { grid-template-columns: 1fr; }
   .rx-summary, .tgt-grid { grid-template-columns: 1fr 1fr; }
   .solar-strip { grid-auto-flow: row; grid-auto-rows: auto; }
   .notes-preview.notes-drawer-full { width: 100%; }
@@ -1672,7 +1685,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 
 @container (max-width: 460px) {
   .tgt-grid, .rx-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .clock-grid, .comms-strip { grid-template-columns: minmax(0,1fr); }
+  .clock-grid, .comms-strip, .comms-strip.remote-tech { grid-template-columns: minmax(0,1fr); }
   .sci-lab-caption {
     display: grid;
     align-items: center;
