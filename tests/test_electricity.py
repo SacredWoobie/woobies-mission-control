@@ -96,6 +96,25 @@ class ElectricityFlowEstimatorTests(unittest.TestCase):
             )
         )
 
+    def test_latest_generation_total_prefers_valid_after_endpoint(self):
+        self.assertEqual(
+            electricity.latest_generation_total(64.0, 65.0),
+            65.0,
+        )
+
+    def test_latest_generation_total_falls_back_from_invalid_after(self):
+        for invalid in (None, float("nan"), float("inf"), -1.0):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(
+                    electricity.latest_generation_total(64.0, invalid),
+                    64.0,
+                )
+
+    def test_latest_generation_total_rejects_invalid_endpoints(self):
+        self.assertIsNone(
+            electricity.latest_generation_total(float("nan"), -1.0)
+        )
+
     def test_first_sample_calibrates_then_estimates_net_and_draw(self):
         self.assertEqual(
             self.update(),

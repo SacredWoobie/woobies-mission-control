@@ -33,6 +33,7 @@ from krpc.services.spacecenter import VesselType as KRPCVesselType
 from electricity import (
     ElectricityFlowEstimator,
     bracketed_generation_remainder,
+    latest_generation_total,
 )
 from heat import enrich_system_heat_result
 from mission_planning import (
@@ -3457,9 +3458,13 @@ def gather_telemetry(conn):
                 service_total_after = sh.total_electrical_generation()  # excludes solar
             except Exception:
                 pass
-            if service_total_after is None:
+            service_total = latest_generation_total(
+                service_total_before,
+                service_total_after,
+            )
+            if service_total is None:
                 raise RuntimeError("SystemHeat generation total unavailable")
-            total_gen = service_total_after + solar_ec
+            total_gen = service_total + solar_ec
 
             reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
             rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
