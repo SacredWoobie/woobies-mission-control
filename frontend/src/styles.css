@@ -1295,7 +1295,7 @@ button { font: inherit; }
   }
   .inactive-mode .overview-section-head .overview-header-button { min-height: 36px; padding: 4px 7px; font-size: 11px; }
   .status-strip {
-    --flight-status-grid-width: 963px;
+    --flight-status-grid-width: 1003px;
     position: relative;
     display: block;
     width: calc(var(--flight-status-grid-width) + 2px);
@@ -1306,7 +1306,7 @@ button { font: inherit; }
     border-radius: 4px;
     background: var(--rule);
   }
-  .status-strip:has(.flight-context-grid.remote-tech) { --flight-status-grid-width: 1139px; }
+  .status-strip:has(.flight-context-grid.remote-tech) { --flight-status-grid-width: 1179px; }
   .status-strip > .panel { border: 0; border-radius: 0; }
   .status-strip #clock {
     display: block;
@@ -1323,17 +1323,18 @@ button { font: inherit; }
     display: grid;
     width: var(--flight-status-grid-width);
     max-width: none;
-    grid-template-columns: 240px 300px 220px 200px;
+    grid-template-columns: 240px 340px 220px 200px;
     gap: 1px;
     background: var(--rule);
   }
-  .status-strip #clock .flight-context-grid.remote-tech { grid-template-columns: 240px 300px 220px 200px 175px; }
+  .status-strip #clock .flight-context-grid.remote-tech { grid-template-columns: 240px 340px 220px 200px 175px; }
   .status-strip #clock .clock-grid, .status-strip #clock .comms-strip { display: contents; }
   .status-strip #clock > h2 { display: none; }
   .status-strip .flight-context-identity, .status-strip .clockcell, .status-strip .cs-cell { min-width: 0; padding: 4px 10px; border: 0; background: var(--panel); justify-content: flex-start; }
   .status-strip .clockcell { display: flex; flex-direction: column; }
   .status-strip .calendar-toggle { min-width: 0; min-height: 22px; padding-inline: 3px; }
   .status-strip .clockcell .big { font-size: 20px; }
+  .status-strip .clock-primary-row .big { white-space: nowrap; }
   .flight-grid {
     grid-template-columns: minmax(420px,1.1fr) repeat(3,minmax(300px,1fr));
     grid-template-areas: "primary health operations reference";
