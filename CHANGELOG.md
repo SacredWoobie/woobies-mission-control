@@ -22,6 +22,8 @@ All notable public changes will be recorded here.
   for accumulated lab science only; stored experiment data is never included.
 - Added a context-aware per-lab `Start Research` / `Stop Research` control that
   invokes the selected converter's matching stock PAW action.
+- Fixed engine alternator generation remaining falsely elevated after a burn
+  followed immediately by time warp.
 
 ## v0.4.2 - Mission Control vessel management
 
