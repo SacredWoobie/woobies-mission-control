@@ -6,6 +6,9 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ScienceAlarmResult,
+  ScienceLabResearchResult,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -16,6 +19,9 @@ describe("TelemetryStore", () => {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+      onScienceAlarmResult?(result: ScienceAlarmResult): void;
+      onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
+      onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;
@@ -55,12 +61,38 @@ describe("TelemetryStore", () => {
       status: "accepted",
       message: "Terminated Odyssey.",
     });
+    callbacks!.onScienceAlarmResult?.({
+      type: "science.alarm.create.result",
+      requestId: "alarm-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "KAC alarm set.",
+      provider: "kac",
+    });
+    callbacks!.onScienceLabResearchResult?.({
+      type: "science.lab.research.result",
+      requestId: "research-1",
+      labId: "42:1",
+      enabled: false,
+      status: "accepted",
+      message: "Research stopped.",
+    });
+    callbacks!.onScienceLabTransmitResult?.({
+      type: "science.lab.transmit.result",
+      requestId: "transmit-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "Transmit Science invoked.",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
+    expect(store.getSnapshot().scienceAlarmResult?.provider).toBe("kac");
+    expect(store.getSnapshot().scienceLabResearchResult?.enabled).toBe(false);
+    expect(store.getSnapshot().scienceLabTransmitResult?.requestId).toBe("transmit-1");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
@@ -69,6 +101,9 @@ describe("TelemetryStore", () => {
       overviewVesselSwitchResult: undefined,
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
+      scienceAlarmResult: undefined,
+      scienceLabResearchResult: undefined,
+      scienceLabTransmitResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);

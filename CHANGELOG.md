@@ -9,6 +9,19 @@ All notable public changes will be recorded here.
   speed value.
 - Let surface-start Delta-V plans choose their launch parking altitude directly
   in the starting step instead of requiring a redundant same-body orbit stop.
+- Reworked the Flight science panel to match the dashboard's newer instrument
+  styling, with a recoverable-science overview and one compact status card per
+  onboard research laboratory.
+- Added stock-compatible laboratory telemetry for stored data and science,
+  crew and scientist readiness, current science production, and a decay-aware
+  estimate of when each active lab will reach its science capacity.
+- Added one-shot lab-capacity alarms with saved 30- or 60-minute lead defaults;
+  automatic provider selection prefers Kerbal Alarm Clock and falls back to
+  KSP's stock alarm manager, with configurable KAC alarm actions.
+- Added a per-lab control that invokes KSP's stock `Transmit Science` action
+  for accumulated lab science only; stored experiment data is never included.
+- Added a context-aware per-lab `Start Research` / `Stop Research` control that
+  invokes the selected converter's matching stock PAW action.
 
 ## v0.4.2 - Mission Control vessel management
 

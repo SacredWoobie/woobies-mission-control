@@ -5,6 +5,9 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ScienceAlarmResult,
+  ScienceLabResearchResult,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -17,6 +20,9 @@ export interface LiveTelemetryState {
   overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
+  scienceAlarmResult?: ScienceAlarmResult;
+  scienceLabResearchResult?: ScienceLabResearchResult;
+  scienceLabTransmitResult?: ScienceLabTransmitResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -53,6 +59,9 @@ export class TelemetryStore {
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+        onScienceAlarmResult?(result: ScienceAlarmResult): void;
+        onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
+        onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -90,6 +99,15 @@ export class TelemetryStore {
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
       },
+      onScienceAlarmResult: (scienceAlarmResult) => {
+        this.patch({ scienceAlarmResult });
+      },
+      onScienceLabResearchResult: (scienceLabResearchResult) => {
+        this.patch({ scienceLabResearchResult });
+      },
+      onScienceLabTransmitResult: (scienceLabTransmitResult) => {
+        this.patch({ scienceLabTransmitResult });
+      },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
       },
@@ -108,6 +126,9 @@ export class TelemetryStore {
             overviewVesselEditResult: undefined,
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
+            scienceAlarmResult: undefined,
+            scienceLabResearchResult: undefined,
+            scienceLabTransmitResult: undefined,
           } : {}),
         });
       },
@@ -117,6 +138,9 @@ export class TelemetryStore {
       frameCount: 0,
       lastFrameAt: null,
       message: undefined,
+      scienceAlarmResult: undefined,
+      scienceLabResearchResult: undefined,
+      scienceLabTransmitResult: undefined,
       snapshot: null,
       status: "connecting",
     });

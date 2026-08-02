@@ -2030,6 +2030,15 @@ def _apply_telemetry_command(conn, command):
     if _mission_planning.apply_command(conn, command):
         return
 
+    if command.get("type") == "science.alarm.create":
+        return _apply_science_alarm_command(conn, command)
+
+    if command.get("type") == "science.lab.transmit":
+        return _apply_science_lab_transmit_command(conn, command)
+
+    if command.get("type") == "science.lab.research":
+        return _apply_science_lab_research_command(conn, command)
+
     if command.get("type") == "overview.vessel.switch":
         return _apply_overview_vessel_switch_command(conn, command)
 
@@ -2182,11 +2191,436 @@ def _optional_service_list(service, method_name):
         return []
 
 
+def _science_lab_number(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+def _science_alarm_capabilities(conn):
+    providers = {"kac": False, "stock": False}
+    try:
+        providers["stock"] = conn.space_center.alarm_manager is not None
+    except Exception:
+        pass
+    try:
+        providers["kac"] = bool(conn.kerbal_alarm_clock.available)
+    except Exception:
+        pass
+    return providers
+
+
+def _science_lab_transmit_result(request_id, lab_id, status, message):
+    return {
+        "type": "science.lab.transmit.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_science_lab_transmit_command(conn, command):
+    """Invoke only the selected ModuleScienceLab stock Transmit Science event."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+    ):
+        return None
+
+    def result(status, message):
+        return _science_lab_transmit_result(
+            request_id, lab_id, status, message,
+        )
+
+    try:
+        service = conn.vessel_science
+        labs = _gather_science_labs(service)
+        if labs is None:
+            return result("error", "Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return result("error", "The selected science lab is no longer aboard.")
+        if _science_lab_number(lab.get("scienceStored"), 0.0) <= 1.0:
+            return result("error", "The selected science lab needs more than 1 science to transmit.")
+
+        transmit = getattr(service, "transmit_lab_science", None)
+        if not callable(transmit):
+            return result("error", "Science transmission requires the current service update.")
+        if not bool(transmit(lab_id)):
+            return result("error", "KSP did not invoke the selected lab's Transmit Science event.")
+        return result(
+            "accepted",
+            f"Transmit Science invoked for {lab.get('title') or 'science lab'}.",
+        )
+    except Exception as error:
+        return result("error", f"The lab's Transmit Science event failed: {error}")
+
+
+def _science_lab_research_result(
+        request_id, lab_id, enabled, status, message):
+    return {
+        "type": "science.lab.research.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "enabled": enabled,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_science_lab_research_command(conn, command):
+    """Invoke the selected lab converter's stock Start/Stop Research event."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    enabled = command.get("enabled")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+        or not isinstance(enabled, bool)
+    ):
+        return None
+
+    def result(status, message):
+        return _science_lab_research_result(
+            request_id, lab_id, enabled, status, message,
+        )
+
+    try:
+        service = conn.vessel_science
+        labs = _gather_science_labs(service)
+        if labs is None:
+            return result("error", "Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return result("error", "The selected science lab is no longer aboard.")
+        if not lab.get("converterAvailable"):
+            return result("error", "The selected science lab has no research converter.")
+
+        set_enabled = getattr(service, "set_lab_research_enabled", None)
+        if not callable(set_enabled):
+            return result("error", "Research control requires the current service update.")
+        if not bool(set_enabled(lab_id, enabled)):
+            action = "Start Research" if enabled else "Stop Research"
+            return result("error", f"KSP did not apply the selected lab's {action} event.")
+        action = "started" if enabled else "stopped"
+        return result(
+            "accepted",
+            f"Research {action} for {lab.get('title') or 'science lab'}.",
+        )
+    except Exception as error:
+        action = "Start Research" if enabled else "Stop Research"
+        return result("error", f"The lab's {action} event failed: {error}")
+
+
+def _science_alarm_result(
+        request_id, lab_id, status, message, provider=None,
+        trigger_ut=None, lead_seconds=None):
+    result = {
+        "type": "science.alarm.create.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "status": status,
+        "message": message,
+    }
+    if provider in ("kac", "stock"):
+        result["provider"] = provider
+    if trigger_ut is not None:
+        result["triggerUT"] = trigger_ut
+    if lead_seconds is not None:
+        result["leadSeconds"] = lead_seconds
+    return result
+
+
+def _apply_science_alarm_command(conn, command):
+    """Create one manually scheduled alarm from a freshly computed lab ETA."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    preference = command.get("provider")
+    lead_seconds = command.get("leadSeconds")
+    kac_action = command.get("kacAction")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+        or preference not in ("auto", "kac", "stock")
+        or lead_seconds not in (1800, 3600)
+        or kac_action not in ("kill_warp", "pause_game", "message_only", "do_nothing")
+    ):
+        return None
+
+    def reject(message):
+        return _science_alarm_result(
+            request_id, lab_id, "error", message,
+            lead_seconds=lead_seconds,
+        )
+
+    try:
+        sc = conn.space_center
+        vessel = sc.active_vessel
+        if vessel is None:
+            return reject("No active Flight vessel is available.")
+        labs = _gather_science_labs(conn.vessel_science)
+        if labs is None:
+            return reject("Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return reject("The selected science lab is no longer aboard.")
+        completion_kind = lab.get("etaKind")
+        if lab.get("state") != "researching" or completion_kind not in ("finite", "depleted"):
+            return reject("The selected science lab no longer has a finite completion estimate.")
+        eta_seconds = _science_lab_number(lab.get("etaSeconds"), -1.0)
+        current_ut = _science_lab_number(sc.ut, -1.0)
+        if eta_seconds <= 0 or current_ut < 0:
+            return reject("The science alarm time could not be calculated.")
+
+        providers = _science_alarm_capabilities(conn)
+        if preference == "auto":
+            provider = "kac" if providers["kac"] else "stock" if providers["stock"] else None
+        else:
+            provider = preference if providers[preference] else None
+        if provider is None:
+            label = "KAC" if preference == "kac" else "Stock" if preference == "stock" else "KAC or Stock"
+            return reject(f"{label} alarm creation is unavailable.")
+
+        trigger_delay = max(60.0, eta_seconds - lead_seconds)
+        trigger_ut = current_ut + trigger_delay
+        vessel_name = str(getattr(vessel, "name", "Vessel") or "Vessel").strip()[:80]
+        lab_title = str(lab.get("title") or "Science lab").strip()[:100]
+        reaches_capacity = completion_kind == "finite"
+        title = (
+            f"{vessel_name} science lab nearly full"
+            if reaches_capacity
+            else f"{vessel_name} science lab research nearly complete"
+        )
+        completion_description = (
+            "reach science capacity"
+            if reaches_capacity
+            else "reach its practical data-depletion cutoff"
+        )
+        description = (
+            f"{lab_title} is estimated to {completion_description} at UT "
+            f"{current_ut + eta_seconds:.1f}. Created by Woobie's Mission Control "
+            f"with a {lead_seconds // 60}-minute lead from the current lab state."
+        )
+
+        if provider == "kac":
+            kac = conn.kerbal_alarm_clock
+            alarm = kac.create_alarm(kac.AlarmType.raw, title, trigger_ut)
+            try:
+                alarm.action = getattr(kac.AlarmAction, kac_action)
+                if alarm.action != getattr(kac.AlarmAction, kac_action):
+                    raise RuntimeError("KAC did not retain the requested alarm action.")
+            except Exception as error:
+                try:
+                    alarm.remove()
+                except Exception:
+                    pass
+                return reject(f"KAC could not apply the requested alarm action: {error}")
+            try:
+                alarm.vessel = vessel
+            except Exception:
+                pass
+            try:
+                alarm.notes = description
+            except Exception:
+                pass
+        else:
+            sc.alarm_manager.add_vessel_alarm(
+                trigger_delay, vessel, title, description,
+            )
+
+        return _science_alarm_result(
+            request_id,
+            lab_id,
+            "accepted",
+            f"{provider.upper() if provider == 'kac' else 'Stock'} alarm set "
+            f"{lead_seconds // 60} minutes before estimated "
+            f"{'capacity' if reaches_capacity else 'data depletion'}.",
+            provider=provider,
+            trigger_ut=round(trigger_ut, 1),
+            lead_seconds=lead_seconds,
+        )
+    except Exception as error:
+        return reject(f"The science alarm could not be created: {error}")
+
+
+def _science_lab_state(row):
+    science = row["scienceStored"]
+    science_capacity = row["scienceCapacity"]
+    data = row["dataStored"]
+    if not row["converterAvailable"]:
+        return "unavailable"
+    if science_capacity > 0 and science >= science_capacity - 1e-3:
+        return "science-full"
+    if data <= 1e-6:
+        return "no-data"
+    if row["scientistCount"] <= 0 or row["scientistFactor"] <= 0:
+        return "no-scientist"
+    if not row["operational"] or row["crewCount"] + 1e-6 < row["crewRequired"]:
+        return "insufficient-crew"
+    if not row["researchEnabled"]:
+        return "stopped"
+    if row["calculatedSciencePerDay"] <= 0:
+        return "stalled"
+    return "researching"
+
+
+def _science_lab_eta(row, day_seconds):
+    state = row["state"]
+    if state == "science-full":
+        return "full", 0.0
+    if state != "researching":
+        return state, None
+
+    science = row["scienceStored"]
+    science_capacity = row["scienceCapacity"]
+    data = row["dataStored"]
+    multiplier = row["scienceMultiplier"]
+    rate = row["calculatedSciencePerDay"]
+    if day_seconds <= 0 or science_capacity <= 0 or data <= 0 or multiplier <= 0 or rate <= 0:
+        return "unavailable", None
+
+    science_needed = max(0.0, science_capacity - science)
+    potential_science = multiplier * data
+    if science_needed <= 1e-6:
+        return "full", 0.0
+    if science_needed < potential_science - 1e-6:
+        eta_kind = "finite"
+        remaining_potential = potential_science - science_needed
+    else:
+        # Science production decays exponentially with the remaining data and
+        # reaches literal zero only at infinite time. Treat the data as spent
+        # after 99.9% of its convertible science has been produced, or once no
+        # more than 0.1 science remains, whichever happens first.
+        eta_kind = "depleted"
+        remaining_potential = min(
+            potential_science,
+            max(0.1, potential_science * 0.001),
+        )
+    try:
+        seconds = (
+            day_seconds * potential_science / rate
+            * math.log(potential_science / remaining_potential)
+        )
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return "unavailable", None
+    if not math.isfinite(seconds) or seconds < 0:
+        return "unavailable", None
+    return eta_kind, seconds
+
+
+def _gather_science_labs(service):
+    try:
+        reported_count = max(0, int(service.lab_count()))
+        day_seconds = max(0, int(service.lab_day_seconds()))
+        failed_count = max(0, int(service.failed_lab_count()))
+        columns = {
+            "ids": list(service.lab_ids()),
+            "titles": list(service.lab_part_titles()),
+            "dataStored": list(service.lab_data_stored()),
+            "dataCapacity": list(service.lab_data_capacities()),
+            "scienceStored": list(service.lab_science_stored()),
+            "scienceCapacity": list(service.lab_science_capacities()),
+            "calculatedSciencePerDay": list(service.lab_calculated_science_rates()),
+            "scienceMultiplier": list(service.lab_science_multipliers()),
+            "crewCount": list(service.lab_crew_counts()),
+            "scientistCount": list(service.lab_scientist_counts()),
+            "crewRequired": list(service.lab_crew_required()),
+            "scientistFactor": list(service.lab_scientist_factors()),
+            "converterAvailable": list(service.lab_converters_available()),
+            "researchEnabled": list(service.lab_research_enabled()),
+            "operational": list(service.lab_operational()),
+            "converterStatus": list(service.lab_converter_statuses()),
+            "lastTimeFactor": list(service.lab_last_time_factors()),
+        }
+    except Exception:
+        # Older WoobiesControlStats builds have no lab procedures. Omit the
+        # capability instead of claiming that the vessel has no labs.
+        return None
+
+    aligned_count = min([reported_count] + [len(values) for values in columns.values()])
+    rows = []
+    for index in range(aligned_count):
+        row = {
+            "id": str(columns["ids"][index] or f"lab-{index}"),
+            "title": str(columns["titles"][index] or "Science lab"),
+            "dataStored": _science_lab_number(columns["dataStored"][index]),
+            "dataCapacity": _science_lab_number(columns["dataCapacity"][index]),
+            "scienceStored": _science_lab_number(columns["scienceStored"][index]),
+            "scienceCapacity": _science_lab_number(columns["scienceCapacity"][index]),
+            "calculatedSciencePerDay": _science_lab_number(
+                columns["calculatedSciencePerDay"][index]
+            ),
+            "scienceMultiplier": _science_lab_number(columns["scienceMultiplier"][index]),
+            "crewCount": max(0, int(_science_lab_number(columns["crewCount"][index]))),
+            "scientistCount": max(
+                0, int(_science_lab_number(columns["scientistCount"][index]))
+            ),
+            "crewRequired": max(0.0, _science_lab_number(columns["crewRequired"][index])),
+            "scientistFactor": max(
+                0.0, _science_lab_number(columns["scientistFactor"][index])
+            ),
+            "converterAvailable": bool(columns["converterAvailable"][index]),
+            "researchEnabled": bool(columns["researchEnabled"][index]),
+            "operational": bool(columns["operational"][index]),
+            "converterStatus": str(columns["converterStatus"][index] or ""),
+            "lastTimeFactor": _science_lab_number(columns["lastTimeFactor"][index]),
+        }
+        row["state"] = _science_lab_state(row)
+        row["sciencePerDay"] = (
+            row["calculatedSciencePerDay"] if row["state"] == "researching" else 0.0
+        )
+        eta_kind, eta_seconds = _science_lab_eta(row, day_seconds)
+        row["etaKind"] = eta_kind
+        if eta_seconds is not None:
+            row["etaSeconds"] = round(eta_seconds, 1)
+        rows.append(row)
+
+    return {
+        "sci.krpc.labTelemetryAvailable": True,
+        "sci.krpc.labDaySeconds": day_seconds,
+        "sci.krpc.labCount": reported_count,
+        "sci.krpc.failedLabCount": failed_count,
+        "sci.krpc.malformedLabCount": max(0, reported_count - aligned_count),
+        "sci.krpc.labs": rows,
+    }
+
+
 def _gather_science(conn, vessel):
+    alarm_capabilities = {
+        "sci.alarmProviders": _science_alarm_capabilities(conn),
+    }
     try:
         service = conn.vessel_science
         if not service.available:
-            return _gather_science_stock(vessel)
+            result = _gather_science_stock(vessel)
+            result.update(alarm_capabilities)
+            return result
 
         titles = list(service.titles())
         values = list(service.science_values())
@@ -2234,6 +2668,10 @@ def _gather_science(conn, vessel):
             "sci.krpc.backend": "VesselScience",
         }
 
+        labs = _gather_science_labs(service)
+        if labs is not None:
+            result.update(labs)
+
         for key, method_name in (
             ("sci.krpc.containerCount", "container_count"),
             ("sci.krpc.failedContainerCount", "failed_container_count"),
@@ -2243,9 +2681,12 @@ def _gather_science(conn, vessel):
                 result[key] = getattr(service, method_name)()
             except Exception:
                 pass
+        result.update(alarm_capabilities)
         return result
     except Exception:
-        return _gather_science_stock(vessel)
+        result = _gather_science_stock(vessel)
+        result.update(alarm_capabilities)
+        return result
 
 
 # ---------------------------------------------------------------------------

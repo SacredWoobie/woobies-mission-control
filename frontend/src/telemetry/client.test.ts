@@ -5,11 +5,14 @@ import {
   parseOverviewVesselEditResult,
   parseOverviewVesselLifecycleResult,
   parseOverviewVesselSwitchResult,
+  parseScienceAlarmResult,
+  parseScienceLabResearchResult,
+  parseScienceLabTransmitResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, ScienceAlarmResult, ScienceLabResearchResult, ScienceLabTransmitResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -164,7 +167,153 @@ describe("parseOverviewVesselLifecycleResult", () => {
   });
 });
 
+describe("parseScienceAlarmResult", () => {
+  it("accepts finite typed alarm results and rejects unsupported providers", () => {
+    expect(parseScienceAlarmResult({
+      type: "science.alarm.create.result",
+      requestId: "alarm-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "Alarm set.",
+      provider: "kac",
+      triggerUT: 9700084.3,
+      leadSeconds: 3600,
+    })?.provider).toBe("kac");
+    expect(parseScienceAlarmResult({
+      type: "science.alarm.create.result",
+      requestId: "alarm-2",
+      labId: "42:1",
+      status: "accepted",
+      message: "Alarm set.",
+      provider: "other",
+    })).toBeNull();
+  });
+});
+
+describe("parseScienceLabTransmitResult", () => {
+  it("accepts typed stock lab transmission results", () => {
+    expect(parseScienceLabTransmitResult({
+      type: "science.lab.transmit.result",
+      requestId: "transmit-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "Transmit Science invoked.",
+    })?.labId).toBe("42:1");
+    expect(parseScienceLabTransmitResult({
+      type: "science.lab.transmit.result",
+      requestId: "",
+      labId: "42:1",
+      status: "accepted",
+      message: "Malformed.",
+    })).toBeNull();
+  });
+});
+
+describe("parseScienceLabResearchResult", () => {
+  it("accepts typed stock lab research results", () => {
+    expect(parseScienceLabResearchResult({
+      type: "science.lab.research.result",
+      requestId: "research-1",
+      labId: "42:1",
+      enabled: true,
+      status: "accepted",
+      message: "Research started.",
+    })?.enabled).toBe(true);
+    expect(parseScienceLabResearchResult({
+      type: "science.lab.research.result",
+      requestId: "research-2",
+      labId: "42:1",
+      enabled: "yes",
+      status: "accepted",
+      message: "Malformed.",
+    })).toBeNull();
+  });
+});
+
 describe("TelemetryClient", () => {
+  it("routes validated lab research results outside the snapshot stream", () => {
+    const socket = new FakeSocket();
+    const results: ScienceLabResearchResult[] = [];
+    const snapshots: TelemetrySnapshot[] = [];
+    const client = new TelemetryClient("ws://127.0.0.1:8090", {
+      onScienceLabResearchResult: (result) => results.push(result),
+      onSnapshot: (snapshot) => snapshots.push(snapshot),
+      onStatus: () => undefined,
+    }, { createSocket: () => socket });
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "science.lab.research.result",
+      requestId: "research-1",
+      labId: "42:1",
+      enabled: false,
+      status: "accepted",
+      message: "Research stopped.",
+    }));
+
+    expect(results).toHaveLength(1);
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes validated lab transmission results outside the snapshot stream", () => {
+    const socket = new FakeSocket();
+    const results: ScienceLabTransmitResult[] = [];
+    const snapshots: TelemetrySnapshot[] = [];
+    const client = new TelemetryClient("ws://127.0.0.1:8090", {
+      onScienceLabTransmitResult: (result) => results.push(result),
+      onSnapshot: (snapshot) => snapshots.push(snapshot),
+      onStatus: () => undefined,
+    }, { createSocket: () => socket });
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "science.lab.transmit.result",
+      requestId: "transmit-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "Transmit Science invoked.",
+    }));
+
+    expect(results).toHaveLength(1);
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes validated science alarm results outside the snapshot stream", () => {
+    const socket = new FakeSocket();
+    const results: ScienceAlarmResult[] = [];
+    const snapshots: TelemetrySnapshot[] = [];
+    const client = new TelemetryClient("ws://127.0.0.1:8090", {
+      onScienceAlarmResult: (result) => results.push(result),
+      onSnapshot: (snapshot) => snapshots.push(snapshot),
+      onStatus: () => undefined,
+    }, { createSocket: () => socket });
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "science.alarm.create.result",
+      requestId: "alarm-1",
+      labId: "42:1",
+      status: "accepted",
+      message: "KAC alarm set.",
+      provider: "kac",
+      triggerUT: 9700084.3,
+      leadSeconds: 3600,
+    }));
+    socket.message(JSON.stringify({
+      type: "science.alarm.create.result",
+      requestId: "",
+      labId: "42:1",
+      status: "accepted",
+      message: "Malformed.",
+    }));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].provider).toBe("kac");
+    expect(snapshots).toEqual([]);
+  });
   it("publishes snapshots and sends existing dashboard commands when linked", () => {
     const sockets: FakeSocket[] = [];
     const statuses: ConnectionStatus[] = [];

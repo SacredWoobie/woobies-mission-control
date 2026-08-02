@@ -117,6 +117,74 @@ export interface ScienceExperimentTelemetry {
   sourceKind?: string;
 }
 
+export type ScienceLabState =
+  | "researching"
+  | "science-full"
+  | "no-data"
+  | "no-scientist"
+  | "insufficient-crew"
+  | "stopped"
+  | "stalled"
+  | "unavailable";
+
+export type ScienceLabEtaKind = ScienceLabState | "finite" | "depleted" | "full";
+
+export interface ScienceLabTelemetry {
+  id: string;
+  title: string;
+  dataStored?: number;
+  dataCapacity?: number;
+  scienceStored?: number;
+  scienceCapacity?: number;
+  calculatedSciencePerDay?: number;
+  sciencePerDay?: number;
+  scienceMultiplier?: number;
+  crewCount?: number;
+  scientistCount?: number;
+  crewRequired?: number;
+  scientistFactor?: number;
+  converterAvailable?: boolean;
+  researchEnabled?: boolean;
+  operational?: boolean;
+  converterStatus?: string;
+  lastTimeFactor?: number;
+  state: ScienceLabState;
+  etaKind: ScienceLabEtaKind;
+  etaSeconds?: number;
+}
+
+export type ScienceAlarmProviderPreference = "auto" | "kac" | "stock";
+export type ScienceAlarmProvider = "kac" | "stock";
+export type ScienceAlarmAction = "kill_warp" | "pause_game" | "message_only" | "do_nothing";
+
+export interface ScienceAlarmResult {
+  type: "science.alarm.create.result";
+  requestId: string;
+  labId: string;
+  status: "accepted" | "error";
+  message: string;
+  provider?: ScienceAlarmProvider;
+  triggerUT?: number;
+  leadSeconds?: number;
+}
+
+export interface ScienceLabTransmitResult {
+  type: "science.lab.transmit.result";
+  requestId: string;
+  labId: string;
+  status: "accepted" | "error";
+  message: string;
+}
+
+export interface ScienceLabResearchResult {
+  type: "science.lab.research.result";
+  requestId: string;
+  labId: string;
+  enabled: boolean;
+  status: "accepted" | "error";
+  message: string;
+}
+
 export interface OverviewVesselTelemetry {
   objectId?: string;
   guid?: string;
@@ -421,6 +489,13 @@ export interface TelemetrySnapshot {
   "sci.krpc.count"?: number;
   "sci.krpc.experiments"?: ScienceExperimentTelemetry[];
   "sci.krpc.backend"?: string;
+  "sci.krpc.labTelemetryAvailable"?: boolean;
+  "sci.krpc.labDaySeconds"?: number;
+  "sci.krpc.labCount"?: number;
+  "sci.krpc.failedLabCount"?: number;
+  "sci.krpc.malformedLabCount"?: number;
+  "sci.krpc.labs"?: ScienceLabTelemetry[];
+  "sci.alarmProviders"?: Record<ScienceAlarmProvider, boolean>;
   "career.science"?: number;
   "tar.name"?: string;
   "tar.type"?: string;
@@ -524,6 +599,9 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
+  | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
+  | { type: "science.lab.transmit"; requestId: string; labId: string }
+  | { type: "science.lab.research"; requestId: string; labId: string; enabled: boolean }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }

@@ -226,7 +226,23 @@ function LiveClockPanel() { const snapshot = useLiveFlightSnapshot(clockSnapshot
 function LiveConsumablesPanel() { const snapshot = useLiveFlightSnapshot(consumablesSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ConsumablesPanel snapshot={snapshot} /> : null; }
 function LiveElectricityPanel() { const snapshot = useLiveFlightSnapshot(electricitySnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ElectricityPanel snapshot={snapshot} /> : null; }
 function LiveHeatPanel() { const snapshot = useLiveFlightSnapshot(heatSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <HeatPanel snapshot={snapshot} /> : null; }
-function LiveSciencePanel() { const snapshot = useLiveFlightSnapshot(scienceSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <SciencePanel snapshot={snapshot} /> : null; }
+function LiveSciencePanel() {
+  const liveState = useLiveTelemetrySelector(
+    (state) => ({
+      alarmResult: state.scienceAlarmResult,
+      researchResult: state.scienceLabResearchResult,
+      snapshot: state.snapshot,
+      transmitResult: state.scienceLabTransmitResult,
+    }),
+    (left, right) => scienceSnapshotsEqual(left.snapshot, right.snapshot)
+      && left.alarmResult === right.alarmResult
+      && left.researchResult === right.researchResult
+      && left.transmitResult === right.transmitResult,
+  );
+  return liveState.snapshot?.["context.mode"] === "flight"
+    ? <SciencePanel alarmResult={liveState.alarmResult} commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} researchResult={liveState.researchResult} snapshot={liveState.snapshot} transmitResult={liveState.transmitResult} />
+    : null;
+}
 function LiveStagingPanel() { const snapshot = useLiveFlightSnapshot(stagingSnapshotsEqual); return snapshot && snapshot["context.mode"] !== "inactive" ? <StagingPanel snapshot={snapshot} /> : null; }
 function LiveTargetPanel() { const snapshot = useLiveFlightSnapshot(targetSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : null; }
 function LivePinnedNotePanel() { const snapshot = useLiveFlightSnapshot(pinnedNoteSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["notes.pinned"] ? <PinnedNotePanel commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={snapshot} /> : null; }
