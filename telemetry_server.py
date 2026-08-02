@@ -108,6 +108,7 @@ _res_last_poll = 0.0
 _tgt_cache = {}
 _tgt_last_poll = 0.0
 _stage_cache = {}
+_stage_current_authority = {}
 _stage_last_poll = 0.0
 _stage_last_ut = None
 _stage_trace_last_published = None
@@ -909,6 +910,8 @@ def _current_stage(vessel, stage_snapshot=None):
             if _HAS_CURRENT_STAGE is None:
                 print("[telemetry] current-stage resources use stock kRPC.")
             _HAS_CURRENT_STAGE = True
+            if stage < 0:
+                return None
             return stage
         except Exception:
             if _HAS_CURRENT_STAGE is None:
@@ -928,6 +931,19 @@ def _current_stage(vessel, stage_snapshot=None):
         return stage
     except Exception:
         return None
+
+
+def _current_stage_authority(stage_result):
+    """Keep only a fresh, valid StageStats current-stage sample."""
+    if not isinstance(stage_result, dict):
+        return {}
+    try:
+        stage = int(stage_result["stage.currentKsp"])
+    except (KeyError, TypeError, ValueError):
+        return {}
+    if stage < 0:
+        return {}
+    return {"stage.currentKsp": stage}
 
 
 # ---------------------------------------------------------------------------
@@ -3162,7 +3178,8 @@ def _finalize_telemetry(conn, payload):
 
 
 def gather_telemetry(conn):
-    global _stage_cache, _stage_last_poll, _stage_last_ut
+    global _stage_cache, _stage_current_authority
+    global _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
     d = {}
 
@@ -3186,6 +3203,7 @@ def gather_telemetry(conn):
                 _stage_trace("cache_clear", reason="enter_flight",
                              previous=_stage_summary(_stage_cache))
                 _stage_cache = {}
+                _stage_current_authority = {}
                 _stage_last_poll = 0.0
                 _stage_last_ut = None
             _telemetry_mode = mode
@@ -3296,11 +3314,13 @@ def gather_telemetry(conn):
                 previousCache=_stage_summary(_stage_cache),
             )
             _stage_cache = {}
+            _stage_current_authority = {}
             _stage_last_poll = 0.0
         _stage_last_ut = universal_time
 
     if now - _stage_last_poll >= STAGE_POLL_SECONDS:
         _stage_last_poll = now
+        result = {}
         try:
             result = _gather_stages(conn)
             if result:
@@ -3313,11 +3333,15 @@ def gather_telemetry(conn):
                 )
         except Exception:
             pass  # keep last good cache through scene changes
+        # The staging panel intentionally retains its last good display cache,
+        # but resource partitioning must fail closed when this poll did not
+        # produce a fresh current-stage value.
+        _stage_current_authority = _current_stage_authority(result)
     d.update(_stage_cache)
     _trace_stage_publish(d, "flight")
 
     # ---- current stage index ----
-    cs = _current_stage(vessel, _stage_cache)
+    cs = _current_stage(vessel, _stage_current_authority)
     if cs is not None:
         d["krpc.currentStage"] = cs
 

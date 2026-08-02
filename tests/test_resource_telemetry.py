@@ -61,6 +61,25 @@ class ResourceTelemetryTests(unittest.TestCase):
             )
         )
 
+    def test_negative_stock_stage_fails_closed(self):
+        self.assertIsNone(
+            telemetry_server._current_stage(
+                FakeVessel(stock_stage=-1),
+                {"stage.currentKsp": 7},
+            )
+        )
+        self.assertTrue(telemetry_server._HAS_CURRENT_STAGE)
+
+    def test_failed_stage_poll_invalidates_current_stage_authority(self):
+        authority = telemetry_server._current_stage_authority({
+            "stage.available": True,
+            "stage.currentKsp": 7,
+        })
+        self.assertEqual(authority, {"stage.currentKsp": 7})
+
+        authority = telemetry_server._current_stage_authority({})
+        self.assertEqual(authority, {})
+
     def test_explicit_fallback_stage_populates_current_resource_values(self):
         vessel = FakeVessel()
         with mock.patch.object(
