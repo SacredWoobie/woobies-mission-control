@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Prevent rapidly changing reactor output from appearing as a transient
+  `Other` electricity source by reconciling per-source reads between two total
+  generation samples.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated

@@ -30,7 +30,10 @@ from pathlib import Path
 import krpc
 from krpc.services.spacecenter import VesselType as KRPCVesselType
 
-from electricity import ElectricityFlowEstimator, generation_remainder
+from electricity import (
+    ElectricityFlowEstimator,
+    bracketed_generation_remainder,
+)
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
@@ -3389,6 +3392,16 @@ def gather_telemetry(conn):
         _elec_last_poll = now
         elec = {}
 
+        # Bracket the sequential per-reactor reads with total-generation
+        # samples. Reactor output can change while the RPCs below are in flight;
+        # a residual that exists at only one endpoint is timing skew, not an
+        # `Other` generator family.
+        service_total_before = None
+        try:
+            service_total_before = conn.system_heat.total_electrical_generation()
+        except Exception:
+            pass
+
         try:
             sh = conn.system_heat
             reactors = []
@@ -3439,15 +3452,21 @@ def gather_telemetry(conn):
         # alternators, and any modded producer the service could read.
         try:
             sh = conn.system_heat
-            service_total = sh.total_electrical_generation()  # excludes solar
-            total_gen = service_total + solar_ec
+            service_total_after = service_total_before
+            try:
+                service_total_after = sh.total_electrical_generation()  # excludes solar
+            except Exception:
+                pass
+            if service_total_after is None:
+                raise RuntimeError("SystemHeat generation total unavailable")
+            total_gen = service_total_after + solar_ec
 
             reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
             rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
-            other = generation_remainder(
-                total_gen,
+            other = bracketed_generation_remainder(
+                service_total_before,
+                service_total_after,
                 reactor_sum,
-                solar_ec,
                 rtg_ec,
             )
 
