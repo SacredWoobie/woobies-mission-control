@@ -366,7 +366,7 @@ export function SciencePanel({
               lab={lab}
             />;
           })}</div>
-          : <div className="sci-lab-empty">No research labs aboard</div>
+          : null
       ) : (
         <div className="sci-lab-empty unavailable">Lab telemetry unavailable · service update required</div>
       )}

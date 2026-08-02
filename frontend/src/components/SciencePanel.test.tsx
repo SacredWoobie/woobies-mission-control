@@ -65,7 +65,7 @@ describe("SciencePanel", () => {
     expect(screen.getByLabelText("Science laboratories").children).toHaveLength(2);
   });
 
-  it("does not confuse a legacy DLL with a vessel that has no labs", () => {
+  it("distinguishes a legacy DLL but omits a known-empty lab section", () => {
     const { rerender } = renderPanel({
       "context.mode": "flight",
       "sci.krpc.total": 0,
@@ -80,7 +80,9 @@ describe("SciencePanel", () => {
       "sci.krpc.labTelemetryAvailable": true,
       "sci.krpc.labs": [],
     }} /></PanelVisibilityProvider>);
-    expect(screen.getByText("No research labs aboard", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("No research labs aboard", { exact: true })).toBeNull();
+    expect(screen.queryByLabelText("Science laboratories")).toBeNull();
+    expect(screen.getByText("Recoverable", { exact: true })).toBeTruthy();
   });
 
   it("preserves fixed experiment-column precision and source metadata", () => {

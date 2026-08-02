@@ -11,7 +11,8 @@ All notable public changes will be recorded here.
   in the starting step instead of requiring a redundant same-body orbit stop.
 - Reworked the Flight science panel to match the dashboard's newer instrument
   styling, with a recoverable-science overview and one compact status card per
-  onboard research laboratory.
+  onboard research laboratory; vessels without labs omit the non-actionable
+  laboratory section entirely.
 - Added stock-compatible laboratory telemetry for stored data and science,
   crew and scientist readiness, current science production, and a decay-aware
   estimate of when each active lab will reach its science capacity.
