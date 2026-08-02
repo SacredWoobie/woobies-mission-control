@@ -176,14 +176,14 @@ NOTES_FAVORITES_PATH = _default_notes_favorites_path()
 _stage_partition_cache = None
 
 # kRPC builds differ in whether vessel.control.current_stage is available. Probe
-# it once at runtime and retain the result.
+# the stock property once and retain the result. StageStats 0.2.7 exposes KSP's
+# direct vessel.currentStage value as a compatibility fallback.
 #   None  = not probed yet
 #   True  = present, use it
-#   False = absent, leave the stage-resource column blank. (Note: KRPC.StageStats
-#           now also reports the current KSP stage via stage.currentKsp, so the
-#           dashboard is no longer blind to current stage even when this is False;
-#           this flag only gates the per-stage RESOURCE breakdown.)
+#   False = absent, try StageStats instead
 _HAS_CURRENT_STAGE = None
+_STAGE_STATS_CURRENT_STAGE_REPORTED = False
+_CURRENT_STAGE_UNSET = object()
 
 
 # ---------------------------------------------------------------------------
@@ -900,29 +900,40 @@ def _current_stage_resource_values(vessel, current_stage):
     return None, None, {}
 
 
-def _current_stage(vessel):
-    """Current stage index, or None if this kRPC build doesn't expose it."""
-    global _HAS_CURRENT_STAGE
-    if _HAS_CURRENT_STAGE is False:
+def _current_stage(vessel, stage_snapshot=None):
+    """Return the active KSP stage from stock kRPC or StageStats."""
+    global _HAS_CURRENT_STAGE, _STAGE_STATS_CURRENT_STAGE_REPORTED
+    if _HAS_CURRENT_STAGE is not False:
+        try:
+            stage = int(vessel.control.current_stage)
+            if _HAS_CURRENT_STAGE is None:
+                print("[telemetry] current-stage resources use stock kRPC.")
+            _HAS_CURRENT_STAGE = True
+            return stage
+        except Exception:
+            if _HAS_CURRENT_STAGE is None:
+                print("[telemetry] stock kRPC does not expose the current stage; "
+                      "trying StageStats.")
+            _HAS_CURRENT_STAGE = False
+
+    if not isinstance(stage_snapshot, dict):
         return None
     try:
-        s = int(vessel.control.current_stage)
-        if _HAS_CURRENT_STAGE is None:
-            print("[telemetry] current-stage resources are available.")
-        _HAS_CURRENT_STAGE = True
-        return s
+        stage = int(stage_snapshot["stage.currentKsp"])
+        if stage < 0:
+            return None
+        if not _STAGE_STATS_CURRENT_STAGE_REPORTED:
+            print("[telemetry] current-stage resources use StageStats.")
+            _STAGE_STATS_CURRENT_STAGE_REPORTED = True
+        return stage
     except Exception:
-        if _HAS_CURRENT_STAGE is None:
-            print("[telemetry] this kRPC build does not expose the current stage; "
-                  "the current-stage resource column will remain blank.")
-        _HAS_CURRENT_STAGE = False
         return None
 
 
 # ---------------------------------------------------------------------------
 # Resources (vessel total + current stage)
 # ---------------------------------------------------------------------------
-def _gather_resources(vessel):
+def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
     """Return vessel and current-stage resources for dashboard rendering."""
     out = {}
     try:
@@ -939,7 +950,11 @@ def _gather_resources(vessel):
         except Exception:
             pass
 
-    stage = _current_stage(vessel)
+    stage = (
+        _current_stage(vessel)
+        if current_stage is _CURRENT_STAGE_UNSET
+        else current_stage
+    )
     # Distinguish an unavailable stage index from a valid stage with no resources.
     out["res.stageKnown"] = (stage is not None)
     if stage is not None:
@@ -3267,8 +3282,42 @@ def gather_telemetry(conn):
     except Exception:
         pass
 
-    # ---- current stage index (fed to the dashboard if this build has it) ----
-    cs = _current_stage(vessel)
+    # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
+    # Revert-to-launch rewinds universal time while the process and kRPC
+    # connection can remain alive. Never carry the previous flight's last good
+    # stage snapshot across that boundary. Gather this before resources so the
+    # same bounded StageStats poll can supply the current KSP stage when stock
+    # kRPC omits it.
+    if universal_time is not None:
+        if _stage_last_ut is not None and universal_time < _stage_last_ut:
+            _stage_trace(
+                "ut_rewind", previousUt=_stage_last_ut,
+                currentUt=universal_time,
+                previousCache=_stage_summary(_stage_cache),
+            )
+            _stage_cache = {}
+            _stage_last_poll = 0.0
+        _stage_last_ut = universal_time
+
+    if now - _stage_last_poll >= STAGE_POLL_SECONDS:
+        _stage_last_poll = now
+        try:
+            result = _gather_stages(conn)
+            if result:
+                previous_stage_cache = _stage_summary(_stage_cache)
+                _stage_cache = result
+                _stage_trace(
+                    "cache_replace", source="flight",
+                    previous=previous_stage_cache,
+                    current=_stage_summary(result),
+                )
+        except Exception:
+            pass  # keep last good cache through scene changes
+    d.update(_stage_cache)
+    _trace_stage_publish(d, "flight")
+
+    # ---- current stage index ----
+    cs = _current_stage(vessel, _stage_cache)
     if cs is not None:
         d["krpc.currentStage"] = cs
 
@@ -3302,7 +3351,7 @@ def gather_telemetry(conn):
     if now - _res_last_poll >= RES_POLL_SECONDS:
         _res_last_poll = now
         try:
-            r = _gather_resources(vessel)
+            r = _gather_resources(vessel, current_stage=cs)
             if r:
                 _res_cache = r
         except Exception:
@@ -3318,38 +3367,6 @@ def gather_telemetry(conn):
         except Exception:
             pass
     d.update(_tgt_cache)
-
-    # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
-    # Revert-to-launch rewinds universal time while the process and kRPC
-    # connection can remain alive. Never carry the previous flight's last good
-    # stage snapshot across that boundary.
-    if universal_time is not None:
-        if _stage_last_ut is not None and universal_time < _stage_last_ut:
-            _stage_trace(
-                "ut_rewind", previousUt=_stage_last_ut,
-                currentUt=universal_time,
-                previousCache=_stage_summary(_stage_cache),
-            )
-            _stage_cache = {}
-            _stage_last_poll = 0.0
-        _stage_last_ut = universal_time
-
-    if now - _stage_last_poll >= STAGE_POLL_SECONDS:
-        _stage_last_poll = now
-        try:
-            result = _gather_stages(conn)
-            if result:
-                previous_stage_cache = _stage_summary(_stage_cache)
-                _stage_cache = result
-                _stage_trace(
-                    "cache_replace", source="flight",
-                    previous=previous_stage_cache,
-                    current=_stage_summary(result),
-                )
-        except Exception:
-            pass  # keep last good cache through scene changes
-    d.update(_stage_cache)
-    _trace_stage_publish(d, "flight")
 
     # ---- science aboard: VesselScience, with stock experiment fallback ----
     global _sci_cache, _sci_last_poll

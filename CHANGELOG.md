@@ -2,6 +2,11 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Populate Flight's current-stage consumable resources from StageStats when the
+  installed kRPC core does not expose the active stage directly.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated
