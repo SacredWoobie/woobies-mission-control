@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Tightened the wide Flight status columns to their content like Mission
+  Control's program metrics, and hide Signal Delay when RemoteTech is not the
+  active communications provider.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated

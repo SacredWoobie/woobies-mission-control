@@ -54,6 +54,7 @@ test("the wide Flight context header remains one compact row", async ({ page }) 
 
   expect(layout.height).toBeLessThan(100);
   expect(layout.maxTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.clientWidth).toBeLessThan(1200);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
 });
 
