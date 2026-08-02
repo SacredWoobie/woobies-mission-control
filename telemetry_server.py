@@ -2013,6 +2013,9 @@ def _apply_telemetry_command(conn, command):
     if command.get("type") == "science.lab.transmit":
         return _apply_science_lab_transmit_command(conn, command)
 
+    if command.get("type") == "science.lab.research":
+        return _apply_science_lab_research_command(conn, command)
+
     if command.get("type") == "overview.vessel.switch":
         return _apply_overview_vessel_switch_command(conn, command)
 
@@ -2240,6 +2243,69 @@ def _apply_science_lab_transmit_command(conn, command):
         )
     except Exception as error:
         return result("error", f"The lab's Transmit Science event failed: {error}")
+
+
+def _science_lab_research_result(
+        request_id, lab_id, enabled, status, message):
+    return {
+        "type": "science.lab.research.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "enabled": enabled,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_science_lab_research_command(conn, command):
+    """Invoke the selected lab converter's stock Start/Stop Research event."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    enabled = command.get("enabled")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+        or not isinstance(enabled, bool)
+    ):
+        return None
+
+    def result(status, message):
+        return _science_lab_research_result(
+            request_id, lab_id, enabled, status, message,
+        )
+
+    try:
+        service = conn.vessel_science
+        labs = _gather_science_labs(service)
+        if labs is None:
+            return result("error", "Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return result("error", "The selected science lab is no longer aboard.")
+        if not lab.get("converterAvailable"):
+            return result("error", "The selected science lab has no research converter.")
+
+        set_enabled = getattr(service, "set_lab_research_enabled", None)
+        if not callable(set_enabled):
+            return result("error", "Research control requires the current service update.")
+        if not bool(set_enabled(lab_id, enabled)):
+            action = "Start Research" if enabled else "Stop Research"
+            return result("error", f"KSP did not apply the selected lab's {action} event.")
+        action = "started" if enabled else "stopped"
+        return result(
+            "accepted",
+            f"Research {action} for {lab.get('title') or 'science lab'}.",
+        )
+    except Exception as error:
+        action = "Start Research" if enabled else "Stop Research"
+        return result("error", f"The lab's {action} event failed: {error}")
 
 
 def _science_alarm_result(

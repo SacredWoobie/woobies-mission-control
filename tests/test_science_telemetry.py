@@ -273,6 +273,48 @@ class ScienceTelemetryTests(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertEqual(transmitted, [])
 
+    def test_starts_only_the_selected_labs_stock_research_converter(self):
+        service = LabService()
+        research_commands = []
+        service.set_lab_research_enabled = (
+            lambda lab_id, enabled: not research_commands.append((lab_id, enabled))
+        )
+        result = telemetry_server._apply_science_lab_research_command(
+            SimpleNamespace(vessel_science=service),
+            {
+                "type": "science.lab.research",
+                "requestId": "research-1",
+                "labId": "42:1",
+                "enabled": True,
+            },
+        )
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertTrue(result["enabled"])
+        self.assertEqual(research_commands, [("42:1", True)])
+        self.assertIn("Research started", result["message"])
+
+    def test_stops_only_the_selected_labs_stock_research_converter(self):
+        service = LabService()
+        research_commands = []
+        service.set_lab_research_enabled = (
+            lambda lab_id, enabled: not research_commands.append((lab_id, enabled))
+        )
+        result = telemetry_server._apply_science_lab_research_command(
+            SimpleNamespace(vessel_science=service),
+            {
+                "type": "science.lab.research",
+                "requestId": "research-2",
+                "labId": "42:1",
+                "enabled": False,
+            },
+        )
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertFalse(result["enabled"])
+        self.assertEqual(research_commands, [("42:1", False)])
+        self.assertIn("Research stopped", result["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

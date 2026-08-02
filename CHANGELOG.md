@@ -15,6 +15,8 @@ All notable public changes will be recorded here.
   KSP's stock alarm manager, with configurable KAC alarm actions.
 - Added a per-lab control that invokes KSP's stock `Transmit Science` action
   for accumulated lab science only; stored experiment data is never included.
+- Added a context-aware per-lab `Start Research` / `Stop Research` control that
+  invokes the selected converter's matching stock PAW action.
 
 ## v0.4.2 - Mission Control vessel management
 

@@ -6,6 +6,7 @@ import type {
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   ScienceAlarmResult,
+  ScienceLabResearchResult,
   ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -20,6 +21,7 @@ export interface LiveTelemetryState {
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
   scienceAlarmResult?: ScienceAlarmResult;
+  scienceLabResearchResult?: ScienceLabResearchResult;
   scienceLabTransmitResult?: ScienceLabTransmitResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
@@ -58,6 +60,7 @@ export class TelemetryStore {
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
         onScienceAlarmResult?(result: ScienceAlarmResult): void;
+        onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
         onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -99,6 +102,9 @@ export class TelemetryStore {
       onScienceAlarmResult: (scienceAlarmResult) => {
         this.patch({ scienceAlarmResult });
       },
+      onScienceLabResearchResult: (scienceLabResearchResult) => {
+        this.patch({ scienceLabResearchResult });
+      },
       onScienceLabTransmitResult: (scienceLabTransmitResult) => {
         this.patch({ scienceLabTransmitResult });
       },
@@ -121,6 +127,7 @@ export class TelemetryStore {
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
             scienceAlarmResult: undefined,
+            scienceLabResearchResult: undefined,
             scienceLabTransmitResult: undefined,
           } : {}),
         });
@@ -132,6 +139,7 @@ export class TelemetryStore {
       lastFrameAt: null,
       message: undefined,
       scienceAlarmResult: undefined,
+      scienceLabResearchResult: undefined,
       scienceLabTransmitResult: undefined,
       snapshot: null,
       status: "connecting",

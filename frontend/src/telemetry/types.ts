@@ -176,6 +176,15 @@ export interface ScienceLabTransmitResult {
   message: string;
 }
 
+export interface ScienceLabResearchResult {
+  type: "science.lab.research.result";
+  requestId: string;
+  labId: string;
+  enabled: boolean;
+  status: "accepted" | "error";
+  message: string;
+}
+
 export interface OverviewVesselTelemetry {
   objectId?: string;
   guid?: string;
@@ -592,6 +601,7 @@ export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
   | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
   | { type: "science.lab.transmit"; requestId: string; labId: string }
+  | { type: "science.lab.research"; requestId: string; labId: string; enabled: boolean }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }

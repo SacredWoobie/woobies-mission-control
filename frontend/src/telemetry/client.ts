@@ -5,6 +5,7 @@ import type {
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   ScienceAlarmResult,
+  ScienceLabResearchResult,
   ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -24,6 +25,7 @@ export interface WebSocketTransport {
 
 interface TelemetryClientCallbacks {
   onScienceAlarmResult?(result: ScienceAlarmResult): void;
+  onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
   onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
   onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
   onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
@@ -228,6 +230,43 @@ export function parseScienceLabTransmitResult(raw: unknown): ScienceLabTransmitR
   return candidate as unknown as ScienceLabTransmitResult;
 }
 
+export function parseScienceLabResearchResult(raw: unknown): ScienceLabResearchResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "science.lab.research.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.labId !== "string"
+    || !candidate.labId
+    || typeof candidate.enabled !== "boolean"
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as ScienceLabResearchResult;
+}
+
+function isScienceLabResearchResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "science.lab.research.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isScienceLabTransmitResultMessage(raw: unknown) {
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -413,6 +452,12 @@ export class TelemetryClient {
         return;
       }
       if (isScienceAlarmResultMessage(event.data)) return;
+      const scienceLabResearchResult = parseScienceLabResearchResult(event.data);
+      if (scienceLabResearchResult) {
+        this.callbacks.onScienceLabResearchResult?.(scienceLabResearchResult);
+        return;
+      }
+      if (isScienceLabResearchResultMessage(event.data)) return;
       const scienceLabTransmitResult = parseScienceLabTransmitResult(event.data);
       if (scienceLabTransmitResult) {
         this.callbacks.onScienceLabTransmitResult?.(scienceLabTransmitResult);

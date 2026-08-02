@@ -7,6 +7,7 @@ import type {
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
   ScienceAlarmResult,
+  ScienceLabResearchResult,
   ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -19,6 +20,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
       onScienceAlarmResult?(result: ScienceAlarmResult): void;
+      onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
       onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
@@ -67,6 +69,14 @@ describe("TelemetryStore", () => {
       message: "KAC alarm set.",
       provider: "kac",
     });
+    callbacks!.onScienceLabResearchResult?.({
+      type: "science.lab.research.result",
+      requestId: "research-1",
+      labId: "42:1",
+      enabled: false,
+      status: "accepted",
+      message: "Research stopped.",
+    });
     callbacks!.onScienceLabTransmitResult?.({
       type: "science.lab.transmit.result",
       requestId: "transmit-1",
@@ -81,6 +91,7 @@ describe("TelemetryStore", () => {
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
     expect(store.getSnapshot().scienceAlarmResult?.provider).toBe("kac");
+    expect(store.getSnapshot().scienceLabResearchResult?.enabled).toBe(false);
     expect(store.getSnapshot().scienceLabTransmitResult?.requestId).toBe("transmit-1");
 
     callbacks!.onStatus("retrying", "Connection dropped");
@@ -91,6 +102,7 @@ describe("TelemetryStore", () => {
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
       scienceAlarmResult: undefined,
+      scienceLabResearchResult: undefined,
       scienceLabTransmitResult: undefined,
       status: "retrying",
     });

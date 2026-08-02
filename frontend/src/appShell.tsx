@@ -228,13 +228,19 @@ function LiveElectricityPanel() { const snapshot = useLiveFlightSnapshot(electri
 function LiveHeatPanel() { const snapshot = useLiveFlightSnapshot(heatSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <HeatPanel snapshot={snapshot} /> : null; }
 function LiveSciencePanel() {
   const liveState = useLiveTelemetrySelector(
-    (state) => ({ alarmResult: state.scienceAlarmResult, snapshot: state.snapshot, transmitResult: state.scienceLabTransmitResult }),
+    (state) => ({
+      alarmResult: state.scienceAlarmResult,
+      researchResult: state.scienceLabResearchResult,
+      snapshot: state.snapshot,
+      transmitResult: state.scienceLabTransmitResult,
+    }),
     (left, right) => scienceSnapshotsEqual(left.snapshot, right.snapshot)
       && left.alarmResult === right.alarmResult
+      && left.researchResult === right.researchResult
       && left.transmitResult === right.transmitResult,
   );
   return liveState.snapshot?.["context.mode"] === "flight"
-    ? <SciencePanel alarmResult={liveState.alarmResult} commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} transmitResult={liveState.transmitResult} />
+    ? <SciencePanel alarmResult={liveState.alarmResult} commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} researchResult={liveState.researchResult} snapshot={liveState.snapshot} transmitResult={liveState.transmitResult} />
     : null;
 }
 function LiveStagingPanel() { const snapshot = useLiveFlightSnapshot(stagingSnapshotsEqual); return snapshot && snapshot["context.mode"] !== "inactive" ? <StagingPanel snapshot={snapshot} /> : null; }

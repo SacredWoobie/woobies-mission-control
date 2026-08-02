@@ -7,6 +7,7 @@ import type {
   ScienceAlarmProviderPreference,
   ScienceAlarmResult,
   ScienceExperimentTelemetry,
+  ScienceLabResearchResult,
   ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
@@ -16,7 +17,7 @@ import { selectScience, type ScienceLabViewModel } from "./scienceModel";
 
 const SCIENCE_ALARM_SETTINGS_KEY = "wmc-science-alarm-defaults-v1";
 type ScienceAlarmLead = 1800 | 3600;
-type SciencePanelCommand = Extract<TelemetryCommand, { type: "science.alarm.create" | "science.lab.transmit" }>;
+type SciencePanelCommand = Extract<TelemetryCommand, { type: "science.alarm.create" | "science.lab.research" | "science.lab.transmit" }>;
 
 interface ScienceAlarmDefaults {
   provider: ScienceAlarmProviderPreference;
@@ -144,12 +145,14 @@ export function SciencePanel({
   alarmResult,
   commandEnabled = false,
   onSendCommand = () => false,
+  researchResult,
   snapshot,
   transmitResult,
 }: {
   alarmResult?: ScienceAlarmResult;
   commandEnabled?: boolean;
   onSendCommand?(command: SciencePanelCommand): boolean;
+  researchResult?: ScienceLabResearchResult;
   snapshot: TelemetrySnapshot;
   transmitResult?: ScienceLabTransmitResult;
 }) {
@@ -160,6 +163,7 @@ export function SciencePanel({
   const [draftKacAction, setDraftKacAction] = useState<ScienceAlarmAction>(alarmSettings.kacAction);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pending, setPending] = useState<{ labId: string; requestId: string } | null>(null);
+  const [researchPending, setResearchPending] = useState<{ labId: string; requestId: string; enabled: boolean } | null>(null);
   const [transmitPending, setTransmitPending] = useState<{ labId: string; requestId: string } | null>(null);
   const [feedback, setFeedback] = useState<{ labId: string; message: string; status: "accepted" | "error" } | null>(null);
   const providers = snapshot["sci.alarmProviders"] ?? { kac: false, stock: false };
@@ -172,6 +176,12 @@ export function SciencePanel({
     setFeedback({ labId: alarmResult.labId, message: alarmResult.message, status: alarmResult.status });
     setPending(null);
   }, [alarmResult, pending]);
+
+  useEffect(() => {
+    if (!researchPending || researchResult?.requestId !== researchPending.requestId) return;
+    setFeedback({ labId: researchResult.labId, message: researchResult.message, status: researchResult.status });
+    setResearchPending(null);
+  }, [researchPending, researchResult]);
 
   useEffect(() => {
     if (!transmitPending || transmitResult?.requestId !== transmitPending.requestId) return;
@@ -187,6 +197,15 @@ export function SciencePanel({
     }, 10_000);
     return () => globalThis.clearTimeout(timer);
   }, [pending]);
+
+  useEffect(() => {
+    if (!researchPending) return;
+    const timer = globalThis.setTimeout(() => {
+      setFeedback({ labId: researchPending.labId, message: "The research request did not receive a response.", status: "error" });
+      setResearchPending(null);
+    }, 10_000);
+    return () => globalThis.clearTimeout(timer);
+  }, [researchPending]);
 
   useEffect(() => {
     if (!transmitPending) return;
@@ -242,7 +261,7 @@ export function SciencePanel({
   };
 
   const transmitLabScience = (lab: ScienceLabViewModel) => {
-    if (!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1 || transmitPending) return;
+    if (!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1 || researchPending || transmitPending) return;
     const requestId = globalThis.crypto?.randomUUID?.()
       ?? `science-transmit-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const command: Extract<TelemetryCommand, { type: "science.lab.transmit" }> = {
@@ -253,6 +272,25 @@ export function SciencePanel({
     setFeedback(null);
     if (onSendCommand(command)) {
       setTransmitPending({ labId: lab.id, requestId });
+    } else {
+      setFeedback({ labId: lab.id, message: "The dashboard command link is unavailable.", status: "error" });
+    }
+  };
+
+  const setLabResearch = (lab: ScienceLabViewModel) => {
+    if (!commandEnabled || !lab.converterAvailable || typeof lab.researchEnabled !== "boolean" || researchPending || transmitPending) return;
+    const enabled = !lab.researchEnabled;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `science-research-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const command: Extract<TelemetryCommand, { type: "science.lab.research" }> = {
+      type: "science.lab.research",
+      requestId,
+      labId: lab.id,
+      enabled,
+    };
+    setFeedback(null);
+    if (onSendCommand(command)) {
+      setResearchPending({ labId: lab.id, requestId, enabled });
     } else {
       setFeedback({ labId: lab.id, message: "The dashboard command link is unavailable.", status: "error" });
     }
@@ -284,14 +322,28 @@ export function SciencePanel({
           ? <div className="sci-lab-list" aria-label="Science laboratories">{model.labs.map((lab) => {
             const alarmEligible = (lab.etaKind === "finite" || lab.etaKind === "depleted") && isFiniteNumber(lab.etaSeconds);
             const waiting = pending?.labId === lab.id;
+            const changingResearch = researchPending?.labId === lab.id;
             const transmitting = transmitPending?.labId === lab.id;
             const canTransmitScience = isFiniteNumber(lab.scienceStored) && lab.scienceStored > 1;
+            const canControlResearch = lab.converterAvailable === true && typeof lab.researchEnabled === "boolean";
+            const researchLabel = changingResearch
+              ? researchPending.enabled ? "STARTINGâ€¦" : "STOPPINGâ€¦"
+              : canControlResearch
+                ? lab.researchEnabled ? "STOP RESEARCH" : "START RESEARCH"
+                : "RESEARCH UNAVAILABLE";
             const labFeedback = feedback?.labId === lab.id ? feedback : null;
             return <LabCard
               alarmControls={<div className="sci-lab-controls">
                 <button
+                  className="sci-research-toggle"
+                  disabled={!commandEnabled || !canControlResearch || Boolean(researchPending) || Boolean(transmitPending)}
+                  onClick={() => setLabResearch(lab)}
+                  title={canControlResearch ? `Invoke this lab's stock ${lab.researchEnabled ? "Stop" : "Start"} Research action` : "Research control is unavailable for this lab"}
+                  type="button"
+                >{researchLabel}</button>
+                <button
                   className="sci-transmit-science"
-                  disabled={!commandEnabled || !canTransmitScience || Boolean(transmitPending)}
+                  disabled={!commandEnabled || !canTransmitScience || Boolean(researchPending) || Boolean(transmitPending)}
                   onClick={() => transmitLabScience(lab)}
                   title="Invoke this lab's stock Transmit Science action"
                   type="button"

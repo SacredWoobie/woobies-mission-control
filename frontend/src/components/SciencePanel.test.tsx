@@ -202,4 +202,29 @@ describe("SciencePanel", () => {
 
     expect(screen.getByRole("button", { name: "NEED MORE SCIENCE" }).hasAttribute("disabled")).toBe(true);
   });
+
+  it("uses one context-aware stock research button with an explicit desired state", () => {
+    const base = flightTelemetryFixture["sci.krpc.labs"]?.[0] as ScienceLabTelemetry;
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const { unmount } = render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={onSendCommand} snapshot={flightTelemetryFixture} /></PanelVisibilityProvider>);
+
+    fireEvent.click(screen.getByRole("button", { name: "STOP RESEARCH" }));
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({
+      type: "science.lab.research",
+      labId: "42001:1",
+      enabled: false,
+    });
+    unmount();
+
+    render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+      ...flightTelemetryFixture,
+      "sci.krpc.labs": [{ ...base, researchEnabled: false, state: "stopped", sciencePerDay: 0 }],
+    }} /></PanelVisibilityProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "START RESEARCH" }));
+    expect(onSendCommand.mock.calls[1][0]).toMatchObject({
+      type: "science.lab.research",
+      labId: "42001:1",
+      enabled: true,
+    });
+  });
 });
