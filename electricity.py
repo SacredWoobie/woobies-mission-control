@@ -52,6 +52,42 @@ def generation_remainder(total, *itemized):
     return max(0.0, remainder)
 
 
+def bracketed_generation_remainder(total_before, total_after, *itemized):
+    """Return generation that both endpoint samples require.
+
+    Per-reactor RPCs are read between the two total-generation samples. During
+    a reactor ramp, their sum can legitimately fall anywhere inside that
+    bracket. Only the lower endpoint can prove that generation remains after
+    the itemized sources are removed. If one endpoint is unavailable, retain
+    the existing single-sample conservative behavior.
+    """
+    before = _finite_number(total_before)
+    after = _finite_number(total_after)
+    valid_totals = [
+        value for value in (before, after)
+        if value is not None and value >= 0.0
+    ]
+    if not valid_totals:
+        return None
+    return generation_remainder(min(valid_totals), *itemized)
+
+
+def latest_generation_total(total_before, total_after):
+    """Return the newest valid non-negative generation endpoint.
+
+    The second bracket sample normally drives the displayed total. If that RPC
+    produces an invalid value during a scene or service transition, retain the
+    usable first endpoint instead of publishing a non-finite total.
+    """
+    before = _finite_number(total_before)
+    after = _finite_number(total_after)
+    if after is not None and after >= 0.0:
+        return after
+    if before is not None and before >= 0.0:
+        return before
+    return None
+
+
 class ElectricityFlowEstimator:
     """Estimate net EC flow from successive vessel-total observations."""
 

@@ -51,6 +51,70 @@ class ElectricityFlowEstimatorTests(unittest.TestCase):
             1.3,
         )
 
+    def test_bracketed_remainder_rejects_reactor_ramp_timing_skew(self):
+        self.assertEqual(
+            electricity.bracketed_generation_remainder(
+                64.0,
+                66.0,
+                65.0,
+            ),
+            0.0,
+        )
+        self.assertEqual(
+            electricity.bracketed_generation_remainder(
+                66.0,
+                64.0,
+                65.0,
+            ),
+            0.0,
+        )
+
+    def test_bracketed_remainder_preserves_proven_small_generator(self):
+        self.assertAlmostEqual(
+            electricity.bracketed_generation_remainder(
+                65.4,
+                65.6,
+                65.0,
+            ),
+            0.4,
+        )
+
+    def test_bracketed_remainder_falls_back_to_available_endpoint(self):
+        self.assertAlmostEqual(
+            electricity.bracketed_generation_remainder(
+                None,
+                65.4,
+                65.0,
+            ),
+            0.4,
+        )
+        self.assertIsNone(
+            electricity.bracketed_generation_remainder(
+                None,
+                float("nan"),
+                65.0,
+            )
+        )
+
+    def test_latest_generation_total_prefers_valid_after_endpoint(self):
+        self.assertEqual(
+            electricity.latest_generation_total(64.0, 65.0),
+            65.0,
+        )
+
+    def test_latest_generation_total_falls_back_from_invalid_after(self):
+        for invalid in (None, float("nan"), float("inf"), -1.0):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(
+                    electricity.latest_generation_total(64.0, invalid),
+                    64.0,
+                )
+
+    def test_latest_generation_total_rejects_invalid_endpoints(self):
+        self.assertIsNone(
+            electricity.latest_generation_total(float("nan"), -1.0)
+        )
+
     def test_first_sample_calibrates_then_estimates_net_and_draw(self):
         self.assertEqual(
             self.update(),
