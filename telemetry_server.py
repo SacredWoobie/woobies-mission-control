@@ -2226,8 +2226,8 @@ def _apply_science_lab_transmit_command(conn, command):
         )
         if lab is None:
             return result("error", "The selected science lab is no longer aboard.")
-        if _science_lab_number(lab.get("scienceStored"), 0.0) <= 1e-6:
-            return result("error", "The selected science lab has no stored science to transmit.")
+        if _science_lab_number(lab.get("scienceStored"), 0.0) <= 1.0:
+            return result("error", "The selected science lab needs more than 1 science to transmit.")
 
         transmit = getattr(service, "transmit_lab_science", None)
         if not callable(transmit):

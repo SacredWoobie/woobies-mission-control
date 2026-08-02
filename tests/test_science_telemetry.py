@@ -258,7 +258,7 @@ class ScienceTelemetryTests(unittest.TestCase):
 
     def test_does_not_invoke_stock_transmit_when_the_lab_has_no_science(self):
         service = LabService()
-        service.lab_science_stored = lambda: [0.0]
+        service.lab_science_stored = lambda: [0.3]
         transmitted = []
         service.transmit_lab_science = lambda lab_id: transmitted.append(lab_id)
         result = telemetry_server._apply_science_lab_transmit_command(

@@ -242,7 +242,7 @@ export function SciencePanel({
   };
 
   const transmitLabScience = (lab: ScienceLabViewModel) => {
-    if (!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1e-6 || transmitPending) return;
+    if (!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1 || transmitPending) return;
     const requestId = globalThis.crypto?.randomUUID?.()
       ?? `science-transmit-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const command: Extract<TelemetryCommand, { type: "science.lab.transmit" }> = {
@@ -285,16 +285,17 @@ export function SciencePanel({
             const alarmEligible = (lab.etaKind === "finite" || lab.etaKind === "depleted") && isFiniteNumber(lab.etaSeconds);
             const waiting = pending?.labId === lab.id;
             const transmitting = transmitPending?.labId === lab.id;
+            const canTransmitScience = isFiniteNumber(lab.scienceStored) && lab.scienceStored > 1;
             const labFeedback = feedback?.labId === lab.id ? feedback : null;
             return <LabCard
               alarmControls={<div className="sci-lab-controls">
                 <button
                   className="sci-transmit-science"
-                  disabled={!commandEnabled || !isFiniteNumber(lab.scienceStored) || lab.scienceStored <= 1e-6 || Boolean(transmitPending)}
+                  disabled={!commandEnabled || !canTransmitScience || Boolean(transmitPending)}
                   onClick={() => transmitLabScience(lab)}
                   title="Invoke this lab's stock Transmit Science action"
                   type="button"
-                >{transmitting ? "TRANSMITTING…" : "TRANSMIT SCIENCE"}</button>
+                >{transmitting ? "TRANSMITTING…" : canTransmitScience ? "TRANSMIT SCIENCE" : "NEED MORE SCIENCE"}</button>
                 <div className="sci-alarm-controls">
                   <button
                     className="sci-alarm-create"

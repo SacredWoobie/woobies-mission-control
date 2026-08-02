@@ -193,13 +193,13 @@ describe("SciencePanel", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("disables Transmit Science when the selected lab has no stored science", () => {
+  it("requires more than one stored science before enabling stock transmission", () => {
     const base = flightTelemetryFixture["sci.krpc.labs"]?.[0] as ScienceLabTelemetry;
     render(<PanelVisibilityProvider><SciencePanel commandEnabled onSendCommand={() => true} snapshot={{
       ...flightTelemetryFixture,
-      "sci.krpc.labs": [{ ...base, scienceStored: 0 }],
+      "sci.krpc.labs": [{ ...base, scienceStored: 0.3 }],
     }} /></PanelVisibilityProvider>);
 
-    expect(screen.getByRole("button", { name: "TRANSMIT SCIENCE" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "NEED MORE SCIENCE" }).hasAttribute("disabled")).toBe(true);
   });
 });
