@@ -22,6 +22,18 @@ const stockSnapshot: TelemetrySnapshot = {
 };
 
 describe("ClockPanel communications", () => {
+  it("renders a six-digit mission day count as one primary value", () => {
+    const kerbinDaySeconds = 21_600;
+    render(<ClockPanel snapshot={{
+      ...stockSnapshot,
+      "v.missionTime": 999_999 * kerbinDaySeconds + 21_599,
+    }} />);
+
+    const value = screen.getByText("T+ 999999d 05:59:59", { exact: true });
+    expect(value.classList.contains("big")).toBe(true);
+    expect(value.closest(".met-cell")).toBeTruthy();
+  });
+
   it("omits signal delay when RemoteTech is not reported", () => {
     const { container } = render(<ClockPanel snapshot={stockSnapshot} />);
 

@@ -5,8 +5,9 @@ All notable public changes will be recorded here.
 ## Unreleased
 
 - Tightened the wide Flight status columns to their content like Mission
-  Control's program metrics, and hide Signal Delay when RemoteTech is not the
-  active communications provider.
+  Control's program metrics while reserving enough room for long Universal and
+  Mission Elapsed times, and hide Signal Delay when RemoteTech is not the active
+  communications provider.
 
 ## v0.4.2 - Mission Control vessel management
 
