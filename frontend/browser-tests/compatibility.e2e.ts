@@ -37,25 +37,36 @@ test("native controls opt into the dark system color scheme", async ({ page }) =
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
 });
 
-test("the wide Flight context header remains one compact row", async ({ page }) => {
+test("the wide Flight context header fits long mission times in one compact row", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
+
+  const missionElapsed = page.locator(".met-cell .big");
+  await missionElapsed.evaluate((element) => {
+    element.textContent = "T+ 999999d 05:59:59";
+  });
 
   const layout = await page.locator(".status-strip").evaluate((element) => {
     const cells = Array.from(element.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell"));
     const tops = cells.map((cell) => cell.getBoundingClientRect().top);
+    const elapsed = element.querySelector<HTMLElement>(".met-cell .big")!;
     return {
       height: element.getBoundingClientRect().height,
       maxTopDifference: Math.max(...tops) - Math.min(...tops),
       clientWidth: element.clientWidth,
       scrollWidth: element.scrollWidth,
+      elapsedClientWidth: elapsed.clientWidth,
+      elapsedScrollWidth: elapsed.scrollWidth,
+      elapsedWhiteSpace: getComputedStyle(elapsed).whiteSpace,
     };
   });
 
   expect(layout.height).toBeLessThan(100);
   expect(layout.maxTopDifference).toBeLessThanOrEqual(1);
-  expect(layout.clientWidth).toBeLessThan(1200);
+  expect(layout.clientWidth).toBeLessThan(1300);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+  expect(layout.elapsedWhiteSpace).toBe("nowrap");
+  expect(layout.elapsedScrollWidth).toBeLessThanOrEqual(layout.elapsedClientWidth + 1);
 });
 
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {

@@ -26,8 +26,9 @@ All notable public changes will be recorded here.
 - Fixed engine alternator generation remaining falsely elevated after a burn
   followed immediately by time warp.
 - Tightened the wide Flight status columns to their content like Mission
-  Control's program metrics. Signal Delay now disappears when RemoteTech is not
-  the active communications provider.
+  Control's program metrics while reserving enough room for long Universal and
+  Mission Elapsed times. Signal Delay now disappears when RemoteTech is not the
+  active communications provider.
 - Populate Flight's current-stage consumable resources from StageStats when the
   installed kRPC core does not expose the active stage directly.
 - Prevent rapidly changing reactor output from appearing as a transient
