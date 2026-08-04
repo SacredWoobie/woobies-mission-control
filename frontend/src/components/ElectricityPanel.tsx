@@ -3,6 +3,7 @@ import {
   formatRateColumn,
   formatResourcePair,
   formatTemperature,
+  formatTelemetryNumber,
   isFiniteNumber,
 } from "../formatting/numbers";
 import type { ReactorTelemetry, TelemetrySnapshot } from "../telemetry/types";
@@ -16,6 +17,10 @@ import {
 
 function ecRate(value: number | undefined) {
   return formatRateColumn(value, "EC/s");
+}
+
+function throttlePercent(value: number | undefined) {
+  return isFiniteNumber(value) ? `${formatTelemetryNumber(value)}%` : formatTelemetryNumber(value);
 }
 
 function compactDuration(seconds: number | undefined) {
@@ -178,12 +183,14 @@ function ReactorDetail({
     <details className={`rx-details ${warning ? "warn" : ""}`}>
       <summary><span>Reactor detail</span><span>{reactors.length}</span></summary>
       <div className="rx-scroll"><div className="rx-list">{reactors.map((reactor, index) => {
+        const isFusion = reactor.family === "fusion";
+        const hasIntegrity = reactor.hasIntegrity !== false;
         const tempWarn = (
           isFiniteNumber(reactor.coreTemp)
           && isFiniteNumber(reactor.nominalTemp)
           && reactor.coreTemp > reactor.nominalTemp * 1.05
         );
-        const integrityWarn = isFiniteNumber(reactor.integrity) && reactor.integrity < 90;
+        const integrityWarn = hasIntegrity && isFiniteNumber(reactor.integrity) && reactor.integrity < 90;
         return (
           <div className="rx-card" key={`${reactor.name}-${index}`}>
             <div className="rx-head">
@@ -193,8 +200,12 @@ function ReactorDetail({
             <div className="rx-stats">
               <div className="rx-stat"><label>Output</label><span className="rv">{ecRate(reactor.ecPerSec)}</span></div>
               <div className="rx-stat"><label>Core</label><span className={`rv ${tempWarn ? "warn" : ""}`}>{formatTemperature(reactor.coreTemp, true)}</span></div>
-              <div className="rx-stat"><label>Integrity</label><span className={`rv ${integrityWarn ? "warn" : ""}`}>{formatPercent(reactor.integrity)}</span></div>
-              <div className="rx-stat"><label>Life</label><span className="rv" title={reactor.fuel}>{reactor.fuel?.trim() || "—"}</span></div>
+              {hasIntegrity ? (
+                <div className="rx-stat"><label>Integrity</label><span className={`rv ${integrityWarn ? "warn" : ""}`}>{formatPercent(reactor.integrity)}</span></div>
+              ) : (
+                <div className="rx-stat"><label>Throttle</label><span className="rv">{throttlePercent(reactor.throttle)}</span></div>
+              )}
+              <div className="rx-stat"><label>{isFusion ? "Fuel rate" : "Life"}</label><span className="rv" title={reactor.fuel}>{reactor.fuel?.trim() || "—"}</span></div>
             </div>
           </div>
         );

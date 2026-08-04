@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added Far Future Technologies fusion reactors to Electricity telemetry and
+  reactor details, including demand-scaled output, temperature, throttle, and a
+  precise fuel-consumption rate without a fabricated fission-core integrity.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated

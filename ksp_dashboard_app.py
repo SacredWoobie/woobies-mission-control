@@ -119,7 +119,7 @@ SERVICE_DLLS = (
 SERVICE_TESTED_VERSIONS = {
     "WoobiesControlStats": "0.2.3",
     "KRPC.StageStats": "0.2.7",
-    "KRPC.SystemHeat": "0.2.2",
+    "KRPC.SystemHeat": "0.2.4",
     "KRPC.WoobiesMechJeb": "0.8.6",
 }
 SUPERSEDED_SERVICE_DLLS_BY_SERVICE = {

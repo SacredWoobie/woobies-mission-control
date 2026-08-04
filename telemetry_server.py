@@ -3146,6 +3146,53 @@ def _finalize_telemetry(conn, payload):
     return payload
 
 
+def _gather_reactors(system_heat):
+    """Read the additive reactor contract while remaining compatible with 0.2.3."""
+    reactors = []
+    for index in range(system_heat.reactor_count()):
+        family = "fission"
+        try:
+            reported_family = str(system_heat.reactor_family(index) or "").lower()
+            if reported_family in {"fission", "fusion"}:
+                family = reported_family
+        except Exception:
+            pass
+
+        has_integrity = family != "fusion"
+        try:
+            has_integrity = bool(
+                system_heat.reactor_core_integrity_available(index)
+            )
+        except Exception:
+            pass
+
+        reactor = {
+            "name": system_heat.reactor_name(index),
+            "family": family,
+            "hasIntegrity": has_integrity,
+            "on": bool(system_heat.reactor_enabled(index)),
+            "status": system_heat.reactor_status(index) or "",
+            "ecPerSec": round(
+                system_heat.reactor_electrical_generation(index), 2
+            ),
+            "ecMax": round(
+                system_heat.reactor_max_electrical_generation(index), 2
+            ),
+            "coreTemp": round(system_heat.reactor_core_temperature(index), 1),
+            "nominalTemp": round(
+                system_heat.reactor_nominal_temperature(index), 1
+            ),
+            "fuel": system_heat.reactor_fuel_status(index) or "",
+            "throttle": round(system_heat.reactor_throttle(index), 1),
+        }
+        if has_integrity:
+            reactor["integrity"] = round(
+                system_heat.reactor_core_integrity(index), 1
+            )
+        reactors.append(reactor)
+    return reactors
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
@@ -3391,21 +3438,7 @@ def gather_telemetry(conn):
 
         try:
             sh = conn.system_heat
-            reactors = []
-            for i in range(sh.reactor_count()):
-                reactors.append({
-                    "name": sh.reactor_name(i),
-                    "on": bool(sh.reactor_enabled(i)),
-                    "status": sh.reactor_status(i) or "",
-                    "ecPerSec": round(sh.reactor_electrical_generation(i), 2),
-                    "ecMax": round(sh.reactor_max_electrical_generation(i), 2),
-                    "coreTemp": round(sh.reactor_core_temperature(i), 1),
-                    "nominalTemp": round(sh.reactor_nominal_temperature(i), 1),
-                    "integrity": round(sh.reactor_core_integrity(i), 1),
-                    "fuel": sh.reactor_fuel_status(i) or "",
-                    "throttle": round(sh.reactor_throttle(i), 1),
-                })
-            elec["elec.reactors"] = reactors
+            elec["elec.reactors"] = _gather_reactors(sh)
         except Exception:
             pass  # service not present / scene change
 

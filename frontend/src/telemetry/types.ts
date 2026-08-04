@@ -67,6 +67,8 @@ export interface StockHeatPartTelemetry {
 
 export interface ReactorTelemetry {
   name: string;
+  family?: "fission" | "fusion";
+  hasIntegrity?: boolean;
   on: boolean;
   status?: string;
   ecPerSec?: number;
