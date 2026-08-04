@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added solar generation and exposure telemetry for
+  `ModuleCurvedSolarPanel`, covering Near Future Solar curved arrays and other
+  installed parts that use the same module alongside stock solar panels.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated

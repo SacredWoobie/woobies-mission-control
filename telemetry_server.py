@@ -30,7 +30,12 @@ from pathlib import Path
 import krpc
 from krpc.services.spacecenter import VesselType as KRPCVesselType
 
-from electricity import ElectricityFlowEstimator, generation_remainder
+from electricity import (
+    ElectricityFlowEstimator,
+    curved_solar_readings,
+    generation_remainder,
+    solar_summary,
+)
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
@@ -3419,15 +3424,15 @@ def gather_telemetry(conn):
         solar_ec = 0.0
         try:
             panels = vessel.parts.solar_panels
-            total_flow = 0.0
-            exposures = []
-            for sp in panels:
-                total_flow += sp.energy_flow
-                exposures.append(sp.sun_exposure)
+            readings = [
+                (sp.energy_flow, sp.sun_exposure) for sp in panels
+            ]
+            readings.extend(curved_solar_readings(vessel.parts))
+            panel_count, total_flow, average_exposure = solar_summary(readings)
             solar_ec = total_flow
-            elec["solar.count"] = len(exposures)
+            elec["solar.count"] = panel_count
             elec["solar.outputEcPerSec"] = round(total_flow, 2)
-            elec["solar.efficiency"] = round(sum(exposures) / len(exposures), 3) if exposures else 0.0
+            elec["solar.efficiency"] = round(average_exposure, 3)
         except Exception:
             pass
 

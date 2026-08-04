@@ -1,6 +1,7 @@
 import importlib.util
 import math
 import unittest
+from collections import OrderedDict
 from pathlib import Path
 
 
@@ -10,6 +11,21 @@ EXTENSION = ROOT / "electricity.py"
 spec = importlib.util.spec_from_file_location("electricity_extension", EXTENSION)
 electricity = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(electricity)
+
+
+class FakeModule:
+    def __init__(self, fields):
+        self.fields = fields
+
+
+class FakeParts:
+    def __init__(self, modules):
+        self.modules = modules
+        self.requested_name = None
+
+    def modules_with_name(self, name):
+        self.requested_name = name
+        return self.modules
 
 
 def flight_payload(
@@ -40,6 +56,93 @@ class ElectricityFlowEstimatorTests(unittest.TestCase):
 
     def update(self, **overrides):
         return self.estimator.update(flight_payload(**overrides))
+
+    def test_curved_solar_reads_english_module_fields(self):
+        reading = electricity.curved_solar_reading({
+            "Sun Exposure": "0.35",
+            "Energy Flow": "15.83",
+        })
+
+        self.assertEqual(reading, (15.83, 0.35))
+
+    def test_curved_solar_uses_stable_field_order_for_localized_labels(self):
+        reading = electricity.curved_solar_reading(OrderedDict((
+            ("Exposition au soleil", "15,0%"),
+            ("Flux d'énergie", "6,87 Ec/s"),
+        )))
+
+        self.assertEqual(reading, (6.87, 0.15))
+
+    def test_curved_solar_text_states_report_zero_output(self):
+        reading = electricity.curved_solar_reading({
+            "Sun Exposure": "Blocked by fuel tank",
+            "Energy Flow": "Panels Retracted",
+        })
+
+        self.assertEqual(reading, (0.0, 0.0))
+
+    def test_curved_solar_rejects_invalid_shape_and_physical_values(self):
+        invalid = (
+            {},
+            {"Sun Exposure": "0.5"},
+            {"Sun Exposure": "1.2", "Energy Flow": "4.0"},
+            {"Sun Exposure": "0.5", "Energy Flow": "-1.0"},
+        )
+
+        for fields in invalid:
+            with self.subTest(fields=fields):
+                self.assertIsNone(electricity.curved_solar_reading(fields))
+
+    def test_curved_solar_collector_uses_module_name_and_preserves_all_panels(self):
+        parts = FakeParts([
+            FakeModule({"Sun Exposure": "0.35", "Energy Flow": "15.83"}),
+            FakeModule({"Sun Exposure": "0.15", "Energy Flow": "6.87"}),
+            FakeModule({"Sun Exposure": "0.00", "Energy Flow": "0.00"}),
+            FakeModule({"Sun Exposure": "0.03", "Energy Flow": "1.43"}),
+        ])
+
+        readings = electricity.curved_solar_readings(parts)
+
+        self.assertEqual(
+            parts.requested_name,
+            electricity.CURVED_SOLAR_MODULE_NAME,
+        )
+        self.assertEqual(len(readings), 4)
+        self.assertAlmostEqual(sum(flow for flow, _ in readings), 24.13)
+        self.assertAlmostEqual(
+            sum(exposure for _, exposure in readings) / len(readings),
+            0.1325,
+        )
+
+    def test_curved_solar_collector_fails_closed_on_malformed_module(self):
+        parts = FakeParts([FakeModule({"unexpected": "field"})])
+
+        with self.assertRaises(ValueError):
+            electricity.curved_solar_readings(parts)
+
+    def test_solar_summary_combines_stock_and_curved_readings(self):
+        summary = electricity.solar_summary([
+            (2.0, 0.8),
+            (1.0, 0.4),
+            (15.83, 0.35),
+            (6.87, 0.15),
+        ])
+
+        self.assertEqual(summary[0], 4)
+        self.assertAlmostEqual(summary[1], 25.7)
+        self.assertAlmostEqual(summary[2], 0.425)
+
+    def test_solar_summary_handles_empty_vessel_and_rejects_invalid_values(self):
+        self.assertEqual(electricity.solar_summary([]), (0, 0.0, 0.0))
+        for reading in (
+            (float("nan"), 0.5),
+            (-1.0, 0.5),
+            (1.0, float("inf")),
+            (1.0, 1.1),
+        ):
+            with self.subTest(reading=reading):
+                with self.assertRaises(ValueError):
+                    electricity.solar_summary([reading])
 
     def test_generation_remainder_clamps_sequential_sample_noise(self):
         self.assertEqual(
