@@ -130,7 +130,7 @@ describe("ElectricityPanel", () => {
     expect(screen.getByText("100%", { exact: true })).toBeTruthy();
   });
 
-  it("shows fusion throttle and precise fuel rate without fission integrity", () => {
+  it("shows legacy fusion fuel rate without fission integrity", () => {
     renderPanel({
       ...flightTelemetryFixture,
       "elec.reactors": [{
@@ -152,6 +152,33 @@ describe("ElectricityPanel", () => {
     expect(screen.getByText("2.5%", { exact: true })).toBeTruthy();
     expect(screen.getByText("Fuel rate", { exact: true })).toBeTruthy();
     expect(screen.getByText("0.00000027 u/s", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Integrity", { exact: true })).toBeNull();
+  });
+
+  it("shows fusion fuel life with limiting fuel and rate detail", () => {
+    renderPanel({
+      ...flightTelemetryFixture,
+      "elec.reactors": [{
+        name: "FX-2 Fusion Reactor",
+        family: "fusion",
+        hasIntegrity: false,
+        on: true,
+        ecPerSec: 4_000,
+        coreTemp: 1_600,
+        nominalTemp: 1_600,
+        fuel: "112y 4d 3h 2m",
+        fuelKind: "life",
+        fuelRate: "LqdDeuterium 0.0000109 u/s",
+        fuelLimitingResource: "LqdDeuterium",
+        throttle: 100,
+      }],
+    });
+
+    expect(screen.getByText("Life", { exact: true })).toBeTruthy();
+    const life = screen.getByText("112y 4d 3h 2m", { exact: true });
+    expect(life.getAttribute("title")).toBe(
+      "LqdDeuterium limiting · LqdDeuterium 0.0000109 u/s",
+    );
     expect(screen.queryByText("Integrity", { exact: true })).toBeNull();
   });
 });

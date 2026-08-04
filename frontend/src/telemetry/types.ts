@@ -77,6 +77,9 @@ export interface ReactorTelemetry {
   nominalTemp?: number;
   integrity?: number;
   fuel?: string;
+  fuelKind?: "life" | "rate";
+  fuelRate?: string;
+  fuelLimitingResource?: string;
   throttle?: number;
 }
 

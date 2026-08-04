@@ -3183,8 +3183,32 @@ def _gather_reactors(system_heat):
                 system_heat.reactor_nominal_temperature(index), 1
             ),
             "fuel": system_heat.reactor_fuel_status(index) or "",
+            "fuelKind": "life" if family == "fission" else "rate",
             "throttle": round(system_heat.reactor_throttle(index), 1),
         }
+        if family == "fusion":
+            try:
+                fuel_life = system_heat.reactor_fuel_life_status(index) or ""
+                if fuel_life:
+                    reactor["fuel"] = fuel_life
+                    reactor["fuelKind"] = "life"
+            except Exception:
+                # SystemHeat 0.2.4 exposes the exact rate but not remaining life.
+                pass
+            try:
+                fuel_rate = system_heat.reactor_fuel_rate_status(index) or ""
+                if fuel_rate:
+                    reactor["fuelRate"] = fuel_rate
+            except Exception:
+                pass
+            try:
+                limiting = (
+                    system_heat.reactor_fuel_limiting_resource(index) or ""
+                )
+                if limiting:
+                    reactor["fuelLimitingResource"] = limiting
+            except Exception:
+                pass
         if has_integrity:
             reactor["integrity"] = round(
                 system_heat.reactor_core_integrity(index), 1
