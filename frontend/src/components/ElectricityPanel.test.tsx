@@ -129,4 +129,29 @@ describe("ElectricityPanel", () => {
     expect(screen.getByText("2,400 K", { exact: true })).toBeTruthy();
     expect(screen.getByText("100%", { exact: true })).toBeTruthy();
   });
+
+  it("shows fusion throttle and precise fuel rate without fission integrity", () => {
+    renderPanel({
+      ...flightTelemetryFixture,
+      "elec.reactors": [{
+        name: "FX-2 Fusion Reactor",
+        family: "fusion",
+        hasIntegrity: false,
+        on: true,
+        ecPerSec: 100,
+        ecMax: 4_000,
+        coreTemp: 1_600,
+        nominalTemp: 1_600,
+        fuel: "0.00000027 u/s",
+        throttle: 2.5,
+      }],
+    });
+
+    expect(screen.getByText("FX-2 Fusion Reactor", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Throttle", { exact: true })).toBeTruthy();
+    expect(screen.getByText("2.5%", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Fuel rate", { exact: true })).toBeTruthy();
+    expect(screen.getByText("0.00000027 u/s", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Integrity", { exact: true })).toBeNull();
+  });
 });

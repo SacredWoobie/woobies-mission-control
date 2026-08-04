@@ -18,8 +18,8 @@
         @{
             Folder = "KRPC.SystemHeat"
             File = "KRPC.SystemHeat.dll"
-            Version = "0.2.2.0"
-            Sha256 = "2265CC09E391A629D5281EA0BB74B47CBC4311AD40F1B14DA9C273D0CED723EF"
+            Version = "0.2.4.0"
+            Sha256 = "118B945D5810CBB0ABE7B71560F590537D2FEDB0AC35AEA6095217B953A0C39C"
             License = "MIT"
         }
         @{
