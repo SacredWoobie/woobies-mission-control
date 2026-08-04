@@ -34,6 +34,10 @@ All notable public changes will be recorded here.
 - Prevent rapidly changing reactor output from appearing as a transient
   `Other` electricity source by reconciling per-source reads between two total
   generation samples.
+- Kept the launcher in a truthful startup state until the dashboard loopback is
+  reachable, and shortened only the dashboard's initial connection retry so a
+  server that becomes ready between attempts links without an extra two-second
+  wait.
 
 ## v0.4.2 - Mission Control vessel management
 

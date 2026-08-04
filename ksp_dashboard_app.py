@@ -1933,6 +1933,7 @@ class Backend:
         self.log = log
         self.environment_provider = environment_provider
         self.proc = None
+        self.startup_ready = False
 
     def running(self):
         return self.proc is not None and self.proc.poll() is None
@@ -1940,6 +1941,7 @@ class Backend:
     def start(self):
         if self.running():
             return False
+        self.startup_ready = False
         if not self.script.is_file():
             self.log(self.name, f"ERROR: {self.script.name} is no longer available.")
             return False
@@ -1984,6 +1986,7 @@ class Backend:
 
     def stop(self):
         if not self.running():
+            self.startup_ready = False
             return
         self.log(self.name, "stopping...")
         try:
@@ -1996,6 +1999,8 @@ class Backend:
                 self.proc.wait(timeout=2)
         except Exception as exc:
             self.log(self.name, f"error while stopping: {exc}")
+        finally:
+            self.startup_ready = False
 
 
 class App:
@@ -3572,18 +3577,32 @@ class App:
             status = row["status"]
             button = row["button"]
             if backend.running():
-                status.config(text="\u25cf running", foreground=THEME["green"])
+                if component["dashboard"] and not backend.startup_ready:
+                    backend.startup_ready = self._dashboard_ready()
+                elif not component["dashboard"]:
+                    backend.startup_ready = True
+                if backend.startup_ready:
+                    status.config(
+                        text="\u25cf running", foreground=THEME["green"]
+                    )
+                else:
+                    status.config(
+                        text="starting...", foreground=THEME["amber"]
+                    )
                 button.config(text="Stop", state="normal")
             elif component["name"] in self.component_setups:
+                backend.startup_ready = False
                 status.config(text="installing...", foreground=THEME["amber"])
                 button.config(text="Setting...", state="disabled")
             elif not component_dependencies_ready(component):
+                backend.startup_ready = False
                 status.config(text="not set up", foreground=THEME["amber"])
                 button.config(
                     text="Set up",
                     state="disabled" if self.component_setups else "normal",
                 )
             else:
+                backend.startup_ready = False
                 status.config(
                     text="\u25cb stopped", foreground=THEME["slate_dim"]
                 )
