@@ -19,12 +19,15 @@ class FakeModule:
 
 
 class FakeParts:
-    def __init__(self, modules):
+    def __init__(self, modules, error=None):
         self.modules = modules
+        self.error = error
         self.requested_name = None
 
     def modules_with_name(self, name):
         self.requested_name = name
+        if self.error is not None:
+            raise self.error
         return self.modules
 
 
@@ -114,11 +117,24 @@ class ElectricityFlowEstimatorTests(unittest.TestCase):
             0.1325,
         )
 
-    def test_curved_solar_collector_fails_closed_on_malformed_module(self):
+    def test_curved_solar_collector_falls_back_on_malformed_module(self):
         parts = FakeParts([FakeModule({"unexpected": "field"})])
 
-        with self.assertRaises(ValueError):
-            electricity.curved_solar_readings(parts)
+        self.assertEqual(electricity.curved_solar_readings(parts), [])
+
+    def test_curved_solar_failure_preserves_valid_stock_readings(self):
+        stock_readings = [(2.0, 0.8), (1.0, 0.4)]
+        for parts in (
+            FakeParts([FakeModule({"unexpected": "field"})]),
+            FakeParts([], error=AttributeError("API unavailable")),
+        ):
+            with self.subTest(error=parts.error):
+                readings = list(stock_readings)
+                readings.extend(electricity.curved_solar_readings(parts))
+
+                summary = electricity.solar_summary(readings)
+                self.assertEqual(summary[:2], (2, 3.0))
+                self.assertAlmostEqual(summary[2], 0.6)
 
     def test_solar_summary_combines_stock_and_curved_readings(self):
         summary = electricity.solar_summary([

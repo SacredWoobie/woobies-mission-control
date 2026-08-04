@@ -91,14 +91,17 @@ def curved_solar_reading(fields):
 
 
 def curved_solar_readings(parts):
-    """Read all ``ModuleCurvedSolarPanel`` modules from a kRPC Parts proxy."""
-    readings = []
-    for module in parts.modules_with_name(CURVED_SOLAR_MODULE_NAME):
-        reading = curved_solar_reading(module.fields)
-        if reading is None:
-            raise ValueError("invalid ModuleCurvedSolarPanel display fields")
-        readings.append(reading)
-    return readings
+    """Read curved panels, falling back cleanly when the API is unavailable."""
+    try:
+        readings = []
+        for module in parts.modules_with_name(CURVED_SOLAR_MODULE_NAME):
+            reading = curved_solar_reading(module.fields)
+            if reading is None:
+                return []
+            readings.append(reading)
+        return readings
+    except Exception:
+        return []
 
 
 def solar_summary(readings):
