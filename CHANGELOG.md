@@ -38,6 +38,9 @@ All notable public changes will be recorded here.
   reachable, and shortened only the dashboard's initial connection retry so a
   server that becomes ready between attempts links without an extra two-second
   wait.
+- Added solar generation and exposure telemetry for
+  `ModuleCurvedSolarPanel`, covering Near Future Solar curved arrays and other
+  installed parts that use the same module alongside stock solar panels.
 
 ## v0.4.2 - Mission Control vessel management
 
