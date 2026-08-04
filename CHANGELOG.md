@@ -42,8 +42,10 @@ All notable public changes will be recorded here.
   `ModuleCurvedSolarPanel`, covering Near Future Solar curved arrays and other
   installed parts that use the same module alongside stock solar panels.
 - Added Far Future Technologies fusion reactors to Electricity telemetry and
-  reactor details, including demand-scaled output, temperature, throttle, and a
-  precise fuel-consumption rate without a fabricated fission-core integrity.
+  reactor details, including demand-scaled output, temperature, throttle, and
+  remaining life based on the limiting fuel and the combined burn from other
+  reactors sharing it. Exact per-resource rates remain available as detail, and
+  fission-only core integrity is not fabricated.
 
 ## v0.4.2 - Mission Control vessel management
 

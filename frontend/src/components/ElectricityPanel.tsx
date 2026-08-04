@@ -191,6 +191,11 @@ function ReactorDetail({
           && reactor.coreTemp > reactor.nominalTemp * 1.05
         );
         const integrityWarn = hasIntegrity && isFiniteNumber(reactor.integrity) && reactor.integrity < 90;
+        const fuelKind = reactor.fuelKind ?? (isFusion ? "rate" : "life");
+        const fuelTitle = [
+          reactor.fuelLimitingResource ? `${reactor.fuelLimitingResource} limiting` : "",
+          reactor.fuelRate ?? "",
+        ].filter(Boolean).join(" · ") || reactor.fuel;
         return (
           <div className="rx-card" key={`${reactor.name}-${index}`}>
             <div className="rx-head">
@@ -205,7 +210,7 @@ function ReactorDetail({
               ) : (
                 <div className="rx-stat"><label>Throttle</label><span className="rv">{throttlePercent(reactor.throttle)}</span></div>
               )}
-              <div className="rx-stat"><label>{isFusion ? "Fuel rate" : "Life"}</label><span className="rv" title={reactor.fuel}>{reactor.fuel?.trim() || "—"}</span></div>
+              <div className="rx-stat"><label>{fuelKind === "rate" ? "Fuel rate" : "Life"}</label><span className="rv" title={fuelTitle}>{reactor.fuel?.trim() || "—"}</span></div>
             </div>
           </div>
         );

@@ -70,6 +70,17 @@ class FusionService(LegacyFissionService):
         return 2.5
 
 
+class FusionLifeService(FusionService):
+    def reactor_fuel_life_status(self, _index):
+        return "112y 4d 3h 2m"
+
+    def reactor_fuel_rate_status(self, _index):
+        return "LqdDeuterium 0.00000027 u/s"
+
+    def reactor_fuel_limiting_resource(self, _index):
+        return "LqdDeuterium"
+
+
 class ReactorTelemetryTests(unittest.TestCase):
     def test_legacy_service_defaults_to_fission_contract(self):
         reactor = _gather_reactors(LegacyFissionService())[0]
@@ -86,7 +97,18 @@ class ReactorTelemetryTests(unittest.TestCase):
         self.assertFalse(reactor["hasIntegrity"])
         self.assertNotIn("integrity", reactor)
         self.assertEqual(reactor["fuel"], "0.00000027 u/s")
+        self.assertEqual(reactor["fuelKind"], "rate")
         self.assertEqual(reactor["throttle"], 2.5)
+
+    def test_fusion_prefers_life_and_keeps_itemized_rate_detail(self):
+        reactor = _gather_reactors(FusionLifeService())[0]
+
+        self.assertEqual(reactor["fuel"], "112y 4d 3h 2m")
+        self.assertEqual(reactor["fuelKind"], "life")
+        self.assertEqual(
+            reactor["fuelRate"], "LqdDeuterium 0.00000027 u/s"
+        )
+        self.assertEqual(reactor["fuelLimitingResource"], "LqdDeuterium")
 
 
 if __name__ == "__main__":
