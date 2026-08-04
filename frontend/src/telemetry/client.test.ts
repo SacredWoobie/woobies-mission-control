@@ -165,6 +165,33 @@ describe("parseOverviewVesselLifecycleResult", () => {
 });
 
 describe("TelemetryClient", () => {
+  it("retries the initial connection after 500 ms", () => {
+    vi.useFakeTimers();
+    const sockets: FakeSocket[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onSnapshot: () => undefined,
+        onStatus: () => undefined,
+      },
+      {
+        createSocket: () => {
+          const socket = new FakeSocket();
+          sockets.push(socket);
+          return socket;
+        },
+      },
+    );
+
+    client.connect();
+    sockets[0].drop();
+    expect(sockets).toHaveLength(1);
+    vi.advanceTimersByTime(499);
+    expect(sockets).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sockets).toHaveLength(2);
+  });
+
   it("publishes snapshots and sends existing dashboard commands when linked", () => {
     const sockets: FakeSocket[] = [];
     const statuses: ConnectionStatus[] = [];

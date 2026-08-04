@@ -31,6 +31,7 @@ interface TelemetryClientCallbacks {
 
 interface TelemetryClientOptions {
   createSocket?: (url: string) => WebSocketTransport;
+  startupReconnectDelayMs?: number;
   reconnectDelayMs?: number;
   setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
@@ -237,6 +238,7 @@ export class TelemetryClient {
   private readonly callbacks: TelemetryClientCallbacks;
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
   private readonly createSocket: (url: string) => WebSocketTransport;
+  private readonly startupReconnectDelayMs: number;
   private readonly reconnectDelayMs: number;
   private readonly setTimer: (
     callback: () => void,
@@ -244,6 +246,7 @@ export class TelemetryClient {
   ) => ReturnType<typeof setTimeout>;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private socket: WebSocketTransport | null = null;
+  private hasLinked = false;
   private wanted = false;
 
   constructor(
@@ -253,6 +256,7 @@ export class TelemetryClient {
   ) {
     this.callbacks = callbacks;
     this.createSocket = options.createSocket ?? defaultSocketFactory;
+    this.startupReconnectDelayMs = options.startupReconnectDelayMs ?? 500;
     this.reconnectDelayMs = options.reconnectDelayMs ?? 2_000;
     this.setTimer = options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
     this.clearTimer = options.clearTimer ?? ((timer) => globalThis.clearTimeout(timer));
@@ -261,11 +265,13 @@ export class TelemetryClient {
   connect() {
     if (this.wanted) return;
     this.wanted = true;
+    this.hasLinked = false;
     this.openSocket("connecting");
   }
 
   disconnect() {
     this.wanted = false;
+    this.hasLinked = false;
     this.clearReconnectTimer();
     const socket = this.socket;
     this.socket = null;
@@ -309,7 +315,7 @@ export class TelemetryClient {
     this.reconnectTimer = this.setTimer(() => {
       this.reconnectTimer = null;
       if (this.wanted) this.openSocket("connecting");
-    }, this.reconnectDelayMs);
+    }, this.hasLinked ? this.reconnectDelayMs : this.startupReconnectDelayMs);
   }
 
   private openSocket(status: "connecting") {
@@ -324,7 +330,10 @@ export class TelemetryClient {
 
     this.socket = socket;
     socket.onopen = () => {
-      if (socket === this.socket && this.wanted) this.callbacks.onStatus("linked");
+      if (socket === this.socket && this.wanted) {
+        this.hasLinked = true;
+        this.callbacks.onStatus("linked");
+      }
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
@@ -372,6 +381,6 @@ export class TelemetryClient {
     this.reconnectTimer = this.setTimer(() => {
       this.reconnectTimer = null;
       if (this.wanted) this.openSocket("connecting");
-    }, this.reconnectDelayMs);
+    }, this.hasLinked ? this.reconnectDelayMs : this.startupReconnectDelayMs);
   }
 }

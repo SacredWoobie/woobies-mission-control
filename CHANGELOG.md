@@ -2,6 +2,13 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Kept the launcher in a truthful startup state until the dashboard loopback is
+  reachable, and shortened only the dashboard's initial connection retry so a
+  server that becomes ready between attempts links without an extra two-second
+  wait.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated
