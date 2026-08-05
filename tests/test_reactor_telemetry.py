@@ -1,6 +1,7 @@
 import unittest
+from types import SimpleNamespace
 
-from telemetry_server import _gather_reactors
+from telemetry_server import _apply_reactor_control_command, _gather_reactors
 
 
 class LegacyFissionService:
@@ -80,6 +81,80 @@ class FusionLifeService(FusionService):
     def reactor_fuel_limiting_resource(self, _index):
         return "LqdDeuterium"
 
+    def reactor_control_action(self, _index):
+        return "stop"
+
+    def reactor_charge_state(self, _index):
+        return "running"
+
+    def reactor_charge_percent(self, _index):
+        return 0
+
+
+class ChargingFusionService(FusionLifeService):
+    def reactor_enabled(self, _index):
+        return False
+
+    def reactor_status(self, _index):
+        return "Charging"
+
+    def reactor_control_action(self, _index):
+        return "stop_charging"
+
+    def reactor_charge_state(self, _index):
+        return "charging"
+
+    def reactor_charge_percent(self, _index):
+        return 37.54
+
+
+class ReactorCommandService:
+    def __init__(self, action="start_charging"):
+        self.action = action
+        self.calls = []
+
+    def reactor_count(self):
+        return 1
+
+    def reactor_name(self, _index):
+        return "FX-2 Fusion Reactor"
+
+    def reactor_family(self, _index):
+        return "fusion"
+
+    def reactor_control_action(self, _index):
+        return self.action
+
+    def reactor_start(self, index):
+        self.calls.append(("start", index))
+        return True
+
+    def reactor_stop(self, index):
+        self.calls.append(("stop", index))
+        return True
+
+    def reactor_start_charging(self, index):
+        self.calls.append(("start_charging", index))
+        return True
+
+    def reactor_stop_charging(self, index):
+        self.calls.append(("stop_charging", index))
+        return True
+
+
+def reactor_command_connection(service, vessel_id="vessel-1"):
+    game_scene = SimpleNamespace(flight="flight")
+    return SimpleNamespace(
+        krpc=SimpleNamespace(
+            current_game_scene="flight",
+            GameScene=game_scene,
+        ),
+        space_center=SimpleNamespace(
+            active_vessel=SimpleNamespace(id=vessel_id),
+        ),
+        system_heat=service,
+    )
+
 
 class ReactorTelemetryTests(unittest.TestCase):
     def test_legacy_service_defaults_to_fission_contract(self):
@@ -89,6 +164,7 @@ class ReactorTelemetryTests(unittest.TestCase):
         self.assertTrue(reactor["hasIntegrity"])
         self.assertEqual(reactor["integrity"], 100.0)
         self.assertEqual(reactor["ecPerSec"], 62.5)
+        self.assertNotIn("controlAction", reactor)
 
     def test_fusion_omits_integrity_and_preserves_small_fuel_rate(self):
         reactor = _gather_reactors(FusionService())[0]
@@ -109,6 +185,67 @@ class ReactorTelemetryTests(unittest.TestCase):
             reactor["fuelRate"], "LqdDeuterium 0.00000027 u/s"
         )
         self.assertEqual(reactor["fuelLimitingResource"], "LqdDeuterium")
+        self.assertEqual(reactor["chargeState"], "running")
+        self.assertEqual(reactor["controlAction"], "stop")
+
+    def test_fusion_charging_exposes_progress_and_pause_action(self):
+        reactor = _gather_reactors(ChargingFusionService())[0]
+
+        self.assertFalse(reactor["on"])
+        self.assertEqual(reactor["chargeState"], "charging")
+        self.assertEqual(reactor["chargePercent"], 37.5)
+        self.assertEqual(reactor["controlAction"], "stop_charging")
+
+    def test_reactor_command_revalidates_and_calls_native_service_action(self):
+        service = ReactorCommandService()
+        result = _apply_reactor_control_command(
+            reactor_command_connection(service),
+            {
+                "type": "reactor.control",
+                "requestId": "reactor-1",
+                "index": 0,
+                "action": "start_charging",
+                "expectedName": "FX-2 Fusion Reactor",
+                "expectedFamily": "fusion",
+                "expectedVesselGuid": "vessel-1",
+            },
+        )
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertEqual(service.calls, [("start_charging", 0)])
+
+    def test_reactor_command_rejects_stale_vessel_and_state(self):
+        service = ReactorCommandService(action="start")
+        stale_vessel = _apply_reactor_control_command(
+            reactor_command_connection(service, vessel_id="vessel-2"),
+            {
+                "type": "reactor.control",
+                "requestId": "reactor-2",
+                "index": 0,
+                "action": "start",
+                "expectedName": "FX-2 Fusion Reactor",
+                "expectedFamily": "fusion",
+                "expectedVesselGuid": "vessel-1",
+            },
+        )
+        stale_state = _apply_reactor_control_command(
+            reactor_command_connection(service),
+            {
+                "type": "reactor.control",
+                "requestId": "reactor-3",
+                "index": 0,
+                "action": "stop_charging",
+                "expectedName": "FX-2 Fusion Reactor",
+                "expectedFamily": "fusion",
+                "expectedVesselGuid": "vessel-1",
+            },
+        )
+
+        self.assertEqual(stale_vessel["status"], "error")
+        self.assertIn("active vessel changed", stale_vessel["message"])
+        self.assertEqual(stale_state["status"], "error")
+        self.assertIn("reactor state changed", stale_state["message"])
+        self.assertEqual(service.calls, [])
 
 
 if __name__ == "__main__":

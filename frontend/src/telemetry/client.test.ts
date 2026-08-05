@@ -5,11 +5,12 @@ import {
   parseOverviewVesselEditResult,
   parseOverviewVesselLifecycleResult,
   parseOverviewVesselSwitchResult,
+  parseReactorControlResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, ReactorControlResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -164,7 +165,73 @@ describe("parseOverviewVesselLifecycleResult", () => {
   });
 });
 
+describe("parseReactorControlResult", () => {
+  it("accepts typed reactor results and rejects malformed actions and indexes", () => {
+    expect(parseReactorControlResult(JSON.stringify({
+      type: "reactor.control.result",
+      requestId: "reactor-1",
+      index: 2,
+      action: "start_charging",
+      status: "accepted",
+      message: "Startup charging enabled.",
+    }))).toEqual({
+      type: "reactor.control.result",
+      requestId: "reactor-1",
+      index: 2,
+      action: "start_charging",
+      status: "accepted",
+      message: "Startup charging enabled.",
+    });
+    expect(parseReactorControlResult({
+      type: "reactor.control.result",
+      requestId: "reactor-2",
+      index: -1,
+      action: "ignite",
+      status: "accepted",
+      message: "Nope.",
+    })).toBeNull();
+  });
+});
+
 describe("TelemetryClient", () => {
+  it("routes reactor results only through the reactor callback", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const results: ReactorControlResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onReactorControlResult: (result) => results.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "reactor.control.result",
+      requestId: "reactor-1",
+      index: 0,
+      action: "stop",
+      status: "accepted",
+      message: "Reactor shut down.",
+    }));
+    socket.message(JSON.stringify({
+      type: "reactor.control.result",
+      requestId: "",
+      index: -1,
+      action: "invalid",
+      status: "error",
+      message: "Malformed.",
+    }));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].action).toBe("stop");
+    expect(snapshots).toEqual([]);
+  });
+
   it("publishes snapshots and sends existing dashboard commands when linked", () => {
     const sockets: FakeSocket[] = [];
     const statuses: ConnectionStatus[] = [];

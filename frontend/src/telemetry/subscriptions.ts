@@ -177,6 +177,7 @@ export function heatSnapshotsEqual(left: TelemetrySnapshot | null, right: Teleme
 export function electricitySnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
   return fieldsEqual(left, right, [
     "context.mode",
+    "v.guid",
     "elec.reactors",
     "elec.sources",
     "elec.totalGenEcPerSec",

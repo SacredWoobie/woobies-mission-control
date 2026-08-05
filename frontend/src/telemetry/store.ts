@@ -5,6 +5,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -17,6 +18,7 @@ export interface LiveTelemetryState {
   overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
+  reactorControlResult?: ReactorControlResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -53,6 +55,7 @@ export class TelemetryStore {
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+        onReactorControlResult?(result: ReactorControlResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -90,6 +93,9 @@ export class TelemetryStore {
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
       },
+      onReactorControlResult: (reactorControlResult) => {
+        this.patch({ reactorControlResult });
+      },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
       },
@@ -108,6 +114,7 @@ export class TelemetryStore {
             overviewVesselEditResult: undefined,
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
+            reactorControlResult: undefined,
           } : {}),
         });
       },
@@ -118,6 +125,7 @@ export class TelemetryStore {
       lastFrameAt: null,
       message: undefined,
       snapshot: null,
+      reactorControlResult: undefined,
       status: "connecting",
     });
     this.client.connect();

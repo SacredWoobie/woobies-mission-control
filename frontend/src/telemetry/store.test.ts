@@ -6,6 +6,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -16,6 +17,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+      onReactorControlResult?(result: ReactorControlResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;
@@ -55,12 +57,21 @@ describe("TelemetryStore", () => {
       status: "accepted",
       message: "Terminated Odyssey.",
     });
+    callbacks!.onReactorControlResult?.({
+      type: "reactor.control.result",
+      requestId: "reactor-1",
+      index: 0,
+      action: "start",
+      status: "accepted",
+      message: "Reactor started.",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
+    expect(store.getSnapshot().reactorControlResult?.requestId).toBe("reactor-1");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
@@ -69,6 +80,7 @@ describe("TelemetryStore", () => {
       overviewVesselSwitchResult: undefined,
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
+      reactorControlResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);
@@ -85,6 +97,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+      onReactorControlResult?(result: ReactorControlResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;

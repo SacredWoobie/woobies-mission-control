@@ -65,7 +65,11 @@ export interface StockHeatPartTelemetry {
   netW?: number;
 }
 
+export type ReactorControlAction = "start" | "stop" | "start_charging" | "stop_charging";
+export type ReactorChargeState = "off" | "charging" | "ready" | "running";
+
 export interface ReactorTelemetry {
+  index?: number;
   name: string;
   family?: "fission" | "fusion";
   hasIntegrity?: boolean;
@@ -81,6 +85,19 @@ export interface ReactorTelemetry {
   fuelRate?: string;
   fuelLimitingResource?: string;
   throttle?: number;
+  chargeState?: ReactorChargeState;
+  chargePercent?: number;
+  controlAction?: ReactorControlAction;
+  controlAvailable?: boolean;
+}
+
+export interface ReactorControlResult {
+  type: "reactor.control.result";
+  requestId: string;
+  index: number;
+  action: ReactorControlAction;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export type ElectricitySourceKind =
@@ -532,6 +549,7 @@ export type TelemetryCommand =
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }
+  | { type: "reactor.control"; requestId: string; index: number; action: ReactorControlAction; expectedName: string; expectedFamily: "fission" | "fusion"; expectedVesselGuid: string }
   | { type: "notes.select"; relativePath: string | null }
   | { type: "notes.pin"; relativePath: string | null }
   | { type: "notes.favorite"; relativePath: string; favorite: boolean }

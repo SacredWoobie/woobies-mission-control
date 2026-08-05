@@ -9,6 +9,10 @@ All notable public changes will be recorded here.
   remaining life based on the limiting fuel and the combined burn from other
   reactors sharing it. Exact per-resource rates remain available as detail, and
   fission-only core integrity is not fabricated.
+- Added guarded reactor controls to Reactor Detail. Fission reactors can be
+  started or stopped, while Far Future fusion reactors expose their native
+  off, startup-charging, ready, and running phases with context-sensitive
+  controls and live startup-charge progress.
 
 ## v0.4.2 - Mission Control vessel management
 

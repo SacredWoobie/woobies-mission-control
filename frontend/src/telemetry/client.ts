@@ -4,6 +4,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -24,6 +25,7 @@ interface TelemetryClientCallbacks {
   onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
   onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
   onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+  onReactorControlResult?(result: ReactorControlResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
   onStatus(status: ConnectionStatus, message?: string): void;
@@ -177,6 +179,52 @@ export function parseOverviewVesselLifecycleResult(raw: unknown): OverviewVessel
   return candidate as unknown as OverviewVesselLifecycleResult;
 }
 
+const reactorControlActions = new Set<ReactorControlResult["action"]>([
+  "start",
+  "stop",
+  "start_charging",
+  "stop_charging",
+]);
+
+export function parseReactorControlResult(raw: unknown): ReactorControlResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "reactor.control.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.index !== "number"
+    || !Number.isSafeInteger(candidate.index)
+    || candidate.index < 0
+    || !reactorControlActions.has(candidate.action as ReactorControlResult["action"])
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as ReactorControlResult;
+}
+
+function isReactorControlResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "reactor.control.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isOverviewVesselLifecycleResultMessage(raw: unknown) {
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -328,6 +376,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const reactorControlResult = parseReactorControlResult(event.data);
+      if (reactorControlResult) {
+        this.callbacks.onReactorControlResult?.(reactorControlResult);
+        return;
+      }
+      if (isReactorControlResultMessage(event.data)) return;
       const lifecycleResult = parseOverviewVesselLifecycleResult(event.data);
       if (lifecycleResult) {
         this.callbacks.onOverviewVesselLifecycleResult?.(lifecycleResult);
