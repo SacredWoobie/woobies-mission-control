@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
 import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
@@ -312,5 +312,60 @@ describe("ElectricityPanel", () => {
       expectedPartId: 202,
       expectedVesselGuid: "vessel-guid",
     });
+  });
+
+  it("dismisses a reactor control result after five seconds", () => {
+    vi.useFakeTimers();
+    try {
+      const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+      const snapshot: TelemetrySnapshot = {
+        ...flightTelemetryFixture,
+        "v.guid": "vessel-guid",
+        "elec.reactors": [{
+          index: 1,
+          partId: 202,
+          name: "MX-1 Fission Reactor",
+          family: "fission",
+          on: true,
+          controlAction: "stop",
+          controlAvailable: true,
+          fuel: "59y",
+        }],
+      };
+      const { rerender } = render(
+        <PanelVisibilityProvider>
+          <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={snapshot} />
+        </PanelVisibilityProvider>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Shut down MX-1 Fission Reactor" }));
+      const request = onSendCommand.mock.calls[0][0];
+      if (request.type !== "reactor.control") throw new Error("Expected a reactor command.");
+      rerender(
+        <PanelVisibilityProvider>
+          <ElectricityPanel
+            commandEnabled
+            controlResult={{
+              type: "reactor.control.result",
+              requestId: request.requestId,
+              index: request.index,
+              action: request.action,
+              status: "accepted",
+              message: "Reactor shutdown accepted.",
+            }}
+            onSendCommand={onSendCommand}
+            snapshot={snapshot}
+          />
+        </PanelVisibilityProvider>,
+      );
+
+      expect(screen.getByText("Reactor shutdown accepted.")).toBeTruthy();
+      act(() => vi.advanceTimersByTime(4_999));
+      expect(screen.getByText("Reactor shutdown accepted.")).toBeTruthy();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByText("Reactor shutdown accepted.")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
