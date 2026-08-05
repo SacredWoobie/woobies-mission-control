@@ -1,11 +1,11 @@
 @{
-    ProductVersion = "0.4.2"
+    ProductVersion = "0.4.3"
     Services = @(
         @{
             Folder = "WoobiesControlStats"
             File = "WoobiesControlStats.dll"
-            Version = "0.2.3.0"
-            Sha256 = "CB5E720A3FA7EDF64CC09C946F749006B737ACE8881682D8F76AC6C8B1E99F22"
+            Version = "0.2.6.0"
+            Sha256 = "B6041F1D8C403C82342B8288B86BEA6139E7949E808E6DD27CC471F73A32A088"
             License = "MIT"
         }
         @{

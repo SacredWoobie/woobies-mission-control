@@ -89,8 +89,8 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Mission Control vessel management", section)
-        self.assertIn("WoobiesControlStats 0.2.3", section)
+        self.assertIn("Flight systems and science operations", section)
+        self.assertIn("Far Future Technologies fusion reactors", section)
 
 
 if __name__ == "__main__":

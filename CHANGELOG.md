@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.4.3 - Flight systems and science operations
+
 - Corrected Flight docking-port targets to show the target vessel name and the
   selected port part's relative speed instead of a generic port label with no
   speed value.

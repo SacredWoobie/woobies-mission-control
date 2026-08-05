@@ -45,7 +45,7 @@ DASHBOARD = HERE / "web" / "index.html"
 DASHBOARD_URL = "http://127.0.0.1:8090/"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.3"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 LATEST_RELEASE_API = (
@@ -117,7 +117,7 @@ SERVICE_DLLS = (
     ("KRPC.WoobiesMechJeb", "Mission planning / MechJeb bridge"),
 )
 SERVICE_TESTED_VERSIONS = {
-    "WoobiesControlStats": "0.2.3",
+    "WoobiesControlStats": "0.2.6",
     "KRPC.StageStats": "0.2.7",
     "KRPC.SystemHeat": "0.2.9",
     "KRPC.WoobiesMechJeb": "0.8.6",

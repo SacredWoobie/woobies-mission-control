@@ -144,7 +144,7 @@ describe("Dashboard lifecycle", () => {
 
   it("renders the complete flight dashboard and restores hidden panels from the left rail", () => {
     const firstView = render(<App />);
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.2 · Development")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.3 · Development")).toBeTruthy();
     ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target", "Pinned note"].forEach((heading) => {
       expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });

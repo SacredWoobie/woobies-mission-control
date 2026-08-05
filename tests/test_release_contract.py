@@ -138,6 +138,33 @@ class ReleaseContractTests(unittest.TestCase):
             r'SourceCommit = "c655ae1806af21d8420278e386c9b4e99964c32c"',
         )
 
+    def test_v043_release_pack_selects_flight_system_services(self):
+        release_pack = (
+            ROOT / "tools" / "Release-Pack-v0.4.3.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('ProductVersion = "0.4.3"', release_pack)
+        expected_services = {
+            "WoobiesControlStats": (
+                "0.2.6.0",
+                "B6041F1D8C403C82342B8288B86BEA6139E7949E808E6DD27CC471F73A32A088",
+                "6e3c72f8efdd0637979dac6fabf8d305eec7a123",
+            ),
+            "KRPC.SystemHeat": (
+                "0.2.9.0",
+                "D253044319E44FAFC19F8DB59415339BE8E42BFE9643E44A19332092239C22C4",
+                "815a05a922b31fc6325c4de2e828ab1c28338748",
+            ),
+        }
+        for service, (version, sha256, source_commit) in expected_services.items():
+            self.assertRegex(
+                release_pack,
+                rf'(?s)Folder = "{re.escape(service)}".*?'
+                rf'Version = "{re.escape(version)}".*?'
+                rf'Sha256 = "{sha256}".*?'
+                rf'SourceCommit = "{source_commit}"',
+            )
+
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
             "release_launcher", ROOT / "ksp_dashboard_app.py"

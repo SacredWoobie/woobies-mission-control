@@ -1,16 +1,16 @@
 # Woobie's Mission Control
 
-Current release: **v0.4.2**
+Current release: **v0.4.3**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.4.2 turns the Space Center overview into a practical vessel-management
-screen. It adds collision-safe craft selection, guarded switching, renaming and
-type changes, contextual recovery or termination with crew-loss warnings, and
-automatic transfer-window population when MechJeb is available.
+Version 0.4.3 expands Flight operations with research-lab telemetry and controls,
+fusion-reactor monitoring and native reactor controls, guarded System Heat loop
+radiator controls, broader solar-array support, current-stage consumables, and
+more resilient electricity, connection, docking, and long-duration header data.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -103,13 +103,12 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The current development selection includes four independently versioned kRPC
-extensions. Published release packs remain pinned to their original service
-bytes:
+The current release includes four independently versioned kRPC extensions.
+Historical release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
 | --- | --- | --- |
-| WoobiesControlStats | 0.2.3 | Roster, stored science, stock thermal data, KAC bridge recovery, and guarded vessel termination |
+| WoobiesControlStats | 0.2.6 | Roster, stored science, research-lab telemetry and controls, stock thermal data, KAC bridge recovery, and guarded vessel termination |
 | KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
 | KRPC.SystemHeat | 0.2.9 | System Heat loops, components, electrical integration, reactor control, and guarded per-loop radiator control |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
