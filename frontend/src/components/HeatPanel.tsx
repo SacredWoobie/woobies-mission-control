@@ -103,7 +103,7 @@ function HeatEntityRow({ autoExpand, controlPending, entity, onControl }: {
     && entity.radiatorPartIds?.length,
   );
   const nonRetractable = entity.radiatorState === "online"
-    && entity.radiatorControlAvailable === false
+    && entity.radiatorControlAvailable !== true
     && !entity.radiatorControlAction;
   const controlLabel = controlPending
     ? "APPLYING"

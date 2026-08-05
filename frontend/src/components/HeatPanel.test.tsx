@@ -258,7 +258,6 @@ describe("HeatPanel", () => {
         netKw: -500,
         radiatorPartIds: [8, 9],
         radiatorState: "online",
-        radiatorControlAvailable: false,
       }],
     }} />);
 

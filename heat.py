@@ -227,6 +227,7 @@ def enrich_system_heat_result(service, result):
             "offline", "partial", "online",
         }:
             loop["radiatorState"] = radiator_state
+            loop["radiatorControlAvailable"] = False
         if (
             radiator_action in {"start", "stop"}
             and radiator_part_ids

@@ -132,6 +132,9 @@ class HeatExtensionTests(unittest.TestCase):
         self.assertNotIn(
             "radiatorControlAction", enriched["heat.loops"][1]
         )
+        self.assertFalse(
+            enriched["heat.loops"][1]["radiatorControlAvailable"]
+        )
 
     def test_falls_back_to_collector_generation_and_removal(self):
         class LegacySystemHeat:
