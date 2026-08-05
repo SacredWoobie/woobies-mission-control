@@ -3726,8 +3726,8 @@ def _apply_reactor_control_command(conn, command):
         if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
             return reject("Reactor controls are available only in flight.")
 
-        vessel = conn.space_center.active_vessel
-        current_vessel_guid = str(_overview_value(vessel, "id", "")).strip()
+        current_identity = _mission_planning.current_craft_identity(conn, "flight")
+        current_vessel_guid = str(current_identity.get("v.guid", "")).strip()
         if current_vessel_guid != expected_vessel_guid:
             return reject("The active vessel changed; refresh before controlling a reactor.")
 

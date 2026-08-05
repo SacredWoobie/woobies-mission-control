@@ -157,7 +157,14 @@ def reactor_command_connection(service, vessel_id="vessel-1"):
             GameScene=game_scene,
         ),
         space_center=SimpleNamespace(
-            active_vessel=SimpleNamespace(id=vessel_id),
+            active_vessel=SimpleNamespace(),
+        ),
+        stage_stats=SimpleNamespace(
+            game_save_folder="default",
+            vessel_guid=vessel_id,
+            vessel_persistent_id=1,
+            vessel_root_part_persistent_id=101,
+            vessel_part_persistent_ids=lambda: [101],
         ),
         system_heat=service,
     )
@@ -203,7 +210,7 @@ class ReactorTelemetryTests(unittest.TestCase):
         self.assertEqual(reactor["chargePercent"], 37.5)
         self.assertEqual(reactor["controlAction"], "stop_charging")
 
-    def test_reactor_command_revalidates_and_calls_native_service_action(self):
+    def test_reactor_command_uses_stage_stats_identity_when_vessel_has_no_id(self):
         service = ReactorCommandService()
         result = _apply_reactor_control_command(
             reactor_command_connection(service),
