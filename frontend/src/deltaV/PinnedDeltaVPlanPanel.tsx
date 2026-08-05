@@ -400,8 +400,8 @@ export function PinnedDeltaVPlanPanel({
           onClick={() => setReadinessExpanded((expanded) => !expanded)}
           type="button"
         >
-          <span aria-hidden="true">{readinessExpanded ? "\u25be" : "\u25c2"}</span>
           <strong>{readinessStatus}</strong>
+          <span aria-hidden="true">{readinessExpanded ? "\u25be" : "\u25c2"}</span>
         </button>
       </header>
       {readinessExpanded && <div className="delta-v-readiness-body" id="flight-transfer-readiness-details">

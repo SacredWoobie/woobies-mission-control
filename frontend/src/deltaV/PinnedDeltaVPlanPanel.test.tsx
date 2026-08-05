@@ -185,7 +185,7 @@ describe("pinned delta-v Mission Plan", () => {
 
     const collapse = screen.getByRole("button", { name: "Collapse transfer readiness" });
     expect(collapse.getAttribute("aria-expanded")).toBe("true");
-    expect(collapse.textContent).toContain("\u25be");
+    expect(collapse.textContent).toBe("HOLD\u25be");
     expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
     expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
 
@@ -193,7 +193,7 @@ describe("pinned delta-v Mission Plan", () => {
 
     const expand = screen.getByRole("button", { name: "Expand transfer readiness" });
     expect(expand.getAttribute("aria-expanded")).toBe("false");
-    expect(expand.textContent).toContain("\u25c2");
+    expect(expand.textContent).toBe("HOLD\u25c2");
     expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
     expect(screen.queryByText("Target orbit", { exact: true })).toBeNull();
 
