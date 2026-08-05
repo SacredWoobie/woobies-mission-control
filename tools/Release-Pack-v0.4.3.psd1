@@ -10,6 +10,8 @@
             Sha256 = "B6041F1D8C403C82342B8288B86BEA6139E7949E808E6DD27CC471F73A32A088"
             License = "MIT"
             SourceCommit = "6e3c72f8efdd0637979dac6fabf8d305eec7a123"
+            EmbeddedInformationalCommit = "db0e393519a61253634ae773b8a3c7b3a249bab0"
+            BuildProvenance = "Built from the completed 6e3c72f source snapshot before that snapshot was committed; the assembly informational version therefore retains the preceding HEAD."
         }
         @{
             Folder = "KRPC.StageStats"

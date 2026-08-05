@@ -164,6 +164,12 @@ class ReleaseContractTests(unittest.TestCase):
                 rf'Sha256 = "{sha256}".*?'
                 rf'SourceCommit = "{source_commit}"',
             )
+        self.assertIn(
+            'EmbeddedInformationalCommit = '
+            '"db0e393519a61253634ae773b8a3c7b3a249bab0"',
+            release_pack,
+        )
+        self.assertIn("assembly informational version", release_pack)
 
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
