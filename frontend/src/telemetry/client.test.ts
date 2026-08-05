@@ -5,6 +5,7 @@ import {
   parseOverviewVesselEditResult,
   parseOverviewVesselLifecycleResult,
   parseOverviewVesselSwitchResult,
+  parseReactorControlResult,
   parseScienceAlarmResult,
   parseScienceLabResearchResult,
   parseScienceLabTransmitResult,
@@ -12,7 +13,7 @@ import {
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, ScienceAlarmResult, ScienceLabResearchResult, ScienceLabTransmitResult, TelemetrySnapshot } from "./types";
+import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, ReactorControlResult, ScienceAlarmResult, ScienceLabResearchResult, ScienceLabTransmitResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -565,5 +566,37 @@ describe("TelemetryClient", () => {
     vi.advanceTimersByTime(4_000);
     expect(statuses.at(-1)).toBe("offline");
     expect(sockets).toHaveLength(2);
+  });
+});
+
+describe("reactor control results", () => {
+  it("parses and routes a valid result without publishing it as telemetry", () => {
+    const payload = {
+      type: "reactor.control.result" as const,
+      requestId: "reactor-1",
+      index: 2,
+      action: "start_charging" as const,
+      status: "accepted" as const,
+      message: "Startup charging enabled.",
+    };
+    expect(parseReactorControlResult(JSON.stringify(payload))).toEqual(payload);
+    expect(parseReactorControlResult({ ...payload, index: -1 })).toBeNull();
+
+    const socket = new FakeSocket();
+    const results: ReactorControlResult[] = [];
+    const snapshots: TelemetrySnapshot[] = [];
+    const client = new TelemetryClient("ws://127.0.0.1:8090", {
+      onReactorControlResult: (result) => results.push(result),
+      onSnapshot: (snapshot) => snapshots.push(snapshot),
+      onStatus: () => undefined,
+    }, { createSocket: () => socket });
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify(payload));
+    socket.message(JSON.stringify({ ...payload, requestId: "", action: "invalid" }));
+
+    expect(results).toEqual([payload]);
+    expect(snapshots).toEqual([]);
   });
 });

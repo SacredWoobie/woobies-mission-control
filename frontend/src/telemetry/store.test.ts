@@ -6,6 +6,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
   ScienceAlarmResult,
   ScienceLabResearchResult,
   ScienceLabTransmitResult,
@@ -19,6 +20,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+      onReactorControlResult?(result: ReactorControlResult): void;
       onScienceAlarmResult?(result: ScienceAlarmResult): void;
       onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
       onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
@@ -61,6 +63,14 @@ describe("TelemetryStore", () => {
       status: "accepted",
       message: "Terminated Odyssey.",
     });
+    callbacks!.onReactorControlResult?.({
+      type: "reactor.control.result",
+      requestId: "reactor-1",
+      index: 0,
+      action: "start",
+      status: "accepted",
+      message: "Reactor started.",
+    });
     callbacks!.onScienceAlarmResult?.({
       type: "science.alarm.create.result",
       requestId: "alarm-1",
@@ -90,6 +100,7 @@ describe("TelemetryStore", () => {
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
+    expect(store.getSnapshot().reactorControlResult?.requestId).toBe("reactor-1");
     expect(store.getSnapshot().scienceAlarmResult?.provider).toBe("kac");
     expect(store.getSnapshot().scienceLabResearchResult?.enabled).toBe(false);
     expect(store.getSnapshot().scienceLabTransmitResult?.requestId).toBe("transmit-1");
@@ -101,6 +112,7 @@ describe("TelemetryStore", () => {
       overviewVesselSwitchResult: undefined,
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
+      reactorControlResult: undefined,
       scienceAlarmResult: undefined,
       scienceLabResearchResult: undefined,
       scienceLabTransmitResult: undefined,
@@ -120,6 +132,7 @@ describe("TelemetryStore", () => {
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+      onReactorControlResult?(result: ReactorControlResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;

@@ -2085,6 +2085,9 @@ def _apply_telemetry_command(conn, command):
     if command.get("type") == "overview.vessel.lifecycle":
         return _apply_overview_vessel_lifecycle_command(conn, command)
 
+    if command.get("type") == "reactor.control":
+        return _apply_reactor_control_command(conn, command)
+
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
         if pinned is None or pinned == "":
@@ -3647,6 +3650,127 @@ def _finalize_telemetry(conn, payload):
     return payload
 
 
+_REACTOR_CONTROL_ACTIONS = {
+    "start",
+    "stop",
+    "start_charging",
+    "stop_charging",
+}
+
+
+def _reactor_control_result(request_id, index, action, status, message):
+    return {
+        "type": "reactor.control.result",
+        "requestId": request_id if isinstance(request_id, str) else "",
+        "index": index if isinstance(index, int) and not isinstance(index, bool) else -1,
+        "action": action if action in _REACTOR_CONTROL_ACTIONS else "start",
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_reactor_control_command(conn, command):
+    """Apply one identity- and state-guarded native reactor action."""
+    request_id = command.get("requestId")
+    index = command.get("index")
+    action = command.get("action")
+
+    def reject(message):
+        return _reactor_control_result(
+            request_id, index, action, "error", message
+        )
+
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid reactor request ID is required.")
+    if (
+        not isinstance(index, int)
+        or isinstance(index, bool)
+        or index < 0
+        or index > 255
+    ):
+        return reject("Select a valid reactor index.")
+    if action not in _REACTOR_CONTROL_ACTIONS:
+        return reject("Select a valid reactor action.")
+
+    expected_name = command.get("expectedName")
+    expected_family = command.get("expectedFamily")
+    expected_part_id = command.get("expectedPartId")
+    expected_vessel_guid = command.get("expectedVesselGuid")
+    if (
+        not isinstance(expected_name, str)
+        or not expected_name
+        or len(expected_name) > 256
+    ):
+        return reject("A valid expected reactor name is required.")
+    if expected_family not in {"fission", "fusion"}:
+        return reject("A valid expected reactor family is required.")
+    if (
+        not isinstance(expected_part_id, int)
+        or isinstance(expected_part_id, bool)
+        or expected_part_id < 0
+        or expected_part_id > 0xFFFFFFFF
+    ):
+        return reject("A valid expected reactor part ID is required.")
+    if (
+        not isinstance(expected_vessel_guid, str)
+        or not expected_vessel_guid
+        or len(expected_vessel_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid expected vessel ID is required.")
+
+    try:
+        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+            return reject("Reactor controls are available only in flight.")
+
+        vessel = conn.space_center.active_vessel
+        current_vessel_guid = str(_overview_value(vessel, "id", "")).strip()
+        if current_vessel_guid != expected_vessel_guid:
+            return reject("The active vessel changed; refresh before controlling a reactor.")
+
+        service = conn.system_heat
+        count = int(service.reactor_count())
+        if index >= count:
+            return reject("The reactor list changed; refresh before trying again.")
+
+        current_name = str(service.reactor_name(index) or "")
+        current_family = str(service.reactor_family(index) or "").lower()
+        current_part_id = int(service.reactor_part_id(index))
+        current_action = str(service.reactor_control_action(index) or "")
+        if current_part_id != expected_part_id:
+            return reject("The selected reactor identity changed; refresh before trying again.")
+        if current_name != expected_name or current_family != expected_family:
+            return reject("The selected reactor changed; refresh before trying again.")
+        if current_action != action:
+            return reject(
+                "The reactor state changed; use the newly available control."
+            )
+
+        procedures = {
+            "start": service.reactor_start,
+            "stop": service.reactor_stop,
+            "start_charging": service.reactor_start_charging,
+            "stop_charging": service.reactor_stop_charging,
+        }
+        if not bool(procedures[action](index)):
+            return reject("The reactor rejected the requested state change.")
+
+        messages = {
+            "start": "Reactor start accepted.",
+            "stop": "Reactor shutdown accepted.",
+            "start_charging": "Fusion startup charging accepted.",
+            "stop_charging": "Fusion startup charging paused.",
+        }
+        return _reactor_control_result(
+            request_id, index, action, "accepted", messages[action]
+        )
+    except Exception as exc:
+        return reject(f"Reactor control failed: {exc}")
+
+
 def _gather_reactors(system_heat):
     """Read the additive reactor contract while remaining compatible with 0.2.3."""
     reactors = []
@@ -3668,6 +3792,7 @@ def _gather_reactors(system_heat):
             pass
 
         reactor = {
+            "index": index,
             "name": system_heat.reactor_name(index),
             "family": family,
             "hasIntegrity": has_integrity,
@@ -3687,6 +3812,32 @@ def _gather_reactors(system_heat):
             "fuelKind": "life" if family == "fission" else "rate",
             "throttle": round(system_heat.reactor_throttle(index), 1),
         }
+        try:
+            part_id = int(system_heat.reactor_part_id(index))
+            if part_id < 0 or part_id > 0xFFFFFFFF:
+                raise ValueError("invalid reactor part ID")
+            control_action = str(
+                system_heat.reactor_control_action(index) or ""
+            )
+            if control_action in _REACTOR_CONTROL_ACTIONS:
+                reactor["partId"] = part_id
+                reactor["controlAction"] = control_action
+                reactor["controlAvailable"] = True
+            charge_state = str(
+                system_heat.reactor_charge_state(index) or ""
+            )
+            if charge_state in {"off", "charging", "ready", "running"}:
+                reactor["chargeState"] = charge_state
+                charge_percent = float(
+                    system_heat.reactor_charge_percent(index)
+                )
+                if math.isfinite(charge_percent):
+                    reactor["chargePercent"] = round(
+                        max(0.0, min(100.0, charge_percent)), 1
+                    )
+        except Exception:
+            # SystemHeat 0.2.6 and older remain telemetry-only.
+            pass
         if family == "fusion":
             try:
                 fuel_life = system_heat.reactor_fuel_life_status(index) or ""
@@ -3798,6 +3949,13 @@ def gather_telemetry(conn):
         d["v.name"] = vessel.name
     except Exception:
         d["v.name"] = ""
+
+    try:
+        vessel_guid = str(_overview_value(vessel, "id", "")).strip()
+        if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
+            d["v.guid"] = vessel_guid
+    except Exception:
+        pass
 
     try:
         universal_time = sc.ut

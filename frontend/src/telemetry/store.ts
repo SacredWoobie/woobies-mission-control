@@ -5,6 +5,7 @@ import type {
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
   ScienceAlarmResult,
   ScienceLabResearchResult,
   ScienceLabTransmitResult,
@@ -20,6 +21,7 @@ export interface LiveTelemetryState {
   overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
+  reactorControlResult?: ReactorControlResult;
   scienceAlarmResult?: ScienceAlarmResult;
   scienceLabResearchResult?: ScienceLabResearchResult;
   scienceLabTransmitResult?: ScienceLabTransmitResult;
@@ -59,6 +61,7 @@ export class TelemetryStore {
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+        onReactorControlResult?(result: ReactorControlResult): void;
         onScienceAlarmResult?(result: ScienceAlarmResult): void;
         onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
         onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
@@ -99,6 +102,9 @@ export class TelemetryStore {
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
       },
+      onReactorControlResult: (reactorControlResult) => {
+        this.patch({ reactorControlResult });
+      },
       onScienceAlarmResult: (scienceAlarmResult) => {
         this.patch({ scienceAlarmResult });
       },
@@ -126,6 +132,7 @@ export class TelemetryStore {
             overviewVesselEditResult: undefined,
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
+            reactorControlResult: undefined,
             scienceAlarmResult: undefined,
             scienceLabResearchResult: undefined,
             scienceLabTransmitResult: undefined,
@@ -138,6 +145,7 @@ export class TelemetryStore {
       frameCount: 0,
       lastFrameAt: null,
       message: undefined,
+      reactorControlResult: undefined,
       scienceAlarmResult: undefined,
       scienceLabResearchResult: undefined,
       scienceLabTransmitResult: undefined,
