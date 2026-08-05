@@ -247,6 +247,26 @@ describe("HeatPanel", () => {
     expect((screen.getByRole("button", { name: "Loop 4 radiators are deploying" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("labels active radiators without a shutdown action as non-retractable", () => {
+    render(<HeatPanel commandEnabled onSendCommand={vi.fn()} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat",
+      "heat.loops": [{
+        id: "0",
+        tempK: 300,
+        nominalTempK: 800,
+        netKw: -500,
+        radiatorPartIds: [8, 9],
+        radiatorState: "online",
+        radiatorControlAvailable: false,
+      }],
+    }} />);
+
+    const control = screen.getByRole("button", { name: "Loop 0 radiators are active and cannot be retracted" });
+    expect(control.textContent).toBe("NON-RETRACTABLE");
+    expect((control as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("keeps older services and stock fallback display-only", () => {
     const view = render(<HeatPanel commandEnabled onSendCommand={vi.fn()} snapshot={{
       ...flightTelemetryFixture,

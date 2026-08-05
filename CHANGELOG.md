@@ -58,8 +58,9 @@ All notable public changes will be recorded here.
   activates and extends all registered radiators, or deactivates and retracts
   them when the loop is fully online. Commands revalidate the active vessel,
   loop membership, and current aggregate action before calling KSP's native
-  radiator controls; older services and stock thermal fallback remain
-  display-only.
+  radiator controls. Active radiators without a native retract or shutdown
+  action are identified as non-retractable; older services and stock thermal
+  fallback remain display-only.
 
 ## v0.4.2 - Mission Control vessel management
 

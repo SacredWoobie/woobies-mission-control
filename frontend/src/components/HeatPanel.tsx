@@ -102,6 +102,9 @@ function HeatEntityRow({ autoExpand, controlPending, entity, onControl }: {
     && Number.isSafeInteger(entity.loopId)
     && entity.radiatorPartIds?.length,
   );
+  const nonRetractable = entity.radiatorState === "online"
+    && entity.radiatorControlAvailable === false
+    && !entity.radiatorControlAction;
   const controlLabel = controlPending
     ? "APPLYING"
     : entity.radiatorControlAction === "start"
@@ -114,12 +117,16 @@ function HeatEntityRow({ autoExpand, controlPending, entity, onControl }: {
             ? "RETRACTING"
             : entity.radiatorState === "broken"
               ? "DAMAGED"
-              : "UNAVAILABLE";
+              : nonRetractable
+                ? "NON-RETRACTABLE"
+                : "UNAVAILABLE";
   const controlTitle = entity.radiatorControlAction === "start"
     ? `Activate and extend all radiators in ${entity.name}`
     : entity.radiatorControlAction === "stop"
       ? `Deactivate and retract all radiators in ${entity.name}`
-      : `${entity.name} radiators are ${entity.radiatorState ?? "unavailable"}`;
+      : nonRetractable
+        ? `${entity.name} radiators are active and cannot be retracted`
+        : `${entity.name} radiators are ${entity.radiatorState ?? "unavailable"}`;
 
   return (
     <div className={`heat-entity ${entity.severity}${expanded ? " expanded" : ""}`}>
