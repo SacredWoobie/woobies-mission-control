@@ -3197,6 +3197,7 @@ def _apply_reactor_control_command(conn, command):
 
     expected_name = command.get("expectedName")
     expected_family = command.get("expectedFamily")
+    expected_part_id = command.get("expectedPartId")
     expected_vessel_guid = command.get("expectedVesselGuid")
     if (
         not isinstance(expected_name, str)
@@ -3206,6 +3207,13 @@ def _apply_reactor_control_command(conn, command):
         return reject("A valid expected reactor name is required.")
     if expected_family not in {"fission", "fusion"}:
         return reject("A valid expected reactor family is required.")
+    if (
+        not isinstance(expected_part_id, int)
+        or isinstance(expected_part_id, bool)
+        or expected_part_id < 0
+        or expected_part_id > 0xFFFFFFFF
+    ):
+        return reject("A valid expected reactor part ID is required.")
     if (
         not isinstance(expected_vessel_guid, str)
         or not expected_vessel_guid
@@ -3229,7 +3237,10 @@ def _apply_reactor_control_command(conn, command):
 
         current_name = str(service.reactor_name(index) or "")
         current_family = str(service.reactor_family(index) or "").lower()
+        current_part_id = int(service.reactor_part_id(index))
         current_action = str(service.reactor_control_action(index) or "")
+        if current_part_id != expected_part_id:
+            return reject("The selected reactor identity changed; refresh before trying again.")
         if current_name != expected_name or current_family != expected_family:
             return reject("The selected reactor changed; refresh before trying again.")
         if current_action != action:
@@ -3301,10 +3312,14 @@ def _gather_reactors(system_heat):
             "throttle": round(system_heat.reactor_throttle(index), 1),
         }
         try:
+            part_id = int(system_heat.reactor_part_id(index))
+            if part_id < 0 or part_id > 0xFFFFFFFF:
+                raise ValueError("invalid reactor part ID")
             control_action = str(
                 system_heat.reactor_control_action(index) or ""
             )
             if control_action in _REACTOR_CONTROL_ACTIONS:
+                reactor["partId"] = part_id
                 reactor["controlAction"] = control_action
                 reactor["controlAvailable"] = True
             charge_state = str(

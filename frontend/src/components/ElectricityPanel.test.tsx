@@ -189,6 +189,7 @@ describe("ElectricityPanel", () => {
       "v.guid": "vessel-guid",
       "elec.reactors": [{
         index: 3,
+        partId: 303,
         name: "FX-2 Fusion Reactor",
         family: "fusion",
         hasIntegrity: false,
@@ -214,6 +215,7 @@ describe("ElectricityPanel", () => {
       action: "start_charging",
       expectedName: "FX-2 Fusion Reactor",
       expectedFamily: "fusion",
+      expectedPartId: 303,
       expectedVesselGuid: "vessel-guid",
     });
 
@@ -242,6 +244,7 @@ describe("ElectricityPanel", () => {
       "v.guid": "vessel-guid",
       "elec.reactors": [{
         index: 0,
+        partId: 101,
         name: "FX-2 Fusion Reactor",
         family: "fusion",
         hasIntegrity: false,
@@ -288,6 +291,7 @@ describe("ElectricityPanel", () => {
           "v.guid": "vessel-guid",
           "elec.reactors": [{
             index: 1,
+            partId: 202,
             name: "MX-1 Fission Reactor",
             family: "fission",
             on: false,
@@ -305,6 +309,7 @@ describe("ElectricityPanel", () => {
       index: 1,
       action: "start",
       expectedFamily: "fission",
+      expectedPartId: 202,
       expectedVesselGuid: "vessel-guid",
     });
   });

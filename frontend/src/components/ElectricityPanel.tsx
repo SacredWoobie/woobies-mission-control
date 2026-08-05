@@ -221,6 +221,7 @@ function ReactorDetail({
       || !commandEnabled
       || !onSendCommand
       || !Number.isSafeInteger(reactor.index)
+      || !Number.isSafeInteger(reactor.partId)
       || !vesselGuid
     ) return;
     const requestId = `reactor-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -231,6 +232,7 @@ function ReactorDetail({
       action,
       expectedName: reactor.name,
       expectedFamily: reactor.family ?? "fission",
+      expectedPartId: reactor.partId!,
       expectedVesselGuid: vesselGuid,
     });
     setLastRequestId(requestId);
@@ -282,7 +284,8 @@ function ReactorDetail({
           && vesselGuid
           && reactor.controlAvailable
           && action
-          && Number.isSafeInteger(reactor.index),
+          && Number.isSafeInteger(reactor.index)
+          && Number.isSafeInteger(reactor.partId),
         );
         const isPending = pending?.index === reactor.index;
         const fuelTitle = [

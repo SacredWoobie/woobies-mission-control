@@ -70,6 +70,7 @@ export type ReactorChargeState = "off" | "charging" | "ready" | "running";
 
 export interface ReactorTelemetry {
   index?: number;
+  partId?: number;
   name: string;
   family?: "fission" | "fusion";
   hasIntegrity?: boolean;
@@ -549,7 +550,7 @@ export type TelemetryCommand =
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }
-  | { type: "reactor.control"; requestId: string; index: number; action: ReactorControlAction; expectedName: string; expectedFamily: "fission" | "fusion"; expectedVesselGuid: string }
+  | { type: "reactor.control"; requestId: string; index: number; action: ReactorControlAction; expectedName: string; expectedFamily: "fission" | "fusion"; expectedPartId: number; expectedVesselGuid: string }
   | { type: "notes.select"; relativePath: string | null }
   | { type: "notes.pin"; relativePath: string | null }
   | { type: "notes.favorite"; relativePath: string; favorite: boolean }

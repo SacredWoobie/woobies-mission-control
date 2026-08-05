@@ -72,6 +72,9 @@ class FusionService(LegacyFissionService):
 
 
 class FusionLifeService(FusionService):
+    def reactor_part_id(self, _index):
+        return 101
+
     def reactor_fuel_life_status(self, _index):
         return "112y 4d 3h 2m"
 
@@ -109,8 +112,9 @@ class ChargingFusionService(FusionLifeService):
 
 
 class ReactorCommandService:
-    def __init__(self, action="start_charging"):
+    def __init__(self, action="start_charging", part_id=101):
         self.action = action
+        self.part_id = part_id
         self.calls = []
 
     def reactor_count(self):
@@ -121,6 +125,9 @@ class ReactorCommandService:
 
     def reactor_family(self, _index):
         return "fusion"
+
+    def reactor_part_id(self, _index):
+        return self.part_id
 
     def reactor_control_action(self, _index):
         return self.action
@@ -207,6 +214,7 @@ class ReactorTelemetryTests(unittest.TestCase):
                 "action": "start_charging",
                 "expectedName": "FX-2 Fusion Reactor",
                 "expectedFamily": "fusion",
+                "expectedPartId": 101,
                 "expectedVesselGuid": "vessel-1",
             },
         )
@@ -225,6 +233,7 @@ class ReactorTelemetryTests(unittest.TestCase):
                 "action": "start",
                 "expectedName": "FX-2 Fusion Reactor",
                 "expectedFamily": "fusion",
+                "expectedPartId": 101,
                 "expectedVesselGuid": "vessel-1",
             },
         )
@@ -237,6 +246,7 @@ class ReactorTelemetryTests(unittest.TestCase):
                 "action": "stop_charging",
                 "expectedName": "FX-2 Fusion Reactor",
                 "expectedFamily": "fusion",
+                "expectedPartId": 101,
                 "expectedVesselGuid": "vessel-1",
             },
         )
@@ -245,6 +255,26 @@ class ReactorTelemetryTests(unittest.TestCase):
         self.assertIn("active vessel changed", stale_vessel["message"])
         self.assertEqual(stale_state["status"], "error")
         self.assertIn("reactor state changed", stale_state["message"])
+        self.assertEqual(service.calls, [])
+
+    def test_reactor_command_rejects_duplicate_name_after_index_reorder(self):
+        service = ReactorCommandService(part_id=202)
+        result = _apply_reactor_control_command(
+            reactor_command_connection(service),
+            {
+                "type": "reactor.control",
+                "requestId": "reactor-4",
+                "index": 0,
+                "action": "start_charging",
+                "expectedName": "FX-2 Fusion Reactor",
+                "expectedFamily": "fusion",
+                "expectedPartId": 101,
+                "expectedVesselGuid": "vessel-1",
+            },
+        )
+
+        self.assertEqual(result["status"], "error")
+        self.assertIn("reactor identity changed", result["message"])
         self.assertEqual(service.calls, [])
 
 
