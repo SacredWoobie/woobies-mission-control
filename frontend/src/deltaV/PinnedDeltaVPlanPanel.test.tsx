@@ -175,6 +175,33 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByText("Launch to Kerbin orbit", { exact: true })).toBeTruthy();
   });
 
+  it("collapses transfer readiness while keeping its live status visible", () => {
+    seedPinnedPlan();
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
+    library.assignments[0].completedLegIds = ["segment-1-ascent"];
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
+
+    renderPanel("flight");
+
+    const collapse = screen.getByRole("button", { name: "Collapse transfer readiness" });
+    expect(collapse.getAttribute("aria-expanded")).toBe("true");
+    expect(collapse.textContent).toContain("\u25be");
+    expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
+
+    fireEvent.click(collapse);
+
+    const expand = screen.getByRole("button", { name: "Expand transfer readiness" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(expand.textContent).toContain("\u25c2");
+    expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Target orbit", { exact: true })).toBeNull();
+
+    fireEvent.click(expand);
+    expect(screen.getByRole("button", { name: "Collapse transfer readiness" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
+  });
+
   it("describes a legacy Simple transfer as ideal when its maneuver vector is missing", () => {
     seedPinnedPlan();
     const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
