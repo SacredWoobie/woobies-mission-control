@@ -72,8 +72,8 @@ mission plan stays visible beside the vehicle it was designed for.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.4.0/flight-dashboard-mission-planning.png">
-    <img src="docs/images/v0.4.0/flight-dashboard-mission-planning.png" width="900" alt="Flight dashboard with staging, electricity, thermal data, and a pinned mission plan">
+  <a href="docs/images/v0.4.3/flight-dashboard-mission-planning.png">
+    <img src="docs/images/v0.4.3/flight-dashboard-mission-planning.png" width="900" alt="Flight dashboard with reactor controls, heat-loop controls, science operations, staging analysis, and a pinned mission plan">
   </a>
 </p>
 

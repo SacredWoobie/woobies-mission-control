@@ -234,8 +234,12 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn(
             "docs/images/v0.4.2/space-center-overview.png", publish_script
         )
-        for name in required[1:]:
+        for name in required[1:4]:
             self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
+        self.assertIn(
+            "docs/images/v0.4.3/flight-dashboard-mission-planning.png",
+            publish_script,
+        )
         for name in supplemental:
             self.assertNotIn(f"docs/images/v0.4.0/{name}", publish_script)
         self.assertFalse(any(" " in name or "&" in name for name in required))
@@ -258,9 +262,9 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-05-flight-dashboard-mission-planning.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.4.2.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.3.zip"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.4.2.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.3.{name}" for name in image_names
         ]
         self.assertEqual(
             sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name

@@ -108,12 +108,12 @@ Before creating a GitHub draft:
 - verify Notes, KAC/stock alarms, stock/System Heat selection, reconnects,
   collapsed panels, planner persistence, transfer preview/confirmation, and
   launcher update/preflight behavior as applicable;
-- follow `docs/images/v0.4.2/README.md` for the refreshed overview and the
-  still-current v0.4.0 briefs for the four reused full-resolution screenshots.
+- follow `docs/images/v0.4.3/README.md` for the approved screenshot set and
+  its source briefs.
 
-Version 0.4.3 initially reuses the v0.4.2 Space Center overview and the four
-v0.4.0 planning, editor, and Flight images. Refresh any reused image if final
-acceptance finds that the current interface has materially drifted.
+Version 0.4.3 refreshes the Flight dashboard image for its science and systems
+cohort. It reuses the v0.4.2 Space Center overview and the three still-current
+v0.4.0 planning and editor images.
 
 ## 5. Create a private draft release
 
