@@ -153,7 +153,7 @@ class ReleaseContractTests(unittest.TestCase):
             "KRPC.SystemHeat": (
                 "0.2.9.0",
                 "D253044319E44FAFC19F8DB59415339BE8E42BFE9643E44A19332092239C22C4",
-                "815a05a922b31fc6325c4de2e828ab1c28338748",
+                "341c0edfc3b2ee95af459489f59ada02f92c2fcf",
             ),
         }
         for service, (version, sha256, source_commit) in expected_services.items():
