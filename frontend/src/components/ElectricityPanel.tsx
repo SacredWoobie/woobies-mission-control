@@ -22,6 +22,8 @@ import {
   type ElectricityViewModel,
 } from "./electricityModel";
 
+const REACTOR_CONTROL_MESSAGE_MS = 5_000;
+
 function ecRate(value: number | undefined) {
   return formatRateColumn(value, "EC/s");
 }
@@ -213,8 +215,19 @@ function ReactorDetail({
     }
   }, [controlResult, pending]);
 
-  if (reactors.length === 0) return null;
   const result = controlResult?.requestId === lastRequestId ? controlResult : undefined;
+
+  useEffect(() => {
+    if (!localError && !result) return;
+    const visibleRequestId = lastRequestId;
+    const timer = window.setTimeout(() => {
+      setLocalError(undefined);
+      setLastRequestId((current) => current === visibleRequestId ? undefined : current);
+    }, REACTOR_CONTROL_MESSAGE_MS);
+    return () => window.clearTimeout(timer);
+  }, [lastRequestId, localError, result]);
+
+  if (reactors.length === 0) return null;
   const sendControl = (reactor: ReactorTelemetry, action: ReactorControlAction) => {
     if (
       pending
