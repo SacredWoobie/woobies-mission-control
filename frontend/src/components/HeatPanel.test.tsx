@@ -265,6 +265,38 @@ describe("HeatPanel", () => {
     expect(screen.queryByText("DEACTIVATE")).toBeNull();
   });
 
+  it("clears a pending command when its loop disappears", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const controllableSnapshot = {
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat" as const,
+      "heat.loops": [{
+        id: "6",
+        tempK: 300,
+        nominalTempK: 800,
+        netKw: 0,
+        radiatorPartIds: [606],
+        radiatorState: "offline" as const,
+        radiatorControlAction: "start" as const,
+        radiatorControlAvailable: true,
+      }],
+    };
+    const view = render(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={controllableSnapshot} />);
+    fireEvent.click(screen.getByRole("button", { name: "Activate and extend all radiators in Loop 6" }));
+    expect(screen.getByText("APPLYING")).toBeTruthy();
+
+    view.rerender(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "stock",
+      "heat.loops": [],
+      "heat.parts": [{ name: "Radiator panel", tempK: 300, maxTempK: 1_200, utilization: 25 }],
+    }} />);
+    view.rerender(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={controllableSnapshot} />);
+
+    expect(screen.getByText("ACTIVATE")).toBeTruthy();
+    expect(screen.queryByText("APPLYING")).toBeNull();
+  });
+
   it("removes a loop command result after five seconds", () => {
     vi.useFakeTimers();
     const onSendCommand = vi.fn((_command: TelemetryCommand) => true);

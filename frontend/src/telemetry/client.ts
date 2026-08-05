@@ -81,7 +81,8 @@ export function parseHeatLoopControlResult(raw: unknown): HeatLoopControlResult 
     || candidate.requestId.length > 128
     || typeof candidate.loopId !== "number"
     || !Number.isSafeInteger(candidate.loopId)
-    || candidate.loopId < 0
+    || candidate.loopId < -1
+    || (candidate.loopId === -1 && candidate.status !== "error")
     || (candidate.action !== "start" && candidate.action !== "stop")
     || (candidate.status !== "accepted" && candidate.status !== "error")
     || typeof candidate.message !== "string"

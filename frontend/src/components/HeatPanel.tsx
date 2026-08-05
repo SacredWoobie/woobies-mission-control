@@ -216,7 +216,7 @@ export function HeatPanel({
   useEffect(() => {
     if (!pending) return;
     const entity = entities.find((candidate) => candidate.loopId === pending.loopId);
-    if (entity && entity.radiatorControlAction !== pending.action) setPending(null);
+    if (!entity || entity.radiatorControlAction !== pending.action) setPending(null);
   }, [entities, pending]);
 
   useEffect(() => {

@@ -307,6 +307,14 @@ describe("TelemetryClient", () => {
     }));
     socket.message(JSON.stringify({
       type: "heat.loop.control.result",
+      requestId: "heat-invalid-loop",
+      loopId: -1,
+      action: "start",
+      status: "error",
+      message: "Select a valid heat loop.",
+    }));
+    socket.message(JSON.stringify({
+      type: "heat.loop.control.result",
       requestId: "",
       loopId: -1,
       action: "unknown",
@@ -314,14 +322,24 @@ describe("TelemetryClient", () => {
       message: "Malformed.",
     }));
 
-    expect(results).toEqual([{
-      type: "heat.loop.control.result",
-      requestId: "heat-1",
-      loopId: 7,
-      action: "start",
-      status: "accepted",
-      message: "Radiators are extending and activating.",
-    }]);
+    expect(results).toEqual([
+      {
+        type: "heat.loop.control.result",
+        requestId: "heat-1",
+        loopId: 7,
+        action: "start",
+        status: "accepted",
+        message: "Radiators are extending and activating.",
+      },
+      {
+        type: "heat.loop.control.result",
+        requestId: "heat-invalid-loop",
+        loopId: -1,
+        action: "start",
+        status: "error",
+        message: "Select a valid heat loop.",
+      },
+    ]);
     expect(snapshots).toEqual([]);
   });
 
