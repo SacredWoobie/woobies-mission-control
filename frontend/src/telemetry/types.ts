@@ -45,6 +45,30 @@ export interface HeatLoopTelemetry {
   stateText?: string;
   timeToCriticalSeconds?: number;
   thermalCapacityKjPerK?: number;
+  radiatorCount?: number;
+  radiatorPartIds?: number[];
+  radiatorState?: HeatLoopRadiatorState;
+  radiatorControlAction?: HeatLoopControlAction;
+  radiatorControlAvailable?: boolean;
+}
+
+export type HeatLoopControlAction = "start" | "stop";
+export type HeatLoopRadiatorState =
+  | "unavailable"
+  | "broken"
+  | "deploying"
+  | "retracting"
+  | "offline"
+  | "partial"
+  | "online";
+
+export interface HeatLoopControlResult {
+  type: "heat.loop.control.result";
+  requestId: string;
+  loopId: number;
+  action: HeatLoopControlAction;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export interface HeatComponentTelemetry {
@@ -65,8 +89,15 @@ export interface StockHeatPartTelemetry {
   netW?: number;
 }
 
+export type ReactorControlAction = "start" | "stop" | "start_charging" | "stop_charging";
+export type ReactorChargeState = "off" | "charging" | "ready" | "running";
+
 export interface ReactorTelemetry {
+  index?: number;
+  partId?: number;
   name: string;
+  family?: "fission" | "fusion";
+  hasIntegrity?: boolean;
   on: boolean;
   status?: string;
   ecPerSec?: number;
@@ -75,7 +106,23 @@ export interface ReactorTelemetry {
   nominalTemp?: number;
   integrity?: number;
   fuel?: string;
+  fuelKind?: "life" | "rate";
+  fuelRate?: string;
+  fuelLimitingResource?: string;
   throttle?: number;
+  chargeState?: ReactorChargeState;
+  chargePercent?: number;
+  controlAction?: ReactorControlAction;
+  controlAvailable?: boolean;
+}
+
+export interface ReactorControlResult {
+  type: "reactor.control.result";
+  requestId: string;
+  index: number;
+  action: ReactorControlAction;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export type ElectricitySourceKind =
@@ -115,6 +162,74 @@ export interface ScienceExperimentTelemetry {
   sourcePart?: string;
   sourceModule?: string;
   sourceKind?: string;
+}
+
+export type ScienceLabState =
+  | "researching"
+  | "science-full"
+  | "no-data"
+  | "no-scientist"
+  | "insufficient-crew"
+  | "stopped"
+  | "stalled"
+  | "unavailable";
+
+export type ScienceLabEtaKind = ScienceLabState | "finite" | "depleted" | "full";
+
+export interface ScienceLabTelemetry {
+  id: string;
+  title: string;
+  dataStored?: number;
+  dataCapacity?: number;
+  scienceStored?: number;
+  scienceCapacity?: number;
+  calculatedSciencePerDay?: number;
+  sciencePerDay?: number;
+  scienceMultiplier?: number;
+  crewCount?: number;
+  scientistCount?: number;
+  crewRequired?: number;
+  scientistFactor?: number;
+  converterAvailable?: boolean;
+  researchEnabled?: boolean;
+  operational?: boolean;
+  converterStatus?: string;
+  lastTimeFactor?: number;
+  state: ScienceLabState;
+  etaKind: ScienceLabEtaKind;
+  etaSeconds?: number;
+}
+
+export type ScienceAlarmProviderPreference = "auto" | "kac" | "stock";
+export type ScienceAlarmProvider = "kac" | "stock";
+export type ScienceAlarmAction = "kill_warp" | "pause_game" | "message_only" | "do_nothing";
+
+export interface ScienceAlarmResult {
+  type: "science.alarm.create.result";
+  requestId: string;
+  labId: string;
+  status: "accepted" | "error";
+  message: string;
+  provider?: ScienceAlarmProvider;
+  triggerUT?: number;
+  leadSeconds?: number;
+}
+
+export interface ScienceLabTransmitResult {
+  type: "science.lab.transmit.result";
+  requestId: string;
+  labId: string;
+  status: "accepted" | "error";
+  message: string;
+}
+
+export interface ScienceLabResearchResult {
+  type: "science.lab.research.result";
+  requestId: string;
+  labId: string;
+  enabled: boolean;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export interface OverviewVesselTelemetry {
@@ -421,6 +536,13 @@ export interface TelemetrySnapshot {
   "sci.krpc.count"?: number;
   "sci.krpc.experiments"?: ScienceExperimentTelemetry[];
   "sci.krpc.backend"?: string;
+  "sci.krpc.labTelemetryAvailable"?: boolean;
+  "sci.krpc.labDaySeconds"?: number;
+  "sci.krpc.labCount"?: number;
+  "sci.krpc.failedLabCount"?: number;
+  "sci.krpc.malformedLabCount"?: number;
+  "sci.krpc.labs"?: ScienceLabTelemetry[];
+  "sci.alarmProviders"?: Record<ScienceAlarmProvider, boolean>;
   "career.science"?: number;
   "tar.name"?: string;
   "tar.type"?: string;
@@ -524,9 +646,14 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
+  | { type: "heat.loop.control"; requestId: string; loopId: number; action: HeatLoopControlAction; expectedVesselGuid: string; expectedRadiatorPartIds: number[] }
+  | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
+  | { type: "science.lab.transmit"; requestId: string; labId: string }
+  | { type: "science.lab.research"; requestId: string; labId: string; enabled: boolean }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }
+  | { type: "reactor.control"; requestId: string; index: number; action: ReactorControlAction; expectedName: string; expectedFamily: "fission" | "fusion"; expectedPartId: number; expectedVesselGuid: string }
   | { type: "notes.select"; relativePath: string | null }
   | { type: "notes.pin"; relativePath: string | null }
   | { type: "notes.favorite"; relativePath: string; favorite: boolean }

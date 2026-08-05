@@ -1220,6 +1220,10 @@ class MissionPlanningController:
             },
         )
 
+    def current_craft_identity(self, connection, mode):
+        """Read the authoritative live craft identity without using the poll cache."""
+        return _craft_identity(connection, mode)
+
     def apply_command(self, connection, command):
         """Apply a planning command, returning whether it was recognized."""
         return self._apply_command(connection, command)

@@ -9,12 +9,19 @@ repeat as zero flow.
 from __future__ import annotations
 
 import math
+import re
+from collections.abc import Mapping
 
 
 ELECTRIC_CHARGE = "ElectricCharge"
 STATIONARY_CONFIRM_SECONDS = 1.0
 SMOOTHING_ALPHA = 0.4
 AMOUNT_EPSILON = 1.0e-6
+CURVED_SOLAR_MODULE_NAME = "ModuleCurvedSolarPanel"
+_DISPLAY_NUMBER = re.compile(
+    r"^\s*([-+]?(?:\d+(?:[.,]\d*)?|[.,]\d+))\s*(%|(?:e(?:lectric)?c?)?\s*/\s*s)?\s*$",
+    re.IGNORECASE,
+)
 
 
 def _finite_number(value):
@@ -22,6 +29,101 @@ def _finite_number(value):
         return None
     value = float(value)
     return value if math.isfinite(value) else None
+
+
+def _display_number(value):
+    """Parse one finite number from a part-module display field."""
+    if isinstance(value, bool):
+        return None, False
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return (number, False) if math.isfinite(number) else (None, False)
+    if not isinstance(value, str):
+        return None, False
+    match = _DISPLAY_NUMBER.fullmatch(value)
+    if match is None:
+        return None, False
+    try:
+        number = float(match.group(1).replace(",", "."))
+    except ValueError:
+        return None, False
+    if not math.isfinite(number):
+        return None, False
+    return number, match.group(2) == "%"
+
+
+def _normalized_field_name(value):
+    return re.sub(r"[^a-z0-9]", "", str(value).casefold())
+
+
+def curved_solar_reading(fields):
+    """Return ``(energy_flow, sun_exposure)`` for a curved-panel module.
+
+    Generic kRPC module fields use localized PAW labels. English field names
+    are preferred, with the module's stable two-field order as a localization
+    fallback. Text states such as blocked, broken, or retracted represent zero
+    output rather than a collector failure.
+    """
+    if not isinstance(fields, Mapping) or len(fields) != 2:
+        return None
+
+    items = list(fields.items())
+    by_name = {
+        _normalized_field_name(name): value for name, value in items
+    }
+    exposure_value = by_name.get("sunexposure")
+    flow_value = by_name.get("energyflow")
+    if exposure_value is None or flow_value is None:
+        exposure_value = items[0][1]
+        flow_value = items[1][1]
+
+    exposure, is_percent = _display_number(exposure_value)
+    flow, _ = _display_number(flow_value)
+    if exposure is None:
+        exposure = 0.0
+    elif is_percent:
+        exposure /= 100.0
+    if flow is None:
+        flow = 0.0
+    if not 0.0 <= exposure <= 1.0 or flow < 0.0:
+        return None
+    return flow, exposure
+
+
+def curved_solar_readings(parts):
+    """Read curved panels, falling back cleanly when the API is unavailable."""
+    try:
+        readings = []
+        for module in parts.modules_with_name(CURVED_SOLAR_MODULE_NAME):
+            reading = curved_solar_reading(module.fields)
+            if reading is None:
+                return []
+            readings.append(reading)
+        return readings
+    except Exception:
+        return []
+
+
+def solar_summary(readings):
+    """Return ``(count, total_flow, average_exposure)`` for solar readings."""
+    total_flow = 0.0
+    total_exposure = 0.0
+    count = 0
+    for energy_flow, sun_exposure in readings:
+        energy_flow = _finite_number(energy_flow)
+        sun_exposure = _finite_number(sun_exposure)
+        if (
+            energy_flow is None
+            or energy_flow < 0.0
+            or sun_exposure is None
+            or not 0.0 <= sun_exposure <= 1.0
+        ):
+            raise ValueError("invalid solar-panel reading")
+        count += 1
+        total_flow += energy_flow
+        total_exposure += sun_exposure
+    average_exposure = total_exposure / count if count else 0.0
+    return count, total_flow, average_exposure
 
 
 def _vessel_identity(payload):
@@ -50,6 +152,42 @@ def generation_remainder(total, *itemized):
         if value is not None and value > 0.0:
             remainder -= value
     return max(0.0, remainder)
+
+
+def bracketed_generation_remainder(total_before, total_after, *itemized):
+    """Return generation that both endpoint samples require.
+
+    Per-reactor RPCs are read between the two total-generation samples. During
+    a reactor ramp, their sum can legitimately fall anywhere inside that
+    bracket. Only the lower endpoint can prove that generation remains after
+    the itemized sources are removed. If one endpoint is unavailable, retain
+    the existing single-sample conservative behavior.
+    """
+    before = _finite_number(total_before)
+    after = _finite_number(total_after)
+    valid_totals = [
+        value for value in (before, after)
+        if value is not None and value >= 0.0
+    ]
+    if not valid_totals:
+        return None
+    return generation_remainder(min(valid_totals), *itemized)
+
+
+def latest_generation_total(total_before, total_after):
+    """Return the newest valid non-negative generation endpoint.
+
+    The second bracket sample normally drives the displayed total. If that RPC
+    produces an invalid value during a scene or service transition, retain the
+    usable first endpoint instead of publishing a non-finite total.
+    """
+    before = _finite_number(total_before)
+    after = _finite_number(total_after)
+    if after is not None and after >= 0.0:
+        return after
+    if before is not None and before >= 0.0:
+        return before
+    return None
 
 
 class ElectricityFlowEstimator:

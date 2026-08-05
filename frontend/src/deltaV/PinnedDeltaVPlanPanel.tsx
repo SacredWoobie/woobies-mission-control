@@ -129,9 +129,11 @@ export function PinnedDeltaVPlanPanel({
     context: string;
   } | null>(null);
   const [routeExpanded, setRouteExpanded] = useState(false);
+  const [readinessExpanded, setReadinessExpanded] = useState(true);
   const pinned = pinnedForTelemetry(snapshot);
   useEffect(() => rememberPinnedCraft(snapshot), [rememberPinnedCraft, snapshot]);
   useEffect(() => setRouteExpanded(false), [pinned?.id]);
+  useEffect(() => setReadinessExpanded(true), [pinned?.id]);
   useEffect(() => {
     if (connection.status !== "linked") setManeuverPreview(null);
   }, [connection.status]);
@@ -388,27 +390,42 @@ export function PinnedDeltaVPlanPanel({
       <button onClick={() => setPinnedStepComplete(firstIncompleteLeg.id, true, snapshot)} type="button">Mark launch complete</button>
     </div>}
     {scene === "flight" && nextTransferLeg && <div className={`delta-v-transfer-readiness ${readinessClass}`}>
-      <header><span>TRANSFER READINESS</span><strong>{readinessStatus}</strong></header>
-      <div className="delta-v-readiness-grid">
-        <div><span>Target orbit</span><b>{plannedAltitude === undefined ? "\u2014" : `${orbitAltitude(plannedAltitude)} circular`}</b></div>
-        <div><span>Current orbit</span><b>{orbitAltitude(apoapsisAltitude)}{" \u00d7 "}{orbitAltitude(periapsisAltitude)}</b></div>
-        <div><span>Inclination</span><b>{formatInclination(inclination)}</b></div>
-        <div><span>Transfer epoch</span><b>{nextTransferBurnUT === undefined ? "\u2014" : formatMissionUT(nextTransferBurnUT, kerbinTime)}</b></div>
-      </div>
-      <p>{nextTransferLeg.label}{nextTransferBurnUT !== undefined && typeof currentUT === "number" ? ` \u00b7 ${relativeBurnTime(nextTransferBurnUT, currentUT, kerbinTime)}` : ""}</p>
-      {nodeState === "ready" && previewNodeUT !== undefined && previewDeltaV !== undefined && <div className="delta-v-maneuver-preview">
-        <div><span>Actual node</span><strong>{formatMissionUT(previewNodeUT, kerbinTime)}</strong><small>{typeof currentUT === "number" ? relativeBurnTime(previewNodeUT, currentUT, kerbinTime) : ""}</small></div>
-        <div><span>Active-orbit burn</span><strong>{formatDeltaV(previewDeltaV)}</strong><small>Plan {formatDeltaV(selectedSolution?.ejectionDeltaV ?? 0)}</small></div>
+      <header>
+        <span>TRANSFER READINESS</span>
+        <button
+          aria-controls="flight-transfer-readiness-details"
+          aria-expanded={readinessExpanded}
+          aria-label={`${readinessExpanded ? "Collapse" : "Expand"} transfer readiness`}
+          className="delta-v-readiness-toggle"
+          onClick={() => setReadinessExpanded((expanded) => !expanded)}
+          type="button"
+        >
+          <strong>{readinessStatus}</strong>
+          <span aria-hidden="true">{readinessExpanded ? "\u25be" : "\u25c2"}</span>
+        </button>
+      </header>
+      {readinessExpanded && <div className="delta-v-readiness-body" id="flight-transfer-readiness-details">
+        <div className="delta-v-readiness-grid">
+          <div><span>Target orbit</span><b>{plannedAltitude === undefined ? "\u2014" : `${orbitAltitude(plannedAltitude)} circular`}</b></div>
+          <div><span>Current orbit</span><b>{orbitAltitude(apoapsisAltitude)}{" \u00d7 "}{orbitAltitude(periapsisAltitude)}</b></div>
+          <div><span>Inclination</span><b>{formatInclination(inclination)}</b></div>
+          <div><span>Transfer epoch</span><b>{nextTransferBurnUT === undefined ? "\u2014" : formatMissionUT(nextTransferBurnUT, kerbinTime)}</b></div>
+        </div>
+        <p>{nextTransferLeg.label}{nextTransferBurnUT !== undefined && typeof currentUT === "number" ? ` \u00b7 ${relativeBurnTime(nextTransferBurnUT, currentUT, kerbinTime)}` : ""}</p>
+        {nodeState === "ready" && previewNodeUT !== undefined && previewDeltaV !== undefined && <div className="delta-v-maneuver-preview">
+          <div><span>Actual node</span><strong>{formatMissionUT(previewNodeUT, kerbinTime)}</strong><small>{typeof currentUT === "number" ? relativeBurnTime(previewNodeUT, currentUT, kerbinTime) : ""}</small></div>
+          <div><span>Active-orbit burn</span><strong>{formatDeltaV(previewDeltaV)}</strong><small>Plan {formatDeltaV(selectedSolution?.ejectionDeltaV ?? 0)}</small></div>
+        </div>}
+        {readinessBlockers.length > 0 && <ul className="delta-v-readiness-issues blockers">{readinessBlockers.map((message) => <li key={message}>{message}</li>)}</ul>}
+        {nodeError && <p className="delta-v-maneuver-error" role="alert">{nodeError}</p>}
+        {readinessBlockers.length === 0 && readinessWarnings.length > 0 && <ul className="delta-v-readiness-issues warnings">{readinessWarnings.map((message) => <li key={message}>{message}</li>)}</ul>}
+        {maneuverSendError && <p className="delta-v-maneuver-error" role="alert">{maneuverSendError}</p>}
+        <div className="delta-v-maneuver-actions">
+          {nodeState !== "ready" && nodeState !== "created" && nodeState !== "executed" && <button disabled={readinessBlockers.length > 0 || nodeState === "previewing"} onClick={previewManeuver} type="button">{nodeState === "previewing" ? "Checking\u2026" : nodeState === "failed" ? "Check again" : "Check maneuver"}</button>}
+          {nodeState === "ready" && <button disabled={readinessBlockers.length > 0} onClick={createManeuver} type="button">Create KSP node</button>}
+          {(nodeState === "created" || nodeState === "executed") && <button onClick={() => setPinnedStepComplete(nextTransferLeg.id, true, snapshot)} type="button">Mark transfer complete</button>}
+        </div>
       </div>}
-      {readinessBlockers.length > 0 && <ul className="delta-v-readiness-issues blockers">{readinessBlockers.map((message) => <li key={message}>{message}</li>)}</ul>}
-      {nodeError && <p className="delta-v-maneuver-error" role="alert">{nodeError}</p>}
-      {readinessBlockers.length === 0 && readinessWarnings.length > 0 && <ul className="delta-v-readiness-issues warnings">{readinessWarnings.map((message) => <li key={message}>{message}</li>)}</ul>}
-      {maneuverSendError && <p className="delta-v-maneuver-error" role="alert">{maneuverSendError}</p>}
-      <div className="delta-v-maneuver-actions">
-        {nodeState !== "ready" && nodeState !== "created" && nodeState !== "executed" && <button disabled={readinessBlockers.length > 0 || nodeState === "previewing"} onClick={previewManeuver} type="button">{nodeState === "previewing" ? "Checking\u2026" : nodeState === "failed" ? "Check again" : "Check maneuver"}</button>}
-        {nodeState === "ready" && <button disabled={readinessBlockers.length > 0} onClick={createManeuver} type="button">Create KSP node</button>}
-        {(nodeState === "created" || nodeState === "executed") && <button onClick={() => setPinnedStepComplete(nextTransferLeg.id, true, snapshot)} type="button">Mark transfer complete</button>}
-      </div>
     </div>}
     {routeIsLong && <div className="delta-v-pinned-route-toggle">
       <span>{visibleLegs.length} mission steps remaining</span>

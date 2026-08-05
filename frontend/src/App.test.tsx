@@ -144,9 +144,9 @@ describe("Dashboard lifecycle", () => {
 
   it("renders the complete flight dashboard and restores hidden panels from the left rail", () => {
     const firstView = render(<App />);
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.2 · Development")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.3 · Development")).toBeTruthy();
     ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target", "Pinned note"].forEach((heading) => {
-      expect(screen.getByText(heading, { exact: true })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });
     const flightContext = firstView.container.querySelector("#clock");
     expect(flightContext?.textContent).toContain("Odyssey");
@@ -154,6 +154,8 @@ describe("Dashboard lifecycle", () => {
     expect(flightContext?.textContent).toContain("Orbiting");
     expect(screen.queryByRole("button", { name: "Hide Flight context panel" })).toBeNull();
     expect(firstView.container.querySelector("#target .tag")?.textContent).toBe("Docking port");
+    expect(firstView.container.querySelector("#target .tgt-name")?.textContent).toBe("Odyssey Station Docking Port");
+    expect(firstView.container.querySelector("#target")?.textContent).toContain("2.3\u2009m/s");
     expect(screen.getAllByRole("button", { name: "Notes" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Notes" }).querySelector(".panel-rail-icon-notes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Notes" }).querySelector(".panel-rail-label")?.textContent).toBe("Notes");

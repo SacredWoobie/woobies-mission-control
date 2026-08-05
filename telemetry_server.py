@@ -30,7 +30,13 @@ from pathlib import Path
 import krpc
 from krpc.services.spacecenter import VesselType as KRPCVesselType
 
-from electricity import ElectricityFlowEstimator, generation_remainder
+from electricity import (
+    ElectricityFlowEstimator,
+    bracketed_generation_remainder,
+    curved_solar_readings,
+    latest_generation_total,
+    solar_summary,
+)
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
@@ -108,6 +114,7 @@ _res_last_poll = 0.0
 _tgt_cache = {}
 _tgt_last_poll = 0.0
 _stage_cache = {}
+_stage_current_authority = {}
 _stage_last_poll = 0.0
 _stage_last_ut = None
 _stage_trace_last_published = None
@@ -176,14 +183,14 @@ NOTES_FAVORITES_PATH = _default_notes_favorites_path()
 _stage_partition_cache = None
 
 # kRPC builds differ in whether vessel.control.current_stage is available. Probe
-# it once at runtime and retain the result.
+# the stock property once and retain the result. StageStats 0.2.7 exposes KSP's
+# direct vessel.currentStage value as a compatibility fallback.
 #   None  = not probed yet
 #   True  = present, use it
-#   False = absent, leave the stage-resource column blank. (Note: KRPC.StageStats
-#           now also reports the current KSP stage via stage.currentKsp, so the
-#           dashboard is no longer blind to current stage even when this is False;
-#           this flag only gates the per-stage RESOURCE breakdown.)
+#   False = absent, try StageStats instead
 _HAS_CURRENT_STAGE = None
+_STAGE_STATS_CURRENT_STAGE_REPORTED = False
+_CURRENT_STAGE_UNSET = object()
 
 
 # ---------------------------------------------------------------------------
@@ -900,29 +907,55 @@ def _current_stage_resource_values(vessel, current_stage):
     return None, None, {}
 
 
-def _current_stage(vessel):
-    """Current stage index, or None if this kRPC build doesn't expose it."""
-    global _HAS_CURRENT_STAGE
-    if _HAS_CURRENT_STAGE is False:
+def _current_stage(vessel, stage_snapshot=None):
+    """Return the active KSP stage from stock kRPC or StageStats."""
+    global _HAS_CURRENT_STAGE, _STAGE_STATS_CURRENT_STAGE_REPORTED
+    if _HAS_CURRENT_STAGE is not False:
+        try:
+            stage = int(vessel.control.current_stage)
+            if _HAS_CURRENT_STAGE is None:
+                print("[telemetry] current-stage resources use stock kRPC.")
+            _HAS_CURRENT_STAGE = True
+            if stage < 0:
+                return None
+            return stage
+        except Exception:
+            if _HAS_CURRENT_STAGE is None:
+                print("[telemetry] stock kRPC does not expose the current stage; "
+                      "trying StageStats.")
+            _HAS_CURRENT_STAGE = False
+
+    if not isinstance(stage_snapshot, dict):
         return None
     try:
-        s = int(vessel.control.current_stage)
-        if _HAS_CURRENT_STAGE is None:
-            print("[telemetry] current-stage resources are available.")
-        _HAS_CURRENT_STAGE = True
-        return s
+        stage = int(stage_snapshot["stage.currentKsp"])
+        if stage < 0:
+            return None
+        if not _STAGE_STATS_CURRENT_STAGE_REPORTED:
+            print("[telemetry] current-stage resources use StageStats.")
+            _STAGE_STATS_CURRENT_STAGE_REPORTED = True
+        return stage
     except Exception:
-        if _HAS_CURRENT_STAGE is None:
-            print("[telemetry] this kRPC build does not expose the current stage; "
-                  "the current-stage resource column will remain blank.")
-        _HAS_CURRENT_STAGE = False
         return None
+
+
+def _current_stage_authority(stage_result):
+    """Keep only a fresh, valid StageStats current-stage sample."""
+    if not isinstance(stage_result, dict):
+        return {}
+    try:
+        stage = int(stage_result["stage.currentKsp"])
+    except (KeyError, TypeError, ValueError):
+        return {}
+    if stage < 0:
+        return {}
+    return {"stage.currentKsp": stage}
 
 
 # ---------------------------------------------------------------------------
 # Resources (vessel total + current stage)
 # ---------------------------------------------------------------------------
-def _gather_resources(vessel):
+def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
     """Return vessel and current-stage resources for dashboard rendering."""
     out = {}
     try:
@@ -939,7 +972,11 @@ def _gather_resources(vessel):
         except Exception:
             pass
 
-    stage = _current_stage(vessel)
+    stage = (
+        _current_stage(vessel)
+        if current_stage is _CURRENT_STAGE_UNSET
+        else current_stage
+    )
     # Distinguish an unavailable stage index from a valid stage with no resources.
     out["res.stageKnown"] = (stage is not None)
     if stage is not None:
@@ -1004,11 +1041,21 @@ def _gather_target(conn, vessel):
     tgt = None
     ttype = ""
     tport = None
+    target_part = None
+    target_vessel = None
 
     try:
         tport = sc.target_docking_port
         if tport is not None:
             tgt, ttype = tport, "dockingport"
+            try:
+                target_part = tport.part
+            except Exception:
+                target_part = None
+            try:
+                target_vessel = target_part.vessel
+            except Exception:
+                target_vessel = None
     except Exception:
         pass
     if tgt is None:
@@ -1029,27 +1076,40 @@ def _gather_target(conn, vessel):
     if tgt is None:
         return {"tar.name": ""}   # explicit "no target" -- dashboard hides the panel
 
-    try:
-        out["tar.name"] = tgt.name
-    except Exception:
-        out["tar.name"] = ttype
+    if ttype == "dockingport":
+        try:
+            vessel_name = str(target_vessel.name).strip()
+        except Exception:
+            vessel_name = ""
+        out["tar.name"] = (
+            f"{vessel_name} Docking Port" if vessel_name else "Docking Port"
+        )
+    else:
+        try:
+            out["tar.name"] = tgt.name
+        except Exception:
+            out["tar.name"] = ttype
     out["tar.type"] = ttype
 
     # Distance / relative velocity, expressed in OUR vessel's frame.
     try:
         vref = vessel.reference_frame
-        out["tar.distance"] = _mag(tgt.position(vref))
-        out["tar.o.relativeVelocity"] = _mag(tgt.velocity(vref))
+    except Exception:
+        vref = None
+    try:
+        if vref is not None:
+            out["tar.distance"] = _mag(tgt.position(vref))
+    except Exception:
+        pass
+    try:
+        velocity_src = target_part if ttype == "dockingport" else tgt
+        if velocity_src is not None and vref is not None:
+            out["tar.o.relativeVelocity"] = _mag(velocity_src.velocity(vref))
     except Exception:
         pass
 
     # Target's own orbit. A docking port has no .orbit -- climb to its vessel.
-    orbit_src = tgt
-    if ttype == "dockingport":
-        try:
-            orbit_src = tport.part.vessel
-        except Exception:
-            orbit_src = None
+    orbit_src = target_vessel if ttype == "dockingport" else tgt
     try:
         o = orbit_src.orbit if orbit_src is not None else None
         if o is not None:
@@ -2007,6 +2067,15 @@ def _apply_telemetry_command(conn, command):
     if _mission_planning.apply_command(conn, command):
         return
 
+    if command.get("type") == "science.alarm.create":
+        return _apply_science_alarm_command(conn, command)
+
+    if command.get("type") == "science.lab.transmit":
+        return _apply_science_lab_transmit_command(conn, command)
+
+    if command.get("type") == "science.lab.research":
+        return _apply_science_lab_research_command(conn, command)
+
     if command.get("type") == "overview.vessel.switch":
         return _apply_overview_vessel_switch_command(conn, command)
 
@@ -2015,6 +2084,12 @@ def _apply_telemetry_command(conn, command):
 
     if command.get("type") == "overview.vessel.lifecycle":
         return _apply_overview_vessel_lifecycle_command(conn, command)
+
+    if command.get("type") == "reactor.control":
+        return _apply_reactor_control_command(conn, command)
+
+    if command.get("type") == "heat.loop.control":
+        return _apply_heat_loop_control_command(conn, command)
 
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
@@ -2159,11 +2234,436 @@ def _optional_service_list(service, method_name):
         return []
 
 
+def _science_lab_number(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+def _science_alarm_capabilities(conn):
+    providers = {"kac": False, "stock": False}
+    try:
+        providers["stock"] = conn.space_center.alarm_manager is not None
+    except Exception:
+        pass
+    try:
+        providers["kac"] = bool(conn.kerbal_alarm_clock.available)
+    except Exception:
+        pass
+    return providers
+
+
+def _science_lab_transmit_result(request_id, lab_id, status, message):
+    return {
+        "type": "science.lab.transmit.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_science_lab_transmit_command(conn, command):
+    """Invoke only the selected ModuleScienceLab stock Transmit Science event."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+    ):
+        return None
+
+    def result(status, message):
+        return _science_lab_transmit_result(
+            request_id, lab_id, status, message,
+        )
+
+    try:
+        service = conn.vessel_science
+        labs = _gather_science_labs(service)
+        if labs is None:
+            return result("error", "Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return result("error", "The selected science lab is no longer aboard.")
+        if _science_lab_number(lab.get("scienceStored"), 0.0) <= 1.0:
+            return result("error", "The selected science lab needs more than 1 science to transmit.")
+
+        transmit = getattr(service, "transmit_lab_science", None)
+        if not callable(transmit):
+            return result("error", "Science transmission requires the current service update.")
+        if not bool(transmit(lab_id)):
+            return result("error", "KSP did not invoke the selected lab's Transmit Science event.")
+        return result(
+            "accepted",
+            f"Transmit Science invoked for {lab.get('title') or 'science lab'}.",
+        )
+    except Exception as error:
+        return result("error", f"The lab's Transmit Science event failed: {error}")
+
+
+def _science_lab_research_result(
+        request_id, lab_id, enabled, status, message):
+    return {
+        "type": "science.lab.research.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "enabled": enabled,
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_science_lab_research_command(conn, command):
+    """Invoke the selected lab converter's stock Start/Stop Research event."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    enabled = command.get("enabled")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+        or not isinstance(enabled, bool)
+    ):
+        return None
+
+    def result(status, message):
+        return _science_lab_research_result(
+            request_id, lab_id, enabled, status, message,
+        )
+
+    try:
+        service = conn.vessel_science
+        labs = _gather_science_labs(service)
+        if labs is None:
+            return result("error", "Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return result("error", "The selected science lab is no longer aboard.")
+        if not lab.get("converterAvailable"):
+            return result("error", "The selected science lab has no research converter.")
+
+        set_enabled = getattr(service, "set_lab_research_enabled", None)
+        if not callable(set_enabled):
+            return result("error", "Research control requires the current service update.")
+        if not bool(set_enabled(lab_id, enabled)):
+            action = "Start Research" if enabled else "Stop Research"
+            return result("error", f"KSP did not apply the selected lab's {action} event.")
+        action = "started" if enabled else "stopped"
+        return result(
+            "accepted",
+            f"Research {action} for {lab.get('title') or 'science lab'}.",
+        )
+    except Exception as error:
+        action = "Start Research" if enabled else "Stop Research"
+        return result("error", f"The lab's {action} event failed: {error}")
+
+
+def _science_alarm_result(
+        request_id, lab_id, status, message, provider=None,
+        trigger_ut=None, lead_seconds=None):
+    result = {
+        "type": "science.alarm.create.result",
+        "requestId": request_id,
+        "labId": lab_id,
+        "status": status,
+        "message": message,
+    }
+    if provider in ("kac", "stock"):
+        result["provider"] = provider
+    if trigger_ut is not None:
+        result["triggerUT"] = trigger_ut
+    if lead_seconds is not None:
+        result["leadSeconds"] = lead_seconds
+    return result
+
+
+def _apply_science_alarm_command(conn, command):
+    """Create one manually scheduled alarm from a freshly computed lab ETA."""
+    request_id = command.get("requestId")
+    lab_id = command.get("labId")
+    preference = command.get("provider")
+    lead_seconds = command.get("leadSeconds")
+    kac_action = command.get("kacAction")
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+        or not isinstance(lab_id, str)
+        or not lab_id
+        or len(lab_id) > 256
+        or preference not in ("auto", "kac", "stock")
+        or lead_seconds not in (1800, 3600)
+        or kac_action not in ("kill_warp", "pause_game", "message_only", "do_nothing")
+    ):
+        return None
+
+    def reject(message):
+        return _science_alarm_result(
+            request_id, lab_id, "error", message,
+            lead_seconds=lead_seconds,
+        )
+
+    try:
+        sc = conn.space_center
+        vessel = sc.active_vessel
+        if vessel is None:
+            return reject("No active Flight vessel is available.")
+        labs = _gather_science_labs(conn.vessel_science)
+        if labs is None:
+            return reject("Science lab telemetry is unavailable.")
+        lab = next(
+            (row for row in labs["sci.krpc.labs"] if row["id"] == lab_id),
+            None,
+        )
+        if lab is None:
+            return reject("The selected science lab is no longer aboard.")
+        completion_kind = lab.get("etaKind")
+        if lab.get("state") != "researching" or completion_kind not in ("finite", "depleted"):
+            return reject("The selected science lab no longer has a finite completion estimate.")
+        eta_seconds = _science_lab_number(lab.get("etaSeconds"), -1.0)
+        current_ut = _science_lab_number(sc.ut, -1.0)
+        if eta_seconds <= 0 or current_ut < 0:
+            return reject("The science alarm time could not be calculated.")
+
+        providers = _science_alarm_capabilities(conn)
+        if preference == "auto":
+            provider = "kac" if providers["kac"] else "stock" if providers["stock"] else None
+        else:
+            provider = preference if providers[preference] else None
+        if provider is None:
+            label = "KAC" if preference == "kac" else "Stock" if preference == "stock" else "KAC or Stock"
+            return reject(f"{label} alarm creation is unavailable.")
+
+        trigger_delay = max(60.0, eta_seconds - lead_seconds)
+        trigger_ut = current_ut + trigger_delay
+        vessel_name = str(getattr(vessel, "name", "Vessel") or "Vessel").strip()[:80]
+        lab_title = str(lab.get("title") or "Science lab").strip()[:100]
+        reaches_capacity = completion_kind == "finite"
+        title = (
+            f"{vessel_name} science lab nearly full"
+            if reaches_capacity
+            else f"{vessel_name} science lab research nearly complete"
+        )
+        completion_description = (
+            "reach science capacity"
+            if reaches_capacity
+            else "reach its practical data-depletion cutoff"
+        )
+        description = (
+            f"{lab_title} is estimated to {completion_description} at UT "
+            f"{current_ut + eta_seconds:.1f}. Created by Woobie's Mission Control "
+            f"with a {lead_seconds // 60}-minute lead from the current lab state."
+        )
+
+        if provider == "kac":
+            kac = conn.kerbal_alarm_clock
+            alarm = kac.create_alarm(kac.AlarmType.raw, title, trigger_ut)
+            try:
+                alarm.action = getattr(kac.AlarmAction, kac_action)
+                if alarm.action != getattr(kac.AlarmAction, kac_action):
+                    raise RuntimeError("KAC did not retain the requested alarm action.")
+            except Exception as error:
+                try:
+                    alarm.remove()
+                except Exception:
+                    pass
+                return reject(f"KAC could not apply the requested alarm action: {error}")
+            try:
+                alarm.vessel = vessel
+            except Exception:
+                pass
+            try:
+                alarm.notes = description
+            except Exception:
+                pass
+        else:
+            sc.alarm_manager.add_vessel_alarm(
+                trigger_delay, vessel, title, description,
+            )
+
+        return _science_alarm_result(
+            request_id,
+            lab_id,
+            "accepted",
+            f"{provider.upper() if provider == 'kac' else 'Stock'} alarm set "
+            f"{lead_seconds // 60} minutes before estimated "
+            f"{'capacity' if reaches_capacity else 'data depletion'}.",
+            provider=provider,
+            trigger_ut=round(trigger_ut, 1),
+            lead_seconds=lead_seconds,
+        )
+    except Exception as error:
+        return reject(f"The science alarm could not be created: {error}")
+
+
+def _science_lab_state(row):
+    science = row["scienceStored"]
+    science_capacity = row["scienceCapacity"]
+    data = row["dataStored"]
+    if not row["converterAvailable"]:
+        return "unavailable"
+    if science_capacity > 0 and science >= science_capacity - 1e-3:
+        return "science-full"
+    if data <= 1e-6:
+        return "no-data"
+    if row["scientistCount"] <= 0 or row["scientistFactor"] <= 0:
+        return "no-scientist"
+    if not row["operational"] or row["crewCount"] + 1e-6 < row["crewRequired"]:
+        return "insufficient-crew"
+    if not row["researchEnabled"]:
+        return "stopped"
+    if row["calculatedSciencePerDay"] <= 0:
+        return "stalled"
+    return "researching"
+
+
+def _science_lab_eta(row, day_seconds):
+    state = row["state"]
+    if state == "science-full":
+        return "full", 0.0
+    if state != "researching":
+        return state, None
+
+    science = row["scienceStored"]
+    science_capacity = row["scienceCapacity"]
+    data = row["dataStored"]
+    multiplier = row["scienceMultiplier"]
+    rate = row["calculatedSciencePerDay"]
+    if day_seconds <= 0 or science_capacity <= 0 or data <= 0 or multiplier <= 0 or rate <= 0:
+        return "unavailable", None
+
+    science_needed = max(0.0, science_capacity - science)
+    potential_science = multiplier * data
+    if science_needed <= 1e-6:
+        return "full", 0.0
+    if science_needed < potential_science - 1e-6:
+        eta_kind = "finite"
+        remaining_potential = potential_science - science_needed
+    else:
+        # Science production decays exponentially with the remaining data and
+        # reaches literal zero only at infinite time. Treat the data as spent
+        # after 99.9% of its convertible science has been produced, or once no
+        # more than 0.1 science remains, whichever happens first.
+        eta_kind = "depleted"
+        remaining_potential = min(
+            potential_science,
+            max(0.1, potential_science * 0.001),
+        )
+    try:
+        seconds = (
+            day_seconds * potential_science / rate
+            * math.log(potential_science / remaining_potential)
+        )
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return "unavailable", None
+    if not math.isfinite(seconds) or seconds < 0:
+        return "unavailable", None
+    return eta_kind, seconds
+
+
+def _gather_science_labs(service):
+    try:
+        reported_count = max(0, int(service.lab_count()))
+        day_seconds = max(0, int(service.lab_day_seconds()))
+        failed_count = max(0, int(service.failed_lab_count()))
+        columns = {
+            "ids": list(service.lab_ids()),
+            "titles": list(service.lab_part_titles()),
+            "dataStored": list(service.lab_data_stored()),
+            "dataCapacity": list(service.lab_data_capacities()),
+            "scienceStored": list(service.lab_science_stored()),
+            "scienceCapacity": list(service.lab_science_capacities()),
+            "calculatedSciencePerDay": list(service.lab_calculated_science_rates()),
+            "scienceMultiplier": list(service.lab_science_multipliers()),
+            "crewCount": list(service.lab_crew_counts()),
+            "scientistCount": list(service.lab_scientist_counts()),
+            "crewRequired": list(service.lab_crew_required()),
+            "scientistFactor": list(service.lab_scientist_factors()),
+            "converterAvailable": list(service.lab_converters_available()),
+            "researchEnabled": list(service.lab_research_enabled()),
+            "operational": list(service.lab_operational()),
+            "converterStatus": list(service.lab_converter_statuses()),
+            "lastTimeFactor": list(service.lab_last_time_factors()),
+        }
+    except Exception:
+        # Older WoobiesControlStats builds have no lab procedures. Omit the
+        # capability instead of claiming that the vessel has no labs.
+        return None
+
+    aligned_count = min([reported_count] + [len(values) for values in columns.values()])
+    rows = []
+    for index in range(aligned_count):
+        row = {
+            "id": str(columns["ids"][index] or f"lab-{index}"),
+            "title": str(columns["titles"][index] or "Science lab"),
+            "dataStored": _science_lab_number(columns["dataStored"][index]),
+            "dataCapacity": _science_lab_number(columns["dataCapacity"][index]),
+            "scienceStored": _science_lab_number(columns["scienceStored"][index]),
+            "scienceCapacity": _science_lab_number(columns["scienceCapacity"][index]),
+            "calculatedSciencePerDay": _science_lab_number(
+                columns["calculatedSciencePerDay"][index]
+            ),
+            "scienceMultiplier": _science_lab_number(columns["scienceMultiplier"][index]),
+            "crewCount": max(0, int(_science_lab_number(columns["crewCount"][index]))),
+            "scientistCount": max(
+                0, int(_science_lab_number(columns["scientistCount"][index]))
+            ),
+            "crewRequired": max(0.0, _science_lab_number(columns["crewRequired"][index])),
+            "scientistFactor": max(
+                0.0, _science_lab_number(columns["scientistFactor"][index])
+            ),
+            "converterAvailable": bool(columns["converterAvailable"][index]),
+            "researchEnabled": bool(columns["researchEnabled"][index]),
+            "operational": bool(columns["operational"][index]),
+            "converterStatus": str(columns["converterStatus"][index] or ""),
+            "lastTimeFactor": _science_lab_number(columns["lastTimeFactor"][index]),
+        }
+        row["state"] = _science_lab_state(row)
+        row["sciencePerDay"] = (
+            row["calculatedSciencePerDay"] if row["state"] == "researching" else 0.0
+        )
+        eta_kind, eta_seconds = _science_lab_eta(row, day_seconds)
+        row["etaKind"] = eta_kind
+        if eta_seconds is not None:
+            row["etaSeconds"] = round(eta_seconds, 1)
+        rows.append(row)
+
+    return {
+        "sci.krpc.labTelemetryAvailable": True,
+        "sci.krpc.labDaySeconds": day_seconds,
+        "sci.krpc.labCount": reported_count,
+        "sci.krpc.failedLabCount": failed_count,
+        "sci.krpc.malformedLabCount": max(0, reported_count - aligned_count),
+        "sci.krpc.labs": rows,
+    }
+
+
 def _gather_science(conn, vessel):
+    alarm_capabilities = {
+        "sci.alarmProviders": _science_alarm_capabilities(conn),
+    }
     try:
         service = conn.vessel_science
         if not service.available:
-            return _gather_science_stock(vessel)
+            result = _gather_science_stock(vessel)
+            result.update(alarm_capabilities)
+            return result
 
         titles = list(service.titles())
         values = list(service.science_values())
@@ -2211,6 +2711,10 @@ def _gather_science(conn, vessel):
             "sci.krpc.backend": "VesselScience",
         }
 
+        labs = _gather_science_labs(service)
+        if labs is not None:
+            result.update(labs)
+
         for key, method_name in (
             ("sci.krpc.containerCount", "container_count"),
             ("sci.krpc.failedContainerCount", "failed_container_count"),
@@ -2220,9 +2724,12 @@ def _gather_science(conn, vessel):
                 result[key] = getattr(service, method_name)()
             except Exception:
                 pass
+        result.update(alarm_capabilities)
         return result
     except Exception:
-        return _gather_science_stock(vessel)
+        result = _gather_science_stock(vessel)
+        result.update(alarm_capabilities)
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -2388,6 +2895,138 @@ def _overview_vessel_switch_result(request_id, status, message):
         "status": status,
         "message": message,
     }
+
+
+_HEAT_LOOP_CONTROL_ACTIONS = {"start", "stop"}
+
+
+def _heat_loop_control_result(
+    request_id, loop_id, action, status, message
+):
+    return {
+        "type": "heat.loop.control.result",
+        "requestId": request_id if isinstance(request_id, str) else "",
+        "loopId": loop_id if isinstance(loop_id, int) and not isinstance(loop_id, bool) else -1,
+        "action": action if action in _HEAT_LOOP_CONTROL_ACTIONS else "start",
+        "status": status,
+        "message": message,
+    }
+
+
+def _normalized_radiator_part_ids(values):
+    if not isinstance(values, (list, tuple)) or not values or len(values) > 256:
+        return None
+    normalized = []
+    for value in values:
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
+            or value > 0xFFFFFFFF
+        ):
+            return None
+        normalized.append(value)
+    return sorted(normalized)
+
+
+def _apply_heat_loop_control_command(conn, command):
+    """Apply one vessel-, membership-, and state-guarded loop radiator action."""
+    request_id = command.get("requestId")
+    loop_id = command.get("loopId")
+    action = command.get("action")
+
+    def reject(message):
+        return _heat_loop_control_result(
+            request_id, loop_id, action, "error", message
+        )
+
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid heat-loop request ID is required.")
+    if (
+        not isinstance(loop_id, int)
+        or isinstance(loop_id, bool)
+        or loop_id < 0
+        or loop_id > 0x7FFFFFFF
+    ):
+        return reject("Select a valid heat loop.")
+    if action not in _HEAT_LOOP_CONTROL_ACTIONS:
+        return reject("Select a valid radiator action.")
+
+    expected_vessel_guid = command.get("expectedVesselGuid")
+    if (
+        not isinstance(expected_vessel_guid, str)
+        or not expected_vessel_guid
+        or len(expected_vessel_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid expected vessel ID is required.")
+    expected_part_ids = _normalized_radiator_part_ids(
+        command.get("expectedRadiatorPartIds")
+    )
+    if expected_part_ids is None:
+        return reject("Valid expected radiator identities are required.")
+
+    try:
+        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+            return reject("Heat-loop controls are available only in flight.")
+
+        current_identity = _mission_planning.current_craft_identity(
+            conn, "flight"
+        )
+        current_vessel_guid = str(
+            current_identity.get("v.guid", "")
+        ).strip()
+        if current_vessel_guid != expected_vessel_guid:
+            return reject(
+                "The active vessel changed; refresh before controlling radiators."
+            )
+
+        service = conn.system_heat
+        current_loop_ids = [int(value) for value in service.loop_ids()]
+        if loop_id not in current_loop_ids:
+            return reject(
+                "The heat-loop list changed; refresh before trying again."
+            )
+
+        current_part_ids = _normalized_radiator_part_ids(
+            list(service.loop_radiator_part_ids(loop_id))
+        )
+        if current_part_ids != expected_part_ids:
+            return reject(
+                "The radiators assigned to this loop changed; refresh before trying again."
+            )
+
+        current_action = str(
+            service.loop_radiator_control_action(loop_id) or ""
+        ).lower()
+        if current_action != action:
+            return reject(
+                "The radiator state changed; use the newly available control."
+            )
+
+        procedure = (
+            service.loop_radiator_start
+            if action == "start"
+            else service.loop_radiator_stop
+        )
+        if not bool(procedure(loop_id)):
+            return reject(
+                "The radiators rejected the requested state change."
+            )
+
+        message = (
+            f"Loop {loop_id} radiator activation accepted."
+            if action == "start"
+            else f"Loop {loop_id} radiator shutdown accepted."
+        )
+        return _heat_loop_control_result(
+            request_id, loop_id, action, "accepted", message
+        )
+    except Exception as exc:
+        return reject(f"Heat-loop control failed: {exc}")
 
 
 def _apply_overview_vessel_switch_command(conn, command):
@@ -3146,8 +3785,228 @@ def _finalize_telemetry(conn, payload):
     return payload
 
 
+_REACTOR_CONTROL_ACTIONS = {
+    "start",
+    "stop",
+    "start_charging",
+    "stop_charging",
+}
+
+
+def _reactor_control_result(request_id, index, action, status, message):
+    return {
+        "type": "reactor.control.result",
+        "requestId": request_id if isinstance(request_id, str) else "",
+        "index": index if isinstance(index, int) and not isinstance(index, bool) else -1,
+        "action": action if action in _REACTOR_CONTROL_ACTIONS else "start",
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_reactor_control_command(conn, command):
+    """Apply one identity- and state-guarded native reactor action."""
+    request_id = command.get("requestId")
+    index = command.get("index")
+    action = command.get("action")
+
+    def reject(message):
+        return _reactor_control_result(
+            request_id, index, action, "error", message
+        )
+
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid reactor request ID is required.")
+    if (
+        not isinstance(index, int)
+        or isinstance(index, bool)
+        or index < 0
+        or index > 255
+    ):
+        return reject("Select a valid reactor index.")
+    if action not in _REACTOR_CONTROL_ACTIONS:
+        return reject("Select a valid reactor action.")
+
+    expected_name = command.get("expectedName")
+    expected_family = command.get("expectedFamily")
+    expected_part_id = command.get("expectedPartId")
+    expected_vessel_guid = command.get("expectedVesselGuid")
+    if (
+        not isinstance(expected_name, str)
+        or not expected_name
+        or len(expected_name) > 256
+    ):
+        return reject("A valid expected reactor name is required.")
+    if expected_family not in {"fission", "fusion"}:
+        return reject("A valid expected reactor family is required.")
+    if (
+        not isinstance(expected_part_id, int)
+        or isinstance(expected_part_id, bool)
+        or expected_part_id < 0
+        or expected_part_id > 0xFFFFFFFF
+    ):
+        return reject("A valid expected reactor part ID is required.")
+    if (
+        not isinstance(expected_vessel_guid, str)
+        or not expected_vessel_guid
+        or len(expected_vessel_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid expected vessel ID is required.")
+
+    try:
+        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+            return reject("Reactor controls are available only in flight.")
+
+        current_identity = _mission_planning.current_craft_identity(conn, "flight")
+        current_vessel_guid = str(current_identity.get("v.guid", "")).strip()
+        if current_vessel_guid != expected_vessel_guid:
+            return reject("The active vessel changed; refresh before controlling a reactor.")
+
+        service = conn.system_heat
+        count = int(service.reactor_count())
+        if index >= count:
+            return reject("The reactor list changed; refresh before trying again.")
+
+        current_name = str(service.reactor_name(index) or "")
+        current_family = str(service.reactor_family(index) or "").lower()
+        current_part_id = int(service.reactor_part_id(index))
+        current_action = str(service.reactor_control_action(index) or "")
+        if current_part_id != expected_part_id:
+            return reject("The selected reactor identity changed; refresh before trying again.")
+        if current_name != expected_name or current_family != expected_family:
+            return reject("The selected reactor changed; refresh before trying again.")
+        if current_action != action:
+            return reject(
+                "The reactor state changed; use the newly available control."
+            )
+
+        procedures = {
+            "start": service.reactor_start,
+            "stop": service.reactor_stop,
+            "start_charging": service.reactor_start_charging,
+            "stop_charging": service.reactor_stop_charging,
+        }
+        if not bool(procedures[action](index)):
+            return reject("The reactor rejected the requested state change.")
+
+        messages = {
+            "start": "Reactor start accepted.",
+            "stop": "Reactor shutdown accepted.",
+            "start_charging": "Fusion startup charging accepted.",
+            "stop_charging": "Fusion startup charging paused.",
+        }
+        return _reactor_control_result(
+            request_id, index, action, "accepted", messages[action]
+        )
+    except Exception as exc:
+        return reject(f"Reactor control failed: {exc}")
+
+
+def _gather_reactors(system_heat):
+    """Read the additive reactor contract while remaining compatible with 0.2.3."""
+    reactors = []
+    for index in range(system_heat.reactor_count()):
+        family = "fission"
+        try:
+            reported_family = str(system_heat.reactor_family(index) or "").lower()
+            if reported_family in {"fission", "fusion"}:
+                family = reported_family
+        except Exception:
+            pass
+
+        has_integrity = family != "fusion"
+        try:
+            has_integrity = bool(
+                system_heat.reactor_core_integrity_available(index)
+            )
+        except Exception:
+            pass
+
+        reactor = {
+            "index": index,
+            "name": system_heat.reactor_name(index),
+            "family": family,
+            "hasIntegrity": has_integrity,
+            "on": bool(system_heat.reactor_enabled(index)),
+            "status": system_heat.reactor_status(index) or "",
+            "ecPerSec": round(
+                system_heat.reactor_electrical_generation(index), 2
+            ),
+            "ecMax": round(
+                system_heat.reactor_max_electrical_generation(index), 2
+            ),
+            "coreTemp": round(system_heat.reactor_core_temperature(index), 1),
+            "nominalTemp": round(
+                system_heat.reactor_nominal_temperature(index), 1
+            ),
+            "fuel": system_heat.reactor_fuel_status(index) or "",
+            "fuelKind": "life" if family == "fission" else "rate",
+            "throttle": round(system_heat.reactor_throttle(index), 1),
+        }
+        try:
+            part_id = int(system_heat.reactor_part_id(index))
+            if part_id < 0 or part_id > 0xFFFFFFFF:
+                raise ValueError("invalid reactor part ID")
+            control_action = str(
+                system_heat.reactor_control_action(index) or ""
+            )
+            if control_action in _REACTOR_CONTROL_ACTIONS:
+                reactor["partId"] = part_id
+                reactor["controlAction"] = control_action
+                reactor["controlAvailable"] = True
+            charge_state = str(
+                system_heat.reactor_charge_state(index) or ""
+            )
+            if charge_state in {"off", "charging", "ready", "running"}:
+                reactor["chargeState"] = charge_state
+                charge_percent = float(
+                    system_heat.reactor_charge_percent(index)
+                )
+                if math.isfinite(charge_percent):
+                    reactor["chargePercent"] = round(
+                        max(0.0, min(100.0, charge_percent)), 1
+                    )
+        except Exception:
+            # SystemHeat 0.2.6 and older remain telemetry-only.
+            pass
+        if family == "fusion":
+            try:
+                fuel_life = system_heat.reactor_fuel_life_status(index) or ""
+                if fuel_life:
+                    reactor["fuel"] = fuel_life
+                    reactor["fuelKind"] = "life"
+            except Exception:
+                # SystemHeat 0.2.4 exposes the exact rate but not remaining life.
+                pass
+            try:
+                fuel_rate = system_heat.reactor_fuel_rate_status(index) or ""
+                if fuel_rate:
+                    reactor["fuelRate"] = fuel_rate
+            except Exception:
+                pass
+            try:
+                limiting = (
+                    system_heat.reactor_fuel_limiting_resource(index) or ""
+                )
+                if limiting:
+                    reactor["fuelLimitingResource"] = limiting
+            except Exception:
+                pass
+        if has_integrity:
+            reactor["integrity"] = round(
+                system_heat.reactor_core_integrity(index), 1
+            )
+        reactors.append(reactor)
+    return reactors
+
+
 def gather_telemetry(conn):
-    global _stage_cache, _stage_last_poll, _stage_last_ut
+    global _stage_cache, _stage_current_authority
+    global _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
     d = {}
 
@@ -3171,6 +4030,7 @@ def gather_telemetry(conn):
                 _stage_trace("cache_clear", reason="enter_flight",
                              previous=_stage_summary(_stage_cache))
                 _stage_cache = {}
+                _stage_current_authority = {}
                 _stage_last_poll = 0.0
                 _stage_last_ut = None
             _telemetry_mode = mode
@@ -3226,6 +4086,13 @@ def gather_telemetry(conn):
         d["v.name"] = ""
 
     try:
+        vessel_guid = str(_overview_value(vessel, "id", "")).strip()
+        if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
+            d["v.guid"] = vessel_guid
+    except Exception:
+        pass
+
+    try:
         universal_time = sc.ut
         d["t.universalTime"] = universal_time
         d["v.missionTime"] = vessel.met
@@ -3267,8 +4134,48 @@ def gather_telemetry(conn):
     except Exception:
         pass
 
-    # ---- current stage index (fed to the dashboard if this build has it) ----
-    cs = _current_stage(vessel)
+    # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
+    # Revert-to-launch rewinds universal time while the process and kRPC
+    # connection can remain alive. Never carry the previous flight's last good
+    # stage snapshot across that boundary. Gather this before resources so the
+    # same bounded StageStats poll can supply the current KSP stage when stock
+    # kRPC omits it.
+    if universal_time is not None:
+        if _stage_last_ut is not None and universal_time < _stage_last_ut:
+            _stage_trace(
+                "ut_rewind", previousUt=_stage_last_ut,
+                currentUt=universal_time,
+                previousCache=_stage_summary(_stage_cache),
+            )
+            _stage_cache = {}
+            _stage_current_authority = {}
+            _stage_last_poll = 0.0
+        _stage_last_ut = universal_time
+
+    if now - _stage_last_poll >= STAGE_POLL_SECONDS:
+        _stage_last_poll = now
+        result = {}
+        try:
+            result = _gather_stages(conn)
+            if result:
+                previous_stage_cache = _stage_summary(_stage_cache)
+                _stage_cache = result
+                _stage_trace(
+                    "cache_replace", source="flight",
+                    previous=previous_stage_cache,
+                    current=_stage_summary(result),
+                )
+        except Exception:
+            pass  # keep last good cache through scene changes
+        # The staging panel intentionally retains its last good display cache,
+        # but resource partitioning must fail closed when this poll did not
+        # produce a fresh current-stage value.
+        _stage_current_authority = _current_stage_authority(result)
+    d.update(_stage_cache)
+    _trace_stage_publish(d, "flight")
+
+    # ---- current stage index ----
+    cs = _current_stage(vessel, _stage_current_authority)
     if cs is not None:
         d["krpc.currentStage"] = cs
 
@@ -3302,7 +4209,7 @@ def gather_telemetry(conn):
     if now - _res_last_poll >= RES_POLL_SECONDS:
         _res_last_poll = now
         try:
-            r = _gather_resources(vessel)
+            r = _gather_resources(vessel, current_stage=cs)
             if r:
                 _res_cache = r
         except Exception:
@@ -3318,38 +4225,6 @@ def gather_telemetry(conn):
         except Exception:
             pass
     d.update(_tgt_cache)
-
-    # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
-    # Revert-to-launch rewinds universal time while the process and kRPC
-    # connection can remain alive. Never carry the previous flight's last good
-    # stage snapshot across that boundary.
-    if universal_time is not None:
-        if _stage_last_ut is not None and universal_time < _stage_last_ut:
-            _stage_trace(
-                "ut_rewind", previousUt=_stage_last_ut,
-                currentUt=universal_time,
-                previousCache=_stage_summary(_stage_cache),
-            )
-            _stage_cache = {}
-            _stage_last_poll = 0.0
-        _stage_last_ut = universal_time
-
-    if now - _stage_last_poll >= STAGE_POLL_SECONDS:
-        _stage_last_poll = now
-        try:
-            result = _gather_stages(conn)
-            if result:
-                previous_stage_cache = _stage_summary(_stage_cache)
-                _stage_cache = result
-                _stage_trace(
-                    "cache_replace", source="flight",
-                    previous=previous_stage_cache,
-                    current=_stage_summary(result),
-                )
-        except Exception:
-            pass  # keep last good cache through scene changes
-    d.update(_stage_cache)
-    _trace_stage_publish(d, "flight")
 
     # ---- science aboard: VesselScience, with stock experiment fallback ----
     global _sci_cache, _sci_last_poll
@@ -3389,23 +4264,19 @@ def gather_telemetry(conn):
         _elec_last_poll = now
         elec = {}
 
+        # Bracket the sequential per-reactor reads with total-generation
+        # samples. Reactor output can change while the RPCs below are in flight;
+        # a residual that exists at only one endpoint is timing skew, not an
+        # `Other` generator family.
+        service_total_before = None
+        try:
+            service_total_before = conn.system_heat.total_electrical_generation()
+        except Exception:
+            pass
+
         try:
             sh = conn.system_heat
-            reactors = []
-            for i in range(sh.reactor_count()):
-                reactors.append({
-                    "name": sh.reactor_name(i),
-                    "on": bool(sh.reactor_enabled(i)),
-                    "status": sh.reactor_status(i) or "",
-                    "ecPerSec": round(sh.reactor_electrical_generation(i), 2),
-                    "ecMax": round(sh.reactor_max_electrical_generation(i), 2),
-                    "coreTemp": round(sh.reactor_core_temperature(i), 1),
-                    "nominalTemp": round(sh.reactor_nominal_temperature(i), 1),
-                    "integrity": round(sh.reactor_core_integrity(i), 1),
-                    "fuel": sh.reactor_fuel_status(i) or "",
-                    "throttle": round(sh.reactor_throttle(i), 1),
-                })
-            elec["elec.reactors"] = reactors
+            elec["elec.reactors"] = _gather_reactors(sh)
         except Exception:
             pass  # service not present / scene change
 
@@ -3419,15 +4290,15 @@ def gather_telemetry(conn):
         solar_ec = 0.0
         try:
             panels = vessel.parts.solar_panels
-            total_flow = 0.0
-            exposures = []
-            for sp in panels:
-                total_flow += sp.energy_flow
-                exposures.append(sp.sun_exposure)
+            readings = [
+                (sp.energy_flow, sp.sun_exposure) for sp in panels
+            ]
+            readings.extend(curved_solar_readings(vessel.parts))
+            panel_count, total_flow, average_exposure = solar_summary(readings)
             solar_ec = total_flow
-            elec["solar.count"] = len(exposures)
+            elec["solar.count"] = panel_count
             elec["solar.outputEcPerSec"] = round(total_flow, 2)
-            elec["solar.efficiency"] = round(sum(exposures) / len(exposures), 3) if exposures else 0.0
+            elec["solar.efficiency"] = round(average_exposure, 3)
         except Exception:
             pass
 
@@ -3439,15 +4310,25 @@ def gather_telemetry(conn):
         # alternators, and any modded producer the service could read.
         try:
             sh = conn.system_heat
-            service_total = sh.total_electrical_generation()  # excludes solar
+            service_total_after = service_total_before
+            try:
+                service_total_after = sh.total_electrical_generation()  # excludes solar
+            except Exception:
+                pass
+            service_total = latest_generation_total(
+                service_total_before,
+                service_total_after,
+            )
+            if service_total is None:
+                raise RuntimeError("SystemHeat generation total unavailable")
             total_gen = service_total + solar_ec
 
             reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
             rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
-            other = generation_remainder(
-                total_gen,
+            other = bracketed_generation_remainder(
+                service_total_before,
+                service_total_after,
                 reactor_sum,
-                solar_ec,
                 rtg_ec,
             )
 

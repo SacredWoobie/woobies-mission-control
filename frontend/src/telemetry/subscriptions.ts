@@ -177,6 +177,7 @@ export function heatSnapshotsEqual(left: TelemetrySnapshot | null, right: Teleme
 export function electricitySnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
   return fieldsEqual(left, right, [
     "context.mode",
+    "v.guid",
     "elec.reactors",
     "elec.sources",
     "elec.totalGenEcPerSec",
@@ -202,7 +203,7 @@ export function electricitySnapshotsEqual(left: TelemetrySnapshot | null, right:
 }
 
 export function scienceSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "sci.krpc.total", "sci.krpc.transmitTotal", "sci.krpc.count", "sci.krpc.experiments", "career.science", "v.body", "v.situationString", "v.biome"]);
+  return fieldsEqual(left, right, ["context.mode", "sci.krpc.total", "sci.krpc.transmitTotal", "sci.krpc.count", "sci.krpc.experiments", "sci.krpc.labTelemetryAvailable", "sci.krpc.labDaySeconds", "sci.krpc.labCount", "sci.krpc.labs", "sci.alarmProviders", "career.science", "v.body", "v.situationString", "v.biome"]);
 }
 
 export function targetSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {

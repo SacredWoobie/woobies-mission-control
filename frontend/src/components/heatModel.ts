@@ -1,6 +1,8 @@
 import { isFiniteNumber } from "../telemetry/formatters";
 import type {
   HeatComponentTelemetry,
+  HeatLoopControlAction,
+  HeatLoopRadiatorState,
   HeatLoopTelemetry,
   StockHeatPartTelemetry,
 } from "../telemetry/types";
@@ -30,6 +32,11 @@ export interface HeatEntity {
   componentSummary?: string;
   stateText?: string;
   timeToCriticalSeconds?: number;
+  loopId?: number;
+  radiatorPartIds?: number[];
+  radiatorState?: HeatLoopRadiatorState;
+  radiatorControlAction?: HeatLoopControlAction;
+  radiatorControlAvailable?: boolean;
 }
 
 const HOT_RATIO = 0.6;
@@ -101,6 +108,7 @@ export function loopHeatEntity(loop: HeatLoopTelemetry): HeatEntity {
   const components = loop.producers || loop.radiators
     ? { producers: loop.producers ?? [], radiators: loop.radiators ?? [] }
     : undefined;
+  const numericLoopId = Number(loop.id);
 
   return {
     id: `loop-${loop.id}`,
@@ -117,6 +125,13 @@ export function loopHeatEntity(loop: HeatLoopTelemetry): HeatEntity {
     componentSummary: loopComponentSummary(loop),
     stateText: loopState(loop, netFlux),
     timeToCriticalSeconds: loop.timeToCriticalSeconds,
+    loopId: Number.isSafeInteger(numericLoopId) && numericLoopId >= 0
+      ? numericLoopId
+      : undefined,
+    radiatorPartIds: loop.radiatorPartIds,
+    radiatorState: loop.radiatorState,
+    radiatorControlAction: loop.radiatorControlAction,
+    radiatorControlAvailable: loop.radiatorControlAvailable,
   };
 }
 
@@ -175,8 +190,13 @@ export function heatPanelIsIdle(entities: HeatEntity[]) {
     entity.severity === "nominal"
     && (
       entity.kind === "part"
-      || !isFiniteNumber(entity.netFlux)
-      || Math.abs(entity.netFlux) < 0.05
+      || (
+        !entity.radiatorState
+        && (
+          !isFiniteNumber(entity.netFlux)
+          || Math.abs(entity.netFlux) < 0.05
+        )
+      )
     )
   ));
 }

@@ -1,11 +1,19 @@
+import { useEffect, useState } from "react";
 import {
   formatPercent,
   formatRateColumn,
   formatResourcePair,
   formatTemperature,
+  formatTelemetryNumber,
   isFiniteNumber,
 } from "../formatting/numbers";
-import type { ReactorTelemetry, TelemetrySnapshot } from "../telemetry/types";
+import type {
+  ReactorControlAction,
+  ReactorControlResult,
+  ReactorTelemetry,
+  TelemetryCommand,
+  TelemetrySnapshot,
+} from "../telemetry/types";
 import { Panel } from "./Panel";
 import { resourceSeverity } from "./resourceMeter";
 import {
@@ -14,8 +22,14 @@ import {
   type ElectricityViewModel,
 } from "./electricityModel";
 
+const REACTOR_CONTROL_MESSAGE_MS = 5_000;
+
 function ecRate(value: number | undefined) {
   return formatRateColumn(value, "EC/s");
+}
+
+function throttlePercent(value: number | undefined) {
+  return isFiniteNumber(value) ? `${formatTelemetryNumber(value)}%` : formatTelemetryNumber(value);
 }
 
 function compactDuration(seconds: number | undefined) {
@@ -167,43 +181,196 @@ function SourceLedger({
 }
 
 function ReactorDetail({
+  commandEnabled,
+  controlResult,
+  onSendCommand,
   reactors,
+  vesselGuid,
   warning,
 }: {
+  commandEnabled: boolean;
+  controlResult?: ReactorControlResult;
+  onSendCommand?: (command: TelemetryCommand) => boolean;
   reactors: ReactorTelemetry[];
+  vesselGuid?: string;
   warning: boolean;
 }) {
+  const [pending, setPending] = useState<{
+    action: ReactorControlAction;
+    index: number;
+    requestId: string;
+  } | null>(null);
+  const [lastRequestId, setLastRequestId] = useState<string>();
+  const [localError, setLocalError] = useState<string>();
+
+  useEffect(() => {
+    if (!pending) return;
+    const reactor = reactors.find((candidate) => candidate.index === pending.index);
+    if (reactor && reactor.controlAction !== pending.action) setPending(null);
+  }, [pending, reactors]);
+
+  useEffect(() => {
+    if (pending && controlResult?.requestId === pending.requestId && controlResult.status === "error") {
+      setPending(null);
+    }
+  }, [controlResult, pending]);
+
+  const result = controlResult?.requestId === lastRequestId ? controlResult : undefined;
+
+  useEffect(() => {
+    if (!localError && !result) return;
+    const visibleRequestId = lastRequestId;
+    const timer = window.setTimeout(() => {
+      setLocalError(undefined);
+      setLastRequestId((current) => current === visibleRequestId ? undefined : current);
+    }, REACTOR_CONTROL_MESSAGE_MS);
+    return () => window.clearTimeout(timer);
+  }, [lastRequestId, localError, result]);
+
   if (reactors.length === 0) return null;
+  const sendControl = (reactor: ReactorTelemetry, action: ReactorControlAction) => {
+    if (
+      pending
+      || !commandEnabled
+      || !onSendCommand
+      || !Number.isSafeInteger(reactor.index)
+      || !Number.isSafeInteger(reactor.partId)
+      || !vesselGuid
+    ) return;
+    const requestId = `reactor-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const sent = onSendCommand({
+      type: "reactor.control",
+      requestId,
+      index: reactor.index!,
+      action,
+      expectedName: reactor.name,
+      expectedFamily: reactor.family ?? "fission",
+      expectedPartId: reactor.partId!,
+      expectedVesselGuid: vesselGuid,
+    });
+    setLastRequestId(requestId);
+    if (sent) {
+      setPending({ action, index: reactor.index!, requestId });
+      setLocalError(undefined);
+    } else {
+      setLocalError("Reactor command was not sent because the telemetry link is unavailable.");
+    }
+  };
   return (
     <details className={`rx-details ${warning ? "warn" : ""}`}>
       <summary><span>Reactor detail</span><span>{reactors.length}</span></summary>
       <div className="rx-scroll"><div className="rx-list">{reactors.map((reactor, index) => {
+        const isFusion = reactor.family === "fusion";
+        const hasIntegrity = reactor.hasIntegrity !== false;
         const tempWarn = (
           isFiniteNumber(reactor.coreTemp)
           && isFiniteNumber(reactor.nominalTemp)
           && reactor.coreTemp > reactor.nominalTemp * 1.05
         );
-        const integrityWarn = isFiniteNumber(reactor.integrity) && reactor.integrity < 90;
+        const integrityWarn = hasIntegrity && isFiniteNumber(reactor.integrity) && reactor.integrity < 90;
+        const fuelKind = reactor.fuelKind ?? (isFusion ? "rate" : "life");
+        const stateLabel = reactor.chargeState === "charging"
+          ? "Charging"
+          : reactor.chargeState === "ready"
+            ? "Ready"
+            : reactor.on
+              ? "On"
+              : "Off";
+        const action = reactor.controlAction;
+        const actionTitle = action === "stop"
+          ? `Shut down ${reactor.name}`
+          : action === "start"
+            ? `Start ${reactor.name}`
+            : action === "stop_charging"
+              ? `Pause startup charging for ${reactor.name}`
+              : `Begin startup charging for ${reactor.name}`;
+        const stateClass = reactor.on
+          ? "on"
+          : reactor.chargeState === "charging"
+            ? "charging"
+            : reactor.chargeState === "ready"
+              ? "ready"
+              : "off";
+        const canControl = Boolean(
+          commandEnabled
+          && onSendCommand
+          && vesselGuid
+          && reactor.controlAvailable
+          && action
+          && Number.isSafeInteger(reactor.index)
+          && Number.isSafeInteger(reactor.partId),
+        );
+        const isPending = pending?.index === reactor.index;
+        const fuelTitle = [
+          reactor.fuelLimitingResource ? `${reactor.fuelLimitingResource} limiting` : "",
+          reactor.fuelRate ?? "",
+        ].filter(Boolean).join(" · ") || reactor.fuel;
         return (
           <div className="rx-card" key={`${reactor.name}-${index}`}>
             <div className="rx-head">
               <span className="rx-name" title={reactor.name}>{reactor.name || "Unnamed reactor"}</span>
-              <span className={`rx-state ${reactor.on ? "on" : "off"}`}>{reactor.on ? "On" : "Off"}</span>
+              {canControl ? (
+                <button
+                  aria-label={actionTitle}
+                  className={`rx-state control ${stateClass} ${isPending ? "pending" : ""}`}
+                  disabled={Boolean(pending)}
+                  onClick={() => sendControl(reactor, action!)}
+                  title={actionTitle}
+                  type="button"
+                >{isPending ? "Applying" : stateLabel}</button>
+              ) : (
+                <span className={`rx-state ${stateClass}`}>{stateLabel}</span>
+              )}
             </div>
+            {reactor.chargeState === "charging" && isFiniteNumber(reactor.chargePercent) && (
+              <div className="rx-charge-row">
+                <span>Startup charge</span>
+                <div
+                  aria-label={`${formatTelemetryNumber(reactor.chargePercent)}% startup charge`}
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={reactor.chargePercent}
+                  className="rx-charge-track"
+                  role="progressbar"
+                >
+                  <span className="rx-charge-fill" style={{ width: `${Math.max(0, Math.min(100, reactor.chargePercent))}%` }} />
+                </div>
+                <strong>{formatTelemetryNumber(reactor.chargePercent)}%</strong>
+              </div>
+            )}
             <div className="rx-stats">
               <div className="rx-stat"><label>Output</label><span className="rv">{ecRate(reactor.ecPerSec)}</span></div>
               <div className="rx-stat"><label>Core</label><span className={`rv ${tempWarn ? "warn" : ""}`}>{formatTemperature(reactor.coreTemp, true)}</span></div>
-              <div className="rx-stat"><label>Integrity</label><span className={`rv ${integrityWarn ? "warn" : ""}`}>{formatPercent(reactor.integrity)}</span></div>
-              <div className="rx-stat"><label>Life</label><span className="rv" title={reactor.fuel}>{reactor.fuel?.trim() || "—"}</span></div>
+              {hasIntegrity ? (
+                <div className="rx-stat"><label>Integrity</label><span className={`rv ${integrityWarn ? "warn" : ""}`}>{formatPercent(reactor.integrity)}</span></div>
+              ) : (
+                <div className="rx-stat"><label>Throttle</label><span className="rv">{throttlePercent(reactor.throttle)}</span></div>
+              )}
+              <div className="rx-stat"><label>{fuelKind === "rate" ? "Fuel rate" : "Life"}</label><span className="rv" title={fuelTitle}>{reactor.fuel?.trim() || "—"}</span></div>
             </div>
           </div>
         );
       })}</div></div>
+      {(localError || result) && (
+        <div className={`rx-command-result ${localError || result?.status === "error" ? "error" : "accepted"}`} role="status">
+          {localError ?? result?.message}
+        </div>
+      )}
     </details>
   );
 }
 
-export function ElectricityPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+export function ElectricityPanel({
+  commandEnabled = false,
+  controlResult,
+  onSendCommand,
+  snapshot,
+}: {
+  commandEnabled?: boolean;
+  controlResult?: ReactorControlResult;
+  onSendCommand?: (command: TelemetryCommand) => boolean;
+  snapshot: TelemetrySnapshot;
+}) {
   const model = selectElectricity(snapshot);
   const deficit = isFiniteNumber(model.netEcPerSec) && model.netEcPerSec < -0.05;
   const heroLabel = model.tier === 1
@@ -243,7 +410,14 @@ export function ElectricityPanel({ snapshot }: { snapshot: TelemetrySnapshot }) 
       {model.tier === 3 && (
         <SourceLedger generation={model.generationEcPerSec} sources={model.sources} />
       )}
-      <ReactorDetail reactors={model.reactors} warning={model.status.tone === "danger"} />
+      <ReactorDetail
+        commandEnabled={commandEnabled}
+        controlResult={controlResult}
+        onSendCommand={onSendCommand}
+        reactors={model.reactors}
+        vesselGuid={snapshot["v.guid"]}
+        warning={model.status.tone === "danger"}
+      />
     </Panel>
   );
 }

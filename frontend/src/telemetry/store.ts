@@ -1,10 +1,15 @@
 import { TelemetryClient, type ConnectionStatus } from "./client";
 import type {
+  HeatLoopControlResult,
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
+  ScienceAlarmResult,
+  ScienceLabResearchResult,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -14,9 +19,14 @@ export interface LiveTelemetryState {
   frameCount: number;
   lastFrameAt: number | null;
   message?: string;
+  heatLoopControlResult?: HeatLoopControlResult;
   overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
+  reactorControlResult?: ReactorControlResult;
+  scienceAlarmResult?: ScienceAlarmResult;
+  scienceLabResearchResult?: ScienceLabResearchResult;
+  scienceLabTransmitResult?: ScienceLabTransmitResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -50,9 +60,14 @@ export class TelemetryStore {
     private readonly createClient: (
       endpoint: string,
       callbacks: {
+        onHeatLoopControlResult?(result: HeatLoopControlResult): void;
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+        onReactorControlResult?(result: ReactorControlResult): void;
+        onScienceAlarmResult?(result: ScienceAlarmResult): void;
+        onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
+        onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -81,6 +96,9 @@ export class TelemetryStore {
 
     this.client?.disconnect();
     this.client = this.createClient(normalized, {
+      onHeatLoopControlResult: (heatLoopControlResult) => {
+        this.patch({ heatLoopControlResult });
+      },
       onOverviewVesselEditResult: (overviewVesselEditResult) => {
         this.patch({ overviewVesselEditResult });
       },
@@ -89,6 +107,18 @@ export class TelemetryStore {
       },
       onOverviewVesselSwitchResult: (overviewVesselSwitchResult) => {
         this.patch({ overviewVesselSwitchResult });
+      },
+      onReactorControlResult: (reactorControlResult) => {
+        this.patch({ reactorControlResult });
+      },
+      onScienceAlarmResult: (scienceAlarmResult) => {
+        this.patch({ scienceAlarmResult });
+      },
+      onScienceLabResearchResult: (scienceLabResearchResult) => {
+        this.patch({ scienceLabResearchResult });
+      },
+      onScienceLabTransmitResult: (scienceLabTransmitResult) => {
+        this.patch({ scienceLabTransmitResult });
       },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
@@ -104,10 +134,15 @@ export class TelemetryStore {
           message,
           status,
           ...(clearSnapshot ? {
+            heatLoopControlResult: undefined,
             snapshot: null,
             overviewVesselEditResult: undefined,
             overviewVesselLifecycleResult: undefined,
             overviewVesselSwitchResult: undefined,
+            reactorControlResult: undefined,
+            scienceAlarmResult: undefined,
+            scienceLabResearchResult: undefined,
+            scienceLabTransmitResult: undefined,
           } : {}),
         });
       },
@@ -117,6 +152,11 @@ export class TelemetryStore {
       frameCount: 0,
       lastFrameAt: null,
       message: undefined,
+      heatLoopControlResult: undefined,
+      reactorControlResult: undefined,
+      scienceAlarmResult: undefined,
+      scienceLabResearchResult: undefined,
+      scienceLabTransmitResult: undefined,
       snapshot: null,
       status: "connecting",
     });

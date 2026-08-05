@@ -22,6 +22,15 @@ class FakeSystemHeat:
     def loop_has_radiators(self, loop_id):
         return loop_id == 1
 
+    def loop_radiator_part_ids(self, loop_id):
+        return {1: [10], 2: []}[loop_id]
+
+    def loop_radiator_state(self, loop_id):
+        return {1: "online", 2: "unavailable"}[loop_id]
+
+    def loop_radiator_control_action(self, loop_id):
+        return {1: "stop", 2: ""}[loop_id]
+
     def loop_component_part_names(self, loop_id):
         return {
             1: [
@@ -74,6 +83,14 @@ class HeatExtensionTests(unittest.TestCase):
         self.assertEqual(enriched["heat.loops"][0]["nominalTempK"], 800.0)
         self.assertEqual(enriched["heat.loops"][0]["netKw"], 60.0)
         self.assertTrue(enriched["heat.loops"][0]["hasRadiators"])
+        self.assertEqual(enriched["heat.loops"][0]["radiatorPartIds"], [10])
+        self.assertEqual(enriched["heat.loops"][0]["radiatorState"], "online")
+        self.assertEqual(
+            enriched["heat.loops"][0]["radiatorControlAction"], "stop"
+        )
+        self.assertTrue(
+            enriched["heat.loops"][0]["radiatorControlAvailable"]
+        )
         self.assertEqual(
             enriched["heat.loops"][0]["producers"],
             [
@@ -108,6 +125,16 @@ class HeatExtensionTests(unittest.TestCase):
         self.assertEqual(enriched["heat.loops"][1]["nominalTempK"], 1200.0)
         self.assertEqual(enriched["heat.loops"][1]["netKw"], -35.12)
         self.assertFalse(enriched["heat.loops"][1]["hasRadiators"])
+        self.assertEqual(enriched["heat.loops"][1]["radiatorPartIds"], [])
+        self.assertEqual(
+            enriched["heat.loops"][1]["radiatorState"], "unavailable"
+        )
+        self.assertNotIn(
+            "radiatorControlAction", enriched["heat.loops"][1]
+        )
+        self.assertFalse(
+            enriched["heat.loops"][1]["radiatorControlAvailable"]
+        )
 
     def test_falls_back_to_collector_generation_and_removal(self):
         class LegacySystemHeat:
@@ -124,6 +151,8 @@ class HeatExtensionTests(unittest.TestCase):
         self.assertNotIn("hasRadiators", enriched["heat.loops"][0])
         self.assertNotIn("producers", enriched["heat.loops"][0])
         self.assertNotIn("radiators", enriched["heat.loops"][0])
+        self.assertNotIn("radiatorPartIds", enriched["heat.loops"][0])
+        self.assertNotIn("radiatorControlAction", enriched["heat.loops"][0])
 
     def test_omits_invalid_numeric_values(self):
         class InvalidSystemHeat:

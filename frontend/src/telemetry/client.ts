@@ -1,9 +1,14 @@
 import type {
+  HeatLoopControlResult,
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
   OverviewVesselSwitchResult,
+  ReactorControlResult,
+  ScienceAlarmResult,
+  ScienceLabResearchResult,
+  ScienceLabTransmitResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -21,9 +26,14 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onHeatLoopControlResult?(result: HeatLoopControlResult): void;
+  onScienceAlarmResult?(result: ScienceAlarmResult): void;
+  onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
+  onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
   onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
   onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
   onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
+  onReactorControlResult?(result: ReactorControlResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
   onStatus(status: ConnectionStatus, message?: string): void;
@@ -31,6 +41,7 @@ interface TelemetryClientCallbacks {
 
 interface TelemetryClientOptions {
   createSocket?: (url: string) => WebSocketTransport;
+  startupReconnectDelayMs?: number;
   reconnectDelayMs?: number;
   setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
@@ -61,6 +72,45 @@ export function parseTelemetrySnapshot(raw: unknown): TelemetrySnapshot | null {
         : "flight";
 
   return { ...candidate, "context.mode": mode } as TelemetrySnapshot;
+}
+
+export function parseHeatLoopControlResult(raw: unknown): HeatLoopControlResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "heat.loop.control.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.loopId !== "number"
+    || !Number.isSafeInteger(candidate.loopId)
+    || candidate.loopId < -1
+    || (candidate.loopId === -1 && candidate.status !== "error")
+    || (candidate.action !== "start" && candidate.action !== "stop")
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as HeatLoopControlResult;
+}
+
+function isHeatLoopControlResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "heat.loop.control.result",
+    );
+  } catch {
+    return false;
+  }
 }
 
 const persistenceSections = new Set<MissionPlanningPersistenceSection>([
@@ -177,6 +227,163 @@ export function parseOverviewVesselLifecycleResult(raw: unknown): OverviewVessel
   return candidate as unknown as OverviewVesselLifecycleResult;
 }
 
+const reactorControlActions = new Set<ReactorControlResult["action"]>([
+  "start",
+  "stop",
+  "start_charging",
+  "stop_charging",
+]);
+
+export function parseReactorControlResult(raw: unknown): ReactorControlResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "reactor.control.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.index !== "number"
+    || !Number.isSafeInteger(candidate.index)
+    || candidate.index < 0
+    || !reactorControlActions.has(candidate.action as ReactorControlResult["action"])
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as ReactorControlResult;
+}
+
+function isReactorControlResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "reactor.control.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function parseScienceAlarmResult(raw: unknown): ScienceAlarmResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "science.alarm.create.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.labId !== "string"
+    || !candidate.labId
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+    || (candidate.provider !== undefined && candidate.provider !== "kac" && candidate.provider !== "stock")
+    || (candidate.triggerUT !== undefined && typeof candidate.triggerUT !== "number")
+    || (candidate.leadSeconds !== undefined && candidate.leadSeconds !== 1800 && candidate.leadSeconds !== 3600)
+  ) return null;
+  return candidate as unknown as ScienceAlarmResult;
+}
+
+export function parseScienceLabTransmitResult(raw: unknown): ScienceLabTransmitResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "science.lab.transmit.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.labId !== "string"
+    || !candidate.labId
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as ScienceLabTransmitResult;
+}
+
+export function parseScienceLabResearchResult(raw: unknown): ScienceLabResearchResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "science.lab.research.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.labId !== "string"
+    || !candidate.labId
+    || typeof candidate.enabled !== "boolean"
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as ScienceLabResearchResult;
+}
+
+function isScienceLabResearchResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "science.lab.research.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isScienceLabTransmitResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "science.lab.transmit.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isScienceAlarmResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "science.alarm.create.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isOverviewVesselLifecycleResultMessage(raw: unknown) {
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -237,6 +444,7 @@ export class TelemetryClient {
   private readonly callbacks: TelemetryClientCallbacks;
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
   private readonly createSocket: (url: string) => WebSocketTransport;
+  private readonly startupReconnectDelayMs: number;
   private readonly reconnectDelayMs: number;
   private readonly setTimer: (
     callback: () => void,
@@ -244,6 +452,7 @@ export class TelemetryClient {
   ) => ReturnType<typeof setTimeout>;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private socket: WebSocketTransport | null = null;
+  private hasLinked = false;
   private wanted = false;
 
   constructor(
@@ -253,6 +462,7 @@ export class TelemetryClient {
   ) {
     this.callbacks = callbacks;
     this.createSocket = options.createSocket ?? defaultSocketFactory;
+    this.startupReconnectDelayMs = options.startupReconnectDelayMs ?? 500;
     this.reconnectDelayMs = options.reconnectDelayMs ?? 2_000;
     this.setTimer = options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
     this.clearTimer = options.clearTimer ?? ((timer) => globalThis.clearTimeout(timer));
@@ -261,11 +471,13 @@ export class TelemetryClient {
   connect() {
     if (this.wanted) return;
     this.wanted = true;
+    this.hasLinked = false;
     this.openSocket("connecting");
   }
 
   disconnect() {
     this.wanted = false;
+    this.hasLinked = false;
     this.clearReconnectTimer();
     const socket = this.socket;
     this.socket = null;
@@ -309,7 +521,7 @@ export class TelemetryClient {
     this.reconnectTimer = this.setTimer(() => {
       this.reconnectTimer = null;
       if (this.wanted) this.openSocket("connecting");
-    }, this.reconnectDelayMs);
+    }, this.hasLinked ? this.reconnectDelayMs : this.startupReconnectDelayMs);
   }
 
   private openSocket(status: "connecting") {
@@ -324,10 +536,43 @@ export class TelemetryClient {
 
     this.socket = socket;
     socket.onopen = () => {
-      if (socket === this.socket && this.wanted) this.callbacks.onStatus("linked");
+      if (socket === this.socket && this.wanted) {
+        this.hasLinked = true;
+        this.callbacks.onStatus("linked");
+      }
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const heatLoopControlResult = parseHeatLoopControlResult(event.data);
+      if (heatLoopControlResult) {
+        this.callbacks.onHeatLoopControlResult?.(heatLoopControlResult);
+        return;
+      }
+      if (isHeatLoopControlResultMessage(event.data)) return;
+      const reactorControlResult = parseReactorControlResult(event.data);
+      if (reactorControlResult) {
+        this.callbacks.onReactorControlResult?.(reactorControlResult);
+        return;
+      }
+      if (isReactorControlResultMessage(event.data)) return;
+      const scienceAlarmResult = parseScienceAlarmResult(event.data);
+      if (scienceAlarmResult) {
+        this.callbacks.onScienceAlarmResult?.(scienceAlarmResult);
+        return;
+      }
+      if (isScienceAlarmResultMessage(event.data)) return;
+      const scienceLabResearchResult = parseScienceLabResearchResult(event.data);
+      if (scienceLabResearchResult) {
+        this.callbacks.onScienceLabResearchResult?.(scienceLabResearchResult);
+        return;
+      }
+      if (isScienceLabResearchResultMessage(event.data)) return;
+      const scienceLabTransmitResult = parseScienceLabTransmitResult(event.data);
+      if (scienceLabTransmitResult) {
+        this.callbacks.onScienceLabTransmitResult?.(scienceLabTransmitResult);
+        return;
+      }
+      if (isScienceLabTransmitResultMessage(event.data)) return;
       const lifecycleResult = parseOverviewVesselLifecycleResult(event.data);
       if (lifecycleResult) {
         this.callbacks.onOverviewVesselLifecycleResult?.(lifecycleResult);
@@ -372,6 +617,6 @@ export class TelemetryClient {
     this.reconnectTimer = this.setTimer(() => {
       this.reconnectTimer = null;
       if (this.wanted) this.openSocket("connecting");
-    }, this.reconnectDelayMs);
+    }, this.hasLinked ? this.reconnectDelayMs : this.startupReconnectDelayMs);
   }
 }

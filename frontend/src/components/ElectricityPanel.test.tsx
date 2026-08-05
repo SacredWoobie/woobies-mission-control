@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
-import type { TelemetrySnapshot } from "../telemetry/types";
+import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 import { ElectricityPanel } from "./ElectricityPanel";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 
@@ -128,5 +128,244 @@ describe("ElectricityPanel", () => {
     expect(screen.getByText("1,499/1,500", { exact: true })).toBeTruthy();
     expect(screen.getByText("2,400 K", { exact: true })).toBeTruthy();
     expect(screen.getByText("100%", { exact: true })).toBeTruthy();
+  });
+
+  it("shows legacy fusion fuel rate without fission integrity", () => {
+    renderPanel({
+      ...flightTelemetryFixture,
+      "elec.reactors": [{
+        name: "FX-2 Fusion Reactor",
+        family: "fusion",
+        hasIntegrity: false,
+        on: true,
+        ecPerSec: 100,
+        ecMax: 4_000,
+        coreTemp: 1_600,
+        nominalTemp: 1_600,
+        fuel: "0.00000027 u/s",
+        throttle: 2.5,
+      }],
+    });
+
+    expect(screen.getByText("FX-2 Fusion Reactor", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Throttle", { exact: true })).toBeTruthy();
+    expect(screen.getByText("2.5%", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Fuel rate", { exact: true })).toBeTruthy();
+    expect(screen.getByText("0.00000027 u/s", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Integrity", { exact: true })).toBeNull();
+  });
+
+  it("shows fusion fuel life with limiting fuel and rate detail", () => {
+    renderPanel({
+      ...flightTelemetryFixture,
+      "elec.reactors": [{
+        name: "FX-2 Fusion Reactor",
+        family: "fusion",
+        hasIntegrity: false,
+        on: true,
+        ecPerSec: 4_000,
+        coreTemp: 1_600,
+        nominalTemp: 1_600,
+        fuel: "112y 4d 3h 2m",
+        fuelKind: "life",
+        fuelRate: "LqdDeuterium 0.0000109 u/s",
+        fuelLimitingResource: "LqdDeuterium",
+        throttle: 100,
+      }],
+    });
+
+    expect(screen.getByText("Life", { exact: true })).toBeTruthy();
+    const life = screen.getByText("112y 4d 3h 2m", { exact: true });
+    expect(life.getAttribute("title")).toBe(
+      "LqdDeuterium limiting · LqdDeuterium 0.0000109 u/s",
+    );
+    expect(screen.queryByText("Integrity", { exact: true })).toBeNull();
+  });
+
+  it("starts fusion charging from off and reports charging progress", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const snapshot: TelemetrySnapshot = {
+      ...flightTelemetryFixture,
+      "v.guid": "vessel-guid",
+      "elec.reactors": [{
+        index: 3,
+        partId: 303,
+        name: "FX-2 Fusion Reactor",
+        family: "fusion",
+        hasIntegrity: false,
+        on: false,
+        chargeState: "off",
+        chargePercent: 12.5,
+        controlAction: "start_charging",
+        controlAvailable: true,
+        fuel: "112y",
+      }],
+    };
+    const { rerender } = render(
+      <PanelVisibilityProvider>
+        <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={snapshot} />
+      </PanelVisibilityProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Begin startup charging for FX-2 Fusion Reactor" }));
+    expect(onSendCommand).toHaveBeenCalledOnce();
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({
+      type: "reactor.control",
+      index: 3,
+      action: "start_charging",
+      expectedName: "FX-2 Fusion Reactor",
+      expectedFamily: "fusion",
+      expectedPartId: 303,
+      expectedVesselGuid: "vessel-guid",
+    });
+
+    rerender(
+      <PanelVisibilityProvider>
+        <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+          ...snapshot,
+          "elec.reactors": [{
+            ...snapshot["elec.reactors"]![0],
+            chargeState: "charging",
+            chargePercent: 37.5,
+            controlAction: "stop_charging",
+          }],
+        }} />
+      </PanelVisibilityProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Pause startup charging for FX-2 Fusion Reactor" })).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "37.5% startup charge" }).getAttribute("aria-valuenow")).toBe("37.5");
+    expect(screen.getByText("37.5%", { exact: true })).toBeTruthy();
+  });
+
+  it("uses ready and running states for fusion ignition and shutdown", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const base: TelemetrySnapshot = {
+      ...flightTelemetryFixture,
+      "v.guid": "vessel-guid",
+      "elec.reactors": [{
+        index: 0,
+        partId: 101,
+        name: "FX-2 Fusion Reactor",
+        family: "fusion",
+        hasIntegrity: false,
+        on: false,
+        chargeState: "ready",
+        chargePercent: 100,
+        controlAction: "start",
+        controlAvailable: true,
+        fuel: "112y",
+      }],
+    };
+    const { rerender } = render(
+      <PanelVisibilityProvider>
+        <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={base} />
+      </PanelVisibilityProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start FX-2 Fusion Reactor" }));
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({ action: "start" });
+
+    rerender(
+      <PanelVisibilityProvider>
+        <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+          ...base,
+          "elec.reactors": [{
+            ...base["elec.reactors"]![0],
+            on: true,
+            chargeState: "running",
+            chargePercent: 0,
+            controlAction: "stop",
+          }],
+        }} />
+      </PanelVisibilityProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Shut down FX-2 Fusion Reactor" })).toBeTruthy();
+  });
+
+  it("turns an offline fission reactor on through the guarded command", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    render(
+      <PanelVisibilityProvider>
+        <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+          ...flightTelemetryFixture,
+          "v.guid": "vessel-guid",
+          "elec.reactors": [{
+            index: 1,
+            partId: 202,
+            name: "MX-1 Fission Reactor",
+            family: "fission",
+            on: false,
+            controlAction: "start",
+            controlAvailable: true,
+            fuel: "59y",
+          }],
+        }} />
+      </PanelVisibilityProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start MX-1 Fission Reactor" }));
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({
+      type: "reactor.control",
+      index: 1,
+      action: "start",
+      expectedFamily: "fission",
+      expectedPartId: 202,
+      expectedVesselGuid: "vessel-guid",
+    });
+  });
+
+  it("dismisses a reactor control result after five seconds", () => {
+    vi.useFakeTimers();
+    try {
+      const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+      const snapshot: TelemetrySnapshot = {
+        ...flightTelemetryFixture,
+        "v.guid": "vessel-guid",
+        "elec.reactors": [{
+          index: 1,
+          partId: 202,
+          name: "MX-1 Fission Reactor",
+          family: "fission",
+          on: true,
+          controlAction: "stop",
+          controlAvailable: true,
+          fuel: "59y",
+        }],
+      };
+      const { rerender } = render(
+        <PanelVisibilityProvider>
+          <ElectricityPanel commandEnabled onSendCommand={onSendCommand} snapshot={snapshot} />
+        </PanelVisibilityProvider>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Shut down MX-1 Fission Reactor" }));
+      const request = onSendCommand.mock.calls[0][0];
+      if (request.type !== "reactor.control") throw new Error("Expected a reactor command.");
+      rerender(
+        <PanelVisibilityProvider>
+          <ElectricityPanel
+            commandEnabled
+            controlResult={{
+              type: "reactor.control.result",
+              requestId: request.requestId,
+              index: request.index,
+              action: request.action,
+              status: "accepted",
+              message: "Reactor shutdown accepted.",
+            }}
+            onSendCommand={onSendCommand}
+            snapshot={snapshot}
+          />
+        </PanelVisibilityProvider>,
+      );
+
+      expect(screen.getByText("Reactor shutdown accepted.")).toBeTruthy();
+      act(() => vi.advanceTimersByTime(4_999));
+      expect(screen.getByText("Reactor shutdown accepted.")).toBeTruthy();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByText("Reactor shutdown accepted.")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

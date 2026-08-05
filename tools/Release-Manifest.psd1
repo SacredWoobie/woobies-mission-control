@@ -1,11 +1,11 @@
 @{
-    ProductVersion = "0.4.2"
+    ProductVersion = "0.4.3"
     Services = @(
         @{
             Folder = "WoobiesControlStats"
             File = "WoobiesControlStats.dll"
-            Version = "0.2.3.0"
-            Sha256 = "CB5E720A3FA7EDF64CC09C946F749006B737ACE8881682D8F76AC6C8B1E99F22"
+            Version = "0.2.6.0"
+            Sha256 = "B6041F1D8C403C82342B8288B86BEA6139E7949E808E6DD27CC471F73A32A088"
             License = "MIT"
         }
         @{
@@ -18,8 +18,8 @@
         @{
             Folder = "KRPC.SystemHeat"
             File = "KRPC.SystemHeat.dll"
-            Version = "0.2.2.0"
-            Sha256 = "2265CC09E391A629D5281EA0BB74B47CBC4311AD40F1B14DA9C273D0CED723EF"
+            Version = "0.2.9.0"
+            Sha256 = "D253044319E44FAFC19F8DB59415339BE8E42BFE9643E44A19332092239C22C4"
             License = "MIT"
         }
         @{

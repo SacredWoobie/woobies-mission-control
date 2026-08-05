@@ -139,7 +139,7 @@
 .delta-v-controls { display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; padding: 9px 16px 11px; }
 .delta-v-location-row, .delta-v-mission-row { display: grid; grid-template-columns: minmax(150px,.9fr) minmax(220px,1.15fr) minmax(170px,.95fr); gap: 9px; }
 .delta-v-location-row { align-items: start; }
-.delta-v-location-row.endpoint-surface { grid-template-columns: minmax(150px,.9fr) minmax(220px,2.1fr); }
+.delta-v-stop-builder.endpoint-surface { grid-template-columns: minmax(150px,.9fr) minmax(220px,2.1fr); }
 .delta-v-mission-row { grid-template-columns: repeat(4,minmax(0,1fr)); align-items: start; }
 .delta-v-mission-row.one-way { grid-template-columns: minmax(280px,360px) minmax(130px,180px) minmax(0,1fr); }
 .delta-v-location-row > label, .delta-v-location-row > fieldset, .delta-v-mission-row > label, .delta-v-mission-row > fieldset { min-width: 0; margin: 0; }
@@ -587,6 +587,10 @@
 .delta-v-transfer-readiness { margin-top: 7px; padding: 8px; border: 1px solid var(--rule-bright); border-left: 2px solid var(--cyan); background: rgba(78,201,224,.045); }
 .delta-v-transfer-readiness > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 8px; letter-spacing: .07em; }
 .delta-v-transfer-readiness > header strong { color: var(--cyan); font-size: 8px; }
+.delta-v-readiness-toggle { display: inline-flex; min-width: 0; padding: 2px 0 2px 5px; align-items: center; gap: 4px; border: 0; color: var(--slate); background: transparent; cursor: pointer; font: inherit; letter-spacing: inherit; }
+.delta-v-readiness-toggle > span { width: 8px; color: currentColor; text-align: center; }
+.delta-v-readiness-toggle:hover { color: var(--cyan); }
+.delta-v-readiness-toggle:focus-visible { color: var(--cyan); outline: 1px solid currentColor; outline-offset: 2px; }
 .delta-v-transfer-readiness.warning { border-color: rgba(255,180,84,.48); background: rgba(255,180,84,.055); }
 .delta-v-transfer-readiness.warning > header strong { color: var(--amber); }
 .delta-v-transfer-readiness.blocked { border-color: rgba(255,107,91,.5); background: rgba(255,107,91,.055); }
@@ -599,7 +603,7 @@
 .delta-v-readiness-grid > div { min-width: 0; padding: 6px 7px; border: 1px solid var(--rule); background: #090f17; }
 .delta-v-readiness-grid span, .delta-v-maneuver-preview span { display: block; margin-bottom: 3px; color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
 .delta-v-readiness-grid b { display: block; overflow: hidden; color: #d7e2ee; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-transfer-readiness > p { margin: 6px 0 0; color: var(--slate); font-size: 8px; line-height: 1.35; }
+.delta-v-readiness-body > p { margin: 6px 0 0; color: var(--slate); font-size: 8px; line-height: 1.35; }
 .delta-v-maneuver-preview { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; margin-top: 7px; }
 .delta-v-maneuver-preview > div { padding: 7px; border: 1px solid rgba(78,201,224,.28); background: rgba(9,15,23,.85); }
 .delta-v-maneuver-preview strong, .delta-v-maneuver-preview small { display: block; }
@@ -752,6 +756,8 @@
   .resonant-library-list article { grid-template-columns: 1fr; }
   .resonant-library-actions { justify-content: flex-start; }
   .delta-v-controls { grid-template-columns: minmax(0,1fr); }
+  .delta-v-start-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .delta-v-start-row > :last-child { grid-column: 1 / -1; }
   .delta-v-mission-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-mission-row.one-way { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-mission-row.one-way .delta-v-add-stop-row { margin-top: 0; grid-column: 1 / -1; justify-self: start; }
@@ -775,6 +781,8 @@
   .resonant-plot, .resonant-plot canvas { min-height: 285px; height: 285px; }
   .resonant-result-grid { grid-template-columns: 1fr; }
   .delta-v-launch-target-grid { grid-template-columns: 1fr; }
+  .delta-v-start-row { grid-template-columns: 1fr; }
+  .delta-v-start-row > :last-child { grid-column: auto; }
 }
 
 @media (max-width: 440px) {
@@ -783,7 +791,7 @@
   .resonant-plot-hud { top: 9px; right: 9px; }
   .resonant-plot-hud > div { min-width: 160px; }
   .delta-v-controls, .delta-v-stat-grid { grid-template-columns: 1fr; }
-  .delta-v-location-row, .delta-v-mission-row { grid-template-columns: 1fr; }
+  .delta-v-location-row, .delta-v-location-row.endpoint-surface, .delta-v-mission-row { grid-template-columns: 1fr; }
   .delta-v-mission-row.one-way { grid-template-columns: 1fr; }
   .delta-v-empty-stop { grid-column: auto; }
   .delta-v-add-stop-row { align-items: flex-start; flex-direction: column; }
@@ -897,7 +905,7 @@
 .delta-v-plan-library-modal > p,
 .resonant-flight-guidance p,
 .delta-v-pinned-scope-warning,
-.delta-v-transfer-readiness > p,
+.delta-v-readiness-body > p,
 .delta-v-readiness-issues li,
 .delta-v-pinned-thermal {
   font-size: 14px;

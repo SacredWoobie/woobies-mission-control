@@ -45,7 +45,7 @@ DASHBOARD = HERE / "web" / "index.html"
 DASHBOARD_URL = "http://127.0.0.1:8090/"
 PYTHON = sys.executable
 APP_NAME = "Woobie's Mission Control"
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.3"
 APP_AUTHOR = "SacredWoobie"
 PROJECT_URL = "https://github.com/SacredWoobie/woobies-mission-control"
 LATEST_RELEASE_API = (
@@ -117,9 +117,9 @@ SERVICE_DLLS = (
     ("KRPC.WoobiesMechJeb", "Mission planning / MechJeb bridge"),
 )
 SERVICE_TESTED_VERSIONS = {
-    "WoobiesControlStats": "0.2.3",
+    "WoobiesControlStats": "0.2.6",
     "KRPC.StageStats": "0.2.7",
-    "KRPC.SystemHeat": "0.2.2",
+    "KRPC.SystemHeat": "0.2.9",
     "KRPC.WoobiesMechJeb": "0.8.6",
 }
 SUPERSEDED_SERVICE_DLLS_BY_SERVICE = {
@@ -1933,6 +1933,7 @@ class Backend:
         self.log = log
         self.environment_provider = environment_provider
         self.proc = None
+        self.startup_ready = False
 
     def running(self):
         return self.proc is not None and self.proc.poll() is None
@@ -1940,6 +1941,7 @@ class Backend:
     def start(self):
         if self.running():
             return False
+        self.startup_ready = False
         if not self.script.is_file():
             self.log(self.name, f"ERROR: {self.script.name} is no longer available.")
             return False
@@ -1984,6 +1986,7 @@ class Backend:
 
     def stop(self):
         if not self.running():
+            self.startup_ready = False
             return
         self.log(self.name, "stopping...")
         try:
@@ -1996,6 +1999,8 @@ class Backend:
                 self.proc.wait(timeout=2)
         except Exception as exc:
             self.log(self.name, f"error while stopping: {exc}")
+        finally:
+            self.startup_ready = False
 
 
 class App:
@@ -3572,18 +3577,32 @@ class App:
             status = row["status"]
             button = row["button"]
             if backend.running():
-                status.config(text="\u25cf running", foreground=THEME["green"])
+                if component["dashboard"] and not backend.startup_ready:
+                    backend.startup_ready = self._dashboard_ready()
+                elif not component["dashboard"]:
+                    backend.startup_ready = True
+                if backend.startup_ready:
+                    status.config(
+                        text="\u25cf running", foreground=THEME["green"]
+                    )
+                else:
+                    status.config(
+                        text="starting...", foreground=THEME["amber"]
+                    )
                 button.config(text="Stop", state="normal")
             elif component["name"] in self.component_setups:
+                backend.startup_ready = False
                 status.config(text="installing...", foreground=THEME["amber"])
                 button.config(text="Setting...", state="disabled")
             elif not component_dependencies_ready(component):
+                backend.startup_ready = False
                 status.config(text="not set up", foreground=THEME["amber"])
                 button.config(
                     text="Set up",
                     state="disabled" if self.component_setups else "normal",
                 )
             else:
+                backend.startup_ready = False
                 status.config(
                     text="\u25cb stopped", foreground=THEME["slate_dim"]
                 )

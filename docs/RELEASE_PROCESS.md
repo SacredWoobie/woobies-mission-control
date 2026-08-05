@@ -31,13 +31,13 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-For Mission Control v0.4.2, the selected set is:
+For Mission Control v0.4.3, the selected set is:
 
 | Service | Release |
 | --- | --- |
-| WoobiesControlStats | 0.2.3 |
+| WoobiesControlStats | 0.2.6 |
 | KRPC.StageStats | 0.2.7 |
-| KRPC.SystemHeat | 0.2.2 |
+| KRPC.SystemHeat | 0.2.9 |
 | KRPC.WoobiesMechJeb | 0.8.6 |
 
 The matching contract is also recorded in `tools/Release-Manifest.psd1`.
@@ -65,14 +65,14 @@ Before the screenshot session, build an internal acceptance package without
 image assets:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.2 -SkipReleaseImages
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.3 -SkipReleaseImages
 ```
 
 The switch is rejected when `-CreateDraftRelease` is present. After all five
 screenshots are approved, run the final package command without the switch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.2
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.3
 ```
 
 The packager:
@@ -108,23 +108,23 @@ Before creating a GitHub draft:
 - verify Notes, KAC/stock alarms, stock/System Heat selection, reconnects,
   collapsed panels, planner persistence, transfer preview/confirmation, and
   launcher update/preflight behavior as applicable;
-- follow `docs/images/v0.4.2/README.md` for the refreshed overview and the
-  still-current v0.4.0 briefs for the four reused full-resolution screenshots.
+- follow `docs/images/v0.4.3/README.md` for the approved screenshot set and
+  its source briefs.
 
-Version 0.4.2 refreshes the Space Center overview screenshot under
-`docs/images/v0.4.2` and reuses the four still-accurate v0.4.0 planning, editor,
-and flight images. Refresh any reused image if final acceptance finds drift.
+Version 0.4.3 refreshes the Flight dashboard image for its science and systems
+cohort. It reuses the v0.4.2 Space Center overview and the three still-current
+v0.4.0 planning and editor images.
 
 ## 5. Create a private draft release
 
 After committing, pushing, and confirming that `main` matches `origin/main`:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.2 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.3 -CreateDraftRelease
 ```
 
 This creates a draft GitHub Release and uploads the ZIP, checksum, GPL source
 archive, and five curated screenshots. The screenshot filenames use a `.zz-01`
-through `.zz-05` suffix so `Woobies-Mission-Control-v0.4.2.zip` remains the
+through `.zz-05` suffix so `Woobies-Mission-Control-v0.4.3.zip` remains the
 first release asset. Review the draft, its generated notes, asset ordering,
 source archive, and final screenshots before publishing it.

@@ -64,7 +64,7 @@ export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
       )}
       {!stageKnown && (
         <p className="res-note">
-          Current-stage column unavailable — this kRPC build does not expose the active stage.
+          Current-stage column unavailable — active-stage telemetry is not available.
         </p>
       )}
     </Panel>

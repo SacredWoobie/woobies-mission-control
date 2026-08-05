@@ -138,6 +138,39 @@ class ReleaseContractTests(unittest.TestCase):
             r'SourceCommit = "c655ae1806af21d8420278e386c9b4e99964c32c"',
         )
 
+    def test_v043_release_pack_selects_flight_system_services(self):
+        release_pack = (
+            ROOT / "tools" / "Release-Pack-v0.4.3.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('ProductVersion = "0.4.3"', release_pack)
+        expected_services = {
+            "WoobiesControlStats": (
+                "0.2.6.0",
+                "B6041F1D8C403C82342B8288B86BEA6139E7949E808E6DD27CC471F73A32A088",
+                "6e3c72f8efdd0637979dac6fabf8d305eec7a123",
+            ),
+            "KRPC.SystemHeat": (
+                "0.2.9.0",
+                "D253044319E44FAFC19F8DB59415339BE8E42BFE9643E44A19332092239C22C4",
+                "341c0edfc3b2ee95af459489f59ada02f92c2fcf",
+            ),
+        }
+        for service, (version, sha256, source_commit) in expected_services.items():
+            self.assertRegex(
+                release_pack,
+                rf'(?s)Folder = "{re.escape(service)}".*?'
+                rf'Version = "{re.escape(version)}".*?'
+                rf'Sha256 = "{sha256}".*?'
+                rf'SourceCommit = "{source_commit}"',
+            )
+        self.assertIn(
+            'EmbeddedInformationalCommit = '
+            '"db0e393519a61253634ae773b8a3c7b3a249bab0"',
+            release_pack,
+        )
+        self.assertIn("assembly informational version", release_pack)
+
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
             "release_launcher", ROOT / "ksp_dashboard_app.py"
@@ -201,8 +234,12 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn(
             "docs/images/v0.4.2/space-center-overview.png", publish_script
         )
-        for name in required[1:]:
+        for name in required[1:4]:
             self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
+        self.assertIn(
+            "docs/images/v0.4.3/flight-dashboard-mission-planning.png",
+            publish_script,
+        )
         for name in supplemental:
             self.assertNotIn(f"docs/images/v0.4.0/{name}", publish_script)
         self.assertFalse(any(" " in name or "&" in name for name in required))
@@ -225,9 +262,9 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-05-flight-dashboard-mission-planning.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.4.2.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.3.zip"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.4.2.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.3.{name}" for name in image_names
         ]
         self.assertEqual(
             sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name

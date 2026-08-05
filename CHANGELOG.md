@@ -2,6 +2,66 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+## v0.4.3 - Flight systems and science operations
+
+- Made Flight transfer-readiness details collapsible while keeping the live
+  readiness state visible in the compact header.
+- Corrected Flight docking-port targets to show the target vessel name and the
+  selected port part's relative speed instead of a generic port label with no
+  speed value.
+- Let surface-start Delta-V plans choose their launch parking altitude directly
+  in the starting step instead of requiring a redundant same-body orbit stop.
+- Reworked the Flight science panel to match the dashboard's newer instrument
+  styling, with a recoverable-science overview and one compact status card per
+  onboard research laboratory; vessels without labs omit the non-actionable
+  laboratory section entirely.
+- Added stock-compatible laboratory telemetry for stored data and science,
+  crew and scientist readiness, current science production, and a decay-aware
+  estimate of when each active lab will reach its science capacity.
+- Added one-shot lab-capacity alarms with saved 30- or 60-minute lead defaults;
+  automatic provider selection prefers Kerbal Alarm Clock and falls back to
+  KSP's stock alarm manager, with configurable KAC alarm actions.
+- Added a per-lab control that invokes KSP's stock `Transmit Science` action
+  for accumulated lab science only; stored experiment data is never included.
+- Added a context-aware per-lab `Start Research` / `Stop Research` control that
+  invokes the selected converter's matching stock PAW action.
+- Fixed engine alternator generation remaining falsely elevated after a burn
+  followed immediately by time warp.
+- Tightened the wide Flight status columns to their content like Mission
+  Control's program metrics while reserving enough room for long Universal and
+  Mission Elapsed times. Signal Delay now disappears when RemoteTech is not the
+  active communications provider.
+- Populate Flight's current-stage consumable resources from StageStats when the
+  installed kRPC core does not expose the active stage directly.
+- Prevent rapidly changing reactor output from appearing as a transient
+  `Other` electricity source by reconciling per-source reads between two total
+  generation samples.
+- Kept the launcher in a truthful startup state until the dashboard loopback is
+  reachable, and shortened only the dashboard's initial connection retry so a
+  server that becomes ready between attempts links without an extra two-second
+  wait.
+- Added solar generation and exposure telemetry for
+  `ModuleCurvedSolarPanel`, covering Near Future Solar curved arrays and other
+  installed parts that use the same module alongside stock solar panels.
+- Added Far Future Technologies fusion reactors to Electricity telemetry and
+  reactor details, including demand-scaled output, temperature, throttle, and
+  remaining life based on the limiting fuel and the combined burn from other
+  reactors sharing it. Exact per-resource rates remain available as detail, and
+  fission-only core integrity is not fabricated.
+- Added guarded reactor controls to Reactor Detail. Fission reactors can be
+  started or stopped, while Far Future fusion reactors expose their native
+  off, startup-charging, ready, and running phases with context-sensitive
+  controls and live startup-charge progress.
+- Added a context-sensitive control to each System Heat loop that safely
+  activates and extends all registered radiators, or deactivates and retracts
+  them when the loop is fully online. Commands revalidate the active vessel,
+  loop membership, and current aggregate action before calling KSP's native
+  radiator controls. Active radiators without a native retract or shutdown
+  action are identified as non-retractable; older services and stock thermal
+  fallback remain display-only.
+
 ## v0.4.2 - Mission Control vessel management
 
 - Refined the Space Center and Tracking Station overview with deduplicated
