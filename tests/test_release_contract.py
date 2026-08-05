@@ -263,11 +263,33 @@ class ReleaseContractTests(unittest.TestCase):
             ],
         )
         zip_name = "Woobies-Mission-Control-v0.4.3.zip"
+        checksum_name = f"{zip_name}.sha256"
         release_image_names = [
             f"Woobies-Mission-Control-v0.4.3.{name}" for name in image_names
         ]
+        source_archive_name = (
+            "Woobies-Mission-Control-v0.4.3.zz-00-"
+            "KRPC.WoobiesMechJeb-0.8.6-source.zip"
+        )
         self.assertEqual(
-            sorted([zip_name, *release_image_names], key=str.casefold)[0], zip_name
+            sorted(
+                [
+                    zip_name,
+                    checksum_name,
+                    source_archive_name,
+                    *release_image_names,
+                ],
+                key=str.casefold,
+            ),
+            [
+                zip_name,
+                checksum_name,
+                source_archive_name,
+                *release_image_names,
+            ],
+        )
+        self.assertIn(
+            '"$packageName.zz-00-$($_.SourceArchive)"', publish_script
         )
         self.assertIn("$zipPath, $checksumPath", publish_script)
         self.assertIn(

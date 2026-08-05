@@ -148,11 +148,17 @@ $releaseImagePaths = @(
     $activeReleaseImages |
         ForEach-Object { Join-Path $OutputDirectory $_.Name }
 )
-$sourceArchiveOutputPaths = @(
+$sourceArchiveAssets = @(
     $manifest.Services |
         Where-Object { $_.ContainsKey('SourceArchive') } |
-        ForEach-Object { Join-Path $OutputDirectory $_.SourceArchive }
+        ForEach-Object {
+            @{
+                Source = $_.SourceArchive
+                OutputPath = Join-Path $OutputDirectory "$packageName.zz-00-$($_.SourceArchive)"
+            }
+        }
 )
+$sourceArchiveOutputPaths = @($sourceArchiveAssets | ForEach-Object { $_.OutputPath })
 foreach ($path in @($stageRoot, $zipPath, $checksumPath, $notesPath) + $releaseImagePaths + $sourceArchiveOutputPaths) {
     Assert-SafeChildPath -Parent $OutputDirectory -Child $path
 }
@@ -346,8 +352,14 @@ foreach ($companion in $serviceCompanionInputs) {
 }
 foreach ($sourceArchive in $sourceArchiveInputs) {
     Copy-AllowlistedFile -SourceRoot $sourceArchiveRoot -StageRoot $stageRoot -Entry $sourceArchive
+    $sourceArchiveAsset = $sourceArchiveAssets |
+        Where-Object { $_.Source -eq $sourceArchive.Source } |
+        Select-Object -First 1
+    if (-not $sourceArchiveAsset) {
+        throw "No release asset path was defined for source archive $($sourceArchive.Source)."
+    }
     Copy-Item -LiteralPath (Join-Path $sourceArchiveRoot $sourceArchive.Source) `
-        -Destination (Join-Path $OutputDirectory $sourceArchive.Source) -Force
+        -Destination $sourceArchiveAsset.OutputPath -Force
 }
 
 $webTarget = Join-Path $stageRoot 'Dashboard\web'
