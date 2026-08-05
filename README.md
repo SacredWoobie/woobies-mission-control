@@ -103,14 +103,15 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The current public v0.4.2 release includes four independently versioned kRPC
-extensions:
+The current development selection includes four independently versioned kRPC
+extensions. Published release packs remain pinned to their original service
+bytes:
 
-| Service | v0.4.2 version | Purpose |
+| Service | Selected version | Purpose |
 | --- | --- | --- |
 | WoobiesControlStats | 0.2.3 | Roster, stored science, stock thermal data, KAC bridge recovery, and guarded vessel termination |
 | KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
-| KRPC.SystemHeat | 0.2.2 | System Heat loops, components, and electrical integration |
+| KRPC.SystemHeat | 0.2.9 | System Heat loops, components, electrical integration, reactor control, and guarded per-loop radiator control |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
 
 Historical v0.4.0 and v0.4.1 release packs remain pinned to their published

@@ -1,4 +1,5 @@
 import type {
+  HeatLoopControlResult,
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
@@ -25,6 +26,7 @@ export interface WebSocketTransport {
 }
 
 interface TelemetryClientCallbacks {
+  onHeatLoopControlResult?(result: HeatLoopControlResult): void;
   onScienceAlarmResult?(result: ScienceAlarmResult): void;
   onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
   onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
@@ -70,6 +72,45 @@ export function parseTelemetrySnapshot(raw: unknown): TelemetrySnapshot | null {
         : "flight";
 
   return { ...candidate, "context.mode": mode } as TelemetrySnapshot;
+}
+
+export function parseHeatLoopControlResult(raw: unknown): HeatLoopControlResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "heat.loop.control.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || typeof candidate.loopId !== "number"
+    || !Number.isSafeInteger(candidate.loopId)
+    || candidate.loopId < -1
+    || (candidate.loopId === -1 && candidate.status !== "error")
+    || (candidate.action !== "start" && candidate.action !== "stop")
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as HeatLoopControlResult;
+}
+
+function isHeatLoopControlResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "heat.loop.control.result",
+    );
+  } catch {
+    return false;
+  }
 }
 
 const persistenceSections = new Set<MissionPlanningPersistenceSection>([
@@ -502,6 +543,12 @@ export class TelemetryClient {
     };
     socket.onmessage = (event) => {
       if (socket !== this.socket || !this.wanted) return;
+      const heatLoopControlResult = parseHeatLoopControlResult(event.data);
+      if (heatLoopControlResult) {
+        this.callbacks.onHeatLoopControlResult?.(heatLoopControlResult);
+        return;
+      }
+      if (isHeatLoopControlResultMessage(event.data)) return;
       const reactorControlResult = parseReactorControlResult(event.data);
       if (reactorControlResult) {
         this.callbacks.onReactorControlResult?.(reactorControlResult);

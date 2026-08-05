@@ -45,6 +45,30 @@ export interface HeatLoopTelemetry {
   stateText?: string;
   timeToCriticalSeconds?: number;
   thermalCapacityKjPerK?: number;
+  radiatorCount?: number;
+  radiatorPartIds?: number[];
+  radiatorState?: HeatLoopRadiatorState;
+  radiatorControlAction?: HeatLoopControlAction;
+  radiatorControlAvailable?: boolean;
+}
+
+export type HeatLoopControlAction = "start" | "stop";
+export type HeatLoopRadiatorState =
+  | "unavailable"
+  | "broken"
+  | "deploying"
+  | "retracting"
+  | "offline"
+  | "partial"
+  | "online";
+
+export interface HeatLoopControlResult {
+  type: "heat.loop.control.result";
+  requestId: string;
+  loopId: number;
+  action: HeatLoopControlAction;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export interface HeatComponentTelemetry {
@@ -622,6 +646,7 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
+  | { type: "heat.loop.control"; requestId: string; loopId: number; action: HeatLoopControlAction; expectedVesselGuid: string; expectedRadiatorPartIds: number[] }
   | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
   | { type: "science.lab.transmit"; requestId: string; labId: string }
   | { type: "science.lab.research"; requestId: string; labId: string; enabled: boolean }

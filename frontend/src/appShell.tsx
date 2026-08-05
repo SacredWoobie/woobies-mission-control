@@ -234,7 +234,16 @@ function LiveElectricityPanel() {
     ? <ElectricityPanel commandEnabled controlResult={liveState.controlResult} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} />
     : null;
 }
-function LiveHeatPanel() { const snapshot = useLiveFlightSnapshot(heatSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <HeatPanel snapshot={snapshot} /> : null; }
+function LiveHeatPanel() {
+  const liveState = useLiveTelemetrySelector(
+    (state) => ({ controlResult: state.heatLoopControlResult, snapshot: state.snapshot }),
+    (left, right) => heatSnapshotsEqual(left.snapshot, right.snapshot)
+      && left.controlResult === right.controlResult,
+  );
+  return liveState.snapshot?.["context.mode"] === "flight"
+    ? <HeatPanel commandEnabled controlResult={liveState.controlResult} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} />
+    : null;
+}
 function LiveSciencePanel() {
   const liveState = useLiveTelemetrySelector(
     (state) => ({

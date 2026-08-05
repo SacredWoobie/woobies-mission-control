@@ -30,6 +30,7 @@ KRPC_COMMAND_TYPES = frozenset(
         "overview.vessel.edit",
         "overview.vessel.lifecycle",
         "reactor.control",
+        "heat.loop.control",
         "notes.select",
         "notes.pin",
         "notes.favorite",

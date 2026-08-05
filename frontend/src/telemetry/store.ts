@@ -1,5 +1,6 @@
 import { TelemetryClient, type ConnectionStatus } from "./client";
 import type {
+  HeatLoopControlResult,
   MissionPlanningPersistenceSection,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
@@ -18,6 +19,7 @@ export interface LiveTelemetryState {
   frameCount: number;
   lastFrameAt: number | null;
   message?: string;
+  heatLoopControlResult?: HeatLoopControlResult;
   overviewVesselEditResult?: OverviewVesselEditResult;
   overviewVesselLifecycleResult?: OverviewVesselLifecycleResult;
   overviewVesselSwitchResult?: OverviewVesselSwitchResult;
@@ -58,6 +60,7 @@ export class TelemetryStore {
     private readonly createClient: (
       endpoint: string,
       callbacks: {
+        onHeatLoopControlResult?(result: HeatLoopControlResult): void;
         onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
         onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
         onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
@@ -93,6 +96,9 @@ export class TelemetryStore {
 
     this.client?.disconnect();
     this.client = this.createClient(normalized, {
+      onHeatLoopControlResult: (heatLoopControlResult) => {
+        this.patch({ heatLoopControlResult });
+      },
       onOverviewVesselEditResult: (overviewVesselEditResult) => {
         this.patch({ overviewVesselEditResult });
       },
@@ -128,6 +134,7 @@ export class TelemetryStore {
           message,
           status,
           ...(clearSnapshot ? {
+            heatLoopControlResult: undefined,
             snapshot: null,
             overviewVesselEditResult: undefined,
             overviewVesselLifecycleResult: undefined,
@@ -145,6 +152,7 @@ export class TelemetryStore {
       frameCount: 0,
       lastFrameAt: null,
       message: undefined,
+      heatLoopControlResult: undefined,
       reactorControlResult: undefined,
       scienceAlarmResult: undefined,
       scienceLabResearchResult: undefined,

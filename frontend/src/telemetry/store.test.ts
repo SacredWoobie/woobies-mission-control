@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TelemetryStore } from "./store";
 import type { ConnectionStatus } from "./client";
 import type {
+  HeatLoopControlResult,
   MissionPlanningPersistenceState,
   OverviewVesselEditResult,
   OverviewVesselLifecycleResult,
@@ -17,6 +18,7 @@ import type {
 describe("TelemetryStore", () => {
   it("clears stale snapshots on connection loss and exposes reconnect state", () => {
     let callbacks: {
+      onHeatLoopControlResult?(result: HeatLoopControlResult): void;
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
@@ -42,6 +44,14 @@ describe("TelemetryStore", () => {
     expect(connect).toHaveBeenCalledOnce();
     callbacks!.onStatus("linked");
     callbacks!.onSnapshot({ "context.mode": "flight", "v.name": "Odyssey" });
+    callbacks!.onHeatLoopControlResult?.({
+      type: "heat.loop.control.result",
+      requestId: "heat-1",
+      loopId: 2,
+      action: "stop",
+      status: "accepted",
+      message: "Radiators are retracting and deactivating.",
+    });
     callbacks!.onOverviewVesselSwitchResult?.({
       type: "overview.vessel.switch.result",
       requestId: "switch-1",
@@ -97,6 +107,7 @@ describe("TelemetryStore", () => {
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
+    expect(store.getSnapshot().heatLoopControlResult?.requestId).toBe("heat-1");
     expect(store.getSnapshot().overviewVesselSwitchResult?.requestId).toBe("switch-1");
     expect(store.getSnapshot().overviewVesselEditResult?.name).toBe("New Odyssey");
     expect(store.getSnapshot().overviewVesselLifecycleResult?.action).toBe("terminate");
@@ -109,6 +120,7 @@ describe("TelemetryStore", () => {
     expect(store.getSnapshot()).toMatchObject({
       message: "Connection dropped",
       snapshot: null,
+      heatLoopControlResult: undefined,
       overviewVesselSwitchResult: undefined,
       overviewVesselEditResult: undefined,
       overviewVesselLifecycleResult: undefined,
@@ -129,6 +141,7 @@ describe("TelemetryStore", () => {
 
   it("broadcasts persistence state and sends typed persistence commands", () => {
     let callbacks: {
+      onHeatLoopControlResult?(result: HeatLoopControlResult): void;
       onOverviewVesselEditResult?(result: OverviewVesselEditResult): void;
       onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
       onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;

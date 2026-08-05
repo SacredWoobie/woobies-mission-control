@@ -2088,6 +2088,9 @@ def _apply_telemetry_command(conn, command):
     if command.get("type") == "reactor.control":
         return _apply_reactor_control_command(conn, command)
 
+    if command.get("type") == "heat.loop.control":
+        return _apply_heat_loop_control_command(conn, command)
+
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
         if pinned is None or pinned == "":
@@ -2892,6 +2895,138 @@ def _overview_vessel_switch_result(request_id, status, message):
         "status": status,
         "message": message,
     }
+
+
+_HEAT_LOOP_CONTROL_ACTIONS = {"start", "stop"}
+
+
+def _heat_loop_control_result(
+    request_id, loop_id, action, status, message
+):
+    return {
+        "type": "heat.loop.control.result",
+        "requestId": request_id if isinstance(request_id, str) else "",
+        "loopId": loop_id if isinstance(loop_id, int) and not isinstance(loop_id, bool) else -1,
+        "action": action if action in _HEAT_LOOP_CONTROL_ACTIONS else "start",
+        "status": status,
+        "message": message,
+    }
+
+
+def _normalized_radiator_part_ids(values):
+    if not isinstance(values, (list, tuple)) or not values or len(values) > 256:
+        return None
+    normalized = []
+    for value in values:
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
+            or value > 0xFFFFFFFF
+        ):
+            return None
+        normalized.append(value)
+    return sorted(normalized)
+
+
+def _apply_heat_loop_control_command(conn, command):
+    """Apply one vessel-, membership-, and state-guarded loop radiator action."""
+    request_id = command.get("requestId")
+    loop_id = command.get("loopId")
+    action = command.get("action")
+
+    def reject(message):
+        return _heat_loop_control_result(
+            request_id, loop_id, action, "error", message
+        )
+
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid heat-loop request ID is required.")
+    if (
+        not isinstance(loop_id, int)
+        or isinstance(loop_id, bool)
+        or loop_id < 0
+        or loop_id > 0x7FFFFFFF
+    ):
+        return reject("Select a valid heat loop.")
+    if action not in _HEAT_LOOP_CONTROL_ACTIONS:
+        return reject("Select a valid radiator action.")
+
+    expected_vessel_guid = command.get("expectedVesselGuid")
+    if (
+        not isinstance(expected_vessel_guid, str)
+        or not expected_vessel_guid
+        or len(expected_vessel_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid expected vessel ID is required.")
+    expected_part_ids = _normalized_radiator_part_ids(
+        command.get("expectedRadiatorPartIds")
+    )
+    if expected_part_ids is None:
+        return reject("Valid expected radiator identities are required.")
+
+    try:
+        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+            return reject("Heat-loop controls are available only in flight.")
+
+        current_identity = _mission_planning.current_craft_identity(
+            conn, "flight"
+        )
+        current_vessel_guid = str(
+            current_identity.get("v.guid", "")
+        ).strip()
+        if current_vessel_guid != expected_vessel_guid:
+            return reject(
+                "The active vessel changed; refresh before controlling radiators."
+            )
+
+        service = conn.system_heat
+        current_loop_ids = [int(value) for value in service.loop_ids()]
+        if loop_id not in current_loop_ids:
+            return reject(
+                "The heat-loop list changed; refresh before trying again."
+            )
+
+        current_part_ids = _normalized_radiator_part_ids(
+            list(service.loop_radiator_part_ids(loop_id))
+        )
+        if current_part_ids != expected_part_ids:
+            return reject(
+                "The radiators assigned to this loop changed; refresh before trying again."
+            )
+
+        current_action = str(
+            service.loop_radiator_control_action(loop_id) or ""
+        ).lower()
+        if current_action != action:
+            return reject(
+                "The radiator state changed; use the newly available control."
+            )
+
+        procedure = (
+            service.loop_radiator_start
+            if action == "start"
+            else service.loop_radiator_stop
+        )
+        if not bool(procedure(loop_id)):
+            return reject(
+                "The radiators rejected the requested state change."
+            )
+
+        message = (
+            f"Loop {loop_id} radiator activation accepted."
+            if action == "start"
+            else f"Loop {loop_id} radiator shutdown accepted."
+        )
+        return _heat_loop_control_result(
+            request_id, loop_id, action, "accepted", message
+        )
+    except Exception as exc:
+        return reject(f"Heat-loop control failed: {exc}")
 
 
 def _apply_overview_vessel_switch_command(conn, command):
