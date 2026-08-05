@@ -4,6 +4,9 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Stage corresponding-source release assets under the established `.zz-00`
+  name so the normal product ZIP remains first without a post-upload rename.
+
 ## v0.4.3 - Flight systems and science operations
 
 - Made Flight transfer-readiness details collapsible while keeping the live
