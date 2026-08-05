@@ -104,4 +104,18 @@ describe("heatModel", () => {
     expect(heatPanelIsIdle([steady])).toBe(true);
     expect(heatPanelIsIdle([active])).toBe(false);
   });
+
+  it("keeps a controllable nominal loop visible even when thermally settled", () => {
+    const controllable = loopHeatEntity({
+      id: "12",
+      tempK: 300,
+      nominalTempK: 1_000,
+      netKw: 0,
+      radiatorPartIds: [1001],
+      radiatorState: "online",
+      radiatorControlAction: "stop",
+      radiatorControlAvailable: true,
+    });
+    expect(heatPanelIsIdle([controllable])).toBe(false);
+  });
 });

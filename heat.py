@@ -1,6 +1,6 @@
 """Enrich SystemHeat loops with limits, flux, and component detail.
 
-The KRPC.SystemHeat 0.2.2 service exposes these additive procedures. The
+The KRPC.SystemHeat service exposes these additive procedures. The
 collector remains compatible with older services while populating expandable
 loop rows whenever the newer procedures are available.
 """
@@ -39,6 +39,31 @@ def _boolean_call(service, method_name, loop_id):
     except Exception:
         return None
     return value if isinstance(value, bool) else None
+
+
+def _string_call(service, method_name, loop_id):
+    try:
+        value = getattr(service, method_name)(loop_id)
+    except Exception:
+        return None
+    return str(value).strip().lower() if value is not None else None
+
+
+def _radiator_part_ids(service, loop_id):
+    values = _list_call(service, "loop_radiator_part_ids", loop_id)
+    if values is None or len(values) > 256:
+        return None
+    normalized = []
+    for value in values:
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
+            or value > 0xFFFFFFFF
+        ):
+            return None
+        normalized.append(value)
+    return sorted(normalized)
 
 
 def _component_groups(service, loop_id):
@@ -186,6 +211,28 @@ def enrich_system_heat_result(service, result):
         )
         if has_radiators is not None:
             loop["hasRadiators"] = has_radiators
+
+        radiator_part_ids = _radiator_part_ids(service, loop_id)
+        radiator_state = _string_call(
+            service, "loop_radiator_state", loop_id
+        )
+        radiator_action = _string_call(
+            service, "loop_radiator_control_action", loop_id
+        )
+        if radiator_part_ids is not None:
+            loop["radiatorPartIds"] = radiator_part_ids
+            loop["radiatorCount"] = len(radiator_part_ids)
+        if radiator_state in {
+            "unavailable", "broken", "deploying", "retracting",
+            "offline", "partial", "online",
+        }:
+            loop["radiatorState"] = radiator_state
+        if (
+            radiator_action in {"start", "stop"}
+            and radiator_part_ids
+        ):
+            loop["radiatorControlAction"] = radiator_action
+            loop["radiatorControlAvailable"] = True
 
         components = _component_groups(service, loop_id)
         if components is not None:

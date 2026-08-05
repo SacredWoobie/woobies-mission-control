@@ -225,7 +225,16 @@ function LiveAscensionPanel() { const snapshot = useLiveFlightSnapshot(ascension
 function LiveClockPanel() { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel snapshot={snapshot} /> : null; }
 function LiveConsumablesPanel() { const snapshot = useLiveFlightSnapshot(consumablesSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ConsumablesPanel snapshot={snapshot} /> : null; }
 function LiveElectricityPanel() { const snapshot = useLiveFlightSnapshot(electricitySnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ElectricityPanel snapshot={snapshot} /> : null; }
-function LiveHeatPanel() { const snapshot = useLiveFlightSnapshot(heatSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <HeatPanel snapshot={snapshot} /> : null; }
+function LiveHeatPanel() {
+  const liveState = useLiveTelemetrySelector(
+    (state) => ({ controlResult: state.heatLoopControlResult, snapshot: state.snapshot }),
+    (left, right) => heatSnapshotsEqual(left.snapshot, right.snapshot)
+      && left.controlResult === right.controlResult,
+  );
+  return liveState.snapshot?.["context.mode"] === "flight"
+    ? <HeatPanel commandEnabled controlResult={liveState.controlResult} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} />
+    : null;
+}
 function LiveSciencePanel() { const snapshot = useLiveFlightSnapshot(scienceSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <SciencePanel snapshot={snapshot} /> : null; }
 function LiveStagingPanel() { const snapshot = useLiveFlightSnapshot(stagingSnapshotsEqual); return snapshot && snapshot["context.mode"] !== "inactive" ? <StagingPanel snapshot={snapshot} /> : null; }
 function LiveTargetPanel() { const snapshot = useLiveFlightSnapshot(targetSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : null; }

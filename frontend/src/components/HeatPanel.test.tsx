@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
+import type { HeatLoopControlResult, TelemetryCommand } from "../telemetry/types";
 import { HeatPanel } from "./HeatPanel";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("HeatPanel", () => {
   it("ranks SystemHeat loops, uses native units, and auto-expands one critical loop", () => {
@@ -175,6 +179,129 @@ describe("HeatPanel", () => {
     expect(screen.queryByText("NO RADIATORS")).toBeNull();
     expect(screen.getAllByText("NOMINAL")).toHaveLength(2);
     expect(screen.queryByText("1 HOT")).toBeNull();
+  });
+
+  it("sends a guarded stop command when every loop radiator is online", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    render(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat",
+      "heat.loops": [{
+        id: "17",
+        tempK: 300,
+        nominalTempK: 800,
+        netKw: 0,
+        radiatorCount: 2,
+        radiatorPartIds: [902, 411],
+        radiatorState: "online",
+        radiatorControlAction: "stop",
+        radiatorControlAvailable: true,
+      }],
+    }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate and retract all radiators in Loop 17" }));
+    expect(onSendCommand).toHaveBeenCalledOnce();
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({
+      type: "heat.loop.control",
+      loopId: 17,
+      action: "stop",
+      expectedVesselGuid: flightTelemetryFixture["v.guid"],
+      expectedRadiatorPartIds: [902, 411],
+    });
+    expect(screen.getByText("APPLYING")).toBeTruthy();
+  });
+
+  it("offers activation for a partial loop and disables transitional controls", () => {
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const view = render(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat",
+      "heat.loops": [{
+        id: "3",
+        tempK: 300,
+        nominalTempK: 800,
+        netKw: 0,
+        radiatorPartIds: [8, 9],
+        radiatorState: "partial",
+        radiatorControlAction: "start",
+        radiatorControlAvailable: true,
+      }],
+    }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Activate and extend all radiators in Loop 3" }));
+    expect(onSendCommand.mock.calls[0][0]).toMatchObject({ action: "start", loopId: 3 });
+
+    view.rerender(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat",
+      "heat.loops": [{
+        id: "4",
+        tempK: 300,
+        nominalTempK: 800,
+        netKw: 0,
+        radiatorPartIds: [10],
+        radiatorState: "deploying",
+        radiatorControlAvailable: false,
+      }],
+    }} />);
+    expect((screen.getByRole("button", { name: "Loop 4 radiators are deploying" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps older services and stock fallback display-only", () => {
+    const view = render(<HeatPanel commandEnabled onSendCommand={vi.fn()} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat",
+      "heat.loops": [{ id: "0", tempK: 400, nominalTempK: 800, netKw: 0.1 }],
+    }} />);
+    expect(screen.queryByText("ACTIVATE")).toBeNull();
+    expect(screen.queryByText("DEACTIVATE")).toBeNull();
+
+    view.rerender(<HeatPanel commandEnabled onSendCommand={vi.fn()} snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "stock",
+      "heat.parts": [{ name: "Radiator panel", tempK: 300, maxTempK: 1_200, utilization: 25 }],
+    }} />);
+    expect(screen.queryByText("ACTIVATE")).toBeNull();
+    expect(screen.queryByText("DEACTIVATE")).toBeNull();
+  });
+
+  it("removes a loop command result after five seconds", () => {
+    vi.useFakeTimers();
+    const onSendCommand = vi.fn((_command: TelemetryCommand) => true);
+    const snapshot = {
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat" as const,
+      "heat.loops": [{
+        id: "1",
+        tempK: 300,
+        nominalTempK: 800,
+        netKw: 0,
+        radiatorPartIds: [55],
+        radiatorState: "offline" as const,
+        radiatorControlAction: "start" as const,
+        radiatorControlAvailable: true,
+      }],
+    };
+    const view = render(<HeatPanel commandEnabled onSendCommand={onSendCommand} snapshot={snapshot} />);
+    fireEvent.click(screen.getByRole("button", { name: "Activate and extend all radiators in Loop 1" }));
+    const command = onSendCommand.mock.calls[0][0];
+    if (command.type !== "heat.loop.control") throw new Error("Expected a heat loop control command.");
+    const requestId = command.requestId;
+    const result: HeatLoopControlResult = {
+      type: "heat.loop.control.result",
+      requestId,
+      loopId: 1,
+      action: "start",
+      status: "accepted",
+      message: "Radiators are extending and activating.",
+    };
+    view.rerender(<HeatPanel commandEnabled controlResult={result} onSendCommand={onSendCommand} snapshot={snapshot} />);
+
+    expect(screen.getByText(result.message)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(4_999));
+    expect(screen.getByText(result.message)).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText(result.message)).toBeNull();
   });
 
   it("renders a compact unavailable state when no backend has thermal entities", () => {

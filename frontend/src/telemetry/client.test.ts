@@ -9,7 +9,7 @@ import {
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
+import type { HeatLoopControlResult, MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -278,6 +278,50 @@ describe("TelemetryClient", () => {
 
     expect(switchResults).toHaveLength(1);
     expect(switchResults[0].requestId).toBe("switch-1");
+    expect(snapshots).toEqual([]);
+  });
+
+  it("routes valid heat loop results and drops malformed result envelopes", () => {
+    const socket = new FakeSocket();
+    const snapshots: TelemetrySnapshot[] = [];
+    const results: HeatLoopControlResult[] = [];
+    const client = new TelemetryClient(
+      "ws://127.0.0.1:8090",
+      {
+        onHeatLoopControlResult: (result) => results.push(result),
+        onSnapshot: (snapshot) => snapshots.push(snapshot),
+        onStatus: () => undefined,
+      },
+      { createSocket: () => socket },
+    );
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify({
+      type: "heat.loop.control.result",
+      requestId: "heat-1",
+      loopId: 7,
+      action: "start",
+      status: "accepted",
+      message: "Radiators are extending and activating.",
+    }));
+    socket.message(JSON.stringify({
+      type: "heat.loop.control.result",
+      requestId: "",
+      loopId: -1,
+      action: "unknown",
+      status: "unknown",
+      message: "Malformed.",
+    }));
+
+    expect(results).toEqual([{
+      type: "heat.loop.control.result",
+      requestId: "heat-1",
+      loopId: 7,
+      action: "start",
+      status: "accepted",
+      message: "Radiators are extending and activating.",
+    }]);
     expect(snapshots).toEqual([]);
   });
 

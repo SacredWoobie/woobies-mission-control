@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { formatPercent, formatRateColumn, formatTemperature, isFiniteNumber } from "../formatting/numbers";
-import type { HeatComponentTelemetry, TelemetrySnapshot } from "../telemetry/types";
+import type {
+  HeatComponentTelemetry,
+  HeatLoopControlAction,
+  HeatLoopControlResult,
+  TelemetryCommand,
+  TelemetrySnapshot,
+} from "../telemetry/types";
 import {
   heatPanelIsIdle,
   heatStatusSummary,
@@ -10,6 +16,8 @@ import {
   type HeatEntity,
 } from "./heatModel";
 import { Panel } from "./Panel";
+
+const HEAT_LOOP_MESSAGE_MS = 5_000;
 
 function formatSignedRate(value: number | undefined, unit: "kW" | "W") {
   if (!isFiniteNumber(value)) return "—";
@@ -53,7 +61,12 @@ function HeatComponentRow({ component, fallbackUnit }: {
   );
 }
 
-function HeatEntityRow({ autoExpand, entity }: { autoExpand: boolean; entity: HeatEntity }) {
+function HeatEntityRow({ autoExpand, controlPending, entity, onControl }: {
+  autoExpand: boolean;
+  controlPending: boolean;
+  entity: HeatEntity;
+  onControl?: (entity: HeatEntity) => void;
+}) {
   const hasDetails = entity.kind === "loop"
     && Boolean(entity.components)
     && ((entity.components?.producers.length ?? 0) + (entity.components?.radiators.length ?? 0) > 0);
@@ -79,41 +92,81 @@ function HeatEntityRow({ autoExpand, entity }: { autoExpand: boolean; entity: He
         isFiniteNumber(entity.generatedFlux) ? `${formatRateColumn(entity.generatedFlux, "kW")} generated` : "",
         isFiniteNumber(entity.removedFlux) ? `${formatRateColumn(entity.removedFlux, "kW")} removed` : "",
       ].filter(Boolean).join(" · ");
+  const showLoopControl = entity.kind === "loop" && Boolean(
+    entity.radiatorState || entity.radiatorControlAvailable,
+  );
+  const canControl = Boolean(
+    onControl
+    && entity.radiatorControlAvailable
+    && entity.radiatorControlAction
+    && Number.isSafeInteger(entity.loopId)
+    && entity.radiatorPartIds?.length,
+  );
+  const controlLabel = controlPending
+    ? "APPLYING"
+    : entity.radiatorControlAction === "start"
+      ? "ACTIVATE"
+      : entity.radiatorControlAction === "stop"
+        ? "DEACTIVATE"
+        : entity.radiatorState === "deploying"
+          ? "DEPLOYING"
+          : entity.radiatorState === "retracting"
+            ? "RETRACTING"
+            : entity.radiatorState === "broken"
+              ? "DAMAGED"
+              : "UNAVAILABLE";
+  const controlTitle = entity.radiatorControlAction === "start"
+    ? `Activate and extend all radiators in ${entity.name}`
+    : entity.radiatorControlAction === "stop"
+      ? `Deactivate and retract all radiators in ${entity.name}`
+      : `${entity.name} radiators are ${entity.radiatorState ?? "unavailable"}`;
 
   return (
     <div className={`heat-entity ${entity.severity}${expanded ? " expanded" : ""}`}>
-      <button
-        aria-expanded={hasDetails ? expanded : undefined}
-        aria-label={hasDetails ? `${expanded ? "Collapse" : "Expand"} ${entity.name}` : undefined}
-        className={`heat-entity-main${hasDetails ? " expandable" : ""}`}
-        disabled={!hasDetails}
-        onClick={() => hasDetails && setExpanded((current) => !current)}
-        type="button"
-      >
-        <span className="heat-caret" aria-hidden="true">{hasDetails ? (expanded ? "⌄" : "›") : ""}</span>
-        <span className="heat-severity-rail" aria-hidden="true" />
-        <span className="heat-entity-copy">
-          <span className="heat-entity-topline">
-            <strong title={entity.name}>{entity.name}</strong>
-            <span className="heat-temperature-track" aria-hidden="true">
-              <span style={{ width: `${displayPercent}%` }} />
-            </span>
-            <span className="heat-temperature-value">{primaryTemperature}</span>
-            {entity.kind === "loop" && (
-              <span className={`heat-net-flux ${(entity.netFlux ?? 0) > 0 ? "warming" : (entity.netFlux ?? 0) < 0 ? "cooling" : ""}`}>
-                {formatSignedRate(entity.netFlux, unit)}
+      <div className="heat-entity-summary">
+        <button
+          aria-expanded={hasDetails ? expanded : undefined}
+          aria-label={hasDetails ? `${expanded ? "Collapse" : "Expand"} ${entity.name}` : undefined}
+          className={`heat-entity-main${hasDetails ? " expandable" : ""}${showLoopControl ? " has-loop-control" : ""}`}
+          disabled={!hasDetails}
+          onClick={() => hasDetails && setExpanded((current) => !current)}
+          type="button"
+        >
+          <span className="heat-caret" aria-hidden="true">{hasDetails ? (expanded ? "⌄" : "›") : ""}</span>
+          <span className="heat-severity-rail" aria-hidden="true" />
+          <span className="heat-entity-copy">
+            <span className="heat-entity-topline">
+              <strong title={entity.name}>{entity.name}</strong>
+              <span className="heat-temperature-track" aria-hidden="true">
+                <span style={{ width: `${displayPercent}%` }} />
               </span>
-            )}
-            {entity.kind === "part" && (
-              <span className="heat-ratio-value">{formatPercent(isFiniteNumber(entity.ratio) ? ratioPercent : undefined)}</span>
-            )}
+              <span className="heat-temperature-value">{primaryTemperature}</span>
+              {entity.kind === "loop" && (
+                <span className={`heat-net-flux ${(entity.netFlux ?? 0) > 0 ? "warming" : (entity.netFlux ?? 0) < 0 ? "cooling" : ""}`}>
+                  {formatSignedRate(entity.netFlux, unit)}
+                </span>
+              )}
+              {entity.kind === "part" && (
+                <span className="heat-ratio-value">{formatPercent(isFiniteNumber(entity.ratio) ? ratioPercent : undefined)}</span>
+              )}
+            </span>
+            <span className="heat-entity-subline">
+              <span>{subline}</span>
+              {entity.kind === "loop" && <span>{state}</span>}
+            </span>
           </span>
-          <span className="heat-entity-subline">
-            <span>{subline}</span>
-            {entity.kind === "loop" && <span>{state}</span>}
-          </span>
-        </span>
-      </button>
+        </button>
+        {showLoopControl && (
+          <button
+            aria-label={controlTitle}
+            className={`heat-loop-control ${entity.radiatorState ?? "unavailable"}${controlPending ? " pending" : ""}`}
+            disabled={!canControl || controlPending}
+            onClick={() => canControl && onControl?.(entity)}
+            title={controlTitle}
+            type="button"
+          >{controlLabel}</button>
+        )}
+      </div>
       {hasDetails && expanded && (
         <div className="heat-component-list">
           {entity.components?.producers.map((component, index) => (
@@ -128,7 +181,24 @@ function HeatEntityRow({ autoExpand, entity }: { autoExpand: boolean; entity: He
   );
 }
 
-export function HeatPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+export function HeatPanel({
+  commandEnabled = false,
+  controlResult,
+  onSendCommand,
+  snapshot,
+}: {
+  commandEnabled?: boolean;
+  controlResult?: HeatLoopControlResult;
+  onSendCommand?: (command: TelemetryCommand) => boolean;
+  snapshot: TelemetrySnapshot;
+}) {
+  const [pending, setPending] = useState<{
+    action: HeatLoopControlAction;
+    loopId: number;
+    requestId: string;
+  } | null>(null);
+  const [lastRequestId, setLastRequestId] = useState<string>();
+  const [localError, setLocalError] = useState<string>();
   const backend = snapshot["heat.backend"];
   const stock = backend === "stock";
   const entities = rankHeatEntities(stock
@@ -139,6 +209,62 @@ export function HeatPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const autoExpandedId = entities.find((entity) => (
     entity.severity === "critical" || entity.severity === "no-radiators"
   ))?.id;
+  const result = controlResult?.requestId === lastRequestId
+    ? controlResult
+    : undefined;
+
+  useEffect(() => {
+    if (!pending) return;
+    const entity = entities.find((candidate) => candidate.loopId === pending.loopId);
+    if (entity && entity.radiatorControlAction !== pending.action) setPending(null);
+  }, [entities, pending]);
+
+  useEffect(() => {
+    if (
+      pending
+      && controlResult?.requestId === pending.requestId
+      && controlResult.status === "error"
+    ) setPending(null);
+  }, [controlResult, pending]);
+
+  useEffect(() => {
+    if (!localError && !result) return;
+    const visibleRequestId = lastRequestId;
+    const timer = window.setTimeout(() => {
+      setLocalError(undefined);
+      setLastRequestId((current) => current === visibleRequestId ? undefined : current);
+    }, HEAT_LOOP_MESSAGE_MS);
+    return () => window.clearTimeout(timer);
+  }, [lastRequestId, localError, result]);
+
+  const sendControl = (entity: HeatEntity) => {
+    const action = entity.radiatorControlAction;
+    if (
+      pending
+      || !commandEnabled
+      || !onSendCommand
+      || !action
+      || !Number.isSafeInteger(entity.loopId)
+      || !entity.radiatorPartIds?.length
+      || !snapshot["v.guid"]
+    ) return;
+    const requestId = `heat-loop-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const sent = onSendCommand({
+      type: "heat.loop.control",
+      requestId,
+      loopId: entity.loopId!,
+      action,
+      expectedVesselGuid: snapshot["v.guid"],
+      expectedRadiatorPartIds: [...entity.radiatorPartIds],
+    });
+    setLastRequestId(requestId);
+    if (sent) {
+      setPending({ action, loopId: entity.loopId!, requestId });
+      setLocalError(undefined);
+    } else {
+      setLocalError("Radiator command was not sent because the telemetry link is unavailable.");
+    }
+  };
 
   return (
     <Panel
@@ -166,10 +292,17 @@ export function HeatPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
           {entities.map((entity) => (
             <HeatEntityRow
               autoExpand={entity.id === autoExpandedId}
+              controlPending={Boolean(pending && pending.loopId === entity.loopId)}
               entity={entity}
               key={entity.id}
+              onControl={commandEnabled ? sendControl : undefined}
             />
           ))}
+        </div>
+      )}
+      {(localError || result) && (
+        <div className={`heat-command-result ${localError || result?.status === "error" ? "error" : "accepted"}`} role="status">
+          {localError ?? result?.message}
         </div>
       )}
     </Panel>

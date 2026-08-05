@@ -45,6 +45,30 @@ export interface HeatLoopTelemetry {
   stateText?: string;
   timeToCriticalSeconds?: number;
   thermalCapacityKjPerK?: number;
+  radiatorCount?: number;
+  radiatorPartIds?: number[];
+  radiatorState?: HeatLoopRadiatorState;
+  radiatorControlAction?: HeatLoopControlAction;
+  radiatorControlAvailable?: boolean;
+}
+
+export type HeatLoopControlAction = "start" | "stop";
+export type HeatLoopRadiatorState =
+  | "unavailable"
+  | "broken"
+  | "deploying"
+  | "retracting"
+  | "offline"
+  | "partial"
+  | "online";
+
+export interface HeatLoopControlResult {
+  type: "heat.loop.control.result";
+  requestId: string;
+  loopId: number;
+  action: HeatLoopControlAction;
+  status: "accepted" | "error";
+  message: string;
 }
 
 export interface HeatComponentTelemetry {
@@ -524,6 +548,7 @@ export interface MissionPlanningPersistenceState {
 
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
+  | { type: "heat.loop.control"; requestId: string; loopId: number; action: HeatLoopControlAction; expectedVesselGuid: string; expectedRadiatorPartIds: number[] }
   | { type: "overview.vessel.switch"; requestId: string; objectId: string; expectedName: string; expectedGuid?: string }
   | { type: "overview.vessel.edit"; requestId: string; objectId: string; expectedName: string; expectedType: string; newName: string; newType: string; expectedGuid?: string }
   | { type: "overview.vessel.lifecycle"; requestId: string; action: OverviewVesselLifecycleAction; objectId: string; expectedName: string; expectedRecoverable: boolean; expectedCrewNames: string[]; expectedGuid?: string }

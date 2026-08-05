@@ -865,7 +865,9 @@ button { font: inherit; }
 .heat-entity { overflow: hidden; border: 1px solid var(--rule); border-radius: 5px; background: var(--panel); }
 .heat-entity.critical,
 .heat-entity.no-radiators { border-color: #4b2930; }
+.heat-entity-summary { position: relative; }
 .heat-entity-main { display: grid; width: 100%; min-height: 45px; padding: 7px 9px 6px 6px; align-items: stretch; grid-template-columns: 10px 3px minmax(0,1fr); gap: 7px; border: 0; color: inherit; background: transparent; text-align: left; }
+.heat-entity-main.has-loop-control { min-height: 65px; padding-bottom: 27px; }
 .heat-entity-main:disabled { cursor: default; opacity: 1; }
 .heat-entity-main.expandable { cursor: pointer; }
 .heat-entity-main.expandable:hover { background: rgba(78,201,224,.035); }
@@ -898,6 +900,16 @@ button { font: inherit; }
 .heat-entity-subline > span:last-child { flex: 0 0 auto; color: var(--slate); text-align: right; }
 .heat-entity.critical .heat-entity-subline > span:last-child,
 .heat-entity.no-radiators .heat-entity-subline > span:last-child { color: var(--warn); }
+.heat-loop-control { position: absolute; right: 65px; bottom: 6px; width: 134px; min-height: 18px; padding: 2px 8px; border: 1px solid var(--cyan); border-radius: 2px; color: var(--cyan); background: rgba(45,212,191,.08); font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }
+.heat-loop-control.online { border-color: var(--green); color: var(--green); background: rgba(74,222,128,.08); }
+.heat-loop-control.partial { border-color: var(--amber); color: var(--amber); background: rgba(251,191,36,.08); }
+.heat-loop-control.broken { border-color: var(--warn); color: var(--warn); background: rgba(255,107,91,.08); }
+.heat-loop-control:hover:not(:disabled),
+.heat-loop-control:focus-visible { filter: brightness(1.3); outline: none; }
+.heat-loop-control:disabled { cursor: default; opacity: .62; }
+.heat-loop-control.pending { cursor: wait; }
+.heat-command-result { margin-top: 7px; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 3px; color: var(--green); background: var(--panel-2); font-size: 9px; line-height: 1.4; }
+.heat-command-result.error { color: #f87171; }
 .heat-component-list { padding: 0 10px 7px 39px; }
 .heat-component-row { display: grid; min-height: 21px; padding: 3px 0; align-items: center; grid-template-columns: minmax(0,1fr) auto; gap: 10px; border-top: 1px solid var(--rule); color: #a9bfd3; font-size: 9px; }
 .heat-component-copy { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
@@ -1610,7 +1622,9 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .ec-source-row { padding-inline: 8px; gap: 7px; }
   .ec-source-copy small { white-space: normal; }
   .heat-entity-main { padding-right: 7px; gap: 5px; }
+  .heat-entity-main.has-loop-control { padding-bottom: 27px; }
   .heat-entity-topline { grid-template-columns: minmax(48px,1fr) minmax(30px,48px) auto 52px; gap: 5px; }
+  .heat-loop-control { right: 55px; width: 116px; }
   .heat-temperature-value, .heat-net-flux, .heat-ratio-value { font-size: 8px; }
   .heat-component-list { padding-left: 31px; }
 }
