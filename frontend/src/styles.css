@@ -779,6 +779,8 @@ button { font: inherit; }
    lane assignment change placement only; they never move a panel in the DOM. */
 .flight-workspace-shell {
   display: grid;
+  container-name: flight-shell;
+  container-type: inline-size;
   grid-template-columns: minmax(0,1fr);
   grid-template-areas: "status" "fixed" "selector" "tabbed";
   gap: 12px;
@@ -864,6 +866,85 @@ button { font: inherit; }
 .flight-workspace-shell[data-arrangement="side-by-side"][data-fixed-empty="true"] {
   grid-template-columns: minmax(0,1fr);
   grid-template-areas: "status" "tabbed";
+}
+
+/* At the portrait target the selector has already moved out of the context
+   strip, leaving enough width for the five context cells to form one compact
+   row. Panel chrome and Ascension then reuse the proven installed-monitor
+   density without changing the workspace structure. */
+@container flight-shell (min-width: 900px) {
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--rule);
+  }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip > .panel { border: 0; border-radius: 0; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock > .body,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .flight-context-grid {
+    display: block;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock > .body { padding: 0; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .flight-context-grid {
+    display: grid;
+    grid-template-columns: minmax(170px,1.05fr) minmax(220px,1.4fr) minmax(190px,1.2fr) minmax(130px,.9fr) minmax(120px,.8fr);
+    gap: 1px;
+    background: var(--rule);
+  }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .clock-grid,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .comms-strip { display: contents; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock > h2 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .flight-context-identity,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clockcell,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .cs-cell {
+    min-width: 0;
+    padding: 5px 8px;
+    border: 0;
+    background: var(--panel);
+    justify-content: flex-start;
+  }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clockcell { display: flex; flex-direction: column; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .calendar-toggle { min-width: 0; min-height: 22px; padding-inline: 3px; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clockcell .big { font-size: 18px; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clock-primary-row { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clock-primary-row .big,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .met-cell .big,
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clockcell .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .flight-workspace-shell[data-arrangement="stacked"] .panel > h2 { min-height: 36px; padding-block: 4px; font-size: 11px; }
+  .flight-workspace-shell[data-arrangement="stacked"] .panel > h2 .tag { font-size: 10px; letter-spacing: .05em; }
+  .flight-workspace-shell[data-arrangement="stacked"] .panel-heading-actions { gap: 5px; }
+  .flight-workspace-shell[data-arrangement="stacked"] .panel-hide-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex: 0 0 36px; font-size: 20px; }
+  .flight-workspace-shell[data-arrangement="stacked"] .resonant-unpin,
+  .flight-workspace-shell[data-arrangement="stacked"] .flight-note-unpin,
+  .flight-workspace-shell[data-arrangement="stacked"] #flightNote .notes-font-controls button { min-width: 36px !important; min-height: 36px; font-size: 10px; }
+  .flight-workspace-shell #asc .body { padding-block: 8px; gap: 8px; }
+  .flight-workspace-shell #asc .asc-top { max-width: 760px; gap: 10px; }
+  .flight-workspace-shell #asc .navball { width: 150px; height: 150px; }
+  .flight-workspace-shell #asc .thr-track { height: 132px; }
+  .flight-workspace-shell #asc .stats-grid .stat { padding: 7px 10px; }
+  .flight-workspace-shell #asc .stats-grid .stat .v { font-size: 17px; }
+  .flight-workspace-shell #asc .spark { height: 36px; }
+  .flight-workspace-shell[data-arrangement="stacked"] #stage .stage-table.flight .st-row {
+    grid-template-columns: 42px 72px 72px minmax(96px,1fr) 72px;
+  }
 }
 .project-footer { align-items: center; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; max-width: 1180px; margin: 12px auto 2px; padding: 10px 4px 2px; border-top: 1px solid var(--rule); color: var(--slate-dim); font-size: 9px; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
 .planner-persistence-status { color: var(--muted); white-space: nowrap; }
@@ -1805,8 +1886,20 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 @container (max-width: 460px) {
   .tgt-grid, .rx-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .clock-grid, .comms-strip, .comms-strip.remote-tech { grid-template-columns: minmax(0,1fr); }
-  .sci-lab-caption {
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-table.flight .st-row.newly-active > span { animation: none; }
+}
+
+@container (max-width: 520px) {
+  /* Keep the docking vector readable while preventing its square plot from
+     setting the height of an otherwise compact MONITOR lane. */
+  #target .dock-svg { max-width: 150px; }
+  #sci .sci-lab-card { padding-block: 6px; }
+  #sci .sci-lab-caption {
     display: grid;
+    margin-top: 4px;
     align-items: center;
     grid-template-areas:
       "activity guidance"
@@ -1814,14 +1907,12 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
     grid-template-columns: auto minmax(0,1fr);
     gap: 3px 10px;
   }
-  .sci-lab-caption > div:first-child { display: contents; }
-  .sci-lab-caption > div:first-child span:first-child { grid-area: activity; white-space: nowrap; }
-  .sci-lab-caption > div:first-child span:last-child { grid-area: guidance; white-space: nowrap; }
-  .sci-lab-controls { grid-area: controls; justify-self: end; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stage-table.flight .st-row.newly-active > span { animation: none; }
+  #sci .sci-lab-caption > div:first-child { display: contents; }
+  #sci .sci-lab-caption > div:first-child span:first-child { grid-area: activity; white-space: nowrap; }
+  #sci .sci-lab-caption > div:first-child span:last-child { grid-area: guidance; white-space: nowrap; }
+  #sci .sci-lab-controls { grid-area: controls; justify-self: end; }
+  #sci .sci-details { margin-top: 4px; }
+  #sci .sci-details summary { padding-block: 4px; }
 }
 
 @container (max-width: 340px) {

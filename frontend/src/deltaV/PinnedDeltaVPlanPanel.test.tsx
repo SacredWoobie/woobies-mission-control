@@ -161,6 +161,8 @@ describe("pinned delta-v Mission Plan", () => {
     await waitFor(() => expect(screen.getByLabelText("Remaining mission plan steps").textContent).not.toContain("Launch to Kerbin orbit"));
     expect(screen.queryByText("LAUNCH TARGET", { exact: true })).toBeNull();
     expect(screen.getByText("TRANSFER READINESS", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Check maneuver" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Expand transfer readiness" }));
     expect(screen.getByText("Calculate and save this ideal transfer before checking the maneuver.", { exact: true })).toBeTruthy();
     expect(document.body.textContent).not.toContain("porkchop");
     expect(screen.getByText("1 / 5 steps", { exact: true })).toBeTruthy();
@@ -175,13 +177,22 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByText("Launch to Kerbin orbit", { exact: true })).toBeTruthy();
   });
 
-  it("collapses transfer readiness while keeping its live status visible", () => {
+  it("starts transfer readiness collapsed while keeping its status and action visible", () => {
     seedPinnedPlan();
     const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
     library.assignments[0].completedLegIds = ["segment-1-ascent"];
     localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
 
     renderPanel("flight");
+
+    const expand = screen.getByRole("button", { name: "Expand transfer readiness" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(expand.textContent).toBe("HOLD\u25c2");
+    expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Target orbit", { exact: true })).toBeNull();
+    expect(screen.getByRole("button", { name: "Check maneuver" })).toBeTruthy();
+
+    fireEvent.click(expand);
 
     const collapse = screen.getByRole("button", { name: "Collapse transfer readiness" });
     expect(collapse.getAttribute("aria-expanded")).toBe("true");
@@ -190,16 +201,8 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
 
     fireEvent.click(collapse);
-
-    const expand = screen.getByRole("button", { name: "Expand transfer readiness" });
-    expect(expand.getAttribute("aria-expanded")).toBe("false");
-    expect(expand.textContent).toBe("HOLD\u25c2");
-    expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Expand transfer readiness" }).getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("Target orbit", { exact: true })).toBeNull();
-
-    fireEvent.click(expand);
-    expect(screen.getByRole("button", { name: "Collapse transfer readiness" }).getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
   });
 
   it("describes a legacy Simple transfer as ideal when its maneuver vector is missing", () => {
@@ -225,6 +228,7 @@ describe("pinned delta-v Mission Plan", () => {
 
     renderPanel("flight");
 
+    fireEvent.click(screen.getByRole("button", { name: "Expand transfer readiness" }));
     expect(screen.getByText("Recalculate and update this ideal transfer to enable maneuver creation.", { exact: true })).toBeTruthy();
     expect(document.body.textContent).not.toContain("porkchop");
   });
@@ -319,6 +323,7 @@ describe("pinned delta-v Mission Plan", () => {
 
     const panel = renderPanel("flight");
 
+    fireEvent.click(screen.getByRole("button", { name: "Expand transfer readiness" }));
     expect(screen.getByText((_, element) => element?.textContent === "80.0\u2009km circular")).toBeTruthy();
     expect(
       screen.getByText(

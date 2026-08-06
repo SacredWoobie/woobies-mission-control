@@ -129,11 +129,11 @@ export function PinnedDeltaVPlanPanel({
     context: string;
   } | null>(null);
   const [routeExpanded, setRouteExpanded] = useState(false);
-  const [readinessExpanded, setReadinessExpanded] = useState(true);
+  const [readinessExpanded, setReadinessExpanded] = useState(scene !== "flight");
   const pinned = pinnedForTelemetry(snapshot);
   useEffect(() => rememberPinnedCraft(snapshot), [rememberPinnedCraft, snapshot]);
   useEffect(() => setRouteExpanded(false), [pinned?.id]);
-  useEffect(() => setReadinessExpanded(true), [pinned?.id]);
+  useEffect(() => setReadinessExpanded(scene !== "flight"), [pinned?.id, scene]);
   useEffect(() => {
     if (connection.status !== "linked") setManeuverPreview(null);
   }, [connection.status]);
@@ -420,12 +420,12 @@ export function PinnedDeltaVPlanPanel({
         {nodeError && <p className="delta-v-maneuver-error" role="alert">{nodeError}</p>}
         {readinessBlockers.length === 0 && readinessWarnings.length > 0 && <ul className="delta-v-readiness-issues warnings">{readinessWarnings.map((message) => <li key={message}>{message}</li>)}</ul>}
         {maneuverSendError && <p className="delta-v-maneuver-error" role="alert">{maneuverSendError}</p>}
-        <div className="delta-v-maneuver-actions">
-          {nodeState !== "ready" && nodeState !== "created" && nodeState !== "executed" && <button disabled={readinessBlockers.length > 0 || nodeState === "previewing"} onClick={previewManeuver} type="button">{nodeState === "previewing" ? "Checking\u2026" : nodeState === "failed" ? "Check again" : "Check maneuver"}</button>}
-          {nodeState === "ready" && <button disabled={readinessBlockers.length > 0} onClick={createManeuver} type="button">Create KSP node</button>}
-          {(nodeState === "created" || nodeState === "executed") && <button onClick={() => setPinnedStepComplete(nextTransferLeg.id, true, snapshot)} type="button">Mark transfer complete</button>}
-        </div>
       </div>}
+      <div className="delta-v-maneuver-actions">
+        {nodeState !== "ready" && nodeState !== "created" && nodeState !== "executed" && <button disabled={readinessBlockers.length > 0 || nodeState === "previewing"} onClick={previewManeuver} type="button">{nodeState === "previewing" ? "Checking\u2026" : nodeState === "failed" ? "Check again" : "Check maneuver"}</button>}
+        {nodeState === "ready" && <button disabled={readinessBlockers.length > 0} onClick={createManeuver} type="button">Create KSP node</button>}
+        {(nodeState === "created" || nodeState === "executed") && <button onClick={() => setPinnedStepComplete(nextTransferLeg.id, true, snapshot)} type="button">Mark transfer complete</button>}
+      </div>
     </div>}
     {routeIsLong && <div className="delta-v-pinned-route-toggle">
       <span>{visibleLegs.length} mission steps remaining</span>
