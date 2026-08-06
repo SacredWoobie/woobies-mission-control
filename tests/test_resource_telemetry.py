@@ -93,11 +93,31 @@ class ResourceTelemetryTests(unittest.TestCase):
             )
 
         gather_stage.assert_called_once_with(vessel, 7)
+        self.assertEqual(result["res.status"], "known")
         self.assertTrue(result["res.stageKnown"])
         self.assertEqual(result["res.stageResourceStage"], 6)
         self.assertEqual(result["res.stageActivationStage"], 7)
         self.assertEqual(result["r.resourceCurrent[LiquidFuel]"], 40.0)
         self.assertEqual(result["r.resourceCurrentMax[LiquidFuel]"], 80.0)
+
+    def test_marks_partial_and_unavailable_resource_sources(self):
+        vessel = FakeVessel(stock_stage=0)
+        vessel.resources = type("Resources", (), {
+            "names": ["LiquidFuel", "Oxidizer"],
+            "amount": lambda _self, name: 100.0 if name == "LiquidFuel" else (_ for _ in ()).throw(RuntimeError("RPC failed")),
+            "max": lambda _self, _name: 200.0,
+        })()
+
+        partial = telemetry_server._gather_resources(vessel, current_stage=None)
+        unavailable = telemetry_server._gather_resources(
+            type("Vessel", (), {
+                "resources": property(lambda _self: (_ for _ in ()).throw(RuntimeError("RPC failed"))),
+            })(),
+            current_stage=None,
+        )
+
+        self.assertEqual(partial["res.status"], "incomplete")
+        self.assertEqual(unavailable, {"res.status": "unknown"})
 
 
 if __name__ == "__main__":

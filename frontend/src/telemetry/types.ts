@@ -484,6 +484,7 @@ export interface TelemetrySnapshot {
   "comm.krpc.canCommunicate"?: boolean;
   "comm.krpc.signalStrength"?: number;
   "res.names"?: string[];
+  "res.status"?: "known" | "incomplete" | "unknown";
   "res.stageKnown"?: boolean;
   "res.stageResourceStage"?: number;
   "res.stageActivationStage"?: number;
@@ -508,11 +509,13 @@ export interface TelemetrySnapshot {
   "heat.netKw"?: number;
   "heat.loops"?: HeatLoopTelemetry[];
   "heat.backend"?: "system_heat" | "stock";
+  "heat.systemHeatStatus"?: "known" | "not_applicable" | "unknown";
   "heat.generatedW"?: number;
   "heat.removedW"?: number;
   "heat.netW"?: number;
   "heat.parts"?: StockHeatPartTelemetry[];
   "elec.reactors"?: ReactorTelemetry[];
+  "elec.reactorsStatus"?: "known" | "not_applicable" | "unknown";
   "elec.sources"?: ElectricitySourceTelemetry[];
   "elec.totalGenEcPerSec"?: number;
   "elec.otherEcPerSec"?: number;

@@ -957,12 +957,12 @@ def _current_stage_authority(stage_result):
 # ---------------------------------------------------------------------------
 def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
     """Return vessel and current-stage resources for dashboard rendering."""
-    out = {}
+    out = {"res.status": "known"}
     try:
         res = vessel.resources
         names = [name for name in res.names if _is_consumable_resource(name)]
     except Exception:
-        return {}
+        return {"res.status": "unknown"}
 
     out["res.names"] = names
     for n in names:
@@ -970,7 +970,7 @@ def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
             out[f"r.resource[{n}]"] = res.amount(n)
             out[f"r.resourceMax[{n}]"] = res.max(n)
         except Exception:
-            pass
+            out["res.status"] = "incomplete"
 
     stage = (
         _current_stage(vessel)
@@ -2825,16 +2825,26 @@ def _gather_stock_heat(conn):
 
 def _gather_heat(conn):
     """Prefer real System Heat loops, then fall back to stock vessel heat."""
+    system_heat_status = "not_applicable"
     try:
-        result = _gather_system_heat(conn)
+        system_heat_available = bool(conn.system_heat.available)
+        if system_heat_available:
+            result = _gather_system_heat(conn)
+            if result:
+                result["heat.systemHeatStatus"] = "known"
+                return result
+    except AttributeError:
+        system_heat_status = "not_applicable"
+    except Exception:
+        system_heat_status = "unknown"
+    try:
+        result = _gather_stock_heat(conn)
         if result:
+            result["heat.systemHeatStatus"] = system_heat_status
             return result
     except Exception:
         pass
-    try:
-        return _gather_stock_heat(conn)
-    except Exception:
-        return None
+    return {"heat.systemHeatStatus": system_heat_status}
 
 
 def _overview_label(value, fallback=""):
@@ -4004,6 +4014,22 @@ def _gather_reactors(system_heat):
     return reactors
 
 
+def _gather_reactor_telemetry(conn):
+    """Return reactors plus an explicit completeness state for alarm rules."""
+    try:
+        service = conn.system_heat
+        if not service.available:
+            return {"elec.reactorsStatus": "not_applicable"}
+        return {
+            "elec.reactors": _gather_reactors(service),
+            "elec.reactorsStatus": "known",
+        }
+    except AttributeError:
+        return {"elec.reactorsStatus": "not_applicable"}
+    except Exception:
+        return {"elec.reactorsStatus": "unknown"}
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_current_authority
     global _stage_last_poll, _stage_last_ut
@@ -4210,10 +4236,12 @@ def gather_telemetry(conn):
         _res_last_poll = now
         try:
             r = _gather_resources(vessel, current_stage=cs)
-            if r:
+            if r.get("res.status") == "known":
                 _res_cache = r
+            else:
+                _res_cache = {**_res_cache, **r}
         except Exception:
-            pass
+            _res_cache = {**_res_cache, "res.status": "unknown"}
     d.update(_res_cache)
 
     # ---- target + docking ----
@@ -4274,11 +4302,7 @@ def gather_telemetry(conn):
         except Exception:
             pass
 
-        try:
-            sh = conn.system_heat
-            elec["elec.reactors"] = _gather_reactors(sh)
-        except Exception:
-            pass  # service not present / scene change
+        elec.update(_gather_reactor_telemetry(conn))
 
         try:
             sh = conn.system_heat

@@ -27,7 +27,11 @@ export interface AnnunciatorRule {
   defaultTier: AnnunciatorTier;
   latchSubDwell?: boolean;
   activationDwellMs?: number;
-  evaluate(snapshot: TelemetrySnapshot): RuleEvaluation;
+  evaluate(snapshot: TelemetrySnapshot, context: RuleEvaluationContext): RuleEvaluation;
+}
+
+export interface RuleEvaluationContext {
+  previousState(instanceId: string): "active" | "clear" | undefined;
 }
 
 export interface AnnunciatorPolicy {
@@ -76,6 +80,7 @@ interface CandidateState {
 interface ConditionTrack {
   phase: "idle" | "candidate" | "active" | "clearing";
   phaseSinceMs: number;
+  lastDecisiveState?: "active" | "clear";
   pausedAtMs?: number;
   candidate?: CandidateState;
   episodeId?: number;
@@ -354,9 +359,11 @@ function applyObservation(
     return;
   }
   if (observation.state === "active") {
+    track.lastDecisiveState = "active";
     applyActive(state, track, definition, observation, context);
     return;
   }
+  track.lastDecisiveState = "clear";
   applyClear(state, track, definition, context);
 }
 
@@ -454,7 +461,11 @@ export function evaluateAnnunciatorSnapshot(
       clearDwellMs: nonNegative(policy.clearDwellMs),
       latchSubDwell: rule.latchSubDwell ?? false,
     };
-    const evaluation = rule.evaluate(snapshot);
+    const evaluation = rule.evaluate(snapshot, {
+      previousState(instanceId) {
+        return next.tracks[conditionKey(rule.ruleId, instanceId)]?.lastDecisiveState;
+      },
+    });
     const tracked = trackedInstancesForRule(next, rule.ruleId);
     if (evaluation.kind === "source-unknown") {
       sourceApplicable.add(rule.sourceId);

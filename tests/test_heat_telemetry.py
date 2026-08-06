@@ -17,6 +17,7 @@ class HeatTelemetryTests(unittest.TestCase):
         )
         result = telemetry_server._gather_heat(SimpleNamespace(system_heat=system_heat))
         self.assertEqual(result["heat.backend"], "system_heat")
+        self.assertEqual(result["heat.systemHeatStatus"], "known")
         self.assertEqual(result["heat.generatedKw"], 184.2)
         self.assertNotIn("heat.generatedW", result)
 
@@ -40,6 +41,7 @@ class HeatTelemetryTests(unittest.TestCase):
             stock_thermal=stock,
         ))
         self.assertEqual(result["heat.backend"], "stock")
+        self.assertEqual(result["heat.systemHeatStatus"], "not_applicable")
         self.assertEqual(result["heat.generatedW"], 410.3)
         self.assertEqual(result["heat.parts"][0]["name"], "Nose Cone")
         self.assertNotIn("heat.generatedKw", result)
@@ -55,6 +57,29 @@ class HeatTelemetryTests(unittest.TestCase):
         )
         result = telemetry_server._gather_heat(SimpleNamespace(stock_thermal=stock))
         self.assertEqual(result["heat.backend"], "stock")
+        self.assertEqual(result["heat.systemHeatStatus"], "not_applicable")
+
+    def test_marks_system_heat_unknown_when_an_expected_source_fails(self):
+        system_heat = SimpleNamespace(
+            available=True,
+            loop_ids=lambda: (_ for _ in ()).throw(RuntimeError("RPC failed")),
+        )
+        stock = SimpleNamespace(
+            available=True,
+            part_names=lambda: [], part_temperatures=lambda: [],
+            part_max_temperatures=lambda: [], part_skin_temperatures=lambda: [],
+            part_max_skin_temperatures=lambda: [], part_utilizations=lambda: [],
+            part_net_watts=lambda: [], generated_watts=0.0,
+            removed_watts=0.0, net_watts=0.0,
+        )
+
+        result = telemetry_server._gather_heat(SimpleNamespace(
+            system_heat=system_heat,
+            stock_thermal=stock,
+        ))
+
+        self.assertEqual(result["heat.backend"], "stock")
+        self.assertEqual(result["heat.systemHeatStatus"], "unknown")
 
 
 if __name__ == "__main__":
