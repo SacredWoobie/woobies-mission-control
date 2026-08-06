@@ -148,6 +148,15 @@ button { font: inherit; }
   background: repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0, rgba(255,255,255,.012) 1px, transparent 1px, transparent 3px);
 }
 .dashboard-surface.inactive-mode { padding-left: 52px; }
+.dashboard-surface.flight-mode { padding-bottom: 10px; }
+.flight-mode .project-footer {
+  position: absolute;
+  right: 10px;
+  bottom: 4px;
+  left: 60px;
+  max-width: none;
+  margin: 0;
+}
 .wrap { display: flex; width: 100%; max-width: 1180px; margin: 0 auto; flex-direction: column; gap: 12px; }
 .slice-status {
   display: flex;
@@ -787,7 +796,7 @@ button { font: inherit; }
   min-width: 0;
 }
 .flight-workspace-shell[data-fixed-empty="true"] { grid-template-areas: "status" "selector" "tabbed"; }
-.flight-workspace-shell > .status-strip { grid-area: status; min-width: 0; margin: 0; }
+.flight-workspace-shell > .status-strip { grid-area: status; min-width: 0; margin: 0 0 0 8px; }
 .flight-fixed-region {
   grid-area: fixed;
   display: flex;
@@ -876,7 +885,7 @@ button { font: inherit; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip {
     position: relative;
     display: block;
-    width: 100%;
+    width: calc(100% - 16px);
     overflow: hidden;
     border: 1px solid var(--rule);
     border-radius: 4px;
@@ -1541,6 +1550,7 @@ button { font: inherit; }
     background: var(--rule);
   }
   .flight-workspace-shell[data-arrangement="side-by-side"] > .status-strip { padding-right: 0; }
+  .flight-workspace-shell #sci .sci-list { max-height: 135px; }
   .status-strip:has(.flight-context-grid.remote-tech) { --flight-status-grid-width: 1540px; }
   .status-strip > .panel { border: 0; border-radius: 0; }
   .status-strip #clock {
@@ -1602,6 +1612,8 @@ button { font: inherit; }
   :is(.flight-grid,.flight-workspace-shell) .panel > h2 .tag { font-size: 10px; letter-spacing: .05em; }
   :is(.flight-grid,.flight-workspace-shell) .panel-heading-actions { gap: 5px; }
   :is(.flight-grid,.flight-workspace-shell) .panel-hide-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex: 0 0 36px; font-size: 20px; }
+  .flight-workspace-shell .delta-v-pinned-check { width: 36px; height: 36px; min-width: 36px; min-height: 36px; }
+  .flight-workspace-shell .delta-v-pinned-route.flight > div { grid-template-columns: 36px 28px minmax(0,1fr) auto; }
   :is(.flight-grid,.flight-workspace-shell) .resonant-unpin,
   :is(.flight-grid,.flight-workspace-shell) .flight-note-unpin,
   :is(.flight-grid,.flight-workspace-shell) #flightNote .notes-font-controls button { min-width: 36px !important; min-height: 36px; font-size: 10px; }

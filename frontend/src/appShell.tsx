@@ -164,7 +164,7 @@ export function DashboardSurface({
   }, [autoCollapsePanel, clearAutoCollapse, datalinkConnected]);
 
   return (
-    <section className={`dashboard-surface ${mode === "editor" ? "editor-mode" : mode === "inactive" ? "inactive-mode" : ""}`}>
+    <section className={`dashboard-surface ${mode === "flight" ? "flight-mode" : mode === "editor" ? "editor-mode" : "inactive-mode"}`}>
       <NotesContinuityPreview commandEnabled={notesCommandEnabled} onClose={onCloseNotes} onSendCommand={onSendNotesCommand} open={notesOpen} snapshot={notesSnapshot} />
       <DashboardRail
         notesButton={<NotesRailButton open={notesOpen} setOpen={onSetNotesOpen} />}

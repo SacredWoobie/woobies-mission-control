@@ -129,6 +129,41 @@ test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", asy
   }
 });
 
+test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome content area", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  const layout = async () => page.locator(".flight-workspace-shell").evaluate((shell) => {
+    const header = shell.querySelector<HTMLElement>(".status-strip")!.getBoundingClientRect();
+    const ascension = shell.querySelector<HTMLElement>("#asc")!.getBoundingClientRect();
+    return {
+      ascensionLeft: ascension.left,
+      documentClientHeight: document.documentElement.clientHeight,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      headerLeft: header.left,
+      shellBottom: shell.getBoundingClientRect().bottom,
+    };
+  });
+
+  const monitor = await layout();
+  expect(Math.abs(monitor.headerLeft - monitor.ascensionLeft)).toBeLessThanOrEqual(1);
+  expect(monitor.documentScrollHeight).toBeLessThanOrEqual(monitor.documentClientHeight);
+  expect(monitor.shellBottom).toBeLessThanOrEqual(monitor.documentClientHeight);
+
+  await page.getByText("Experiment detail", { exact: true }).click();
+  const expanded = await layout();
+  expect(expanded.documentScrollHeight).toBeLessThanOrEqual(expanded.documentClientHeight);
+  expect(expanded.shellBottom).toBeLessThanOrEqual(expanded.documentClientHeight);
+  const scienceList = page.locator("#sci .sci-list");
+  await expect(scienceList).toBeVisible();
+  expect(await scienceList.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+
+  await page.getByRole("tab", { name: "PLAN", exact: true }).click();
+  const plan = await layout();
+  expect(plan.documentScrollHeight).toBeLessThanOrEqual(plan.documentClientHeight);
+  expect(plan.shellBottom).toBeLessThanOrEqual(plan.documentClientHeight);
+});
+
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
