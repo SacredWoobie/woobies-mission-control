@@ -48,6 +48,43 @@ describe("Flight workspace layout model", () => {
     });
   });
 
+  it("keeps region and lane geometry valid across responsive boundaries", () => {
+    const boundaryWidths = [
+      0, 1, 439, 440, 455, 456, 907, 908, 1359, 1360,
+      1735, 1736, 1858, 2498, 3200,
+    ];
+
+    for (const wrapperWidth of boundaryWidths) {
+      for (const hasVisibleFixedPanels of [true, false]) {
+        const geometry = computeFlightRegionGeometry(wrapperWidth, hasVisibleFixedPanels);
+        expect(geometry.fixedRegionWidth).toBeGreaterThanOrEqual(0);
+        expect(geometry.tabbedRegionWidth).toBeGreaterThanOrEqual(0);
+        expect(geometry.tabbedContentWidth).toBeGreaterThanOrEqual(0);
+        expect(geometry.laneCount).toBeGreaterThanOrEqual(1);
+        expect(geometry.laneCount).toBeLessThanOrEqual(3);
+        expect(geometry.laneWidth).toBeGreaterThanOrEqual(0);
+        expect(
+          geometry.laneCount * geometry.laneWidth + (geometry.laneCount - 1) * 12,
+        ).toBeCloseTo(geometry.tabbedContentWidth);
+
+        if (!hasVisibleFixedPanels) {
+          expect(geometry.fixedRegionWidth).toBe(0);
+          expect(geometry.tabbedRegionWidth).toBe(wrapperWidth);
+        } else if (geometry.arrangement === "side-by-side") {
+          expect(geometry.fixedRegionWidth + 12 + geometry.tabbedRegionWidth).toBe(wrapperWidth);
+        } else {
+          expect(geometry.fixedRegionWidth).toBe(wrapperWidth);
+          expect(geometry.tabbedRegionWidth).toBe(wrapperWidth);
+        }
+
+        if (geometry.laneCount > 1) expect(geometry.laneWidth).toBeGreaterThanOrEqual(440);
+      }
+    }
+
+    expect(computeFlightRegionGeometry(1735)).toMatchObject({ arrangement: "stacked", laneCount: 3 });
+    expect(computeFlightRegionGeometry(1736)).toMatchObject({ arrangement: "side-by-side", laneCount: 2 });
+  });
+
   it("keeps balancing contiguous and emits placement rather than ownership", () => {
     const lanes = balanceContiguousPanelLanes(
       ["elec", "heat", "sci", "target"],
