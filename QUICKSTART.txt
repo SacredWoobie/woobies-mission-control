@@ -8,8 +8,12 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
 
 1. KEEP THE COMPLETE PACKAGE TOGETHER
 
-   Extract the complete ZIP so its Dashboard and GameData folders remain next
-   to one another. The launcher can then install or repair these services:
+   Extract the complete ZIP somewhere outside KSP's GameData folder. Do not
+   place the release folder anywhere under GameData: KSP loads DLLs from nested
+   folders and can treat the packaged service DLLs as duplicate installations.
+
+   Keep the extracted Dashboard and GameData folders next to one another. The
+   launcher can then install or repair these services:
 
      WoobiesControlStats
      KRPC.StageStats

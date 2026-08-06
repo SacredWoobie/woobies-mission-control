@@ -218,6 +218,17 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("requirements-dashboard.txt", batch)
         self.assertIn("requirements-panel.txt", batch)
 
+    def test_quickstart_keeps_the_release_outside_ksp_gamedata(self):
+        quickstart = (ROOT / "QUICKSTART.txt").read_text(encoding="utf-8")
+        normalized = " ".join(quickstart.split())
+
+        self.assertIn("outside KSP's GameData folder", normalized)
+        self.assertIn("Do not", normalized)
+        self.assertIn("KSP loads DLLs from nested folders", normalized)
+        self.assertIn(
+            "Dashboard and GameData folders next to one another", normalized
+        )
+
     def test_release_inputs_include_current_scene_images(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
             encoding="utf-8"
