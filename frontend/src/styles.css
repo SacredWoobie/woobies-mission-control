@@ -1030,6 +1030,32 @@ button { font: inherit; }
   .annunciator-lamp.blinking { animation: none; outline: 3px double currentColor; outline-offset: -5px; }
 }
 
+/* Flight information rails collapse in place; compact chrome is pointer-aware. */
+:is(.flight-grid,.flight-workspace-shell) .panel-compact > h2 { min-height: 26px; padding: 1px 6px 1px 9px; gap: 8px; font-size: 10px; }
+.panel-compact > h2 .panel-title { min-width: 0; overflow: hidden; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
+.panel-compact > h2 .panel-heading-actions { margin-left: auto; flex: 1 1 auto; justify-content: flex-end; }
+.panel-compact > h2 .tag { min-width: 0; overflow: hidden; flex: 0 1 auto; text-overflow: ellipsis; }
+.panel-compact .panel-collapse-button { display: inline-flex; width: 22px; height: 22px; min-width: 22px; min-height: 22px; padding: 0; align-items: center; justify-content: center; flex: 0 0 22px; border-radius: 2px; font-size: 15px; line-height: 1; }
+.panel-compact :is(.target-clear-button,.resonant-unpin,.flight-note-unpin),
+.panel-compact#flightNote .notes-font-controls button { min-height: 22px; }
+.panel-compact .panel-collapse-button > span { transform: translateY(-1px); }
+.panel-compact.panel-collapsed .panel-collapse-button > span { transform: translateY(1px); }
+@media (pointer: coarse) {
+  :is(.flight-grid,.flight-workspace-shell) .panel-compact > h2 { min-height: 44px; padding-block: 4px; }
+  .panel-compact .panel-collapse-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex-basis: 36px; }
+  .panel-compact :is(.target-clear-button,.resonant-unpin,.flight-note-unpin),
+  .panel-compact#flightNote .notes-font-controls button { min-height: 36px; }
+}
+@media (pointer: fine) and (orientation: landscape) and (min-width: 1500px) and (max-height: 900px) {
+  .flight-workspace-shell #target > .body { display: grid; align-items: start; grid-template-columns: minmax(0,1fr) 112px; gap: 8px; }
+  .flight-workspace-shell #target .target-command-feedback,
+  .flight-workspace-shell #target .tgt-name { grid-column: 1 / -1; }
+  .flight-workspace-shell #target .tgt-name { margin-bottom: 0; }
+  .flight-workspace-shell #target .tgt-grid { grid-column: 1; }
+  .flight-workspace-shell #target .dock-wrap { grid-column: 2; margin-top: 0; }
+  .flight-workspace-shell #target .dock-svg { max-width: 112px; }
+}
+
 /* Ascension instruments. */
 #asc .body { display: flex; flex-direction: column; gap: 12px; }
 .asc-top { display: flex; align-items: center; justify-content: center; gap: 22px; }
@@ -1078,7 +1104,7 @@ button { font: inherit; }
 .heat-heading-status.hot strong { color: var(--amber); }
 .heat-heading-status.critical strong,
 .heat-heading-status.no-radiators strong { color: var(--warn); }
-.target-clear-button { min-height: 26px; padding: 2px 8px; border: 1px solid #7a5230; border-radius: 2px; color: var(--amber); background: rgba(255,180,84,.06); cursor: pointer; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.target-clear-button { min-height: 22px; padding: 1px 8px; border: 1px solid #7a5230; border-radius: 2px; color: var(--amber); background: rgba(255,180,84,.06); cursor: pointer; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
 .target-clear-button:hover:not(:disabled), .target-clear-button:focus-visible { border-color: var(--amber); background: rgba(255,180,84,.12); outline: none; }
 .target-clear-button:disabled { cursor: default; opacity: .45; }
 .target-command-feedback { padding: 5px 7px; border: 1px solid #315166; border-radius: 3px; color: #9ccfc2; background: rgba(78,201,224,.04); font-size: 8px; }

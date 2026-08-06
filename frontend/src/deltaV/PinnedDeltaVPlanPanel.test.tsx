@@ -167,7 +167,7 @@ describe("pinned delta-v Mission Plan", () => {
     expect(document.body.textContent).not.toContain("porkchop");
     expect(screen.getByText("1 / 5 steps", { exact: true })).toBeTruthy();
     expect(screen.getAllByText("2,185 m/s", { exact: true })).toHaveLength(1);
-    expect(screen.getByText("SURPLUS", { exact: true })).toBeTruthy();
+    expect(screen.getAllByText("SURPLUS", { exact: true })).toHaveLength(2);
     await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null").assignments[0].completedLegIds).toEqual(["segment-1-ascent"]));
 
     const undo = screen.getByRole("button", { name: "Undo last" });
@@ -233,13 +233,12 @@ describe("pinned delta-v Mission Plan", () => {
     expect(document.body.textContent).not.toContain("porkchop");
   });
 
-  it("restores the collapsed panel as Mission Plan with a distinct icon", () => {
+  it("migrates an old hidden Mission Plan preference back to in-place presentation", () => {
     localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["flightDeltaVPlan"]));
     render(<PanelVisibilityProvider><PanelRestoreRail available={new Set(["flightDeltaVPlan"])} /></PanelVisibilityProvider>);
 
-    const restore = screen.getByRole("button", { name: "Mission Plan" });
-    expect(restore.querySelector(".panel-rail-icon-flightDeltaVPlan")).toBeTruthy();
-    expect(restore.getAttribute("title")).toBe("Restore Mission Plan");
+    expect(screen.queryByRole("button", { name: "Mission Plan" })).toBeNull();
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("flightDeltaVPlan");
   });
 
   it("uses the complete live feed for staging when a narrow supplied snapshot is stale", () => {

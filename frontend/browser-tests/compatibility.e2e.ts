@@ -131,6 +131,7 @@ test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", asy
 
 test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome content area", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
+  await page.addInitScript(() => localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["conn"])));
   await page.goto("/");
 
   const layout = async () => page.locator(".flight-workspace-shell").evaluate((shell) => {

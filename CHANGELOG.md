@@ -14,6 +14,10 @@ All notable public changes will be recorded here.
 - Replaced the Target panel's passive type label with a guarded `UNSET TARGET`
   control that revalidates the active vessel and exact selected kRPC object
   before clearing it in KSP.
+- Replaced Flight panel hide-to-rail controls with compact, pointer-aware
+  information rails that keep collapsed-state status and native controls
+  visible while preserving mounted panel state. Older hidden-Flight preferences
+  migrate back into their owning MONITOR or PLAN workspace.
 
 ## v0.4.4 - Launcher usability fixes
 

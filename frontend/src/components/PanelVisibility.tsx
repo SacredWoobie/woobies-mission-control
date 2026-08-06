@@ -54,6 +54,10 @@ const panelRailDescriptions: Record<keyof typeof panelLabels, string> = {
 export type DashboardPanelId = keyof typeof panelLabels;
 
 const storageKey = "wmc-hidden-panels-v1";
+const flightInPlacePanelIds = new Set<DashboardPanelId>([
+  "asc", "cons", "heat", "elec", "sci", "stage", "target",
+  "flightNote", "flightOrbitPlan", "flightDeltaVPlan",
+]);
 const panelOrder: DashboardPanelId[] = [
   "conn",
   "clock",
@@ -102,11 +106,12 @@ const PanelVisibilityContext = createContext<PanelVisibilityValue>(fallbackVisib
 function initialHiddenPanels() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
-    return new Set<DashboardPanelId>(
-      Array.isArray(saved)
-        ? saved.filter((id): id is DashboardPanelId => id in panelLabels)
-        : [],
-    );
+    const valid = Array.isArray(saved)
+      ? saved.filter((id): id is DashboardPanelId => id in panelLabels)
+      : [];
+    const migrated = valid.filter((id) => !flightInPlacePanelIds.has(id));
+    if (migrated.length !== valid.length) localStorage.setItem(storageKey, JSON.stringify(migrated));
+    return new Set<DashboardPanelId>(migrated);
   } catch {
     return new Set<DashboardPanelId>();
   }
@@ -181,6 +186,7 @@ export function PanelVisibilityProvider({
 
   const hidePanel = useCallback((id: DashboardPanelId) => {
     setPreferenceHiddenPanels((current) => {
+      if (flightInPlacePanelIds.has(id)) return current;
       const next = new Set(current);
       next.add(id);
       persist(next);
@@ -260,7 +266,7 @@ export function PanelRestoreRail({ available }: { available: ReadonlySet<Dashboa
   if (centralizedRail) return null;
 
   const datalinkHidden = hiddenPanels.has("conn") && available.has("conn");
-  const visibleTabs = panelOrder.filter((id) => id !== "conn" && hiddenPanels.has(id) && available.has(id));
+  const visibleTabs = panelOrder.filter((id) => id !== "conn" && !flightInPlacePanelIds.has(id) && hiddenPanels.has(id) && available.has(id));
   if (!datalinkHidden && visibleTabs.length === 0) return null;
 
   return (
@@ -293,7 +299,7 @@ export function DashboardRail({
   tools: ReactNode;
 }) {
   const { availablePanels, hiddenPanels, restorePanel } = usePanelVisibility();
-  const visibleTabs = panelOrder.filter((id) => hiddenPanels.has(id) && availablePanels.has(id));
+  const visibleTabs = panelOrder.filter((id) => !flightInPlacePanelIds.has(id) && hiddenPanels.has(id) && availablePanels.has(id));
 
   return (
     <nav aria-label="Dashboard controls" className="dashboard-rail">

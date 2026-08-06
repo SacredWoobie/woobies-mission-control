@@ -322,10 +322,11 @@ export function PinnedDeltaVPlanPanel({
   };
 
   return <Panel
+    collapsible={scene === "flight"}
+    compact={scene === "flight"}
     headingActions={<button className="resonant-unpin" onClick={() => unpinPlan(snapshot)} type="button">Unpin</button>}
-    hideable
     id={scene === "flight" ? "flightDeltaVPlan" : "editorDeltaVPlan"}
-    tag={scene === "flight" ? "MISSION" : "READ ONLY"}
+    tag={scene === "flight" ? comparison.status.toUpperCase() : "READ ONLY"}
     title="Mission Plan"
   >
     <div className="delta-v-pinned-identity">

@@ -96,7 +96,8 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
 
   return (
     <Panel
-      hideable={!editorMode}
+      collapsible={!editorMode}
+      compact={!editorMode}
       id="stage"
       title={editorMode ? "Editor staging analysis" : "Staging analysis"}
       tag={editorMode ? (
@@ -115,7 +116,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
             <strong>{deltaVWithUnit(vacuum.totalDeltaV)}</strong>
           </span>
         </span>
-      ) : undefined}
+      ) : `VAC · ${rows.length} POWERED`}
     >
       {unavailable ? (
         <p className="empty-state">

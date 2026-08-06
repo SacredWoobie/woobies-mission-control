@@ -72,10 +72,11 @@ export function PinnedResonantOrbitPanel({ scene = "flight", snapshot }: { scene
 
   return (
     <Panel
+      collapsible={scene === "flight"}
+      compact={scene === "flight"}
       headingActions={<button className="resonant-unpin" onClick={unpinPlan} type="button">Unpin</button>}
-      hideable={scene === "flight"}
       id={scene === "flight" ? "flightOrbitPlan" : "editorOrbitPlan"}
-      tag="Saved"
+      tag={scene === "flight" ? planStatus : "Saved"}
       title={pinned.name}
     >
       <div className="resonant-flight-summary">

@@ -21,7 +21,12 @@ describe("TargetPanel", () => {
       <TargetPanel commandEnabled onSendCommand={onSendCommand} snapshot={flightTelemetryFixture} />,
     );
 
-    expect(view.container.querySelector("#target .tag")).toBeNull();
+    expect(view.container.querySelector("#target .tag")?.textContent).toBe("Odyssey Station Docking Port");
+    expect([...view.container.querySelectorAll("#target .panel-heading-actions > *")].map((node) => node.className)).toEqual([
+      "tag",
+      "target-clear-button",
+      "panel-collapse-button",
+    ]);
     fireEvent.click(screen.getByRole("button", { name: "UNSET TARGET" }));
 
     expect(onSendCommand).toHaveBeenCalledOnce();

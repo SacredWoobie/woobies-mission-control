@@ -101,9 +101,11 @@ export function TargetPanel({
 
   return (
     <Panel
+      collapsible
+      compact
       headingActions={<button className="target-clear-button" disabled={!canClear || Boolean(pendingRequestId)} onClick={clearTarget} type="button">{pendingRequestId ? "UNSETTING…" : "UNSET TARGET"}</button>}
-      hideable
       id="target"
+      tag={name}
       title="Target"
     >
       {feedback && <div className={`target-command-feedback ${feedback.status}`} role={feedback.status === "error" ? "alert" : "status"}>{feedback.message}</div>}

@@ -385,9 +385,13 @@ export function ElectricityPanel({
         : "—"
     )
     : ecRate(model.generationEcPerSec);
+  const chargePercent = isFiniteNumber(model.chargeCurrent) && isFiniteNumber(model.chargeMaximum) && model.chargeMaximum > 0
+    ? Math.round(Math.max(0, Math.min(1, model.chargeCurrent / model.chargeMaximum)) * 100)
+    : undefined;
+  const railStatus = `${chargePercent === undefined ? "EC" : `${chargePercent}%`} · ${model.status.label}`;
 
   return (
-    <Panel hideable id="elec" title="Electricity">
+    <Panel collapsible compact id="elec" tag={railStatus} title="Electricity">
       <div className={`ec-overview-card ${deficit || model.tier === 1 ? "warn" : ""}`}>
         <div className="ec-hero-row">
           <div>

@@ -275,7 +275,8 @@ export function HeatPanel({
 
   return (
     <Panel
-      hideable
+      collapsible
+      compact
       id="heat"
       title="Heat Management"
       tag={entities.length > 0 ? (

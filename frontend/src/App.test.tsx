@@ -141,7 +141,7 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("button", { name: "Time system: Earth" })).toBeTruthy();
   });
 
-  it("renders the complete flight dashboard and restores hidden panels from the left rail", () => {
+  it("renders the complete flight dashboard with in-place Flight panel collapse", () => {
     const firstView = render(<App />);
     expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.4 · Development")).toBeTruthy();
     ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
@@ -164,14 +164,14 @@ describe("Dashboard lifecycle", () => {
     expect(flightContext?.textContent).toContain("Kerbin");
     expect(flightContext?.textContent).toContain("Orbiting");
     expect(screen.queryByRole("button", { name: "Hide Flight context panel" })).toBeNull();
-    expect(firstView.container.querySelector("#target .tag")).toBeNull();
+    expect(firstView.container.querySelector("#target .tag")?.textContent).toBe("Odyssey Station Docking Port");
     expect((screen.getByRole("button", { name: "UNSET TARGET" }) as HTMLButtonElement).disabled).toBe(true);
     expect(firstView.container.querySelector("#target .tgt-name")?.textContent).toBe("Odyssey Station Docking Port");
     expect(firstView.container.querySelector("#target")?.textContent).toContain("2.3\u2009m/s");
     expect(screen.getAllByRole("button", { name: "Notes" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Notes" }).querySelector(".panel-rail-icon-notes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Notes" }).querySelector(".panel-rail-label")?.textContent).toBe("Notes");
-    const dashboardRail = screen.getByRole("navigation", { name: "Dashboard controls" });
+    screen.getByRole("navigation", { name: "Dashboard controls" });
     const toolsGroup = screen.getByRole("group", { name: "Tools" });
     const resonantTool = screen.getByRole("button", { name: "Resonant orbit planner" });
     const deltaVTool = screen.getByRole("button", { name: "Delta-v planner" });
@@ -219,51 +219,48 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByText("Δv vac", { exact: true })).toBeTruthy();
 
     const heatNode = firstView.container.querySelector("#heat");
-    fireEvent.click(screen.getByRole("button", { name: "Hide Heat Management panel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Heat Management" }));
     expect(firstView.container.querySelector("#heat")).toBe(heatNode);
-    expect(screen.queryByRole("heading", { name: /^Heat Management/ })).toBeNull();
-    expect(heatNode?.closest("[data-flight-panel-host]")?.getAttribute("aria-hidden")).toBe("true");
-    const restore = screen.getByRole("button", { name: "Heat" });
-    expect(restore.querySelector(".panel-rail-label")?.textContent).toBe("Heat Management");
-    expect(restore.querySelector(".panel-rail-icon-heat")).toBeTruthy();
-    const railButtons = [...dashboardRail.querySelectorAll<HTMLElement>("button")];
-    expect(railButtons.indexOf(restore)).toBeLessThan(railButtons.indexOf(resonantTool));
-    expect(railButtons.indexOf(restore)).toBeLessThan(railButtons.indexOf(deltaVTool));
-    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).toContain("heat");
-    fireEvent.click(restore);
-    expect(firstView.container.querySelector("#heat")).toBe(heatNode);
-    expect(screen.getByRole("heading", { name: /^Heat Management/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Hide Ascension panel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide Consumables panel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide Staging analysis panel" }));
-    expect(fixedRegion?.hasAttribute("hidden")).toBe(true);
-    expect(firstView.container.querySelector(".flight-workspace-shell")?.getAttribute("data-fixed-empty")).toBe("true");
+    expect(heatNode?.classList.contains("panel-collapsed")).toBe(true);
+    expect((heatNode?.querySelector(".body") as HTMLElement).hidden).toBe(true);
+    expect(screen.queryByRole("button", { name: "Heat" })).toBeNull();
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("heat");
+    fireEvent.click(screen.getByRole("button", { name: "Expand Heat Management" }));
+    expect((heatNode?.querySelector(".body") as HTMLElement).hidden).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Ascension" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Consumables" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Staging analysis" }));
+    expect(fixedRegion?.hasAttribute("hidden")).toBe(false);
+    expect(firstView.container.querySelector(".flight-workspace-shell")?.getAttribute("data-fixed-empty")).toBe("false");
     fireEvent.click(screen.getByRole("tab", { name: "PLAN" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide Pinned note panel" }));
-    const pinnedRestore = screen.getByRole("button", { name: "Pinned note" });
-    expect(pinnedRestore.querySelector(".panel-rail-icon-flightNote")).toBeTruthy();
-    expect(pinnedRestore.nextElementSibling).toBe(screen.getByRole("button", { name: "Notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Pinned note" }));
+    expect(firstView.container.querySelector("#flightNote")?.classList.contains("panel-collapsed")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Pinned note" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand Pinned note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase pinned note text size" }));
+    expect(screen.getByRole("button", { name: "Reset pinned note text size" }).textContent).toBe("15px");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Pinned note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand Pinned note" }));
+    expect(screen.getByRole("button", { name: "Reset pinned note text size" }).textContent).toBe("15px");
     expect(firstView.container.querySelector("[data-flight-panel=\"asc\"]")).toBeTruthy();
     expect(firstView.container.querySelector("[data-flight-panel=\"cons\"]")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "MONITOR" }));
-    fireEvent.click(pinnedRestore);
-    expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("heading", { name: /^Pinned note/ })).toBeTruthy();
     firstView.unmount();
 
     localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["sci"]));
     const packedView = render(<App />);
-    expect(screen.queryByRole("heading", { name: "Science" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Science" }).querySelector(".panel-rail-label")?.textContent).toBe("Science");
+    expect(screen.getByRole("heading", { name: /^Science/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Science" })).toBeNull();
     expect(packedView.container.querySelector("#sci")).toBeTruthy();
-    expect(packedView.container.querySelector('[data-flight-panel-host="sci"]')?.getAttribute("aria-hidden")).toBe("true");
+    expect(packedView.container.querySelector('[data-flight-panel-host="sci"]')?.getAttribute("aria-hidden")).not.toBe("true");
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("sci");
   });
 
   it("removes ElectricCharge from Flight Consumables", () => {
     const { container } = render(
       <ConsumablesPanel snapshot={fractionalStageElectricChargeFixture} />,
     );
-    expect(container.querySelector("#cons > h2 .tag")).toBeNull();
+    expect(container.querySelector("#cons > h2 .tag")?.textContent).toBe("Liquid Fuel 100%");
     expect(container.textContent).not.toContain("Electric Charge");
     expect(container.textContent).toContain("Liquid Fuel");
   });

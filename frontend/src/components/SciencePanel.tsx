@@ -299,8 +299,12 @@ export function SciencePanel({
   const summary = isFiniteNumber(model.recoverable)
     ? formatScienceInline(model.recoverable)
     : "awaiting kRPC link";
+  const priorityLab = model.labs.find((lab) => lab.tone === "danger")
+    ?? model.labs.find((lab) => lab.tone === "warn")
+    ?? model.labs[0];
+  const railStatus = `${model.experimentCount} EXP${priorityLab ? ` · ${priorityLab.statusLabel}` : ""}`;
   return (
-    <Panel hideable id="sci" title="Science">
+    <Panel collapsible compact id="sci" tag={railStatus} title="Science">
       <div className="sci-overview-card">
         <div className="sci-overview-row">
           <div className="sci-overview-hero">

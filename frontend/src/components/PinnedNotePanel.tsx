@@ -17,6 +17,8 @@ export function PinnedNotePanel({
   const details = [note.relativePath, `${(note.size / 1024).toFixed(1)} KB`, `updated ${new Date(note.modified * 1000).toLocaleString()}`, note.truncated ? "latest 32 KiB shown" : ""].filter(Boolean).join(" / ");
   return (
     <Panel
+      collapsible
+      compact
       headingActions={
         <>
           <span className="flight-note-name" title={note.name}>{note.name}</span>
@@ -28,7 +30,6 @@ export function PinnedNotePanel({
           <button className="flight-note-unpin" disabled={!commandEnabled} onClick={() => onSendCommand({ type: "notes.pin", relativePath: null })} type="button">Unpin</button>
         </>
       }
-      hideable
       id="flightNote"
       title="Pinned note"
     >
