@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.4.4 - Launcher usability fixes
+
 - Kept every launcher control reachable on laptop-height displays with a
   scrollable controls pane and an independently resizable Mission Log.
 - Explain when an extracted Mission Control release was placed inside KSP's

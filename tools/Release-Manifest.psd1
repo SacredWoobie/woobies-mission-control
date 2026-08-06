@@ -1,5 +1,5 @@
 @{
-    ProductVersion = "0.4.3"
+    ProductVersion = "0.4.4"
     Services = @(
         @{
             Folder = "WoobiesControlStats"
