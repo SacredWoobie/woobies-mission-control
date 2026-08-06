@@ -5,6 +5,7 @@ import {
   formatUniversalTime,
   isFiniteNumber,
 } from "../telemetry/formatters";
+import type { ReactNode } from "react";
 import type { SceneMode, TelemetrySnapshot } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { Panel } from "./Panel";
@@ -43,7 +44,7 @@ export function DatalinkPanel({
   );
 }
 
-export function ClockPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+export function ClockPanel({ annunciator, snapshot }: { annunciator?: ReactNode; snapshot: TelemetrySnapshot }) {
   const { system, toggleSystem } = useTimeSystem();
   const kerbin = isKerbinTime(system);
   const ut = formatUniversalTime(snapshot["t.universalTime"], kerbin);
@@ -93,6 +94,7 @@ export function ClockPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
             <span className="cs-val">{delay}</span>
           </div>}
         </div>
+        {annunciator}
       </div>
     </Panel>
   );

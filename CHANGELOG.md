@@ -8,6 +8,9 @@ All notable public changes will be recorded here.
   MONITOR and PLAN workspaces. Responsive lane placement, Rebalance, and panel
   restoration preserve mounted panel state while inactive or hidden panels
   leave layout and accessibility flow and suspend their telemetry updates.
+- Added a software master caution and warning system with latched Flight safety
+  episodes, feed/source-integrity monitoring, compact subsystem tokens, and an
+  accessible acknowledgement and history drawer.
 
 ## v0.4.4 - Launcher usability fixes
 

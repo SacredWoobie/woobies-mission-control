@@ -7,6 +7,8 @@ import { EditorContextPanel } from "./components/EditorContextPanel";
 import { EditorSummaryPanel } from "./components/EditorSummaryPanel";
 import { FlightDashboard } from "./components/FlightDashboard";
 import { ClockPanel, DatalinkPanel } from "./components/FlightStatusPanels";
+import { FlightAnnunciator } from "./annunciator/FlightAnnunciator";
+import { useFlightAnnunciator, type FlightAnnunciatorController } from "./annunciator/useFlightAnnunciator";
 import { HeatPanel } from "./components/HeatPanel";
 import { MissionOverview } from "./components/MissionOverview";
 import { NotesContinuityPreview } from "./components/NotesContinuityPreview";
@@ -49,7 +51,7 @@ import {
   targetSnapshotsEqual,
 } from "./telemetry/subscriptions";
 import type { SceneMode, TelemetryCommand, TelemetrySnapshot } from "./telemetry/types";
-import { useLiveConnectionStatus, useLiveTelemetrySelector } from "./telemetry/useLiveTelemetry";
+import { shallowEqual, useLiveConnectionStatus, useLiveTelemetrySelector } from "./telemetry/useLiveTelemetry";
 import { TimeSystemProvider } from "./timeSystem";
 
 export const DEFAULT_LIVE_ENDPOINT = "ws://127.0.0.1:8090";
@@ -222,7 +224,7 @@ function useLiveFlightSnapshot(equality: (left: TelemetrySnapshot | null, right:
 }
 
 function LiveAscensionPanel() { const snapshot = useLiveFlightSnapshot(ascensionSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <AscensionPanel snapshot={snapshot} /> : null; }
-function LiveClockPanel() { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel snapshot={snapshot} /> : null; }
+function LiveClockPanel({ annunciator }: { annunciator: FlightAnnunciatorController }) { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel annunciator={<FlightAnnunciator controller={annunciator} />} snapshot={snapshot} /> : null; }
 function LiveConsumablesPanel() { const snapshot = useLiveFlightSnapshot(consumablesSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ConsumablesPanel snapshot={snapshot} /> : null; }
 function LiveElectricityPanel() {
   const liveState = useLiveTelemetrySelector(
@@ -282,7 +284,7 @@ function LiveMissionOverview() {
     : null;
 }
 
-function LiveFlightDashboard() {
+function LiveFlightDashboard({ annunciator }: { annunciator: FlightAnnunciatorController }) {
   const availability = useLiveFlightSnapshot(flightAvailabilitySnapshotsEqual);
   const { pinnedForTelemetry: pinnedOrbitForTelemetry } = useResonantOrbitState();
   const { pinnedForTelemetry } = useDeltaVDraft();
@@ -293,7 +295,7 @@ function LiveFlightDashboard() {
     <FlightDashboard
       ascension={<LiveAscensionPanel />}
       availablePanels={available}
-      clock={<LiveClockPanel />}
+      clock={<LiveClockPanel annunciator={annunciator} />}
       consumables={<LiveConsumablesPanel />}
       electricity={<LiveElectricityPanel />}
       heat={<LiveHeatPanel />}
@@ -338,6 +340,13 @@ export function LiveDashboard({
   waitingMessage,
 }: LiveDashboardProps) {
   const connection = useLiveConnectionStatus();
+  const annunciatorInput = useLiveTelemetrySelector((state) => ({
+    connectionState: state.status,
+    frameCount: state.frameCount,
+    lastFrameAt: state.lastFrameAt,
+    snapshot: state.snapshot,
+  }), shallowEqual);
+  const annunciator = useFlightAnnunciator({ ...annunciatorInput, watchdog: true });
   const headerSnapshot = useLiveTelemetrySelector((state) => state.snapshot, headerSnapshotsEqual);
   const notesSnapshot = useLiveTelemetrySelector((state) => state.snapshot, notesSnapshotsEqual);
   const mode = headerSnapshot?.["context.mode"] ?? "inactive";
@@ -370,7 +379,7 @@ export function LiveDashboard({
       waitingMessage={waitingMessage}
     >
       {mode === "flight"
-        ? <LiveFlightDashboard />
+        ? <LiveFlightDashboard annunciator={annunciator} />
         : mode === "editor"
           ? <EditorWorkspace context={<LiveEditorContextPanel />} snapshot={headerSnapshot ?? undefined} staging={<LiveStagingPanel />} summary={<LiveEditorSummaryPanel />} />
           : <LiveMissionOverview />}

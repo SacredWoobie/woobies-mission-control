@@ -37,7 +37,7 @@ test("native controls opt into the dark system color scheme", async ({ page }) =
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
 });
 
-test("the wide Flight context header fits long mission times in one compact row", async ({ page }) => {
+test("the wide Flight context and annunciator fit long mission times in one compact row", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
 
@@ -47,7 +47,7 @@ test("the wide Flight context header fits long mission times in one compact row"
   });
 
   const layout = await page.locator(".status-strip").evaluate((element) => {
-    const cells = Array.from(element.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell"));
+    const cells = Array.from(element.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell, .flight-annunciator"));
     const tops = cells.map((cell) => cell.getBoundingClientRect().top);
     const elapsed = element.querySelector<HTMLElement>(".met-cell .big")!;
     return {
@@ -63,10 +63,70 @@ test("the wide Flight context header fits long mission times in one compact row"
 
   expect(layout.height).toBeLessThan(100);
   expect(layout.maxTopDifference).toBeLessThanOrEqual(1);
-  expect(layout.clientWidth).toBeLessThan(1300);
+  expect(layout.clientWidth).toBeLessThan(1600);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
   expect(layout.elapsedWhiteSpace).toBe("nowrap");
   expect(layout.elapsedScrollWidth).toBeLessThanOrEqual(layout.elapsedClientWidth + 1);
+});
+
+test("the Flight annunciator acknowledges through its history and has a static reduced-motion warning", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto("/");
+
+  const lamp = page.locator(".annunciator-lamp");
+  await expect(lamp).toBeVisible();
+  await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
+  await expect(page.locator(".annunciator-token-field")).toContainText("HEAT");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const reducedMotionStyle = await lamp.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { animationName: style.animationName, outlineStyle: style.outlineStyle };
+  });
+  expect(reducedMotionStyle.animationName).toBe("none");
+  expect(reducedMotionStyle.outlineStyle).toBe("double");
+
+  await lamp.click();
+
+  const history = page.getByRole("dialog", { name: "Master caution history" });
+  await expect(history).toBeVisible();
+  await expect(history.getByRole("heading", { name: "Active 1" })).toBeVisible();
+  await expect(page.locator(".annunciator-lamp")).toHaveAttribute("aria-label", /Master warning, acknowledged/);
+  await page.keyboard.press("Escape");
+  await expect(history).toBeHidden();
+  await expect(lamp).toBeFocused();
+});
+
+test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", async ({ page }) => {
+  await page.goto("/");
+  for (const viewport of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }]) {
+    await page.setViewportSize(viewport);
+    for (const view of ["MONITOR", "PLAN"]) {
+      await page.getByRole("tab", { name: view, exact: true }).click();
+      const layout = await page.locator(".flight-workspace-shell").evaluate((element) => {
+        const rects = Array.from(element.querySelectorAll<HTMLElement>("[data-flight-panel-host]:not([hidden])"))
+          .map((panel) => panel.getBoundingClientRect());
+        let overlaps = 0;
+        for (let left = 0; left < rects.length; left += 1) {
+          for (let right = left + 1; right < rects.length; right += 1) {
+            const a = rects[left];
+            const b = rects[right];
+            if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) overlaps += 1;
+          }
+        }
+        return {
+          documentScrollWidth: document.documentElement.scrollWidth,
+          overlaps,
+          shellBottom: element.getBoundingClientRect().bottom,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        };
+      });
+      expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
+      expect(layout.shellBottom).toBeLessThanOrEqual(layout.viewportHeight);
+      expect(layout.overlaps).toBe(0);
+    }
+  }
 });
 
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { FlightAnnunciator } from "./annunciator/FlightAnnunciator";
+import { useFixtureFlightAnnunciator } from "./annunciator/useFlightAnnunciator";
 import {
   availableFlightPanels,
   DashboardAppFrame,
@@ -41,6 +43,7 @@ const fixtures: Record<SceneMode, TelemetrySnapshot> = {
 };
 
 function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
+  const annunciator = useFixtureFlightAnnunciator(snapshot);
   const { pinnedForTelemetry: pinnedOrbitForTelemetry } = useResonantOrbitState();
   const { pinnedForTelemetry } = useDeltaVDraft();
   const pinnedOrbit = pinnedOrbitForTelemetry(snapshot);
@@ -50,7 +53,7 @@ function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
     <FlightDashboard
       ascension={<AscensionPanel snapshot={snapshot} />}
       availablePanels={available}
-      clock={<ClockPanel snapshot={snapshot} />}
+      clock={<ClockPanel annunciator={<FlightAnnunciator controller={annunciator} />} snapshot={snapshot} />}
       consumables={<ConsumablesPanel snapshot={snapshot} />}
       electricity={<ElectricityPanel snapshot={snapshot} />}
       heat={<HeatPanel snapshot={snapshot} />}
