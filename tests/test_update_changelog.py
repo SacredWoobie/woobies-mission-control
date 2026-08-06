@@ -36,6 +36,19 @@ class UpdateAndChangelogTests(unittest.TestCase):
             (720, 520),
         )
 
+    def test_initial_launcher_panes_favor_controls_and_preserve_log(self):
+        self.assertEqual(app.calculate_initial_pane_sash(700), 518)
+        self.assertEqual(app.calculate_initial_pane_sash(400), 280)
+        self.assertEqual(app.calculate_initial_pane_sash(300), 180)
+        self.assertEqual(app.calculate_initial_pane_sash(100), 0)
+
+    def test_mousewheel_delta_normalizes_for_tk_scrolling(self):
+        self.assertEqual(app.normalize_mousewheel_units(120), -1)
+        self.assertEqual(app.normalize_mousewheel_units(240), -2)
+        self.assertEqual(app.normalize_mousewheel_units(-120), 1)
+        self.assertEqual(app.normalize_mousewheel_units(-1), 1)
+        self.assertEqual(app.normalize_mousewheel_units(0), 0)
+
     def test_fresh_cache_is_scoped_to_launcher_version(self):
         now = time.time()
         state = {

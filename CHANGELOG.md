@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Kept every launcher control reachable on laptop-height displays with a
+  scrollable controls pane and an independently resizable Mission Log.
 - Stage corresponding-source release assets under the established `.zz-00`
   name so the normal product ZIP remains first without a post-upload rename.
 

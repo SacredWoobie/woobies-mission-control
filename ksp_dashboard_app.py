@@ -240,6 +240,32 @@ def calculate_initial_window_size(
     )
 
 
+def calculate_initial_pane_sash(
+    available_height,
+    controls_share=0.74,
+    minimum_controls=240,
+    minimum_log=120,
+):
+    """Return the initial controls/log divider position for the launcher."""
+    available_height = max(0, int(available_height))
+    if available_height <= minimum_log:
+        return 0
+    desired = round(available_height * controls_share)
+    return max(
+        min(minimum_controls, available_height - minimum_log),
+        min(desired, available_height - minimum_log),
+    )
+
+
+def normalize_mousewheel_units(delta):
+    """Translate a native mouse-wheel delta into Tk vertical scroll units."""
+    delta = int(delta)
+    if delta == 0:
+        return 0
+    direction = -1 if delta > 0 else 1
+    return direction * max(1, abs(delta) // 120)
+
+
 def configure_dashboard_theme(root):
     """Apply a standard-library ttk theme inspired by the dashboard."""
     global UI_FONT_FAMILY, UI_FONT, UI_FONT_BOLD
@@ -2003,6 +2029,65 @@ class Backend:
             self.startup_ready = False
 
 
+class ScrollableLauncherPane(ttk.Frame):
+    """A vertically scrollable launcher region that fills its viewport width."""
+
+    def __init__(self, parent):
+        super().__init__(parent, style="Shell.TFrame")
+        self.viewport = tk.Canvas(
+            self,
+            background=THEME["bg"],
+            borderwidth=0,
+            highlightthickness=0,
+            yscrollincrement=24,
+        )
+        self.scrollbar = ttk.Scrollbar(
+            self,
+            orient="vertical",
+            command=self.viewport.yview,
+        )
+        self.viewport.configure(yscrollcommand=self.scrollbar.set)
+        self.viewport.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+
+        self.content = ttk.Frame(self.viewport, style="Shell.TFrame")
+        self.content_window = self.viewport.create_window(
+            0,
+            0,
+            anchor="nw",
+            window=self.content,
+        )
+        self.content.bind("<Configure>", self._sync_scroll_region)
+        self.viewport.bind("<Configure>", self._sync_scroll_region)
+
+    def _sync_scroll_region(self, _event=None):
+        width = max(1, self.viewport.winfo_width())
+        height = max(
+            self.content.winfo_reqheight(),
+            self.viewport.winfo_height(),
+        )
+        self.viewport.itemconfigure(
+            self.content_window,
+            width=width,
+            height=height,
+        )
+        self.viewport.configure(scrollregion=(0, 0, width, height))
+
+    def contains_widget(self, widget):
+        pane_path = str(self)
+        widget_path = str(widget)
+        return widget_path == pane_path or widget_path.startswith(pane_path + ".")
+
+    def scroll_mousewheel(self, delta):
+        units = normalize_mousewheel_units(delta)
+        if units == 0:
+            return False
+        self.viewport.yview_scroll(units, "units")
+        return True
+
+
 class App:
     def __init__(self, root, update_state_path=UPDATE_STATE_PATH,
                  settings_path=SETTINGS_PATH):
@@ -2089,7 +2174,32 @@ class App:
         )
         self.check_updates_control.pack(side="right", padx=(6, 0))
 
-        settings_frame = ttk.LabelFrame(root, text="KSP INSTALLATION")
+        self.main_panes = tk.PanedWindow(
+            root,
+            orient=tk.VERTICAL,
+            background=THEME["rule"],
+            borderwidth=0,
+            opaqueresize=True,
+            relief="flat",
+            sashpad=2,
+            sashrelief="flat",
+            sashwidth=7,
+            showhandle=False,
+        )
+        self.main_panes.pack(fill="both", expand=True)
+        self.controls_pane = ScrollableLauncherPane(self.main_panes)
+        self.main_panes.add(
+            self.controls_pane,
+            minsize=240,
+            stretch="always",
+        )
+        self.controls_root = self.controls_pane.content
+        root.bind("<MouseWheel>", self._on_launcher_mousewheel, add="+")
+
+        settings_frame = ttk.LabelFrame(
+            self.controls_root,
+            text="KSP INSTALLATION",
+        )
         settings_controls = ttk.Frame(settings_frame)
         settings_controls.pack(fill="x", padx=8, pady=(8, 2))
         ttk.Label(
@@ -2340,7 +2450,7 @@ class App:
             for component in components:
                 self._add_component(component)
         else:
-            empty = ttk.LabelFrame(root, text="COMPONENTS")
+            empty = ttk.LabelFrame(self.controls_root, text="COMPONENTS")
             empty.pack(fill="x", padx=14, pady=6)
             ttk.Label(
                 empty,
@@ -2350,8 +2460,10 @@ class App:
 
         settings_frame.pack(fill="x", padx=14, pady=6)
 
-        log_frame = ttk.LabelFrame(root, text="MISSION LOG")
+        log_shell = ttk.Frame(self.main_panes, style="Shell.TFrame")
+        log_frame = ttk.LabelFrame(log_shell, text="MISSION LOG")
         log_frame.pack(fill="both", expand=True, padx=14, pady=(6, 12))
+        self.main_panes.add(log_shell, minsize=120, stretch="always")
         self.logbox = scrolledtext.ScrolledText(
             log_frame,
             height=10,
@@ -2371,6 +2483,7 @@ class App:
         self.logbox.pack(fill="both", expand=True, padx=7, pady=7)
 
         self._apply_initial_window_geometry()
+        self.root.after_idle(self._place_initial_pane_sash)
 
         if components:
             names = ", ".join(component["script"] for component in components)
@@ -2400,6 +2513,20 @@ class App:
         y = max(0, (self.root.winfo_screenheight() - height) // 3)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
+    def _place_initial_pane_sash(self):
+        self.root.update_idletasks()
+        position = calculate_initial_pane_sash(self.main_panes.winfo_height())
+        self.main_panes.sash_place(0, 0, position)
+
+    def _on_launcher_mousewheel(self, event):
+        if not self.controls_pane.contains_widget(event.widget):
+            return None
+        if event.widget is self.controls_pane.scrollbar:
+            return None
+        if self.controls_pane.scroll_mousewheel(event.delta):
+            return "break"
+        return None
+
     def _add_component(self, component):
         script = HERE / component["script"]
         environment_provider = (
@@ -2409,7 +2536,10 @@ class App:
             component["name"], script, self._enqueue, environment_provider
         )
 
-        frame = ttk.LabelFrame(self.root, text=component["title"].upper())
+        frame = ttk.LabelFrame(
+            self.controls_root,
+            text=component["title"].upper(),
+        )
         frame.pack(fill="x", padx=14, pady=6)
 
         controls = ttk.Frame(frame)
