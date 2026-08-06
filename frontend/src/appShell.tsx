@@ -264,7 +264,17 @@ function LiveSciencePanel() {
     : null;
 }
 function LiveStagingPanel() { const snapshot = useLiveFlightSnapshot(stagingSnapshotsEqual); return snapshot && snapshot["context.mode"] !== "inactive" ? <StagingPanel snapshot={snapshot} /> : null; }
-function LiveTargetPanel() { const snapshot = useLiveFlightSnapshot(targetSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : null; }
+function LiveTargetPanel() {
+  const liveState = useLiveTelemetrySelector(
+    (state) => ({ clearResult: state.targetClearResult, snapshot: state.snapshot, status: state.status }),
+    (left, right) => targetSnapshotsEqual(left.snapshot, right.snapshot)
+      && left.clearResult === right.clearResult
+      && left.status === right.status,
+  );
+  return liveState.snapshot?.["context.mode"] === "flight" && liveState.snapshot["tar.name"]?.trim()
+    ? <TargetPanel clearResult={liveState.clearResult} commandEnabled={liveState.status === "linked"} onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={liveState.snapshot} />
+    : null;
+}
 function LivePinnedNotePanel() { const snapshot = useLiveFlightSnapshot(pinnedNoteSnapshotsEqual); return snapshot?.["context.mode"] === "flight" && snapshot["notes.pinned"] ? <PinnedNotePanel commandEnabled onSendCommand={(command) => liveTelemetryStore.send(command)} snapshot={snapshot} /> : null; }
 function LiveMissionOverview() {
   const liveState = useLiveTelemetrySelector(

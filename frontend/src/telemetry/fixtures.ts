@@ -204,6 +204,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "career.science": 384.7,
   "tar.name": "Odyssey Station Docking Port",
   "tar.type": "dockingport",
+  "tar.objectId": "8080",
   "tar.distance": 184.6,
   "tar.o.relativeVelocity": 2.3,
   "tar.o.velocity": 2_291.4,

@@ -6,8 +6,11 @@ import {
   formatSpeed,
   isFiniteNumber,
 } from "../formatting/numbers";
-import type { TelemetrySnapshot } from "../telemetry/types";
+import { useEffect, useState } from "react";
+import type { TargetClearResult, TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
+
+type TargetClearCommand = Extract<TelemetryCommand, { type: "target.clear" }>;
 
 function DockingIndicator({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const ax = snapshot["dock.ax"];
@@ -28,18 +31,82 @@ function DockingIndicator({ snapshot }: { snapshot: TelemetrySnapshot }) {
 
 function Stat({ label, value }: { label: string; value: string }) { return <div className="stat"><span className="label">{label}</span><span className="v">{value}</span></div>; }
 
-function targetTypeLabel(value: string | undefined) {
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (normalized === "dockingport" || normalized === "docking_port") return "Docking port";
-  if (!normalized) return "";
-  return normalized.replace(/[_-]+/g, " ").replace(/^\w/, (character) => character.toUpperCase());
-}
-
-export function TargetPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+export function TargetPanel({
+  clearResult,
+  commandEnabled = false,
+  onSendCommand,
+  snapshot,
+}: {
+  clearResult?: TargetClearResult;
+  commandEnabled?: boolean;
+  onSendCommand?: (command: TargetClearCommand) => boolean;
+  snapshot: TelemetrySnapshot;
+}) {
   const name = snapshot["tar.name"]?.trim();
+  const targetObjectId = snapshot["tar.objectId"]?.trim();
+  const targetType = snapshot["tar.type"]?.trim().toLowerCase();
+  const vesselGuid = snapshot["v.guid"]?.trim();
+  const validTargetType = targetType === "body" || targetType === "dockingport" || targetType === "vessel"
+    ? targetType
+    : undefined;
+  const [pendingRequestId, setPendingRequestId] = useState("");
+  const [feedback, setFeedback] = useState<{ message: string; status: "accepted" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (!pendingRequestId || clearResult?.requestId !== pendingRequestId) return;
+    setFeedback({ message: clearResult.message, status: clearResult.status });
+    setPendingRequestId("");
+  }, [clearResult, pendingRequestId]);
+
+  useEffect(() => {
+    if (!pendingRequestId) return;
+    const timer = globalThis.setTimeout(() => {
+      setFeedback({ message: "The target-clear request did not receive a response.", status: "error" });
+      setPendingRequestId("");
+    }, 10_000);
+    return () => globalThis.clearTimeout(timer);
+  }, [pendingRequestId]);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = globalThis.setTimeout(() => setFeedback(null), 10_000);
+    return () => globalThis.clearTimeout(timer);
+  }, [feedback]);
+
   if (!name) return null;
+
+  const canClear = Boolean(
+    commandEnabled
+    && onSendCommand
+    && vesselGuid
+    && targetObjectId
+    && validTargetType,
+  );
+  const clearTarget = () => {
+    if (!canClear || pendingRequestId || !vesselGuid || !targetObjectId || !validTargetType) return;
+    const requestId = globalThis.crypto?.randomUUID?.()
+      ?? `target-clear-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const sent = onSendCommand!({
+      type: "target.clear",
+      requestId,
+      expectedVesselGuid: vesselGuid,
+      expectedTargetObjectId: targetObjectId,
+      expectedTargetName: name,
+      expectedTargetType: validTargetType,
+    });
+    setFeedback(null);
+    if (sent) setPendingRequestId(requestId);
+    else setFeedback({ message: "The dashboard command link is unavailable.", status: "error" });
+  };
+
   return (
-    <Panel hideable id="target" title="Target" tag={targetTypeLabel(snapshot["tar.type"])}>
+    <Panel
+      headingActions={<button className="target-clear-button" disabled={!canClear || Boolean(pendingRequestId)} onClick={clearTarget} type="button">{pendingRequestId ? "UNSETTING…" : "UNSET TARGET"}</button>}
+      hideable
+      id="target"
+      title="Target"
+    >
+      {feedback && <div className={`target-command-feedback ${feedback.status}`} role={feedback.status === "error" ? "alert" : "status"}>{feedback.message}</div>}
       <div className="tgt-name">{name}</div><div className="tgt-grid"><Stat label="Distance" value={formatDistance(snapshot["tar.distance"], "context")} /><Stat label="Relative speed" value={formatSpeed(snapshot["tar.o.relativeVelocity"])} /><Stat label="Inclination" value={formatInclination(snapshot["tar.o.inclination"])} /><Stat label="Apoapsis" value={formatDistance(snapshot["tar.o.ApA"], "live")} /><Stat label="Periapsis" value={formatDistance(snapshot["tar.o.PeA"], "live")} /><Stat label="Orbital speed" value={formatSpeed(snapshot["tar.o.velocity"])} /></div><DockingIndicator snapshot={snapshot} />
     </Panel>
   );

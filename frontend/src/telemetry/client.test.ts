@@ -9,11 +9,12 @@ import {
   parseScienceAlarmResult,
   parseScienceLabResearchResult,
   parseScienceLabTransmitResult,
+  parseTargetClearResult,
   parseTelemetrySnapshot,
   type ConnectionStatus,
   type WebSocketTransport,
 } from "./client";
-import type { HeatLoopControlResult, MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, ReactorControlResult, ScienceAlarmResult, ScienceLabResearchResult, ScienceLabTransmitResult, TelemetrySnapshot } from "./types";
+import type { HeatLoopControlResult, MissionPlanningPersistenceState, OverviewVesselEditResult, OverviewVesselLifecycleResult, OverviewVesselSwitchResult, ReactorControlResult, ScienceAlarmResult, ScienceLabResearchResult, ScienceLabTransmitResult, TargetClearResult, TelemetrySnapshot } from "./types";
 
 class FakeSocket implements WebSocketTransport {
   readyState = 0;
@@ -657,6 +658,36 @@ describe("reactor control results", () => {
     socket.open();
     socket.message(JSON.stringify(payload));
     socket.message(JSON.stringify({ ...payload, requestId: "", action: "invalid" }));
+
+    expect(results).toEqual([payload]);
+    expect(snapshots).toEqual([]);
+  });
+});
+
+describe("target clear results", () => {
+  it("parses and routes a valid result without publishing it as telemetry", () => {
+    const payload = {
+      type: "target.clear.result" as const,
+      requestId: "target-clear-1",
+      status: "accepted" as const,
+      message: "Target Slate cleared.",
+    };
+    expect(parseTargetClearResult(JSON.stringify(payload))).toEqual(payload);
+    expect(parseTargetClearResult({ ...payload, requestId: "" })).toBeNull();
+
+    const socket = new FakeSocket();
+    const results: TargetClearResult[] = [];
+    const snapshots: TelemetrySnapshot[] = [];
+    const client = new TelemetryClient("ws://127.0.0.1:8090", {
+      onTargetClearResult: (result) => results.push(result),
+      onSnapshot: (snapshot) => snapshots.push(snapshot),
+      onStatus: () => undefined,
+    }, { createSocket: () => socket });
+
+    client.connect();
+    socket.open();
+    socket.message(JSON.stringify(payload));
+    socket.message(JSON.stringify({ ...payload, requestId: "", status: "invalid" }));
 
     expect(results).toEqual([payload]);
     expect(snapshots).toEqual([]);

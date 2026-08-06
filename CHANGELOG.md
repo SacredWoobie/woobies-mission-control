@@ -11,6 +11,9 @@ All notable public changes will be recorded here.
 - Added a software master caution and warning system with latched Flight safety
   episodes, feed/source-integrity monitoring, compact subsystem tokens, and an
   accessible acknowledgement and history drawer.
+- Replaced the Target panel's passive type label with a guarded `UNSET TARGET`
+  control that revalidates the active vessel and exact selected kRPC object
+  before clearing it in KSP.
 
 ## v0.4.4 - Launcher usability fixes
 

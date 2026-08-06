@@ -97,6 +97,7 @@ class TelemetryRuntimeTests(unittest.TestCase):
             '"science.alarm.create"',
             '"science.lab.research"',
             '"science.lab.transmit"',
+            '"target.clear"',
             "if isinstance(event, dict)",
             'event.get("status") in {"merged", "updated"}',
         ):

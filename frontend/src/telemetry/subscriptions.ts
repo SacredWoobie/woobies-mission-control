@@ -207,7 +207,7 @@ export function scienceSnapshotsEqual(left: TelemetrySnapshot | null, right: Tel
 }
 
 export function targetSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "tar.name", "tar.type", "tar.distance", "tar.o.relativeVelocity", "tar.o.velocity", "tar.o.ApA", "tar.o.PeA", "tar.o.inclination", "dock.x", "dock.y", "dock.axial", "dock.ax", "dock.ay"]);
+  return fieldsEqual(left, right, ["context.mode", "v.guid", "tar.name", "tar.type", "tar.objectId", "tar.distance", "tar.o.relativeVelocity", "tar.o.velocity", "tar.o.ApA", "tar.o.PeA", "tar.o.inclination", "dock.x", "dock.y", "dock.axial", "dock.ax", "dock.ay"]);
 }
 
 export function pinnedNoteSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {

@@ -10,6 +10,7 @@ import type {
   ScienceAlarmResult,
   ScienceLabResearchResult,
   ScienceLabTransmitResult,
+  TargetClearResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -27,6 +28,7 @@ export interface LiveTelemetryState {
   scienceAlarmResult?: ScienceAlarmResult;
   scienceLabResearchResult?: ScienceLabResearchResult;
   scienceLabTransmitResult?: ScienceLabTransmitResult;
+  targetClearResult?: TargetClearResult;
   snapshot: TelemetrySnapshot | null;
   status: ConnectionStatus;
 }
@@ -68,6 +70,7 @@ export class TelemetryStore {
         onScienceAlarmResult?(result: ScienceAlarmResult): void;
         onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
         onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
+        onTargetClearResult?(result: TargetClearResult): void;
         onPersistenceState?(state: MissionPlanningPersistenceState): void;
         onSnapshot(snapshot: TelemetrySnapshot): void;
         onStatus(status: ConnectionStatus, message?: string): void;
@@ -120,6 +123,9 @@ export class TelemetryStore {
       onScienceLabTransmitResult: (scienceLabTransmitResult) => {
         this.patch({ scienceLabTransmitResult });
       },
+      onTargetClearResult: (targetClearResult) => {
+        this.patch({ targetClearResult });
+      },
       onPersistenceState: (persistenceState) => {
         this.persistenceListeners.forEach((listener) => listener(persistenceState));
       },
@@ -143,6 +149,7 @@ export class TelemetryStore {
             scienceAlarmResult: undefined,
             scienceLabResearchResult: undefined,
             scienceLabTransmitResult: undefined,
+            targetClearResult: undefined,
           } : {}),
         });
       },
@@ -157,6 +164,7 @@ export class TelemetryStore {
       scienceAlarmResult: undefined,
       scienceLabResearchResult: undefined,
       scienceLabTransmitResult: undefined,
+      targetClearResult: undefined,
       snapshot: null,
       status: "connecting",
     });

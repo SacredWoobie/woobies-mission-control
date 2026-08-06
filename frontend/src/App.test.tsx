@@ -164,7 +164,8 @@ describe("Dashboard lifecycle", () => {
     expect(flightContext?.textContent).toContain("Kerbin");
     expect(flightContext?.textContent).toContain("Orbiting");
     expect(screen.queryByRole("button", { name: "Hide Flight context panel" })).toBeNull();
-    expect(firstView.container.querySelector("#target .tag")?.textContent).toBe("Docking port");
+    expect(firstView.container.querySelector("#target .tag")).toBeNull();
+    expect((screen.getByRole("button", { name: "UNSET TARGET" }) as HTMLButtonElement).disabled).toBe(true);
     expect(firstView.container.querySelector("#target .tgt-name")?.textContent).toBe("Odyssey Station Docking Port");
     expect(firstView.container.querySelector("#target")?.textContent).toContain("2.3\u2009m/s");
     expect(screen.getAllByRole("button", { name: "Notes" })).toHaveLength(1);

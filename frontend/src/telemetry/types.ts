@@ -125,6 +125,13 @@ export interface ReactorControlResult {
   message: string;
 }
 
+export interface TargetClearResult {
+  type: "target.clear.result";
+  requestId: string;
+  status: "accepted" | "error";
+  message: string;
+}
+
 export type ElectricitySourceKind =
   | "reactor"
   | "solar"
@@ -549,6 +556,7 @@ export interface TelemetrySnapshot {
   "career.science"?: number;
   "tar.name"?: string;
   "tar.type"?: string;
+  "tar.objectId"?: string;
   "tar.distance"?: number;
   "tar.o.relativeVelocity"?: number;
   "tar.o.velocity"?: number;
@@ -650,6 +658,7 @@ export interface MissionPlanningPersistenceState {
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
   | { type: "heat.loop.control"; requestId: string; loopId: number; action: HeatLoopControlAction; expectedVesselGuid: string; expectedRadiatorPartIds: number[] }
+  | { type: "target.clear"; requestId: string; expectedVesselGuid: string; expectedTargetObjectId: string; expectedTargetName: string; expectedTargetType: "body" | "dockingport" | "vessel" }
   | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
   | { type: "science.lab.transmit"; requestId: string; labId: string }
   | { type: "science.lab.research"; requestId: string; labId: string; enabled: boolean }

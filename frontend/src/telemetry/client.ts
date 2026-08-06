@@ -9,6 +9,7 @@ import type {
   ScienceAlarmResult,
   ScienceLabResearchResult,
   ScienceLabTransmitResult,
+  TargetClearResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -34,6 +35,7 @@ interface TelemetryClientCallbacks {
   onOverviewVesselLifecycleResult?(result: OverviewVesselLifecycleResult): void;
   onOverviewVesselSwitchResult?(result: OverviewVesselSwitchResult): void;
   onReactorControlResult?(result: ReactorControlResult): void;
+  onTargetClearResult?(result: TargetClearResult): void;
   onPersistenceState?(state: MissionPlanningPersistenceState): void;
   onSnapshot(snapshot: TelemetrySnapshot): void;
   onStatus(status: ConnectionStatus, message?: string): void;
@@ -107,6 +109,40 @@ function isHeatLoopControlResultMessage(raw: unknown) {
       && typeof parsed === "object"
       && !Array.isArray(parsed)
       && (parsed as Record<string, unknown>).type === "heat.loop.control.result",
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function parseTargetClearResult(raw: unknown): TargetClearResult | null {
+  let parsed: unknown;
+  try {
+    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    candidate.type !== "target.clear.result"
+    || typeof candidate.requestId !== "string"
+    || !candidate.requestId
+    || candidate.requestId.length > 128
+    || (candidate.status !== "accepted" && candidate.status !== "error")
+    || typeof candidate.message !== "string"
+  ) return null;
+  return candidate as unknown as TargetClearResult;
+}
+
+function isTargetClearResultMessage(raw: unknown) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Boolean(
+      parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).type === "target.clear.result",
     );
   } catch {
     return false;
@@ -549,6 +585,12 @@ export class TelemetryClient {
         return;
       }
       if (isHeatLoopControlResultMessage(event.data)) return;
+      const targetClearResult = parseTargetClearResult(event.data);
+      if (targetClearResult) {
+        this.callbacks.onTargetClearResult?.(targetClearResult);
+        return;
+      }
+      if (isTargetClearResultMessage(event.data)) return;
       const reactorControlResult = parseReactorControlResult(event.data);
       if (reactorControlResult) {
         this.callbacks.onReactorControlResult?.(reactorControlResult);

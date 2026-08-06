@@ -11,6 +11,7 @@ import type {
   ScienceAlarmResult,
   ScienceLabResearchResult,
   ScienceLabTransmitResult,
+  TargetClearResult,
   TelemetryCommand,
   TelemetrySnapshot,
 } from "./types";
@@ -26,6 +27,7 @@ describe("TelemetryStore", () => {
       onScienceAlarmResult?(result: ScienceAlarmResult): void;
       onScienceLabResearchResult?(result: ScienceLabResearchResult): void;
       onScienceLabTransmitResult?(result: ScienceLabTransmitResult): void;
+      onTargetClearResult?(result: TargetClearResult): void;
       onPersistenceState?(state: MissionPlanningPersistenceState): void;
       onSnapshot(snapshot: TelemetrySnapshot): void;
       onStatus(status: ConnectionStatus, message?: string): void;
@@ -104,6 +106,12 @@ describe("TelemetryStore", () => {
       status: "accepted",
       message: "Transmit Science invoked.",
     });
+    callbacks!.onTargetClearResult?.({
+      type: "target.clear.result",
+      requestId: "target-clear-1",
+      status: "accepted",
+      message: "Target cleared.",
+    });
     expect(store.getSnapshot().snapshot?.["v.name"]).toBe("Odyssey");
     expect(store.getSnapshot().frameCount).toBe(1);
     expect(store.getSnapshot().lastFrameAt).not.toBeNull();
@@ -115,6 +123,7 @@ describe("TelemetryStore", () => {
     expect(store.getSnapshot().scienceAlarmResult?.provider).toBe("kac");
     expect(store.getSnapshot().scienceLabResearchResult?.enabled).toBe(false);
     expect(store.getSnapshot().scienceLabTransmitResult?.requestId).toBe("transmit-1");
+    expect(store.getSnapshot().targetClearResult?.requestId).toBe("target-clear-1");
 
     callbacks!.onStatus("retrying", "Connection dropped");
     expect(store.getSnapshot()).toMatchObject({
@@ -128,6 +137,7 @@ describe("TelemetryStore", () => {
       scienceAlarmResult: undefined,
       scienceLabResearchResult: undefined,
       scienceLabTransmitResult: undefined,
+      targetClearResult: undefined,
       status: "retrying",
     });
     expect(store.send({ type: "notes.select", relativePath: null })).toBe(true);

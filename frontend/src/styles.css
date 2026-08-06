@@ -1078,6 +1078,14 @@ button { font: inherit; }
 .heat-heading-status.hot strong { color: var(--amber); }
 .heat-heading-status.critical strong,
 .heat-heading-status.no-radiators strong { color: var(--warn); }
+.target-clear-button { min-height: 26px; padding: 2px 8px; border: 1px solid #7a5230; border-radius: 2px; color: var(--amber); background: rgba(255,180,84,.06); cursor: pointer; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.target-clear-button:hover:not(:disabled), .target-clear-button:focus-visible { border-color: var(--amber); background: rgba(255,180,84,.12); outline: none; }
+.target-clear-button:disabled { cursor: default; opacity: .45; }
+.target-command-feedback { padding: 5px 7px; border: 1px solid #315166; border-radius: 3px; color: #9ccfc2; background: rgba(78,201,224,.04); font-size: 8px; }
+.target-command-feedback.error { border-color: #573239; color: #d7a29c; background: rgba(255,107,91,.04); }
+@media (pointer: coarse) {
+  .target-clear-button { min-height: 36px; padding-block: 4px; }
+}
 .heat-empty { margin: 0; }
 .heat-idle-state { display: grid; min-height: 38px; padding: 8px 10px; align-items: center; grid-template-columns: 3px minmax(0,1fr) auto; gap: 9px; border: 1px solid var(--rule); border-radius: 4px; color: var(--slate); background: var(--panel); font-size: 9px; }
 .heat-idle-state strong { color: var(--green); font-size: 9px; letter-spacing: .08em; }
