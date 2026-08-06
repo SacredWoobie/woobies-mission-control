@@ -120,7 +120,7 @@ export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
     ? `Exact: ${formatTelemetryNumber(snapshot["v.altitude"])} m` : undefined;
 
   return (
-    <Panel hideable id="asc" title="Ascension" tag="Attitude · Throttle · Flight">
+    <Panel hideable id="asc" title="Ascension">
       <div className="asc-top">
         <div className="asc-left"><div className="sas-box"><span className="label">{sas.source === "mj" ? "Smart A.S.S (MechJeb)" : "SAS"}</span><span className={`sas-val ${sas.source === "off" ? "off" : ""}`}>{sas.mode}</span></div><div className="alt-box"><span className="label">Altitude</span><span className="alt-val" title={exactAltitude}>{formatDistance(snapshot["v.altitude"], "live")}</span></div></div>
         <div className="navwrap"><div className="heading-tape"><HeadingTape heading={heading} /></div><Navball heading={heading} pitch={pitch} roll={roll} /><div className="hdg-readout">HDG {formatHeadingDegrees(heading)}° · PIT {formatAttitudeDegrees(pitch, true)}° · ROL {formatAttitudeDegrees(roll)}°</div></div>
