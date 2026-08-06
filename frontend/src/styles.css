@@ -774,6 +774,97 @@ button { font: inherit; }
 .flight-health-lane { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .flight-flow-lane { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .flight-panel-slot, .flight-panel-slot > .panel { display: block; width: 100%; min-width: 0; }
+
+/* Flight workspaces keep every panel under one persistent owner. Regions and
+   lane assignment change placement only; they never move a panel in the DOM. */
+.flight-workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  grid-template-areas: "status" "fixed" "selector" "tabbed";
+  gap: 12px;
+  min-width: 0;
+}
+.flight-workspace-shell[data-fixed-empty="true"] { grid-template-areas: "status" "selector" "tabbed"; }
+.flight-workspace-shell > .status-strip { grid-area: status; min-width: 0; margin: 0; }
+.flight-fixed-region {
+  grid-area: fixed;
+  display: flex;
+  align-self: start;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  flex-direction: column;
+  gap: 12px;
+  background: color-mix(in srgb,var(--panel) 28%,transparent);
+}
+.flight-fixed-bottom-row { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; align-items: start; }
+.flight-fixed-region[data-bottom-layout="two-up"] .flight-fixed-bottom-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.flight-tabbed-region {
+  grid-area: tabbed;
+  align-self: start;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: color-mix(in srgb,var(--panel) 20%,transparent);
+}
+.flight-workspace-selector {
+  z-index: 2;
+  grid-area: selector;
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  min-height: 38px;
+  padding: 3px;
+  justify-self: end;
+  align-self: center;
+  gap: 3px;
+  border: 1px solid #315166;
+  border-radius: 4px;
+  background: #0b141e;
+}
+.flight-workspace-selector button {
+  min-width: 82px;
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+.flight-workspace-selector button[aria-selected="true"] { border-color: #3a6f86; color: var(--cyan); background: #142535; }
+.flight-workspace-selector button:hover { color: var(--cyan); background: #101f2c; }
+.flight-workspace-selector .flight-workspace-rebalance { min-width: 34px; width: 34px; padding-inline: 0; color: var(--amber); font-size: 17px; }
+.flight-workspace-view { position: relative; width: 100%; min-width: 0; }
+.flight-workspace-view[hidden] { display: none; }
+.flight-workspace-view > [data-flight-panel-host] { left: 0; top: 0; }
+.flight-workspace-empty {
+  display: grid;
+  min-height: 132px;
+  padding: 24px;
+  place-items: center;
+  border: 1px dashed #315166;
+  color: var(--muted);
+  background: #0a1119;
+  text-align: center;
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] {
+  grid-template-columns: var(--flight-fixed-region-width) var(--flight-tabbed-region-width);
+  grid-template-areas: "status status" "fixed tabbed";
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] > .flight-workspace-selector {
+  grid-area: status;
+  margin-right: 4px;
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] > .status-strip { padding-right: 254px; }
+.flight-workspace-shell[data-arrangement="side-by-side"][data-fixed-empty="true"] {
+  grid-template-columns: minmax(0,1fr);
+  grid-template-areas: "status" "tabbed";
+}
 .project-footer { align-items: center; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; max-width: 1180px; margin: 12px auto 2px; padding: 10px 4px 2px; border-top: 1px solid var(--rule); color: var(--slate-dim); font-size: 9px; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
 .planner-persistence-status { color: var(--muted); white-space: nowrap; }
 .planner-persistence-status.is-shared { color: var(--green); }
@@ -1288,6 +1379,7 @@ button { font: inherit; }
 
 @media (min-width: 1440px) {
   .wrap, .project-footer { max-width: 1800px; }
+  .dashboard-surface:not(.editor-mode):not(.inactive-mode) .wrap { max-width: none; }
   .flight-grid {
     align-items: start;
     grid-template-columns: minmax(420px,1.1fr) minmax(320px,1fr) minmax(320px,1fr);
@@ -1386,19 +1478,22 @@ button { font: inherit; }
   .flight-grid-balanced .flight-flow-lane[data-flight-lane="0"] { grid-column: 2; grid-row: 1; }
   .flight-grid-balanced .flight-flow-lane[data-flight-lane="1"] { grid-column: 3; grid-row: 1; }
   .flight-grid-balanced .flight-flow-lane[data-flight-lane="2"] { grid-column: 4; grid-row: 1; }
-  .flight-grid .panel > h2 { min-height: 36px; padding-block: 4px; font-size: 11px; }
-  .flight-grid .panel > h2 .tag { font-size: 10px; letter-spacing: .05em; }
-  .flight-grid .panel-heading-actions { gap: 5px; }
-  .flight-grid .panel-hide-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex: 0 0 36px; font-size: 20px; }
-  .flight-grid .resonant-unpin,
-  .flight-grid .flight-note-unpin,
-  .flight-grid #flightNote .notes-font-controls button { min-width: 36px !important; min-height: 36px; font-size: 10px; }
-  .flight-grid #cons .col-heads,
-  .flight-grid #cons .res-row { grid-template-columns: 120px minmax(0,1fr) minmax(0,1fr); gap: 6px; }
+  :is(.flight-grid,.flight-workspace-shell) .panel > h2 { min-height: 36px; padding-block: 4px; font-size: 11px; }
+  :is(.flight-grid,.flight-workspace-shell) .panel > h2 .tag { font-size: 10px; letter-spacing: .05em; }
+  :is(.flight-grid,.flight-workspace-shell) .panel-heading-actions { gap: 5px; }
+  :is(.flight-grid,.flight-workspace-shell) .panel-hide-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex: 0 0 36px; font-size: 20px; }
+  :is(.flight-grid,.flight-workspace-shell) .resonant-unpin,
+  :is(.flight-grid,.flight-workspace-shell) .flight-note-unpin,
+  :is(.flight-grid,.flight-workspace-shell) #flightNote .notes-font-controls button { min-width: 36px !important; min-height: 36px; font-size: 10px; }
+  :is(.flight-grid,.flight-workspace-shell) #cons .col-heads,
+  :is(.flight-grid,.flight-workspace-shell) #cons .res-row { grid-template-columns: 120px minmax(0,1fr) minmax(0,1fr); gap: 6px; }
   .flight-region-reference .panel > h2 .tag { letter-spacing: 0; }
   .flight-region-primary #asc .stat .v { font-size: 14px; }
   .flight-region-primary #asc .stats-grid .label { font-size: 9px; letter-spacing: .08em; white-space: nowrap; }
   .flight-region-primary .hdg-readout { font-size: 11px; letter-spacing: .05em; white-space: nowrap; }
+  .flight-fixed-region #asc .stat .v { font-size: 14px; }
+  .flight-fixed-region #asc .stats-grid .label { font-size: 9px; letter-spacing: .08em; white-space: nowrap; }
+  .flight-fixed-region .hdg-readout { font-size: 11px; letter-spacing: .05em; white-space: nowrap; }
 }
 
 @media (orientation: landscape) and (min-width: 1050px) {

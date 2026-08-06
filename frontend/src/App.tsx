@@ -60,6 +60,7 @@ function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
       science={<SciencePanel snapshot={snapshot} />}
       staging={<StagingPanel snapshot={snapshot} />}
       target={snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : undefined}
+      vesselIdentity={String(snapshot["v.persistentId"] ?? snapshot["v.guid"] ?? snapshot["v.name"] ?? "fixture-vessel")}
     />
   );
 }

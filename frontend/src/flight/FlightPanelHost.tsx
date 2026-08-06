@@ -10,6 +10,7 @@ export function useFlightPanelActivity() {
 interface FlightPanelHostProps extends PropsWithChildren {
   active: boolean;
   id: FlightLayoutPanelId;
+  layout?: "flat" | "flow";
   position?: Pick<FlightPanelPosition, "x" | "y">;
   visible: boolean;
   width?: number;
@@ -19,6 +20,7 @@ export function FlightPanelHost({
   active,
   children,
   id,
+  layout = "flat",
   position,
   visible,
   width,
@@ -26,8 +28,8 @@ export function FlightPanelHost({
   const participating = active && visible;
   const style: CSSProperties = {
     display: participating ? "block" : "none",
-    position: "absolute",
-    transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)`,
+    position: layout === "flat" ? "absolute" : "relative",
+    transform: layout === "flat" ? `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` : undefined,
     width,
   };
 

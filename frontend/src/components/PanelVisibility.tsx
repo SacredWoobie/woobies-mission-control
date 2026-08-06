@@ -78,6 +78,7 @@ interface PanelVisibilityValue {
   availablePanels: ReadonlySet<DashboardPanelId>;
   centralizedRail: boolean;
   hiddenPanels: ReadonlySet<DashboardPanelId>;
+  lastRestore: { id: DashboardPanelId; sequence: number } | null;
   autoCollapsePanel(id: DashboardPanelId): void;
   clearAutoCollapse(id: DashboardPanelId): void;
   hidePanel(id: DashboardPanelId): void;
@@ -89,6 +90,7 @@ const fallbackVisibility: PanelVisibilityValue = {
   availablePanels: new Set<DashboardPanelId>(),
   centralizedRail: false,
   hiddenPanels: new Set<DashboardPanelId>(),
+  lastRestore: null,
   autoCollapsePanel() {},
   clearAutoCollapse() {},
   hidePanel() {},
@@ -119,6 +121,7 @@ export function PanelVisibilityProvider({
   const [availablePanelSources, setAvailablePanelSources] = useState(
     () => new Map<string, ReadonlySet<DashboardPanelId>>(),
   );
+  const [lastRestore, setLastRestore] = useState<PanelVisibilityValue["lastRestore"]>(null);
 
   const persist = useCallback((next: Set<DashboardPanelId>) => {
     try {
@@ -198,12 +201,14 @@ export function PanelVisibilityProvider({
       next.delete(id);
       return next;
     });
+    setLastRestore((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
   }, [persist]);
 
   const value = useMemo<PanelVisibilityValue>(() => ({
     availablePanels,
     centralizedRail,
     hiddenPanels,
+    lastRestore,
     autoCollapsePanel,
     clearAutoCollapse,
     hidePanel,
@@ -216,6 +221,7 @@ export function PanelVisibilityProvider({
     clearAutoCollapse,
     hiddenPanels,
     hidePanel,
+    lastRestore,
     registerAvailablePanels,
     restorePanel,
   ]);

@@ -4,8 +4,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ConsumablesPanel } from "./components/ConsumablesPanel";
-import { cascadeFlightPanels, flightPanelRegion } from "./components/FlightDashboard";
 import { StagingPanel } from "./components/StagingPanel";
+import { balanceContiguousPanelLanes, flightPanelOwner } from "./flight/layout";
 import {
   editorTelemetryFixture,
   flightTelemetryFixture,
@@ -80,21 +80,20 @@ afterEach(() => {
 });
 
 describe("Dashboard lifecycle", () => {
-  it("assigns every flight panel to a stable semantic region", () => {
-    expect(flightPanelRegion("asc")).toBe("primary");
-    ["cons", "heat", "elec", "sci"].forEach((id) => {
-      expect(flightPanelRegion(id as "cons")).toBe("health");
+  it("assigns every flight panel to its stable fixed or workspace owner", () => {
+    ["asc", "cons", "stage"].forEach((id) => {
+      expect(flightPanelOwner(id as "asc")).toBe("fixed");
     });
-    ["stage", "target"].forEach((id) => {
-      expect(flightPanelRegion(id as "stage")).toBe("operations");
+    ["heat", "elec", "sci", "target"].forEach((id) => {
+      expect(flightPanelOwner(id as "elec")).toBe("monitor");
     });
     ["flightNote", "flightOrbitPlan", "flightDeltaVPlan"].forEach((id) => {
-      expect(flightPanelRegion(id as "flightNote")).toBe("reference");
+      expect(flightPanelOwner(id as "flightNote")).toBe("plan");
     });
   });
 
   it("cascades wide flight panels vertically before moving to the next lane", () => {
-    expect(cascadeFlightPanels(
+    expect(balanceContiguousPanelLanes(
       ["elec", "heat", "sci", "stage", "flightOrbitPlan", "flightDeltaVPlan"],
       {
         heat: 229,
@@ -112,7 +111,7 @@ describe("Dashboard lifecycle", () => {
   });
 
   it("fills wide flow lanes to the fixed primary-column height before moving right", () => {
-    expect(cascadeFlightPanels(
+    expect(balanceContiguousPanelLanes(
       ["elec", "heat", "sci", "stage"],
       {
         elec: 197,
@@ -145,9 +144,16 @@ describe("Dashboard lifecycle", () => {
   it("renders the complete flight dashboard and restores hidden panels from the left rail", () => {
     const firstView = render(<App />);
     expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.4 · Development")).toBeTruthy();
-    ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target", "Pinned note"].forEach((heading) => {
+    ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
       expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });
+    expect(screen.queryByRole("heading", { name: /^Pinned note/ })).toBeNull();
+    expect(screen.getByRole("tab", { name: "MONITOR" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("false");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "MONITOR" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "PLAN" }), { key: "Home" });
+    expect(screen.getByRole("tab", { name: "MONITOR" }).getAttribute("aria-selected")).toBe("true");
     const flightContext = firstView.container.querySelector("#clock");
     expect(flightContext?.textContent).toContain("Odyssey");
     expect(flightContext?.textContent).toContain("Kerbin");
@@ -174,27 +180,31 @@ describe("Dashboard lifecycle", () => {
     expect(firstView.container.querySelector("svg.spark")?.getAttribute("preserveAspectRatio")).toBe("none");
     expect(firstView.container.querySelector(".nav-sky")).toBeTruthy();
     expect(firstView.container.querySelector(".nav-ground")).toBeTruthy();
-    const primaryRegion = firstView.container.querySelector('[data-flight-region="primary"]');
-    const operationsRegion = firstView.container.querySelector('[data-flight-region="operations"]');
-    const healthRegion = firstView.container.querySelector('[data-flight-region="health"]');
-    const referenceRegion = firstView.container.querySelector('[data-flight-region="reference"]');
-    const ascensionSlot = primaryRegion?.querySelector(".flight-panel-slot-asc");
+    const fixedRegion = firstView.container.querySelector('[data-flight-region="fixed"]');
+    const tabbedRegion = firstView.container.querySelector('[data-flight-region="tabbed"]');
+    const monitorView = tabbedRegion?.querySelector('[data-flight-workspace-view="monitor"]');
+    const planView = tabbedRegion?.querySelector('[data-flight-workspace-view="plan"]');
+    const ascensionSlot = fixedRegion?.querySelector(".flight-panel-slot-asc");
     expect(ascensionSlot?.querySelector("#asc")).toBeTruthy();
-    expect(operationsRegion?.querySelector("#stage")).toBeTruthy();
-    expect(operationsRegion?.querySelector("#target")).toBeTruthy();
-    expect(healthRegion?.querySelector("#cons")).toBeTruthy();
-    expect(healthRegion?.querySelector(".flight-health-lane-resources #heat")).toBeTruthy();
-    expect(healthRegion?.querySelector(".flight-health-lane-systems #elec")).toBeTruthy();
-    expect(healthRegion?.querySelector(".flight-health-lane-systems #sci")).toBeTruthy();
-    expect(referenceRegion?.querySelector("#flightNote")).toBeTruthy();
+    expect(fixedRegion?.querySelector("#cons")).toBeTruthy();
+    expect(fixedRegion?.querySelector("#stage")).toBeTruthy();
+    expect(monitorView?.querySelector("#target")).toBeTruthy();
+    expect(monitorView?.querySelector("#heat")).toBeTruthy();
+    expect(monitorView?.querySelector("#elec")).toBeTruthy();
+    expect(monitorView?.querySelector("#sci")).toBeTruthy();
+    expect(planView?.querySelector("#flightNote")).toBeTruthy();
     expect([...firstView.container.querySelectorAll("[data-flight-panel]")].map((slot) => slot.getAttribute("data-flight-panel"))).toEqual([
-      "asc", "stage", "target", "cons", "heat", "elec", "sci", "flightNote",
+      "asc", "cons", "stage", "elec", "heat", "sci", "target", "flightNote",
     ]);
     const pinnedNote = firstView.container.querySelector("#flightNote");
     expect(pinnedNote?.querySelector("h2 .flight-note-name")?.textContent).toBe("log_Odyssey");
     expect(pinnedNote?.querySelector("h2 .notes-font-controls")).toBeTruthy();
     expect(pinnedNote?.querySelector("h2 .flight-note-unpin")).toBeTruthy();
     expect(pinnedNote?.querySelector(".body")?.firstElementChild?.className).toBe("flight-note-meta");
+    fireEvent.click(screen.getByRole("tab", { name: "PLAN" }));
+    expect(screen.getByRole("heading", { name: /^Pinned note/ })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /^Electricity/ })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "MONITOR" }));
     expect(flightTelemetryFixture["stage.totalDvAtmo"]).toBe(flightTelemetryFixture["stage.totalDvVac"]);
     expect(screen.queryByRole("button", { name: "CURRENT" })).toBeNull();
     expect(screen.queryByRole("button", { name: "VACUUM" })).toBeNull();
@@ -202,8 +212,11 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByText("Δv current", { exact: true })).toBeTruthy();
     expect(screen.getByText("Δv vac", { exact: true })).toBeTruthy();
 
+    const heatNode = firstView.container.querySelector("#heat");
     fireEvent.click(screen.getByRole("button", { name: "Hide Heat Management panel" }));
-    expect(firstView.container.querySelector("#heat")).toBeNull();
+    expect(firstView.container.querySelector("#heat")).toBe(heatNode);
+    expect(screen.queryByRole("heading", { name: /^Heat Management/ })).toBeNull();
+    expect(heatNode?.closest("[data-flight-panel-host]")?.getAttribute("aria-hidden")).toBe("true");
     const restore = screen.getByRole("button", { name: "Heat" });
     expect(restore.querySelector(".panel-rail-label")?.textContent).toBe("Heat Management");
     expect(restore.querySelector(".panel-rail-icon-heat")).toBeTruthy();
@@ -212,24 +225,32 @@ describe("Dashboard lifecycle", () => {
     expect(railButtons.indexOf(restore)).toBeLessThan(railButtons.indexOf(deltaVTool));
     expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).toContain("heat");
     fireEvent.click(restore);
-    expect(firstView.container.querySelector("#heat")).toBeTruthy();
+    expect(firstView.container.querySelector("#heat")).toBe(heatNode);
+    expect(screen.getByRole("heading", { name: /^Heat Management/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide Ascension panel" }));
     fireEvent.click(screen.getByRole("button", { name: "Hide Consumables panel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide Staging analysis panel" }));
+    expect(fixedRegion?.hasAttribute("hidden")).toBe(true);
+    expect(firstView.container.querySelector(".flight-workspace-shell")?.getAttribute("data-fixed-empty")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: "PLAN" }));
     fireEvent.click(screen.getByRole("button", { name: "Hide Pinned note panel" }));
     const pinnedRestore = screen.getByRole("button", { name: "Pinned note" });
     expect(pinnedRestore.querySelector(".panel-rail-icon-flightNote")).toBeTruthy();
     expect(pinnedRestore.nextElementSibling).toBe(screen.getByRole("button", { name: "Notes" }));
-    expect(firstView.container.querySelector("[data-flight-panel=\"asc\"]")).toBeNull();
-    expect(firstView.container.querySelector("[data-flight-panel=\"cons\"]")).toBeNull();
+    expect(firstView.container.querySelector("[data-flight-panel=\"asc\"]")).toBeTruthy();
+    expect(firstView.container.querySelector("[data-flight-panel=\"cons\"]")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "MONITOR" }));
+    fireEvent.click(pinnedRestore);
+    expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: /^Pinned note/ })).toBeTruthy();
     firstView.unmount();
 
     localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["sci"]));
     const packedView = render(<App />);
     expect(screen.queryByRole("heading", { name: "Science" })).toBeNull();
     expect(screen.getByRole("button", { name: "Science" }).querySelector(".panel-rail-label")?.textContent).toBe("Science");
-    expect([...packedView.container.querySelectorAll("[data-flight-panel]")].map((slot) => slot.getAttribute("data-flight-panel"))).toEqual([
-      "asc", "stage", "target", "cons", "heat", "elec", "flightNote",
-    ]);
+    expect(packedView.container.querySelector("#sci")).toBeTruthy();
+    expect(packedView.container.querySelector('[data-flight-panel-host="sci"]')?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("removes ElectricCharge from Flight Consumables", () => {

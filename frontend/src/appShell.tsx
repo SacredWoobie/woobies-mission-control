@@ -303,6 +303,7 @@ function LiveFlightDashboard() {
       science={<LiveSciencePanel />}
       staging={<LiveStagingPanel />}
       target={availability?.["tar.name"]?.trim() ? <LiveTargetPanel /> : undefined}
+      vesselIdentity={String(availability?.["v.persistentId"] ?? availability?.["v.guid"] ?? availability?.["v.name"] ?? "unknown-vessel")}
     />
   );
 }

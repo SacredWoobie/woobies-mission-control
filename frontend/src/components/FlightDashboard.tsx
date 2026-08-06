@@ -1,46 +1,16 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { balanceContiguousPanelLanes } from "../flight/layout";
-import { HideablePanelSlot, PanelRestoreRail, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
-
-export type FlightPanelRegion = "primary" | "health" | "operations" | "reference";
-
-const flightPanelRegions: Record<FlightPanelRegion, readonly DashboardPanelId[]> = {
-  primary: ["asc"],
-  operations: ["stage", "target"],
-  health: ["cons", "heat", "elec", "sci"],
-  reference: ["flightNote", "flightOrbitPlan", "flightDeltaVPlan"],
-};
-
-const wideFlightLayoutQuery = "(min-width: 1800px)";
-const flightFlowOrder: readonly DashboardPanelId[] = [
-  "elec",
-  "heat",
-  "sci",
-  "stage",
-  "target",
-  "flightOrbitPlan",
-  "flightNote",
-  "flightDeltaVPlan",
-];
-
-export function flightPanelRegion(id: DashboardPanelId): FlightPanelRegion | undefined {
-  return (Object.entries(flightPanelRegions) as Array<[FlightPanelRegion, readonly DashboardPanelId[]]>)
-    .find(([, ids]) => ids.includes(id))?.[0];
-}
-
-export function cascadeFlightPanels(
-  ids: readonly DashboardPanelId[],
-  heights: Readonly<Partial<Record<DashboardPanelId, number>>>,
-  laneCount = 3,
-  fillHeight?: number,
-): DashboardPanelId[][] {
-  return balanceContiguousPanelLanes(ids, heights, laneCount, fillHeight);
-}
-
-function sameLanes(left: readonly (readonly DashboardPanelId[])[], right: readonly (readonly DashboardPanelId[])[]) {
-  return left.length === right.length
-    && left.every((lane, index) => lane.join("|") === right[index]?.join("|"));
-}
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { FlightPanelHost } from "../flight/FlightPanelHost";
+import { FlightWorkspaceView, type FlightWorkspacePanel } from "../flight/FlightWorkspaceView";
+import {
+  computeFlightRegionGeometry,
+  flightFixedPanelIds,
+  flightMonitorPanelIds,
+  flightPanelOwner,
+  flightPlanPanelIds,
+  type FlightLayoutPanelId,
+  type FlightWorkspaceView as FlightWorkspaceViewName,
+} from "../flight/layout";
+import { PanelRestoreRail, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
 
 interface FlightDashboardProps {
   ascension: ReactNode;
@@ -55,7 +25,13 @@ interface FlightDashboardProps {
   science: ReactNode;
   staging: ReactNode;
   target?: ReactNode;
+  vesselIdentity?: string;
 }
+
+type WorkspaceStyle = CSSProperties & {
+  "--flight-fixed-region-width": string;
+  "--flight-tabbed-region-width": string;
+};
 
 export function FlightDashboard({
   ascension,
@@ -70,138 +46,167 @@ export function FlightDashboard({
   science,
   staging,
   target,
+  vesselIdentity = "unknown-vessel",
 }: FlightDashboardProps) {
-  const { hiddenPanels } = usePanelVisibility();
-  const panelCandidates = new Map<DashboardPanelId, ReactNode>([
-    ["asc", ascension],
-    ["cons", consumables],
-    ["heat", heat],
-    ["elec", electricity],
-    ["sci", science],
-    ["stage", staging],
-  ]);
-  if (target) panelCandidates.set("target", target);
-  if (pinnedNote) panelCandidates.set("flightNote", pinnedNote);
-  if (pinnedOrbitPlan) panelCandidates.set("flightOrbitPlan", pinnedOrbitPlan);
-  if (pinnedDeltaVPlan) panelCandidates.set("flightDeltaVPlan", pinnedDeltaVPlan);
-
-  const visibleFlowIds = flightFlowOrder.filter((id) => panelCandidates.has(id) && !hiddenPanels.has(id));
-  const flowSignature = visibleFlowIds.join("|");
-  const [wideLayout, setWideLayout] = useState(() => (
-    typeof window !== "undefined" && window.matchMedia?.(wideFlightLayoutQuery).matches
+  const boardRef = useRef<HTMLDivElement>(null);
+  const { hiddenPanels, lastRestore } = usePanelVisibility();
+  const [activeView, setActiveView] = useState<FlightWorkspaceViewName>("monitor");
+  const [wrapperWidth, setWrapperWidth] = useState(() => (
+    typeof window === "undefined" ? 0 : window.innerWidth
   ));
-  const [balancedLayout, setBalancedLayout] = useState<{
-    signature: string;
-    lanes: DashboardPanelId[][];
-  }>(() => ({ signature: "", lanes: cascadeFlightPanels(visibleFlowIds, {}) }));
-  const balancedGridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const query = window.matchMedia?.(wideFlightLayoutQuery);
-    if (!query) return undefined;
-    const update = () => setWideLayout(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  const visibleLanes = balancedLayout.signature === flowSignature
-    ? balancedLayout.lanes
-    : cascadeFlightPanels(visibleFlowIds, {});
+  const [rebalanceSequence, setRebalanceSequence] = useState<Record<FlightWorkspaceViewName, number>>({
+    monitor: 0,
+    plan: 0,
+  });
+  const panelCandidates = useMemo(() => {
+    const candidates = new Map<FlightLayoutPanelId, ReactNode>([
+      ["asc", ascension],
+      ["cons", consumables],
+      ["stage", staging],
+      ["elec", electricity],
+      ["heat", heat],
+      ["sci", science],
+    ]);
+    if (target) candidates.set("target", target);
+    if (pinnedDeltaVPlan) candidates.set("flightDeltaVPlan", pinnedDeltaVPlan);
+    if (pinnedOrbitPlan) candidates.set("flightOrbitPlan", pinnedOrbitPlan);
+    if (pinnedNote) candidates.set("flightNote", pinnedNote);
+    return candidates;
+  }, [ascension, consumables, electricity, heat, pinnedDeltaVPlan, pinnedNote, pinnedOrbitPlan, science, staging, target]);
+  const visibleFixedIds = flightFixedPanelIds.filter((id) => panelCandidates.has(id) && !hiddenPanels.has(id));
+  const geometry = computeFlightRegionGeometry(wrapperWidth, visibleFixedIds.length > 0);
+  const panelFor = (id: FlightLayoutPanelId): FlightWorkspacePanel | undefined => {
+    const content = panelCandidates.get(id);
+    return content ? { content, id } : undefined;
+  };
+  const monitorPanels = flightMonitorPanelIds.map(panelFor).filter((panel): panel is FlightWorkspacePanel => !!panel);
+  const planPanels = flightPlanPanelIds.map(panelFor).filter((panel): panel is FlightWorkspacePanel => !!panel);
+  const style: WorkspaceStyle = {
+    "--flight-fixed-region-width": `${geometry.fixedRegionWidth}px`,
+    "--flight-tabbed-region-width": `${geometry.tabbedRegionWidth}px`,
+  };
 
   useLayoutEffect(() => {
-    if (!wideLayout || !balancedGridRef.current) return;
-    const grid = balancedGridRef.current;
+    if (!boardRef.current) return undefined;
+    const board = boardRef.current;
     const measure = () => {
-      const measuredHeights: Partial<Record<DashboardPanelId, number>> = {};
-      grid.querySelectorAll<HTMLElement>("[data-flight-panel]").forEach((slot) => {
-        const id = slot.dataset.flightPanel as DashboardPanelId | undefined;
-        if (id && id !== "asc") measuredHeights[id] = slot.getBoundingClientRect().height;
-      });
-      const primaryHeight = grid
-        .querySelector<HTMLElement>('[data-flight-region="primary"]')
-        ?.getBoundingClientRect().height;
-      const lanes = cascadeFlightPanels(visibleFlowIds, measuredHeights, 3, primaryHeight);
-      setBalancedLayout((current) => (
-        current.signature === flowSignature && sameLanes(current.lanes, lanes)
-          ? current
-          : { signature: flowSignature, lanes }
-      ));
+      const width = board.getBoundingClientRect().width;
+      if (width > 0) setWrapperWidth((current) => current === width ? current : width);
     };
     measure();
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(measure);
-    grid.querySelectorAll<HTMLElement>("[data-flight-panel]").forEach((slot) => observer.observe(slot));
+    observer.observe(board);
     return () => observer.disconnect();
-  }, [flowSignature, wideLayout]);
+  }, []);
 
-  const renderPanel = (id: DashboardPanelId) => {
+  useEffect(() => {
+    if (!lastRestore) return;
+    const owner = flightPanelOwner(lastRestore.id);
+    if (owner === "monitor" || owner === "plan") setActiveView(owner);
+  }, [lastRestore]);
+
+  const selectAdjacentView = (event: KeyboardEvent<HTMLButtonElement>, view: FlightWorkspaceViewName) => {
+    let next: FlightWorkspaceViewName | undefined;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") next = view === "monitor" ? "plan" : "monitor";
+    if (event.key === "Home") next = "monitor";
+    if (event.key === "End") next = "plan";
+    if (!next) return;
+    event.preventDefault();
+    setActiveView(next);
+    document.getElementById(`flight-workspace-tab-${next}`)?.focus();
+  };
+
+  const renderFixedPanel = (id: typeof flightFixedPanelIds[number]) => {
     const content = panelCandidates.get(id);
-    if (!content || hiddenPanels.has(id)) return null;
+    if (!content) return null;
     return (
-      <div
-        className={`flight-panel-slot flight-panel-slot-${id}`}
-        data-flight-panel={id}
-        key={id}
-      >
-        <HideablePanelSlot id={id}>{content}</HideablePanelSlot>
-      </div>
+      <FlightPanelHost active id={id} key={id} layout="flow" visible={!hiddenPanels.has(id)}>
+        <div className={`flight-panel-slot flight-panel-slot-${id}`} data-flight-panel={id}>
+          {content}
+        </div>
+      </FlightPanelHost>
     );
   };
-
-  const renderRegion = (region: FlightPanelRegion) => {
-    const panels = flightPanelRegions[region].map(renderPanel).filter(Boolean);
-    if (panels.length === 0) return null;
-    if (region === "health") {
-      return (
-        <div
-          className="flight-region flight-region-health"
-          data-flight-region="health"
-          key={region}
-        >
-          <div className="flight-health-lane flight-health-lane-resources">
-            {(["cons", "heat"] as const).map(renderPanel)}
-          </div>
-          <div className="flight-health-lane flight-health-lane-systems">
-            {(["elec", "sci"] as const).map(renderPanel)}
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div
-        className={`flight-region flight-region-${region}`}
-        data-flight-region={region}
-        key={region}
-      >
-        {panels}
-      </div>
-    );
-  };
-
-  const flightPanels = wideLayout ? (
-    <div className="flight-grid flight-grid-balanced" ref={balancedGridRef}>
-      <div className="flight-region flight-region-primary" data-flight-region="primary">
-        {renderPanel("asc")}
-        {renderPanel("cons")}
-      </div>
-      {visibleLanes.map((lane, index) => (
-        <div className="flight-flow-lane" data-flight-lane={index} key={index}>
-          {lane.map(renderPanel)}
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div className="flight-grid">
-      {(["primary", "operations", "health", "reference"] as const).map(renderRegion)}
-    </div>
-  );
 
   return (
     <>
       <PanelRestoreRail available={availablePanels} />
-      <div className="status-strip">{clock}</div>
-      {flightPanels}
+      <div
+        className="flight-workspace-shell"
+        data-arrangement={geometry.arrangement}
+        data-fixed-empty={visibleFixedIds.length === 0}
+        ref={boardRef}
+        style={style}
+      >
+        <div className="status-strip">{clock}</div>
+        <div aria-label="Flight workspace" className="flight-workspace-selector" role="tablist">
+          {(["monitor", "plan"] as const).map((view) => (
+            <button
+              aria-controls={`flight-workspace-panel-${view}`}
+              aria-selected={activeView === view}
+              id={`flight-workspace-tab-${view}`}
+              key={view}
+              onKeyDown={(event) => selectAdjacentView(event, view)}
+              onClick={() => setActiveView(view)}
+              role="tab"
+              tabIndex={activeView === view ? 0 : -1}
+              type="button"
+            >
+              {view.toUpperCase()}
+            </button>
+          ))}
+          <button
+            aria-label={`Rebalance ${activeView.toUpperCase()} workspace`}
+            className="flight-workspace-rebalance"
+            onClick={() => setRebalanceSequence((current) => ({
+              ...current,
+              [activeView]: current[activeView] + 1,
+            }))}
+            title={`Rebalance ${activeView.toUpperCase()} panels`}
+            type="button"
+          >
+            ↻
+          </button>
+        </div>
+        <section
+          aria-label="Persistent vessel state"
+          className="flight-fixed-region"
+          data-bottom-layout={geometry.fixedContentWidth >= 800 ? "two-up" : "stacked"}
+          data-flight-region="fixed"
+          hidden={visibleFixedIds.length === 0}
+        >
+          {renderFixedPanel("asc")}
+          <div className="flight-fixed-bottom-row">
+            {renderFixedPanel("cons")}
+            {renderFixedPanel("stage")}
+          </div>
+        </section>
+        <section aria-label="Flight workspaces" className="flight-tabbed-region" data-flight-region="tabbed">
+          <FlightWorkspaceView
+            active={activeView === "monitor"}
+            arrangement={geometry.arrangement}
+            hiddenPanels={hiddenPanels}
+            laneCount={geometry.laneCount}
+            laneWidth={geometry.laneWidth}
+            panels={monitorPanels}
+            rebalanceSequence={rebalanceSequence.monitor}
+            vesselIdentity={vesselIdentity}
+            view="monitor"
+          />
+          <FlightWorkspaceView
+            active={activeView === "plan"}
+            arrangement={geometry.arrangement}
+            hiddenPanels={hiddenPanels}
+            laneCount={geometry.laneCount}
+            laneWidth={geometry.laneWidth}
+            panels={planPanels}
+            rebalanceSequence={rebalanceSequence.plan}
+            vesselIdentity={vesselIdentity}
+            view="plan"
+          />
+        </section>
+      </div>
     </>
   );
 }

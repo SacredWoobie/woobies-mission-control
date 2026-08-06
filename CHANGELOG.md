@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Restructured Flight around a persistent vessel-state region and switchable
+  MONITOR and PLAN workspaces. Responsive lane placement, Rebalance, and panel
+  restoration preserve mounted panel state while inactive or hidden panels
+  leave layout and accessibility flow and suspend their telemetry updates.
+
 ## v0.4.4 - Launcher usability fixes
 
 - Kept every launcher control reachable on laptop-height displays with a
