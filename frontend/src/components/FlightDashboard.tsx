@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { balanceContiguousPanelLanes } from "../flight/layout";
 import { HideablePanelSlot, PanelRestoreRail, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
 
 export type FlightPanelRegion = "primary" | "health" | "operations" | "reference";
@@ -33,80 +34,7 @@ export function cascadeFlightPanels(
   laneCount = 3,
   fillHeight?: number,
 ): DashboardPanelId[][] {
-  if (laneCount <= 0) return [];
-  const lanes = Array.from({ length: laneCount }, () => [] as DashboardPanelId[]);
-  if (ids.length === 0) return lanes;
-
-  const panelHeights = ids.map((id) => Math.max(1, heights[id] ?? 1));
-  if (Number.isFinite(fillHeight) && (fillHeight ?? 0) > 0) {
-    let laneIndex = 0;
-    let laneHeight = 0;
-    ids.forEach((id, index) => {
-      const heightWithGap = panelHeights[index] + (lanes[laneIndex].length > 0 ? 12 : 0);
-      if (
-        lanes[laneIndex].length > 0
-        && laneIndex < laneCount - 1
-        && laneHeight + heightWithGap > fillHeight!
-      ) {
-        laneIndex += 1;
-        laneHeight = 0;
-      }
-      lanes[laneIndex].push(id);
-      laneHeight += panelHeights[index] + (lanes[laneIndex].length > 1 ? 12 : 0);
-    });
-    return lanes;
-  }
-
-  const prefixHeights = [0];
-  panelHeights.forEach((height) => prefixHeights.push(prefixHeights[prefixHeights.length - 1] + height));
-  const segmentHeight = (start: number, end: number) => (
-    prefixHeights[end] - prefixHeights[start] + Math.max(0, end - start - 1) * 12
-  );
-  const usedLaneCount = Math.min(laneCount, ids.length);
-  const bestMaximum = Array.from(
-    { length: usedLaneCount + 1 },
-    () => Array.from({ length: ids.length + 1 }, () => Number.POSITIVE_INFINITY),
-  );
-  const bestSquaredTotal = Array.from(
-    { length: usedLaneCount + 1 },
-    () => Array.from({ length: ids.length + 1 }, () => Number.POSITIVE_INFINITY),
-  );
-  const previousCut = Array.from(
-    { length: usedLaneCount + 1 },
-    () => Array.from({ length: ids.length + 1 }, () => -1),
-  );
-  bestMaximum[0][0] = 0;
-  bestSquaredTotal[0][0] = 0;
-
-  for (let usedLanes = 1; usedLanes <= usedLaneCount; usedLanes += 1) {
-    for (let end = usedLanes; end <= ids.length; end += 1) {
-      for (let start = usedLanes - 1; start < end; start += 1) {
-        if (!Number.isFinite(bestMaximum[usedLanes - 1][start])) continue;
-        const height = segmentHeight(start, end);
-        const candidateMaximum = Math.max(bestMaximum[usedLanes - 1][start], height);
-        const candidateSquaredTotal = bestSquaredTotal[usedLanes - 1][start] + height ** 2;
-        if (
-          candidateMaximum < bestMaximum[usedLanes][end]
-          || (
-            candidateMaximum === bestMaximum[usedLanes][end]
-            && candidateSquaredTotal < bestSquaredTotal[usedLanes][end]
-          )
-        ) {
-          bestMaximum[usedLanes][end] = candidateMaximum;
-          bestSquaredTotal[usedLanes][end] = candidateSquaredTotal;
-          previousCut[usedLanes][end] = start;
-        }
-      }
-    }
-  }
-
-  let end = ids.length;
-  for (let lane = usedLaneCount - 1; lane >= 0; lane -= 1) {
-    const start = previousCut[lane + 1][end];
-    lanes[lane] = ids.slice(start, end);
-    end = start;
-  }
-  return lanes;
+  return balanceContiguousPanelLanes(ids, heights, laneCount, fillHeight);
 }
 
 function sameLanes(left: readonly (readonly DashboardPanelId[])[], right: readonly (readonly DashboardPanelId[])[]) {

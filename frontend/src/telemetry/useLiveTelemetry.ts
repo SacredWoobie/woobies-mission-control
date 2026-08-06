@@ -1,4 +1,5 @@
 import { useCallback, useRef, useSyncExternalStore } from "react";
+import { useFlightPanelActivity } from "../flight/FlightPanelHost";
 import { liveTelemetryStore, type LiveTelemetryState } from "./store";
 
 type Equality<T> = (left: T, right: T) => boolean;
@@ -16,7 +17,10 @@ export function shallowEqual<T extends Record<string, unknown>>(left: T, right: 
 export function useLiveTelemetrySelector<T>(
   selector: Selector<T>,
   isEqual: Equality<T> = Object.is,
+  enabled = true,
 ) {
+  const panelActive = useFlightPanelActivity();
+  const subscriptionEnabled = enabled && panelActive;
   const selectorRef = useRef(selector);
   const equalityRef = useRef(isEqual);
   selectorRef.current = selector;
@@ -25,17 +29,24 @@ export function useLiveTelemetrySelector<T>(
     hasValue: false,
     value: undefined as T,
   });
+  const enabledRef = useRef(subscriptionEnabled);
+  enabledRef.current = subscriptionEnabled;
 
   const getSelection = useCallback(() => {
-    const next = selectorRef.current(liveTelemetryStore.getSnapshot());
     const cached = cacheRef.current;
+    if (!enabledRef.current && cached.hasValue) return cached.value;
+    const next = selectorRef.current(liveTelemetryStore.getSnapshot());
     if (cached.hasValue && equalityRef.current(cached.value, next)) return cached.value;
     cacheRef.current = { hasValue: true, value: next };
     return next;
   }, []);
 
+  const subscribe = useCallback((listener: () => void) => (
+    subscriptionEnabled ? liveTelemetryStore.subscribe(listener) : () => {}
+  ), [subscriptionEnabled]);
+
   return useSyncExternalStore(
-    liveTelemetryStore.subscribe,
+    subscribe,
     getSelection,
     getSelection,
   );
