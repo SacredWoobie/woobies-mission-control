@@ -137,7 +137,7 @@ $releaseImages = @(
     @{ Source = 'docs/images/v0.4.0/resonant-orbit-planner.png'; Name = "$packageName.zz-02-resonant-orbit-planner.png" },
     @{ Source = 'docs/images/v0.4.0/delta-v-planner.png'; Name = "$packageName.zz-03-delta-v-planner.png" },
     @{ Source = 'docs/images/v0.4.0/editor-vab-mission-plan.png'; Name = "$packageName.zz-04-editor-vab-mission-plan.png" },
-    @{ Source = 'docs/images/v0.4.3/flight-dashboard-mission-planning.png'; Name = "$packageName.zz-05-flight-dashboard-mission-planning.png" }
+    @{ Source = 'docs/images/v0.4.4/launcher-scroll.png'; Name = "$packageName.zz-05-launcher-scroll.png" }
 )
 $activeReleaseImages = @(
     if (-not $SkipReleaseImages) {

@@ -1,16 +1,15 @@
 # Woobie's Mission Control
 
-Current release: **v0.4.3**
+Current release: **v0.4.4**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.4.3 expands Flight operations with research-lab telemetry and controls,
-fusion-reactor monitoring and native reactor controls, guarded System Heat loop
-radiator controls, broader solar-array support, current-stage consumables, and
-more resilient electricity, connection, docking, and long-duration header data.
+Version 0.4.4 keeps every launcher control reachable on short displays, gives
+Mission Log its own resizable pane, and clearly explains how to fix a complete
+release accidentally extracted inside KSP's `GameData` folder.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.

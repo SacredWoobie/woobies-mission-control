@@ -171,6 +171,45 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertIn("assembly informational version", release_pack)
 
+    def test_v044_release_pack_preserves_v043_service_set(self):
+        release_pack = (
+            ROOT / "tools" / "Release-Pack-v0.4.4.psd1"
+        ).read_text(encoding="utf-8")
+        manifest = (
+            ROOT / "tools" / "Release-Manifest.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('ProductVersion = "0.4.4"', release_pack)
+        self.assertIn('ProductVersion = "0.4.4"', manifest)
+        for service, version, sha256 in (
+            (
+                "WoobiesControlStats",
+                "0.2.6.0",
+                "B6041F1D8C403C82342B8288B86BEA6139E7949E808E6DD27CC471F73A32A088",
+            ),
+            (
+                "KRPC.StageStats",
+                "0.2.7.0",
+                "18AE2F6D14B63476E37F2EC052119E49C421043FDB1A63F0C9BBED05D5A265EC",
+            ),
+            (
+                "KRPC.SystemHeat",
+                "0.2.9.0",
+                "D253044319E44FAFC19F8DB59415339BE8E42BFE9643E44A19332092239C22C4",
+            ),
+            (
+                "KRPC.WoobiesMechJeb",
+                "0.8.6.0",
+                "0B6EF8FDF2567F6BDD80C639C06C3707B02C6B6BDEDEF65A8DE9EEED3FF94C3A",
+            ),
+        ):
+            for contract in (release_pack, manifest):
+                self.assertRegex(
+                    contract,
+                    rf'(?s)Folder = "{re.escape(service)}".*?'
+                    rf'Version = "{re.escape(version)}".*?Sha256 = "{sha256}"',
+                )
+
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
             "release_launcher", ROOT / "ksp_dashboard_app.py"
@@ -248,7 +287,7 @@ class ReleaseContractTests(unittest.TestCase):
         for name in required[1:4]:
             self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
         self.assertIn(
-            "docs/images/v0.4.3/flight-dashboard-mission-planning.png",
+            "docs/images/v0.4.4/launcher-scroll.png",
             publish_script,
         )
         for name in supplemental:
@@ -270,16 +309,16 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-02-resonant-orbit-planner.png",
                 "zz-03-delta-v-planner.png",
                 "zz-04-editor-vab-mission-plan.png",
-                "zz-05-flight-dashboard-mission-planning.png",
+                "zz-05-launcher-scroll.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.4.3.zip"
+        zip_name = "Woobies-Mission-Control-v0.4.4.zip"
         checksum_name = f"{zip_name}.sha256"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.4.3.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.4.4.{name}" for name in image_names
         ]
         source_archive_name = (
-            "Woobies-Mission-Control-v0.4.3.zz-00-"
+            "Woobies-Mission-Control-v0.4.4.zz-00-"
             "KRPC.WoobiesMechJeb-0.8.6-source.zip"
         )
         self.assertEqual(
