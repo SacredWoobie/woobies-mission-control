@@ -79,18 +79,30 @@ function workspace(overrides: Partial<Parameters<typeof FlightWorkspaceView>[0]>
 }
 
 describe("FlightWorkspaceView", () => {
-  it("preserves flat panel identity through layout, rebalance, hide, and view transitions", () => {
+  it("preserves flat panel identity, focus, state, and scroll through workspace transitions", () => {
     const view = render(workspace());
     const electricity = view.getByTestId("elec-node");
+    const electricitySlot = electricity.closest<HTMLElement>("[data-flight-panel]");
     const heat = view.getByTestId("heat-node");
     fireEvent.click(electricity);
     expect(electricity.textContent).toBe("elec:1");
+    electricity.focus();
+    if (electricitySlot) electricitySlot.scrollTop = 37;
+    expect(document.activeElement).toBe(electricity);
     expect(heat.closest<HTMLElement>("[data-flight-panel-host]")?.style.transform).toBe("translate(0px, 112px)");
 
     view.rerender(workspace({ arrangement: "stacked", laneCount: 3 }));
     expect(view.getByTestId("elec-node")).toBe(electricity);
+    expect(document.activeElement).toBe(electricity);
+    expect(electricitySlot?.scrollTop).toBe(37);
+    view.rerender(workspace({ arrangement: "stacked", laneCount: 2 }));
+    expect(view.getByTestId("elec-node")).toBe(electricity);
+    expect(document.activeElement).toBe(electricity);
+    expect(electricitySlot?.scrollTop).toBe(37);
     view.rerender(workspace({ arrangement: "stacked", laneCount: 2, rebalanceSequence: 1 }));
     expect(view.getByTestId("elec-node")).toBe(electricity);
+    expect(document.activeElement).toBe(electricity);
+    expect(electricitySlot?.scrollTop).toBe(37);
 
     view.rerender(workspace({ hiddenPanels: new Set(["elec"]) }));
     expect(view.getByTestId("elec-node")).toBe(electricity);
@@ -98,12 +110,14 @@ describe("FlightWorkspaceView", () => {
     view.rerender(workspace());
     expect(view.getByTestId("elec-node")).toBe(electricity);
     expect(electricity.textContent).toBe("elec:1");
+    expect(electricitySlot?.scrollTop).toBe(37);
 
     view.rerender(workspace({ active: false }));
     expect(view.getByTestId("elec-node")).toBe(electricity);
     view.rerender(workspace());
     expect(view.getByTestId("elec-node")).toBe(electricity);
     expect(electricity.textContent).toBe("elec:1");
+    expect(electricitySlot?.scrollTop).toBe(37);
   });
 
   it("recomputes coordinates but not assignment when a panel height changes", () => {
