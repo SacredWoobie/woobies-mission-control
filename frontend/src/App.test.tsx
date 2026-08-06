@@ -227,9 +227,9 @@ describe("Dashboard lifecycle", () => {
     expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("heat");
     fireEvent.click(screen.getByRole("button", { name: "Expand Heat Management" }));
     expect((heatNode?.querySelector(".body") as HTMLElement).hidden).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Ascension" }));
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Consumables" }));
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Staging analysis" }));
+    expect(screen.queryByRole("button", { name: "Collapse Ascension" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Collapse Consumables" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Collapse Staging analysis" })).toBeNull();
     expect(fixedRegion?.hasAttribute("hidden")).toBe(false);
     expect(firstView.container.querySelector(".flight-workspace-shell")?.getAttribute("data-fixed-empty")).toBe("false");
     fireEvent.click(screen.getByRole("tab", { name: "PLAN" }));

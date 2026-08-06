@@ -49,7 +49,7 @@ export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
     : "RESOURCE STATUS UNAVAILABLE";
 
   return (
-    <Panel collapsible compact id="cons" tag={status} title="Consumables">
+    <Panel compact id="cons" tag={status} title="Consumables">
       <div className="col-heads" aria-hidden="true">
         <span />
         <span>Vessel total</span>

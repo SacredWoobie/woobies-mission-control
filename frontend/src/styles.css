@@ -1035,11 +1035,12 @@ button { font: inherit; }
 .panel-compact > h2 .panel-title { min-width: 0; overflow: hidden; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
 .panel-compact > h2 .panel-heading-actions { margin-left: auto; flex: 1 1 auto; justify-content: flex-end; }
 .panel-compact > h2 .tag { min-width: 0; overflow: hidden; flex: 0 1 auto; text-overflow: ellipsis; }
-.panel-compact .panel-collapse-button { display: inline-flex; width: 22px; height: 22px; min-width: 22px; min-height: 22px; padding: 0; align-items: center; justify-content: center; flex: 0 0 22px; border-radius: 2px; font-size: 15px; line-height: 1; }
+.panel-compact .panel-collapse-button { display: inline-grid; width: 22px; height: 22px; min-width: 22px; min-height: 22px; padding: 0; place-items: center; flex: 0 0 22px; border-radius: 2px; line-height: 1; }
+.panel-compact#target > h2 .panel-heading-actions { gap: 10px; }
 .panel-compact :is(.target-clear-button,.resonant-unpin,.flight-note-unpin),
 .panel-compact#flightNote .notes-font-controls button { min-height: 22px; }
-.panel-compact .panel-collapse-button > span { transform: translateY(-1px); }
-.panel-compact.panel-collapsed .panel-collapse-button > span { transform: translateY(1px); }
+.panel-compact .panel-collapse-chevron { display: block; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); transform-origin: center; }
+.panel-compact.panel-collapsed .panel-collapse-chevron { transform: rotate(135deg); }
 @media (pointer: coarse) {
   :is(.flight-grid,.flight-workspace-shell) .panel-compact > h2 { min-height: 44px; padding-block: 4px; }
   .panel-compact .panel-collapse-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex-basis: 36px; }

@@ -30,7 +30,7 @@ export function Panel({ children, collapsible = false, compact = false, headingA
               onClick={() => setCollapsed((current) => !current)}
               type="button"
             >
-              <span aria-hidden="true">{collapsed ? "⌄" : "⌃"}</span>
+              <span aria-hidden="true" className="panel-collapse-chevron" />
             </button>
           )}
           {hideable && panelId && (

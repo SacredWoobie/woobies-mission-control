@@ -96,7 +96,6 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
 
   return (
     <Panel
-      collapsible={!editorMode}
       compact={!editorMode}
       id="stage"
       title={editorMode ? "Editor staging analysis" : "Staging analysis"}
