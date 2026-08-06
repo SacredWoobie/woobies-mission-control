@@ -128,6 +128,73 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             )
             self.assertTrue(any("OldMods" in item["observed"] for item in recommendations))
 
+    def test_dll_layout_explains_release_folder_copied_inside_gamedata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_root(directory)
+            canonical = (
+                root
+                / "GameData"
+                / "KRPC.StageStats"
+                / "KRPC.StageStats.dll"
+            )
+            canonical.parent.mkdir(parents=True)
+            canonical.write_bytes(b"installed")
+
+            release_root = root / "GameData" / "Woobies-Mission-Control-v0.4.3"
+            launcher = release_root / "Dashboard" / "ksp_dashboard_app.py"
+            launcher.parent.mkdir(parents=True)
+            launcher.write_text("# launcher", encoding="utf-8")
+            packaged = (
+                release_root
+                / "GameData"
+                / "KRPC.StageStats"
+                / "KRPC.StageStats.dll"
+            )
+            packaged.parent.mkdir(parents=True)
+            packaged.write_bytes(b"packaged")
+            krpc = root / "GameData" / "kRPC" / "KRPC.dll"
+            krpc.parent.mkdir(parents=True)
+            krpc.write_bytes(b"installed kRPC")
+            stale_krpc = root / "GameData" / "OldMods" / "KRPC.dll"
+            stale_krpc.parent.mkdir()
+            stale_krpc.write_bytes(b"stale kRPC")
+
+            inventory = app.dll_layout_inventory(root)
+
+            self.assertEqual(inventory["status"], "issues")
+            self.assertEqual(len(inventory["embedded_packages"]), 1)
+            package = inventory["embedded_packages"][0]
+            self.assertEqual(package["root"], release_root)
+            self.assertEqual(package["release_root"], release_root)
+            self.assertEqual(package["dlls"], [packaged])
+
+            recommendations = app.installation_recommendations(
+                app.ksp_installation_inventory(root),
+                inventory,
+            )
+            self.assertEqual(len(recommendations), 2)
+            package_recommendation = next(
+                item
+                for item in recommendations
+                if item["key"].startswith("dll.layout.embedded_package")
+            )
+            self.assertEqual(
+                package_recommendation["title"],
+                "Mission Control release is inside KSP GameData",
+            )
+            self.assertIn(
+                "KSP can load recursively",
+                package_recommendation["observed"],
+            )
+            self.assertIn("outside KSP's GameData", package_recommendation["fix"])
+            self.assertIn(
+                "Dashboard and GameData folders together",
+                package_recommendation["fix"],
+            )
+            self.assertTrue(
+                any("OldMods" in item["observed"] for item in recommendations)
+            )
+
     def install_krpc(self, root, settings=None):
         folder = root / "GameData" / "kRPC"
         folder.mkdir(parents=True, exist_ok=True)
