@@ -118,8 +118,9 @@ service bytes and provenance.
 
 ## Installation
 
-1. Download and extract the complete release. Keep its `Dashboard` and
-   `GameData` folders together.
+1. Download and extract the complete release somewhere outside KSP's
+   `GameData`. Keep the release's `Dashboard` and `GameData` folders together;
+   the launcher installs only the required service folders into KSP.
 2. Open `Dashboard` and run `Start KSP Dashboard.bat`.
 3. Choose Dashboard, ESP32 Controlpad, or both during first-run setup. The
    launcher creates a package-local Python environment and installs only the

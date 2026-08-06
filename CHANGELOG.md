@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Kept every launcher control reachable on laptop-height displays with a
+  scrollable controls pane and an independently resizable Mission Log.
+- Explain when an extracted Mission Control release was placed inside KSP's
+  `GameData`, where KSP can load its packaged service DLLs as duplicates, and
+  direct the user to move the complete release folder outside `GameData`.
 - Stage corresponding-source release assets under the established `.zz-00`
   name so the normal product ZIP remains first without a post-upload rename.
 

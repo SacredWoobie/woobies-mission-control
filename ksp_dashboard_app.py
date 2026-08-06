@@ -240,6 +240,32 @@ def calculate_initial_window_size(
     )
 
 
+def calculate_initial_pane_sash(
+    available_height,
+    controls_share=0.74,
+    minimum_controls=240,
+    minimum_log=120,
+):
+    """Return the initial controls/log divider position for the launcher."""
+    available_height = max(0, int(available_height))
+    if available_height <= minimum_log:
+        return 0
+    desired = round(available_height * controls_share)
+    return max(
+        min(minimum_controls, available_height - minimum_log),
+        min(desired, available_height - minimum_log),
+    )
+
+
+def normalize_mousewheel_units(delta):
+    """Translate a native mouse-wheel delta into Tk vertical scroll units."""
+    delta = int(delta)
+    if delta == 0:
+        return 0
+    direction = -1 if delta > 0 else 1
+    return direction * max(1, abs(delta) // 120)
+
+
 def configure_dashboard_theme(root):
     """Apply a standard-library ttk theme inspired by the dashboard."""
     global UI_FONT_FAMILY, UI_FONT, UI_FONT_BOLD
@@ -700,13 +726,55 @@ def ksp_installation_inventory(ksp_root_value):
     }
 
 
+def embedded_gamedata_package_for_dll(
+    game_data,
+    dll_path,
+    expected_relative_path,
+):
+    """Identify a packaged ``GameData`` wrapper copied below KSP's GameData."""
+    try:
+        relative_path = dll_path.resolve().relative_to(game_data.resolve())
+    except (OSError, ValueError):
+        return None
+
+    expected_parts = tuple(
+        part.casefold() for part in Path(expected_relative_path).parts
+    )
+    for index, part in enumerate(relative_path.parts[:-1]):
+        if part.casefold() != "gamedata":
+            continue
+        suffix = tuple(
+            value.casefold() for value in relative_path.parts[index + 1 :]
+        )
+        if suffix != expected_parts:
+            continue
+
+        nested_game_data = game_data.joinpath(*relative_path.parts[: index + 1])
+        possible_release_root = nested_game_data.parent
+        release_launcher = (
+            possible_release_root / "Dashboard" / "ksp_dashboard_app.py"
+        )
+        release_root = possible_release_root if release_launcher.is_file() else None
+        return {
+            "root": release_root or nested_game_data,
+            "nested_game_data": nested_game_data,
+            "release_root": release_root,
+        }
+    return None
+
+
 def dll_layout_inventory(ksp_root_value):
     """Find duplicate or misplaced Mission Control-related DLLs in GameData."""
     if isinstance(ksp_root_value, os.PathLike):
         ksp_root_value = os.fspath(ksp_root_value)
     root = resolve_ksp_root(ksp_root_value)
     if root is None:
-        return {"status": "unconfigured", "issues": [], "matches": {}}
+        return {
+            "status": "unconfigured",
+            "issues": [],
+            "matches": {},
+            "embedded_packages": [],
+        }
     game_data = root / "GameData"
     wanted = {name.casefold(): name for name in CORE_DLL_LOCATIONS}
     matches = {name: [] for name in CORE_DLL_LOCATIONS}
@@ -726,10 +794,12 @@ def dll_layout_inventory(ksp_root_value):
             "status": "error",
             "issues": [],
             "matches": matches,
+            "embedded_packages": [],
             "error": str(exc),
         }
 
     issues = []
+    embedded_packages = {}
     for filename, relative_path in CORE_DLL_LOCATIONS.items():
         expected = game_data / relative_path
         found = matches[filename]
@@ -743,18 +813,43 @@ def dll_layout_inventory(ksp_root_value):
             if os.path.normcase(str(path.resolve())) != expected_key
         ]
         if extra:
+            embedded_roots = []
+            for path in extra:
+                package = embedded_gamedata_package_for_dll(
+                    game_data,
+                    path,
+                    relative_path,
+                )
+                if package is None:
+                    continue
+                key = os.path.normcase(str(package["root"].resolve()))
+                record = embedded_packages.setdefault(
+                    key,
+                    {
+                        **package,
+                        "dlls": [],
+                    },
+                )
+                record["dlls"].append(path)
+                embedded_roots.append(package["root"])
             issues.append(
                 {
                     "filename": filename,
                     "kind": "duplicate" if canonical_found else "misplaced",
                     "expected": expected,
                     "found": found,
+                    "embedded_package_roots": embedded_roots,
                 }
             )
+    embedded_package_list = sorted(
+        embedded_packages.values(),
+        key=lambda item: str(item["root"]).casefold(),
+    )
     return {
         "status": "issues" if issues else "current",
         "issues": issues,
         "matches": matches,
+        "embedded_packages": embedded_package_list,
     }
 
 
@@ -976,6 +1071,15 @@ def krpc_configuration_inventory(ksp_root_value):
 def installation_recommendations(ksp_installation, dll_layout):
     """Build repair guidance for KSP identity and related DLL layout issues."""
     recommendations = []
+    root = ksp_installation.get("root")
+    game_data = root / "GameData" if root is not None else None
+
+    def display_path(path):
+        try:
+            return str(path.relative_to(game_data))
+        except (TypeError, ValueError):
+            return str(path)
+
     status = ksp_installation.get("status")
     if status == "invalid":
         missing = ", ".join(ksp_installation.get("missing", []))
@@ -1020,6 +1124,48 @@ def installation_recommendations(ksp_installation, dll_layout):
             }
         )
 
+    embedded_dll_keys = set()
+    for index, package in enumerate(dll_layout.get("embedded_packages", [])):
+        embedded_dll_keys.update(
+            os.path.normcase(str(path.resolve())) for path in package["dlls"]
+        )
+        package_path = display_path(package["root"])
+        dll_names = ", ".join(
+            sorted({path.name for path in package["dlls"]}, key=str.casefold)
+        )
+        complete_release = package.get("release_root") is not None
+        if complete_release:
+            title = "Mission Control release is inside KSP GameData"
+            fix = (
+                f"Close KSP, move the entire {package_path} folder outside "
+                "KSP's GameData, and keep its Dashboard and GameData folders "
+                "together. Then reopen Start KSP Dashboard.bat from the moved "
+                "Dashboard folder and refresh this status."
+            )
+        else:
+            title = "Mission Control GameData package is nested too deeply"
+            fix = (
+                f"Close KSP and move or remove the nested {package_path} "
+                "package folder. Install the service folders only in their "
+                "documented locations directly below KSP's GameData, then "
+                "refresh this status."
+            )
+        recommendations.append(
+            {
+                "key": f"dll.layout.embedded_package.{index}",
+                "title": title,
+                "observed": (
+                    f"{package_path} contains bundled DLLs that KSP can load "
+                    f"recursively: {dll_names}"
+                ),
+                "expected": (
+                    "Keep the extracted Mission Control package outside KSP's "
+                    "GameData; only installed mod/service folders belong inside it"
+                ),
+                "fix": fix,
+            }
+        )
+
     if dll_layout.get("status") == "error":
         recommendations.append(
             {
@@ -1034,16 +1180,22 @@ def installation_recommendations(ksp_installation, dll_layout):
             }
         )
     for issue in dll_layout.get("issues", []):
-        root = ksp_installation.get("root")
-        game_data = root / "GameData" if root is not None else None
-
-        def display_path(path):
-            try:
-                return str(path.relative_to(game_data))
-            except (TypeError, ValueError):
-                return str(path)
-
-        found = "; ".join(display_path(path) for path in issue["found"])
+        expected_key = os.path.normcase(str(issue["expected"].resolve()))
+        remaining_extra = [
+            path
+            for path in issue["found"]
+            if os.path.normcase(str(path.resolve())) != expected_key
+            and os.path.normcase(str(path.resolve())) not in embedded_dll_keys
+        ]
+        if not remaining_extra:
+            continue
+        reported_paths = [
+            path
+            for path in issue["found"]
+            if os.path.normcase(str(path.resolve())) == expected_key
+            or path in remaining_extra
+        ]
+        found = "; ".join(display_path(path) for path in reported_paths)
         recommendations.append(
             {
                 "key": f"dll.layout.{issue['filename']}",
@@ -1735,10 +1887,20 @@ def component_preflight(
                 "unverified."
             )
         if dll_layout["status"] == "issues":
-            warnings.append(
-                f"GameData contains {len(dll_layout['issues'])} duplicate or "
-                "misplaced core DLL issue(s); review the suggested fixes."
-            )
+            embedded_packages = dll_layout.get("embedded_packages", [])
+            if embedded_packages:
+                dll_count = sum(len(item["dlls"]) for item in embedded_packages)
+                warnings.append(
+                    "A Mission Control release/package folder is inside GameData, "
+                    f"where KSP can recursively load its {dll_count} bundled "
+                    "service DLL(s); move the package outside GameData and review "
+                    "the suggested fix."
+                )
+            else:
+                warnings.append(
+                    f"GameData contains {len(dll_layout['issues'])} duplicate or "
+                    "misplaced core DLL issue(s); review the suggested fixes."
+                )
         elif dll_layout["status"] == "error":
             warnings.append(
                 "GameData could not be scanned completely for duplicate DLLs."
@@ -2003,6 +2165,65 @@ class Backend:
             self.startup_ready = False
 
 
+class ScrollableLauncherPane(ttk.Frame):
+    """A vertically scrollable launcher region that fills its viewport width."""
+
+    def __init__(self, parent):
+        super().__init__(parent, style="Shell.TFrame")
+        self.viewport = tk.Canvas(
+            self,
+            background=THEME["bg"],
+            borderwidth=0,
+            highlightthickness=0,
+            yscrollincrement=24,
+        )
+        self.scrollbar = ttk.Scrollbar(
+            self,
+            orient="vertical",
+            command=self.viewport.yview,
+        )
+        self.viewport.configure(yscrollcommand=self.scrollbar.set)
+        self.viewport.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+
+        self.content = ttk.Frame(self.viewport, style="Shell.TFrame")
+        self.content_window = self.viewport.create_window(
+            0,
+            0,
+            anchor="nw",
+            window=self.content,
+        )
+        self.content.bind("<Configure>", self._sync_scroll_region)
+        self.viewport.bind("<Configure>", self._sync_scroll_region)
+
+    def _sync_scroll_region(self, _event=None):
+        width = max(1, self.viewport.winfo_width())
+        height = max(
+            self.content.winfo_reqheight(),
+            self.viewport.winfo_height(),
+        )
+        self.viewport.itemconfigure(
+            self.content_window,
+            width=width,
+            height=height,
+        )
+        self.viewport.configure(scrollregion=(0, 0, width, height))
+
+    def contains_widget(self, widget):
+        pane_path = str(self)
+        widget_path = str(widget)
+        return widget_path == pane_path or widget_path.startswith(pane_path + ".")
+
+    def scroll_mousewheel(self, delta):
+        units = normalize_mousewheel_units(delta)
+        if units == 0:
+            return False
+        self.viewport.yview_scroll(units, "units")
+        return True
+
+
 class App:
     def __init__(self, root, update_state_path=UPDATE_STATE_PATH,
                  settings_path=SETTINGS_PATH):
@@ -2089,7 +2310,32 @@ class App:
         )
         self.check_updates_control.pack(side="right", padx=(6, 0))
 
-        settings_frame = ttk.LabelFrame(root, text="KSP INSTALLATION")
+        self.main_panes = tk.PanedWindow(
+            root,
+            orient=tk.VERTICAL,
+            background=THEME["rule"],
+            borderwidth=0,
+            opaqueresize=True,
+            relief="flat",
+            sashpad=2,
+            sashrelief="flat",
+            sashwidth=7,
+            showhandle=False,
+        )
+        self.main_panes.pack(fill="both", expand=True)
+        self.controls_pane = ScrollableLauncherPane(self.main_panes)
+        self.main_panes.add(
+            self.controls_pane,
+            minsize=240,
+            stretch="always",
+        )
+        self.controls_root = self.controls_pane.content
+        root.bind("<MouseWheel>", self._on_launcher_mousewheel, add="+")
+
+        settings_frame = ttk.LabelFrame(
+            self.controls_root,
+            text="KSP INSTALLATION",
+        )
         settings_controls = ttk.Frame(settings_frame)
         settings_controls.pack(fill="x", padx=8, pady=(8, 2))
         ttk.Label(
@@ -2340,7 +2586,7 @@ class App:
             for component in components:
                 self._add_component(component)
         else:
-            empty = ttk.LabelFrame(root, text="COMPONENTS")
+            empty = ttk.LabelFrame(self.controls_root, text="COMPONENTS")
             empty.pack(fill="x", padx=14, pady=6)
             ttk.Label(
                 empty,
@@ -2350,8 +2596,10 @@ class App:
 
         settings_frame.pack(fill="x", padx=14, pady=6)
 
-        log_frame = ttk.LabelFrame(root, text="MISSION LOG")
+        log_shell = ttk.Frame(self.main_panes, style="Shell.TFrame")
+        log_frame = ttk.LabelFrame(log_shell, text="MISSION LOG")
         log_frame.pack(fill="both", expand=True, padx=14, pady=(6, 12))
+        self.main_panes.add(log_shell, minsize=120, stretch="always")
         self.logbox = scrolledtext.ScrolledText(
             log_frame,
             height=10,
@@ -2371,6 +2619,7 @@ class App:
         self.logbox.pack(fill="both", expand=True, padx=7, pady=7)
 
         self._apply_initial_window_geometry()
+        self.root.after_idle(self._place_initial_pane_sash)
 
         if components:
             names = ", ".join(component["script"] for component in components)
@@ -2400,6 +2649,20 @@ class App:
         y = max(0, (self.root.winfo_screenheight() - height) // 3)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
+    def _place_initial_pane_sash(self):
+        self.root.update_idletasks()
+        position = calculate_initial_pane_sash(self.main_panes.winfo_height())
+        self.main_panes.sash_place(0, 0, position)
+
+    def _on_launcher_mousewheel(self, event):
+        if not self.controls_pane.contains_widget(event.widget):
+            return None
+        if event.widget is self.controls_pane.scrollbar:
+            return None
+        if self.controls_pane.scroll_mousewheel(event.delta):
+            return "break"
+        return None
+
     def _add_component(self, component):
         script = HERE / component["script"]
         environment_provider = (
@@ -2409,7 +2672,10 @@ class App:
             component["name"], script, self._enqueue, environment_provider
         )
 
-        frame = ttk.LabelFrame(self.root, text=component["title"].upper())
+        frame = ttk.LabelFrame(
+            self.controls_root,
+            text=component["title"].upper(),
+        )
         frame.pack(fill="x", padx=14, pady=6)
 
         controls = ttk.Frame(frame)
@@ -2600,11 +2866,20 @@ class App:
         self.ksp_version_status.config(text=ksp_text, foreground=ksp_color)
 
         layout_status = dll_layout["status"]
+        embedded_packages = dll_layout.get("embedded_packages", [])
         if layout_status == "unconfigured":
             layout_text, layout_color = "KSP folder required", THEME["slate_dim"]
         elif layout_status == "issues":
-            issue_count = len(dll_layout["issues"])
-            layout_text = f"{issue_count} duplicate/misplaced issue(s)"
+            if embedded_packages:
+                package_count = len(embedded_packages)
+                layout_text = (
+                    "Release package inside GameData"
+                    if package_count == 1
+                    else f"{package_count} packages inside GameData"
+                )
+            else:
+                issue_count = len(dll_layout["issues"])
+                layout_text = f"{issue_count} duplicate/misplaced issue(s)"
             layout_color = THEME["warn"]
         elif layout_status == "error":
             layout_text, layout_color = "Scan incomplete", THEME["amber"]
@@ -2695,6 +2970,8 @@ class App:
             summary_text, summary_color = "Choose a KSP folder", THEME["slate_dim"]
         elif ksp_status == "invalid":
             summary_text, summary_color = "Wrong KSP folder", THEME["warn"]
+        elif embedded_packages:
+            summary_text, summary_color = "Move release out of GameData", THEME["warn"]
         elif layout_status == "issues":
             summary_text, summary_color = "DLL layout needs attention", THEME["warn"]
         elif statuses.get("krpc") == "missing":
