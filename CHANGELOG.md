@@ -24,8 +24,8 @@ All notable public changes will be recorded here.
   companion.
 - Restored bounded staging and compact two-column resources in short-landscape
   Editor layouts so dense craft analysis stays within the viewport.
-- Grouped Editor craft totals into Mass, Build, and Cost rails so the summary
-  scans consistently in both wide and pinned layouts.
+- Grouped Editor craft totals into higher-contrast Mass, Build, and Cost rails
+  so the summary scans consistently in both wide and pinned layouts.
 - Grouped distant powered stages behind an expandable range row when Flight
   staging grows tall; expanded rows scroll inside the table while the active
   and nearest stages remain visible by default.

@@ -439,7 +439,7 @@ button { font: inherit; }
 .editor-summary-content { display: flex; flex-direction: column; gap: inherit; }
 .editor-summary-groups { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,3fr) minmax(0,2fr); gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
 .editor-summary-group { min-width: 0; background: var(--panel-2); }
-.editor-summary-group-label { display: block; padding: 4px 8px; border-bottom: 1px solid var(--rule); color: var(--slate-dim); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+.editor-summary-group-label { display: block; padding: 4px 8px; border-bottom: 1px solid var(--rule); color: var(--slate); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
 .editor-summary-group-values { display: grid; min-width: 0; gap: 1px; background: var(--rule); }
 .editor-summary-group.mass .editor-summary-group-values,
 .editor-summary-group.build .editor-summary-group-values { grid-template-columns: repeat(3,minmax(0,1fr)); }
