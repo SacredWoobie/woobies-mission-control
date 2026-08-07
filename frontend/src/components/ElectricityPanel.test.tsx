@@ -30,8 +30,10 @@ describe("ElectricityPanel", () => {
     const ledger = container.querySelector(".ec-source-ledger") as HTMLDivElement;
     const detail = container.querySelector(".rx-detail-view") as HTMLElement;
     const slot = container.querySelector(".ec-source-slot") as HTMLElement;
+    const panel = container.querySelector("#elec") as HTMLElement;
     expect(ledger.hidden).toBe(false);
     expect(detail.hidden).toBe(true);
+    expect(panel.classList.contains("reactor-detail-open")).toBe(false);
     expect(within(ledger).getByText("Reactors", { exact: true })).toBeTruthy();
     expect(within(ledger).getByText("RTG", { exact: true })).toBeTruthy();
     expect(within(ledger).getByText("Solar", { exact: true })).toBeTruthy();
@@ -49,6 +51,7 @@ describe("ElectricityPanel", () => {
     fireEvent.click(open);
     expect(ledger.hidden).toBe(true);
     expect(detail.hidden).toBe(false);
+    expect(panel.classList.contains("reactor-detail-open")).toBe(true);
     expect(slot.classList.contains("detail-open")).toBe(true);
     expect(slot.style.height).toBe("");
     const reactorList = screen.getByRole("region", { name: "Reactor list" });
@@ -60,6 +63,7 @@ describe("ElectricityPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to power sources" }));
     expect(ledger.hidden).toBe(false);
     expect(detail.hidden).toBe(true);
+    expect(panel.classList.contains("reactor-detail-open")).toBe(false);
     expect(slot.classList.contains("detail-open")).toBe(false);
     expect(document.activeElement).toBe(open);
   });

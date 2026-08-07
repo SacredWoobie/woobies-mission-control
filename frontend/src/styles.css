@@ -1284,6 +1284,9 @@ button { font: inherit; }
   max-height: 384px;
   flex-direction: column;
 }
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec.reactor-detail-open:not(.panel-collapsed) {
+  max-height: 410px;
+}
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) > .body {
   display: flex;
   min-height: 0;

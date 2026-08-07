@@ -192,7 +192,7 @@ test("fixed Flight headers, utility rail, and Heat rows use the compact aligned 
   expect(Math.max(...bars.map((bar) => bar.right)) - Math.min(...bars.map((bar) => bar.right))).toBeLessThanOrEqual(1);
 });
 
-test("reactor detail remains bounded and scrollable inside Electricity", async ({ page }) => {
+test("reactor detail uses extra runway before internal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
 
@@ -213,11 +213,13 @@ test("reactor detail remains bounded and scrollable inside Electricity", async (
     };
   });
   expect(scrolling.overflowY).toBe("auto");
-  expect(scrolling.scrollHeight).toBeGreaterThan(scrolling.clientHeight);
-  expect(scrolling.after).toBeGreaterThan(scrolling.before);
+  expect(scrolling.clientHeight).toBeGreaterThanOrEqual(scrolling.scrollHeight);
+  expect(scrolling.after).toBe(scrolling.before);
   const detailHeight = await electricity.evaluate((element) => element.getBoundingClientRect().height);
+  expect(detailHeight).toBeGreaterThan(384);
   expect(detailHeight).toBeGreaterThanOrEqual(initialHeight);
-  expect(detailHeight).toBeLessThanOrEqual(384);
+  expect(detailHeight).toBeLessThanOrEqual(410);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(889);
 });
 
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {

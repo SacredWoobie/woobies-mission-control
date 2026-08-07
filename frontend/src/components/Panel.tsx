@@ -2,6 +2,7 @@ import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { panelLabels, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
 
 interface PanelProps extends PropsWithChildren {
+  className?: string;
   collapsible?: boolean;
   compact?: boolean;
   id?: string;
@@ -11,12 +12,12 @@ interface PanelProps extends PropsWithChildren {
   tag?: ReactNode;
 }
 
-export function Panel({ children, collapsible = false, compact = false, headingActions, hideable = false, id, tag, title }: PanelProps) {
+export function Panel({ children, className, collapsible = false, compact = false, headingActions, hideable = false, id, tag, title }: PanelProps) {
   const visibility = usePanelVisibility();
   const [collapsed, setCollapsed] = useState(false);
   const panelId = id && id in panelLabels ? id as DashboardPanelId : null;
   return (
-    <section className={`panel${compact ? " panel-compact" : ""}${collapsed ? " panel-collapsed" : ""}`} id={id}>
+    <section className={`panel${compact ? " panel-compact" : ""}${collapsed ? " panel-collapsed" : ""}${className ? ` ${className}` : ""}`} id={id}>
       <h2>
         <span className="panel-title">{title}</span>
         <span className="panel-heading-actions">

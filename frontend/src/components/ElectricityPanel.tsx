@@ -462,7 +462,14 @@ export function ElectricityPanel({
   const railStatus = `${chargePercent === undefined ? "EC" : `${chargePercent}%`} · ${model.status.label}`;
 
   return (
-    <Panel collapsible compact id="elec" tag={railStatus} title="Electricity">
+    <Panel
+      className={reactorDetailOpen ? "reactor-detail-open" : undefined}
+      collapsible
+      compact
+      id="elec"
+      tag={railStatus}
+      title="Electricity"
+    >
       <div className={`ec-overview-card ${deficit || model.tier === 1 ? "warn" : ""}`}>
         <div className="ec-hero-row">
           <div>
