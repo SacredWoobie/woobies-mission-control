@@ -355,6 +355,23 @@ button { font: inherit; }
   transform: translateX(0);
 }
 .notes-rail-tab.panel-rail-button { border-color: #315166; color: var(--cyan); background: #101c27; }
+.dashboard-rail .panel-rail-button,
+.dashboard-rail .notes-rail-tab.panel-rail-button {
+  border-color: #74552d;
+  color: var(--amber);
+  background: #211a12;
+}
+.dashboard-rail .panel-rail-button:hover,
+.dashboard-rail .panel-rail-button:focus-visible,
+.dashboard-rail .panel-rail-button[aria-expanded="true"] {
+  border-color: var(--amber-dim);
+  color: #ffd498;
+  background: #2b2115;
+}
+.dashboard-rail .panel-rail-icon .rail-note-cover { fill: rgba(255,180,84,.08); }
+.dashboard-rail .resonant-rail-icon i {
+  box-shadow: 0 0 6px currentColor, 11px -4px 0 -1px var(--amber-dim), 11px -4px 4px -1px var(--amber-dim);
+}
 .panel-restore-rail .panel-rail-button:hover { border-color: #3a6f86; color: var(--cyan); background: #152332; }
 .panel-restore-rail .panel-rail-button-flightNote { margin-top: 4px; border-color: #315166; color: var(--cyan); background: #101c27; }
 .panel-rail-icon { display: block; width: 28px; height: 28px; overflow: visible; flex: 0 0 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -1135,7 +1152,7 @@ button { font: inherit; }
 .heat-entity.critical .heat-severity-rail,
 .heat-entity.no-radiators .heat-severity-rail { background: var(--warn); }
 .heat-entity-copy { display: flex; min-width: 0; justify-content: center; flex-direction: column; gap: 3px; }
-.heat-entity-topline { display: grid; min-width: 0; align-items: center; grid-template-columns: minmax(58px,1fr) minmax(36px,68px) auto 58px; gap: 7px; font-size: 9px; font-variant-numeric: tabular-nums; }
+.heat-entity-topline { display: grid; min-width: 0; align-items: center; grid-template-columns: minmax(58px,1fr) 68px 72px 58px; gap: 7px; font-size: 9px; font-variant-numeric: tabular-nums; }
 .heat-entity-topline > strong { overflow: hidden; color: #c7d4e6; font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .heat-temperature-track { position: relative; height: 6px; overflow: hidden; border-radius: 2px; background: #182433; }
 .heat-temperature-track > span { display: block; height: 100%; border-radius: inherit; background: var(--green); }
@@ -2081,7 +2098,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .sci-lab-controls { flex-wrap: wrap; }
   .heat-entity-main { padding-right: 7px; gap: 5px; }
   .heat-entity-main.has-loop-control { padding-bottom: 27px; }
-  .heat-entity-topline { grid-template-columns: minmax(48px,1fr) minmax(30px,48px) auto 52px; gap: 5px; }
+  .heat-entity-topline { grid-template-columns: minmax(48px,1fr) 48px 62px 52px; gap: 5px; }
   .heat-loop-control { right: 55px; width: 116px; }
   .heat-temperature-value, .heat-net-flux, .heat-ratio-value { font-size: 8px; }
   .heat-component-list { padding-left: 31px; }

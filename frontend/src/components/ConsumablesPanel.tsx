@@ -41,15 +41,9 @@ function ResourceMeter({
 export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
   const resources = selectConsumables(snapshot);
   const stageKnown = snapshot["res.stageKnown"] !== false;
-  const limitingResource = resources
-    .filter((resource) => resource.vessel.fraction !== undefined)
-    .sort((left, right) => left.vessel.fraction! - right.vessel.fraction!)[0];
-  const status = limitingResource
-    ? `${humanizeResourceName(limitingResource.name)} ${Math.round(limitingResource.vessel.fraction! * 100)}%`
-    : "RESOURCE STATUS UNAVAILABLE";
 
   return (
-    <Panel compact id="cons" tag={status} title="Consumables">
+    <Panel compact id="cons" title="Consumables">
       <div className="col-heads" aria-hidden="true">
         <span />
         <span>Vessel total</span>

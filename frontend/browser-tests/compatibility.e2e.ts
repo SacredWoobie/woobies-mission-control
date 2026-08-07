@@ -167,6 +167,31 @@ test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome conte
   expect(plan.shellBottom).toBeLessThanOrEqual(plan.documentClientHeight);
 });
 
+test("fixed Flight headers, utility rail, and Heat rows use the compact aligned treatment", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  await expect(page.locator("#cons > h2 .tag")).toHaveCount(0);
+  await expect(page.locator("#stage > h2 .tag")).toHaveCount(0);
+
+  const tools = page.getByRole("group", { name: "Tools" });
+  await expect(tools.locator(":scope > .dashboard-rail-section-label")).toBeVisible();
+  const railColors = await tools.locator(":scope > .panel-rail-button").evaluateAll((buttons) => (
+    buttons.map((button) => getComputedStyle(button).color)
+  ));
+  expect(new Set(railColors).size).toBe(1);
+
+  const bars = await page.locator("#heat .heat-temperature-track").evaluateAll((tracks) => (
+    tracks.map((track) => {
+      const rect = track.getBoundingClientRect();
+      return { left: rect.left, right: rect.right };
+    })
+  ));
+  expect(bars.length).toBeGreaterThanOrEqual(2);
+  expect(Math.max(...bars.map((bar) => bar.left)) - Math.min(...bars.map((bar) => bar.left))).toBeLessThanOrEqual(1);
+  expect(Math.max(...bars.map((bar) => bar.right)) - Math.min(...bars.map((bar) => bar.right))).toBeLessThanOrEqual(1);
+});
+
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");

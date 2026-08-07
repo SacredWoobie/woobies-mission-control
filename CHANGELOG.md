@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Simplified the persistent Flight panel chrome by removing redundant
+  Consumables and Staging header summaries, moved the Tools label to the top of
+  the utility rail with a unified amber control treatment, and aligned System
+  Heat loop temperature bars to shared columns.
+
 - Restructured Flight around a persistent vessel-state region and switchable
   MONITOR and PLAN workspaces. Responsive lane placement, Rebalance, and panel
   restoration preserve mounted panel state while inactive or hidden panels

@@ -303,22 +303,22 @@ export function DashboardRail({
 
   return (
     <nav aria-label="Dashboard controls" className="dashboard-rail">
-      {visibleTabs.map((id) => (
-        <button
-          aria-label={panelLabels[id]}
-          className={`panel-rail-button panel-rail-button-${id}${id === "conn" ? " datalink-rail-tab" : ""}`}
-          key={id}
-          onClick={() => restorePanel(id)}
-          title={`Restore ${panelLabels[id]}`}
-          type="button"
-        >
-          <span aria-hidden="true" className="panel-rail-label">{panelRailDescriptions[id]}</span>
-          <PanelRailIcon name={id} />
-        </button>
-      ))}
-      {notesButton}
       <div aria-label="Tools" className="dashboard-rail-tools" role="group">
         <div aria-hidden="true" className="dashboard-rail-section-label"><span>Tools</span></div>
+        {visibleTabs.map((id) => (
+          <button
+            aria-label={panelLabels[id]}
+            className={`panel-rail-button panel-rail-button-${id}${id === "conn" ? " datalink-rail-tab" : ""}`}
+            key={id}
+            onClick={() => restorePanel(id)}
+            title={`Restore ${panelLabels[id]}`}
+            type="button"
+          >
+            <span aria-hidden="true" className="panel-rail-label">{panelRailDescriptions[id]}</span>
+            <PanelRailIcon name={id} />
+          </button>
+        ))}
+        {notesButton}
         {tools}
       </div>
     </nav>

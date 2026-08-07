@@ -176,6 +176,8 @@ describe("Dashboard lifecycle", () => {
     const resonantTool = screen.getByRole("button", { name: "Resonant orbit planner" });
     const deltaVTool = screen.getByRole("button", { name: "Delta-v planner" });
     expect(toolsGroup.textContent).toContain("Tools");
+    expect(toolsGroup.firstElementChild?.classList.contains("dashboard-rail-section-label")).toBe(true);
+    expect(toolsGroup.contains(screen.getByRole("button", { name: "Notes" }))).toBe(true);
     expect(toolsGroup.contains(resonantTool)).toBe(true);
     expect(toolsGroup.contains(deltaVTool)).toBe(true);
     expect(resonantTool.classList.contains("dashboard-tool-button")).toBe(true);
@@ -260,7 +262,7 @@ describe("Dashboard lifecycle", () => {
     const { container } = render(
       <ConsumablesPanel snapshot={fractionalStageElectricChargeFixture} />,
     );
-    expect(container.querySelector("#cons > h2 .tag")?.textContent).toBe("Liquid Fuel 100%");
+    expect(container.querySelector("#cons > h2 .tag")).toBeNull();
     expect(container.textContent).not.toContain("Electric Charge");
     expect(container.textContent).toContain("Liquid Fuel");
   });

@@ -29,6 +29,7 @@ describe("StagingPanel", () => {
     expect(screen.queryByText("S1")).toBeNull();
     expect(screen.getByText("1 unpowered stage hidden")).toBeTruthy();
     expect(container.querySelector(".st-row.cur .sname")?.textContent).toBe("S2");
+    expect(container.querySelector("#stage > h2 .tag")).toBeNull();
   });
 
   it("collapses a one-stage Flight craft and applies surface TWR danger narrowly", () => {
@@ -66,6 +67,7 @@ describe("StagingPanel", () => {
     expect(screen.getByText("00:00:42")).toBeTruthy();
     expect(container.querySelector(".stage-table.editor")).toBeTruthy();
     expect(container.querySelector(".flight-stage-hero")).toBeNull();
+    expect(container.querySelector("#stage > h2 .tag")).toBeTruthy();
   });
 
   it("retains and unmistakably marks the previous editor analysis", () => {

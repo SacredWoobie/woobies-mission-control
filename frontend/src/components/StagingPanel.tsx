@@ -115,7 +115,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
             <strong>{deltaVWithUnit(vacuum.totalDeltaV)}</strong>
           </span>
         </span>
-      ) : `VAC · ${rows.length} POWERED`}
+      ) : undefined}
     >
       {unavailable ? (
         <p className="empty-state">
