@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calculateResonantOrbit, STOCK_BODIES } from "./calculations";
+import { editorTelemetryFixture } from "../telemetry/fixtures";
 import { ResonantOrbitProvider } from "./state";
 import { ResonantOrbitTool } from "./ResonantOrbitTool";
 
@@ -67,5 +68,22 @@ describe("resonant orbit tool scene availability", () => {
     expect((screen.getByRole("checkbox", { name: "CommNet occlusion modifiers" }) as HTMLInputElement).checked).toBe(false);
     expect(screen.getByRole("button", { name: "UPDATE PLAN" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "SAVE AS NEW" })).toBeTruthy();
+  });
+
+  it("uses supplied Editor fixture identity when saving and pinning plans", async () => {
+    const user = userEvent.setup();
+    render(
+      <ResonantOrbitProvider>
+        <ResonantOrbitTool mode="editor" onOpen={vi.fn()} snapshot={editorTelemetryFixture} />
+      </ResonantOrbitProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Resonant orbit planner" }));
+    await user.type(screen.getByRole("textbox", { name: "Plan name" }), "Editor orbit review");
+    await user.click(screen.getByRole("button", { name: "SAVE PLAN" }));
+    await user.click(screen.getByRole("button", { name: /LOAD SAVED PLANS/ }));
+
+    const pin = screen.getByRole("button", { name: "Pin in Editor" }) as HTMLButtonElement;
+    expect(pin.disabled).toBe(false);
   });
 });

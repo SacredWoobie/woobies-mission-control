@@ -106,12 +106,43 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 });
 
-test("a pinned Editor plan keeps staging and craft summary side by side on wide screens", async ({ page }) => {
+test("Editor planning companions preserve the dense workspace alone and together", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
   await page.getByRole("button", { name: "DEV" }).click();
   await page.getByRole("button", { name: "editor", exact: true }).click();
   await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  await page.getByRole("button", { name: "Resonant orbit planner" }).click();
+  await page.getByRole("textbox", { name: "Plan name" }).fill("Editor orbit review");
+  await page.getByRole("button", { name: "SAVE PLAN" }).click();
+  await page.getByRole("button", { name: /LOAD SAVED PLANS/ }).click();
+  await page.getByRole("button", { name: "Pin in Editor" }).click();
+  await page.getByRole("button", { name: "Close saved plans" }).click();
+  await page.getByRole("button", { name: "Close resonant orbit planner" }).click();
+
+  const workspace = page.locator(".editor-workspace");
+  await expect(workspace).toHaveClass(/has-planning-companion/);
+  await expect(page.locator("#editorOrbitPlan")).toBeVisible();
+  await expect(page.locator("#editorDeltaVPlan")).toHaveCount(0);
+
+  const orbitOnly = await workspace.evaluate((element) => {
+    const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const context = bounds("#editorContext");
+    const orbit = bounds("#editorOrbitPlan");
+    return {
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      orbitContextTopDifference: Math.abs(orbit.top - context.top),
+      secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
+    };
+  });
+  expect(orbitOnly.secondaryChildren).toBe(1);
+  expect(orbitOnly.orbitContextTopDifference).toBeLessThanOrEqual(1);
+  expect(orbitOnly.documentScrollWidth).toBeLessThanOrEqual(orbitOnly.documentClientWidth);
+  expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight);
 
   await page.getByRole("button", { name: "Delta-v planner" }).click();
   await page.getByRole("button", { name: "+ Add next stop" }).click();
@@ -123,8 +154,7 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
   await page.getByRole("button", { name: "Close saved plans" }).click();
   await page.getByRole("button", { name: "Close delta-v planner" }).click();
 
-  const workspace = page.locator(".editor-workspace");
-  await expect(workspace).toHaveClass(/has-planning-companion/);
+  await expect(page.locator("#editorOrbitPlan")).toBeVisible();
   await expect(page.locator("#editorDeltaVPlan")).toBeVisible();
 
   const layout = await workspace.evaluate((element) => {
@@ -133,17 +163,22 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
     const context = bounds("#editorContext");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
-    const plan = bounds("#editorDeltaVPlan");
+    const orbit = bounds("#editorOrbitPlan");
+    const deltaV = bounds("#editorDeltaVPlan");
     const table = element.querySelector<HTMLElement>(".stage-table.editor")!;
     return {
+      companionGap: deltaV.top - orbit.bottom,
       contextMatchesPrimary: Math.abs(context.width - primary.width),
       documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
       overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingSummaryValues: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-summary-value strong"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
-      planContextTopDifference: Math.abs(plan.top - context.top),
+      orbitContextTopDifference: Math.abs(orbit.top - context.top),
+      secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
       stageSummaryGap: summary.left - stage.right,
       stageSummaryTopDifference: Math.abs(stage.top - summary.top),
       tableClientHeight: table.clientHeight,
@@ -151,13 +186,16 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
     };
   });
 
+  expect(layout.secondaryChildren).toBe(2);
+  expect(layout.companionGap).toBeGreaterThanOrEqual(10);
   expect(layout.contextMatchesPrimary).toBeLessThanOrEqual(1);
-  expect(layout.planContextTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.orbitContextTopDifference).toBeLessThanOrEqual(1);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
   expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.overflowingSummaryValues).toBe(0);
   expect(layout.overflowingResourceNames).toBe(0);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -165,11 +203,14 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
   await page.getByRole("button", { name: "DEV" }).click();
   await page.getByRole("button", { name: "editor", exact: true }).click();
   await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+  await expect(page.locator("#editorOrbitPlan")).toBeVisible();
   await expect(page.locator("#editorDeltaVPlan")).toBeVisible();
   const medium = await workspace.evaluate((element) => {
     const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
     const primary = bounds(".editor-workspace-primary");
     const secondary = bounds(".editor-workspace-secondary");
+    const orbit = bounds("#editorOrbitPlan");
+    const deltaV = bounds("#editorDeltaVPlan");
     const table = element.querySelector<HTMLElement>(".stage-table.editor")!;
     const tableBounds = table.getBoundingClientRect();
     const activeBounds = table.querySelector<HTMLElement>('[aria-current="step"]')!.getBoundingClientRect();
@@ -177,17 +218,21 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
       activeFullyVisible: activeBounds.top >= tableBounds.top - 1
         && activeBounds.bottom <= tableBounds.bottom + 1,
       columnGap: secondary.left - primary.right,
+      companionGap: deltaV.top - orbit.bottom,
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
       topDifference: Math.abs(primary.top - secondary.top),
     };
   });
+  expect(medium.secondaryChildren).toBe(2);
   expect(medium.activeFullyVisible).toBe(true);
   expect(medium.columnGap).toBeGreaterThanOrEqual(10);
+  expect(medium.companionGap).toBeGreaterThanOrEqual(6);
   expect(medium.topDifference).toBeLessThanOrEqual(1);
   expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
   expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);
@@ -199,20 +244,25 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
     const context = bounds("#editorContext");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
-    const plan = bounds("#editorDeltaVPlan");
+    const orbit = bounds("#editorOrbitPlan");
+    const deltaV = bounds("#editorDeltaVPlan");
     return {
+      companionGap: deltaV.top - orbit.bottom,
       contextStageGap: stage.top - context.bottom,
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
       stageSummaryGap: summary.top - stage.bottom,
-      summaryPlanGap: plan.top - summary.bottom,
+      secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
+      summaryPlanGap: orbit.top - summary.bottom,
     };
   });
+  expect(portrait.secondaryChildren).toBe(2);
   expect(portrait.contextStageGap).toBeGreaterThanOrEqual(10);
   expect(portrait.stageSummaryGap).toBeGreaterThanOrEqual(10);
   expect(portrait.summaryPlanGap).toBeGreaterThanOrEqual(10);
+  expect(portrait.companionGap).toBeGreaterThanOrEqual(10);
   expect(portrait.documentScrollWidth).toBeLessThanOrEqual(portrait.documentClientWidth);
   expect(portrait.documentScrollHeight).toBeLessThanOrEqual(portrait.documentClientHeight);
 });

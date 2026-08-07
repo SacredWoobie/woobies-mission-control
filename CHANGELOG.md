@@ -13,6 +13,10 @@ All notable public changes will be recorded here.
 - Expanded the deterministic Flight mock to eight powered stages out of ten
   total and added non-retractable, deploying, and damaged radiator states for
   staging- and Heat-panel density testing.
+- Added deterministic save and craft identity to the live Editor mock so
+  Resonant Orbit and Delta-V plans can be pinned safely during layout testing.
+- Aligned the Resonant Orbit planner with the selected dashboard telemetry so
+  fixture and live Editor sessions use the same save context when pinning plans.
 - Reused that dense ten-stage mock craft in Editor so the same staged vehicle
   can be inspected across Flight and VAB layout states.
 - Reclaimed the empty Editor planning column for a full-width craft-analysis

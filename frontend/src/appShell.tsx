@@ -173,7 +173,7 @@ export function DashboardSurface({
         notesButton={<NotesRailButton onOpen={closeDatalink} open={notesOpen} setOpen={onSetNotesOpen} />}
         tools={(
           <>
-            <ResonantOrbitTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} />
+            <ResonantOrbitTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} snapshot={notesSnapshot} />
             <DeltaVTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} snapshot={notesSnapshot} />
           </>
         )}

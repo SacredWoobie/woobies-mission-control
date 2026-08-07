@@ -288,7 +288,12 @@ SCENES = {
     "editor": {
         "context.mode": "editor",
         "flight.active": False,
+        "identity.available": True,
+        "game.saveFolder": "WMC Fixture Save",
         "editor.craftName": "Mock dual-condition craft",
+        "editor.craftPersistentId": "9001",
+        "editor.rootPartPersistentId": "1001",
+        "editor.partPersistentIds": ["1001", "1002", "1003"],
         "editor.facility": "VAB",
         "editor.body": "Kerbin",
         "editor.bodies": ["Kerbin", "Mun", "Minmus", "Duna"],

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CelestialBodyTelemetry, SceneMode } from "../telemetry/types";
+import type { CelestialBodyTelemetry, SceneMode, TelemetrySnapshot } from "../telemetry/types";
 import { useLiveTelemetrySelector } from "../telemetry/useLiveTelemetry";
 import {
   DISTANCE_UNITS,
@@ -139,7 +139,7 @@ function OrbitPlot({ plan }: { plan: ResonantOrbitPlan }) {
   return <canvas ref={canvasRef} />;
 }
 
-export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
+export function ResonantOrbitDrawer({ mode, snapshot }: { mode: SceneMode; snapshot?: TelemetrySnapshot }) {
   const {
     activeSavedPlanId,
     closeDrawer,
@@ -158,20 +158,28 @@ export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
     (state): CelestialBodyTelemetry[] => state.snapshot?.["catalog.bodies"] ?? [],
     bodyCatalogEqual,
   );
-  const contextBodyName = useLiveTelemetrySelector((state) => {
+  const liveContextBodyName = useLiveTelemetrySelector((state) => {
     const snapshot = state.snapshot;
     return String(snapshot?.["v.body"] ?? snapshot?.["editor.body"] ?? "");
   });
-  const currentSaveFolder = useLiveTelemetrySelector((state) => {
+  const liveSaveFolder = useLiveTelemetrySelector((state) => {
     const value = state.snapshot?.["game.saveFolder"];
     return typeof value === "string" ? value.trim() : "";
   });
+  const availableTelemetryBodies = snapshot?.["catalog.bodies"] ?? liveBodies;
+  const contextBodyName = snapshot
+    ? String(snapshot["v.body"] ?? snapshot["editor.body"] ?? "")
+    : liveContextBodyName;
+  const snapshotSaveFolder = snapshot?.["game.saveFolder"];
+  const currentSaveFolder = snapshot
+    ? typeof snapshotSaveFolder === "string" ? snapshotSaveFolder.trim() : ""
+    : liveSaveFolder;
   const availableBodies = useMemo(() => {
     const merged = new Map<string, BodyDefinition>();
     Object.values(STOCK_BODIES).forEach((definition) => merged.set(definition.name, definition));
-    liveBodies.forEach((definition) => merged.set(definition.name, { ...definition }));
+    availableTelemetryBodies.forEach((definition) => merged.set(definition.name, { ...definition }));
     return [...merged.values()].sort((left, right) => left.name.localeCompare(right.name));
-  }, [liveBodies]);
+  }, [availableTelemetryBodies]);
   const [bodyChoice, setBodyChoice] = useState("Minmus");
   const [body, setBody] = useState<BodyDefinition>({ ...STOCK_BODIES.Minmus });
   const [customBody, setCustomBody] = useState<BodyDefinition>({ ...STOCK_BODIES.Kerbin, name: "Custom body" });

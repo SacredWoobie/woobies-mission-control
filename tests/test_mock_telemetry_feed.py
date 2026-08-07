@@ -53,6 +53,10 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual(self.editor["stage.totalDvAtmo"], 4460)
         self.assertEqual(self.editor["stage.totalDvVac"], 5470)
         self.assertEqual(self.editor["stage.totalBurnSeconds"], 335)
+        self.assertTrue(self.editor["identity.available"])
+        self.assertEqual(self.editor["game.saveFolder"], "WMC Fixture Save")
+        self.assertEqual(self.editor["editor.craftPersistentId"], "9001")
+        self.assertEqual(self.editor["editor.rootPartPersistentId"], "1001")
 
     def test_reactor_inventory_has_two_fission_and_one_fusion_reactor(self):
         reactors = self.flight["elec.reactors"]
