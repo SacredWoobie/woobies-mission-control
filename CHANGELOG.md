@@ -19,6 +19,9 @@ All notable public changes will be recorded here.
   row with side-by-side staging and craft summary, repaired shared collapse
   chevrons, and made dense staging explain omitted stages while revealing and
   accessibly identifying the active stage.
+- Reused that side-by-side staging and craft-summary row when a plan is pinned
+  on wide Editor screens, keeping craft analysis compact beside its planning
+  companion.
 - Grouped distant powered stages behind an expandable range row when Flight
   staging grows tall; expanded rows scroll inside the table while the active
   and nearest stages remain visible by default.

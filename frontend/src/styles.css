@@ -1876,6 +1876,18 @@ button { font: inherit; }
 }
 
 @media (orientation: landscape) and (min-width: 1500px) {
+  .editor-mode .editor-workspace.has-planning-companion .editor-workspace-primary {
+    display: grid;
+    width: 100%;
+    align-self: stretch;
+    grid-template-columns: minmax(600px,1.45fr) minmax(400px,.9fr);
+    align-items: start;
+  }
+  .editor-mode .editor-workspace.has-planning-companion #editorContext { grid-column: 1 / -1; }
+  .editor-mode .editor-workspace.has-planning-companion .editor-staging-slice { grid-column: 1; }
+  .editor-mode .editor-workspace.has-planning-companion #editorSummary { grid-column: 2; }
+  .editor-mode .editor-workspace.has-planning-companion #editorSummary .editor-summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .editor-mode .editor-workspace.has-planning-companion #editorSummary .editor-resource-list { grid-template-columns: minmax(0,1fr); }
   .editor-mode .editor-summary-grid { grid-template-columns: repeat(8,minmax(0,1fr)); }
   .editor-mode .editor-resource-list {
     display: grid;

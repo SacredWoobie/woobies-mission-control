@@ -106,6 +106,100 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 });
 
+test("a pinned Editor plan keeps staging and craft summary side by side on wide screens", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "DEV" }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  await page.getByRole("button", { name: "+ Add next stop" }).click();
+  await page.getByRole("combobox", { name: "Next stop" }).selectOption({ label: "Duna" });
+  await page.getByRole("textbox", { name: "Delta-v plan name" }).fill("Editor layout review");
+  await page.getByRole("button", { name: "Save plan" }).click();
+  await page.getByRole("button", { name: "Load saved plans" }).click();
+  await page.getByRole("button", { name: "Pin to Editor craft" }).click();
+  await page.getByRole("button", { name: "Close saved plans" }).click();
+  await page.getByRole("button", { name: "Close delta-v planner" }).click();
+
+  const workspace = page.locator(".editor-workspace");
+  await expect(workspace).toHaveClass(/has-planning-companion/);
+  await expect(page.locator("#editorDeltaVPlan")).toBeVisible();
+
+  const layout = await workspace.evaluate((element) => {
+    const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const primary = bounds(".editor-workspace-primary");
+    const context = bounds("#editorContext");
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    const plan = bounds("#editorDeltaVPlan");
+    const table = element.querySelector<HTMLElement>(".stage-table.editor")!;
+    return {
+      contextMatchesPrimary: Math.abs(context.width - primary.width),
+      documentClientHeight: document.documentElement.clientHeight,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingSummaryValues: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-summary-value strong"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      planContextTopDifference: Math.abs(plan.top - context.top),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      tableClientHeight: table.clientHeight,
+      tableScrollHeight: table.scrollHeight,
+    };
+  });
+
+  expect(layout.contextMatchesPrimary).toBeLessThanOrEqual(1);
+  expect(layout.planContextTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
+  expect(layout.overflowingSummaryValues).toBe(0);
+  expect(layout.overflowingResourceNames).toBe(0);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const medium = await workspace.evaluate((element) => {
+    const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const primary = bounds(".editor-workspace-primary");
+    const secondary = bounds(".editor-workspace-secondary");
+    return {
+      columnGap: secondary.left - primary.right,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      topDifference: Math.abs(primary.top - secondary.top),
+    };
+  });
+  expect(medium.columnGap).toBeGreaterThanOrEqual(10);
+  expect(medium.topDifference).toBeLessThanOrEqual(1);
+  expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);
+
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  const portrait = await workspace.evaluate((element) => {
+    const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const context = bounds("#editorContext");
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    const plan = bounds("#editorDeltaVPlan");
+    return {
+      contextStageGap: stage.top - context.bottom,
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      stageSummaryGap: summary.top - stage.bottom,
+      summaryPlanGap: plan.top - summary.bottom,
+    };
+  });
+  expect(portrait.contextStageGap).toBeGreaterThanOrEqual(10);
+  expect(portrait.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(portrait.summaryPlanGap).toBeGreaterThanOrEqual(10);
+  expect(portrait.documentScrollWidth).toBeLessThanOrEqual(portrait.documentClientWidth);
+  expect(portrait.documentScrollHeight).toBeLessThanOrEqual(portrait.documentClientHeight);
+});
+
 test("the wide Flight context and annunciator fit long mission times in one compact row", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
