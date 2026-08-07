@@ -6,8 +6,9 @@ All notable public changes will be recorded here.
 
 - Reduced the fixed caution surface to an actionable 2x2 HEAT, REACTOR, COMMS,
   and POWER grid; dashboard-feed interruptions remain diagnostic history without
-  relighting Master. Reactor detail now stays bounded inside Electricity and
-  exposes a dedicated wheel- and keyboard-scrollable list.
+  relighting Master. Reactor detail now expands toward Electricity's existing
+  height cap instead of inheriting the aggregate source ledger's height, then
+  exposes a dedicated wheel- and keyboard-scrollable list for any overflow.
 
 - Simplified the persistent Flight panel chrome by removing redundant
   Consumables and Staging header summaries, moved the Tools label to the top of

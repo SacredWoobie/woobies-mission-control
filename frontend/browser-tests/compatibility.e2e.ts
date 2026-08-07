@@ -215,7 +215,9 @@ test("reactor detail remains bounded and scrollable inside Electricity", async (
   expect(scrolling.overflowY).toBe("auto");
   expect(scrolling.scrollHeight).toBeGreaterThan(scrolling.clientHeight);
   expect(scrolling.after).toBeGreaterThan(scrolling.before);
-  expect(await electricity.evaluate((element) => element.getBoundingClientRect().height)).toBeCloseTo(initialHeight, 0);
+  const detailHeight = await electricity.evaluate((element) => element.getBoundingClientRect().height);
+  expect(detailHeight).toBeGreaterThanOrEqual(initialHeight);
+  expect(detailHeight).toBeLessThanOrEqual(384);
 });
 
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {

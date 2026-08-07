@@ -160,20 +160,18 @@ function GenerationMeter({ model }: { model: ElectricityViewModel }) {
 function SourceLedger({
   generation,
   hidden,
-  ledgerRef,
   onOpenReactors,
   reactorButtonRef,
   sources,
 }: {
   generation: number | undefined;
   hidden: boolean;
-  ledgerRef: RefObject<HTMLDivElement | null>;
   onOpenReactors?: () => void;
   reactorButtonRef?: RefObject<HTMLButtonElement | null>;
   sources: ElectricitySourceViewModel[];
 }) {
   return (
-    <div className="ec-source-ledger" aria-label="Electricity generation by source" hidden={hidden} ref={ledgerRef}>
+    <div className="ec-source-ledger" aria-label="Electricity generation by source" hidden={hidden}>
       {sources.map((source) => {
         const idle = !isFiniteNumber(source.outputEcPerSec) || source.outputEcPerSec <= 0.05;
         const share = (
@@ -425,10 +423,8 @@ export function ElectricityPanel({
 }) {
   const model = selectElectricity(snapshot);
   const [reactorDetailOpen, setReactorDetailOpen] = useState(false);
-  const [sourceSlotHeight, setSourceSlotHeight] = useState<number>();
   const reactorButtonRef = useRef<HTMLButtonElement>(null);
   const reactorBackRef = useRef<HTMLButtonElement>(null);
-  const sourceLedgerRef = useRef<HTMLDivElement>(null);
   const reactorDetailWasOpenRef = useRef(false);
   useEffect(() => {
     if (model.reactors.length === 0 && reactorDetailOpen) setReactorDetailOpen(false);
@@ -442,13 +438,10 @@ export function ElectricityPanel({
     reactorDetailWasOpenRef.current = reactorDetailOpen;
   }, [reactorDetailOpen]);
   const openReactorDetail = () => {
-    const height = sourceLedgerRef.current?.getBoundingClientRect().height;
-    setSourceSlotHeight(height && height > 0 ? height : undefined);
     setReactorDetailOpen(true);
   };
   const closeReactorDetail = () => {
     setReactorDetailOpen(false);
-    setSourceSlotHeight(undefined);
   };
   const deficit = isFiniteNumber(model.netEcPerSec) && model.netEcPerSec < -0.05;
   const heroLabel = model.tier === 1
@@ -491,13 +484,11 @@ export function ElectricityPanel({
       </div>
       {(model.tier === 3 || model.reactors.length > 0) && (
         <div
-          className="ec-source-slot"
-          style={sourceSlotHeight ? { flex: "0 0 auto", height: `${sourceSlotHeight}px` } : undefined}
+          className={`ec-source-slot${reactorDetailOpen ? " detail-open" : ""}`}
         >
           <SourceLedger
             generation={model.generationEcPerSec}
             hidden={reactorDetailOpen}
-            ledgerRef={sourceLedgerRef}
             onOpenReactors={model.reactors.length > 0 ? openReactorDetail : undefined}
             reactorButtonRef={reactorButtonRef}
             sources={model.sources}

@@ -23,7 +23,7 @@ function openReactorDetail() {
 }
 
 describe("ElectricityPanel", () => {
-  it("replaces the source ledger with reactor detail without changing the slot height", () => {
+  it("replaces the source ledger with a deliberately expanded reactor detail slot", () => {
     const { container } = renderPanel(flightTelemetryFixture);
 
     expect(screen.queryByText("By source", { exact: true })).toBeNull();
@@ -45,24 +45,45 @@ describe("ElectricityPanel", () => {
     expect(container.querySelector('[role="meter"][aria-label="83% electric charge remaining"]')).toBeTruthy();
     expect(container.querySelector(".ec-charge-fill.healthy")).toBeTruthy();
 
-    vi.spyOn(ledger, "getBoundingClientRect").mockReturnValue({ height: 164 } as DOMRect);
     const open = screen.getByRole("button", { name: "Open reactor detail" });
     fireEvent.click(open);
     expect(ledger.hidden).toBe(true);
     expect(detail.hidden).toBe(false);
-    expect(slot.style.height).toBe("164px");
-    expect(slot.style.flex).toBe("0 0 auto");
+    expect(slot.classList.contains("detail-open")).toBe(true);
+    expect(slot.style.height).toBe("");
     const reactorList = screen.getByRole("region", { name: "Reactor list" });
     expect(reactorList.tabIndex).toBe(0);
+    expect(reactorList.querySelectorAll(".rx-card")).toHaveLength(2);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Back to power sources" }));
     expect(screen.queryByRole("button", { name: "Open reactor detail" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Back to power sources" }));
     expect(ledger.hidden).toBe(false);
     expect(detail.hidden).toBe(true);
-    expect(slot.style.height).toBe("");
-    expect(slot.style.flex).toBe("");
+    expect(slot.classList.contains("detail-open")).toBe(false);
     expect(document.activeElement).toBe(open);
+  });
+
+  it("renders every individual reactor when the source ledger has one aggregate row", () => {
+    const baseReactors = flightTelemetryFixture["elec.reactors"] ?? [];
+    const snapshot: TelemetrySnapshot = {
+      ...flightTelemetryFixture,
+      "elec.otherEcPerSec": 0,
+      "elec.reactors": [
+        ...baseReactors,
+        { ...baseReactors[0], name: "Third onboard reactor", partId: 42013 },
+      ],
+      "rtg.count": 0,
+      "rtg.outputEcPerSec": 0,
+      "solar.count": 0,
+      "solar.outputEcPerSec": 0,
+    };
+    const { container } = renderPanel(snapshot);
+
+    expect(container.querySelectorAll(".ec-source-row")).toHaveLength(1);
+    openReactorDetail();
+    expect(screen.getByRole("region", { name: "Reactor list" }).querySelectorAll(".rx-card")).toHaveLength(3);
+    expect(screen.getByText("Third onboard reactor")).toBeTruthy();
   });
 
   it("hides the ledger for a single source family", () => {

@@ -1229,6 +1229,7 @@ button { font: inherit; }
 .ec-flow-caption { display: flex; margin-top: 7px; color: var(--slate); font-size: 9px; justify-content: space-between; gap: 10px; }
 .ec-flow-caption .danger { color: var(--warn); }
 .ec-source-slot { position: relative; min-height: 0; margin-top: 8px; overflow: hidden; }
+.ec-source-slot.detail-open { height: clamp(190px,28vh,240px); }
 .ec-source-ledger { display: flex; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; background: var(--rule); flex-direction: column; gap: 1px; }
 .ec-source-row { display: flex; min-width: 0; padding: 7px 10px; align-items: center; gap: 9px; background: var(--panel); }
 .ec-source-button { width: 100%; border: 0; color: inherit; cursor: pointer; font-family: var(--mono); text-align: left; }
@@ -1290,6 +1291,11 @@ button { font: inherit; }
   flex-direction: column;
 }
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-slot { min-height: 0; flex: 1; }
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-slot.detail-open {
+  height: clamp(190px,28vh,240px);
+  min-height: 180px;
+  flex: 1 1 220px;
+}
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-ledger { height: 100%; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-row { flex: 1; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) {
