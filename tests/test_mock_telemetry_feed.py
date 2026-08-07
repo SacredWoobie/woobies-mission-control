@@ -14,6 +14,7 @@ class FlightMockTelemetryTests(unittest.TestCase):
     def setUp(self):
         self.flight = mock_feed.SCENES["flight"]
         self.editor = mock_feed.SCENES["editor"]
+        self.inactive = mock_feed.SCENES["inactive"]
 
     def test_all_system_heat_loops_have_expandable_component_details(self):
         loops = self.flight["heat.loops"]
@@ -80,6 +81,19 @@ class FlightMockTelemetryTests(unittest.TestCase):
         for resource in expected:
             self.assertGreater(self.flight[f"r.resourceMax[{resource}]"], 0)
             self.assertGreaterEqual(self.flight[f"r.resource[{resource}]"], 0)
+
+    def test_inactive_scene_has_a_completed_transfer_window_board(self):
+        windows = self.inactive["mj.transfer.windows.results"]
+
+        self.assertTrue(self.inactive["mj.transfer.available"])
+        self.assertTrue(self.inactive["mj.transfer.compatibilityReady"])
+        self.assertEqual(self.inactive["mj.transfer.windows.state"], "completed")
+        self.assertEqual(self.inactive["mj.transfer.windows.origin"], "Kerbin")
+        self.assertEqual(len(windows), 9)
+        self.assertEqual(
+            {window["destination"] for window in windows},
+            {"Moho", "Duna", "Dres", "Neidon", "Urlum", "Eve", "Jool", "Plock", "Sarnus"},
+        )
 
 
 if __name__ == "__main__":

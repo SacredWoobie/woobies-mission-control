@@ -15,6 +15,8 @@ All notable public changes will be recorded here.
   staging- and Heat-panel density testing.
 - Added deterministic save and craft identity to the live Editor mock so
   Resonant Orbit and Delta-V plans can be pinned safely during layout testing.
+- Populated the deterministic inactive mock with a completed nine-destination
+  transfer-window board for overview-scene density and layout review.
 - Aligned the Resonant Orbit planner with the selected dashboard telemetry so
   fixture and live Editor sessions use the same save context when pinning plans.
 - Redesigned the pinned Editor Resonant Orbit plan as a compact constellation
