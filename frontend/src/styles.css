@@ -1130,7 +1130,7 @@ button { font: inherit; }
 .asc-flight-metric { display: flex; min-width: 0; min-height: 58px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--panel); flex-direction: column; justify-content: center; gap: 3px; }
 .asc-flight-metric.hero { min-height: 88px; border: 0; background: transparent; }
 .asc-flight-value { overflow: hidden; color: var(--amber); font-size: 16px; line-height: 1.1; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.asc-flight-metric.hero .asc-flight-value { font-size: clamp(30px,5.1cqi,46px); }
+.asc-flight-metric.hero .asc-flight-value { font-size: clamp(30px,4.35cqi,40px); }
 .asc-flight-subtitle { overflow: hidden; color: var(--slate-dim); font-size: 9px; letter-spacing: .02em; text-overflow: ellipsis; white-space: nowrap; }
 .target-metric { position: relative; }
 .target-metric .asc-flight-subtitle { position: absolute; top: 9px; right: 10px; max-width: 48%; text-align: right; }

@@ -11,7 +11,7 @@ All notable public changes will be recorded here.
   running.
 
 - Reworked Flight Ascension around a persistent attitude instrument, trajectory
-  annunciator, dedicated SAS strip, prominent altitude, 2x2 flight-speed grid,
+  annunciator, dedicated SAS strip, width-safe prominent altitude, 2x2 flight-speed grid,
   explanatory orbital-stat rail, and a centered, dimensional vector navball;
   removed the lower sparklines without adding RCS, vessel controls, backend
   telemetry, or bitmap assets.
