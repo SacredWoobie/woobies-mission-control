@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDialogFocus } from "../deltaV/useDialogFocus";
 import { formatScienceColumn, formatScienceInline, isFiniteNumber } from "../formatting/numbers";
 import type {
@@ -162,6 +162,8 @@ export function SciencePanel({
   const [draftLeadSeconds, setDraftLeadSeconds] = useState<ScienceAlarmLead>(alarmSettings.leadSeconds);
   const [draftKacAction, setDraftKacAction] = useState<ScienceAlarmAction>(alarmSettings.kacAction);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [experimentDetailOpen, setExperimentDetailOpen] = useState(false);
+  const [scienceSlotHeight, setScienceSlotHeight] = useState<number>();
   const [pending, setPending] = useState<{ labId: string; requestId: string } | null>(null);
   const [researchPending, setResearchPending] = useState<{ labId: string; requestId: string; enabled: boolean } | null>(null);
   const [transmitPending, setTransmitPending] = useState<{ labId: string; requestId: string } | null>(null);
@@ -170,6 +172,26 @@ export function SciencePanel({
   const selectedProvider = resolvedAlarmProvider(alarmSettings.provider, providers);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const settingsDialogRef = useDialogFocus<HTMLElement>(settingsOpen, closeSettings);
+  const experimentButtonRef = useRef<HTMLButtonElement>(null);
+  const experimentBackRef = useRef<HTMLButtonElement>(null);
+  const scienceBaselineRef = useRef<HTMLDivElement>(null);
+  const experimentDetailWasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (model.experiments.length === 0 && experimentDetailOpen) {
+      setExperimentDetailOpen(false);
+      setScienceSlotHeight(undefined);
+    }
+  }, [experimentDetailOpen, model.experiments.length]);
+
+  useEffect(() => {
+    if (experimentDetailOpen) {
+      experimentBackRef.current?.focus();
+    } else if (experimentDetailWasOpenRef.current) {
+      experimentButtonRef.current?.focus();
+    }
+    experimentDetailWasOpenRef.current = experimentDetailOpen;
+  }, [experimentDetailOpen]);
 
   useEffect(() => {
     if (!pending || alarmResult?.requestId !== pending.requestId) return;
@@ -303,6 +325,18 @@ export function SciencePanel({
     ?? model.labs.find((lab) => lab.tone === "warn")
     ?? model.labs[0];
   const railStatus = `${model.experimentCount} EXP${priorityLab ? ` · ${priorityLab.statusLabel}` : ""}`;
+  const hasScienceBaseline = model.labs.length > 0 || !model.labTelemetryAvailable;
+  const openExperimentDetail = () => {
+    const height = model.labs.length > 0
+      ? scienceBaselineRef.current?.getBoundingClientRect().height
+      : undefined;
+    setScienceSlotHeight(height && height > 0 ? height : undefined);
+    setExperimentDetailOpen(true);
+  };
+  const closeExperimentDetail = () => {
+    setExperimentDetailOpen(false);
+    setScienceSlotHeight(undefined);
+  };
   return (
     <Panel collapsible compact id="sci" tag={railStatus} title="Science">
       <div className="sci-overview-card">
@@ -318,12 +352,30 @@ export function SciencePanel({
             <small>{model.locationDetail || "location unavailable"}</small>
           </div>
         </div>
-        {isFiniteNumber(model.banked) && <div className="sci-banked">{formatScienceInline(model.banked)} science banked at KSC</div>}
+        {(model.experiments.length > 0 || isFiniteNumber(model.banked)) && <div className={`sci-banked ${model.experiments.length > 0 ? "has-detail" : ""}`}>
+          {model.experiments.length > 0 && <button
+            aria-expanded={experimentDetailOpen}
+            aria-label={experimentDetailOpen ? "Close experiment detail" : "Open experiment detail"}
+            className="sci-experiment-open"
+            onClick={experimentDetailOpen ? closeExperimentDetail : openExperimentDetail}
+            ref={experimentButtonRef}
+            type="button"
+          >
+            <span>Experiment detail</span>
+            <span>{model.experiments.length}</span>
+            <span aria-hidden="true">›</span>
+          </button>}
+          {isFiniteNumber(model.banked) && <span className="sci-banked-value">{formatScienceInline(model.banked)} science banked at KSC</span>}
+        </div>}
       </div>
 
-      {model.labTelemetryAvailable ? (
-        model.labs.length > 0
-          ? <div className="sci-lab-list" aria-label="Science laboratories">{model.labs.map((lab) => {
+      {(hasScienceBaseline || model.experiments.length > 0) && <div
+        className={`sci-content-slot ${experimentDetailOpen ? "detail-open" : ""} ${hasScienceBaseline ? "has-baseline" : ""} ${model.labs.length > 0 ? "has-labs" : ""}`}
+        style={scienceSlotHeight ? { height: `${scienceSlotHeight}px` } : undefined}
+      >
+        {hasScienceBaseline && <div className="sci-baseline-view" hidden={experimentDetailOpen} ref={scienceBaselineRef}>
+          {model.labTelemetryAvailable ? (
+            <div className="sci-lab-list" aria-label="Science laboratories">{model.labs.map((lab) => {
             const alarmEligible = (lab.etaKind === "finite" || lab.etaKind === "depleted") && isFiniteNumber(lab.etaSeconds);
             const waiting = pending?.labId === lab.id;
             const changingResearch = researchPending?.labId === lab.id;
@@ -369,16 +421,25 @@ export function SciencePanel({
               key={lab.id}
               lab={lab}
             />;
-          })}</div>
-          : null
-      ) : (
-        <div className="sci-lab-empty unavailable">Lab telemetry unavailable · service update required</div>
-      )}
+            })}</div>
+          ) : (
+            <div className="sci-lab-empty unavailable">Lab telemetry unavailable · service update required</div>
+          )}
+        </div>}
 
-      {model.experiments.length > 0 && (
-        <details className="sci-details">
-          <summary><span>Experiment detail</span><span>{model.experiments.length}</span></summary>
-          <div className="sci-list">{model.experiments.map((row, index) => {
+        {model.experiments.length > 0 && <section aria-label="Experiment detail" className="sci-experiment-view" hidden={!experimentDetailOpen}>
+          <button
+            aria-label={model.labs.length > 0 ? "Back to lab data" : "Back to science summary"}
+            className="sci-experiment-back"
+            onClick={closeExperimentDetail}
+            ref={experimentBackRef}
+            type="button"
+          >
+            <span aria-hidden="true">‹</span>
+            <span>{model.labs.length > 0 ? "Lab data" : "Science"}</span>
+            <span>{model.experiments.length}</span>
+          </button>
+          <div className="sci-experiment-scroll"><div className="sci-list">{model.experiments.map((row, index) => {
             const source = experimentSource(row);
             return (
               <div className="sl-row" key={`${row.title}-${row.subjectId ?? index}`}>
@@ -386,9 +447,9 @@ export function SciencePanel({
                 <span className="v">{formatScienceColumn(row.value)} <span className="label-muted">/ {formatScienceColumn(row.transmit)} tx</span></span>
               </div>
             );
-          })}</div>
-        </details>
-      )}
+          })}</div></div>
+        </section>}
+      </div>}
 
       {settingsOpen && <div className="delta-v-modal-backdrop sci-alarm-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSettings(); }}>
         <section aria-labelledby="science-alarm-settings-title" aria-modal="true" className="sci-alarm-modal" onMouseDown={(event) => event.stopPropagation()} ref={settingsDialogRef} role="dialog" tabIndex={-1}>
