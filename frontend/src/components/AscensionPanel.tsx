@@ -62,13 +62,15 @@ function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; r
       </defs>
       <circle className="nav-sphere-bezel" cx="84" cy="84" r="82" />
       <circle className="nav-sphere-ground" cx="84" cy="84" r="78" />
-      {geometry.skyPath && <path d={geometry.skyPath} fill={`url(#${skyGradientId})`} />}
-      <g className="nav-spherical-grid" clipPath={`url(#${clipId})`}>
-        {geometry.grid.map((line, index) => <path d={line.path} key={index} opacity={line.opacity} />)}
-      </g>
-      {geometry.horizonPath && <path className="nav-spherical-horizon" d={geometry.horizonPath} />}
-      <g className="nav-cardinals">
-        {geometry.cardinals.map((cardinal) => <text key={cardinal.label} x={cardinal.x.toFixed(1)} y={cardinal.y.toFixed(1)}>{cardinal.label}</text>)}
+      <g className="nav-sphere-world" clipPath={`url(#${clipId})`}>
+        {geometry.skyPath && <path className="nav-sphere-sky" d={geometry.skyPath} fill={`url(#${skyGradientId})`} />}
+        <g className="nav-spherical-grid">
+          {geometry.grid.map((line, index) => <path d={line.path} key={index} opacity={line.opacity} />)}
+        </g>
+        {geometry.horizonPath && <path className="nav-spherical-horizon" d={geometry.horizonPath} />}
+        <g className="nav-cardinals">
+          {geometry.cardinals.map((cardinal) => <text key={cardinal.label} x={cardinal.x.toFixed(1)} y={cardinal.y.toFixed(1)}>{cardinal.label}</text>)}
+        </g>
       </g>
       <circle className="nav-sphere-rim" cx="84" cy="84" r="78" />
       <g className="aircraft">

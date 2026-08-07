@@ -78,6 +78,12 @@ describe("Ascension information hierarchy", () => {
     expect(view.container.querySelectorAll(".navball .nav-spherical-grid path")).toHaveLength(16);
     expect(view.container.querySelector(".navball .nav-spherical-horizon")).not.toBeNull();
     expect(view.container.querySelector(".navball .nav-sphere-rim")).not.toBeNull();
+    const clippedWorld = view.container.querySelector(".navball .nav-sphere-world");
+    expect(clippedWorld?.getAttribute("clip-path")).toMatch(/^url\(#navball-clip-/);
+    expect(clippedWorld?.querySelector(".nav-sphere-sky")).not.toBeNull();
+    expect(clippedWorld?.querySelector(".nav-spherical-grid")).not.toBeNull();
+    expect(clippedWorld?.querySelector(".nav-cardinals")).not.toBeNull();
+    expect(clippedWorld?.contains(view.container.querySelector(".nav-sphere-rim"))).toBe(false);
     expect(view.container.querySelector(".altitude-hero")?.textContent).toContain("Altitude");
     expect(view.container.querySelector(".asc-speed-grid")?.textContent).toContain("Vertical speed");
     expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Target relative");

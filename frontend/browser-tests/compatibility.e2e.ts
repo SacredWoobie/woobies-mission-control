@@ -161,6 +161,33 @@ test("the Ascension orbit rail reflows before telemetry values truncate", async 
   expect(wideTarget).toBe(1);
 });
 
+test("the navball clips every projected world layer to the globe", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  const clipping = await page.locator("#asc .navball").evaluate((navball) => {
+    const world = navball.querySelector<SVGGElement>(".nav-sphere-world");
+    const clipCircle = navball.querySelector<SVGCircleElement>("clipPath circle");
+    return {
+      cardinalsInside: Boolean(world?.querySelector(".nav-cardinals")),
+      clipPath: world?.getAttribute("clip-path"),
+      clipRadius: clipCircle?.getAttribute("r"),
+      gridInside: Boolean(world?.querySelector(".nav-spherical-grid")),
+      horizonInside: Boolean(world?.querySelector(".nav-spherical-horizon")),
+      rimInside: Boolean(world?.querySelector(".nav-sphere-rim")),
+      skyInside: Boolean(world?.querySelector(".nav-sphere-sky")),
+    };
+  });
+
+  expect(clipping.clipPath).toMatch(/^url\(#navball-clip-/);
+  expect(clipping.clipRadius).toBe("78");
+  expect(clipping.skyInside).toBe(true);
+  expect(clipping.gridInside).toBe(true);
+  expect(clipping.horizonInside).toBe(true);
+  expect(clipping.cardinalsInside).toBe(true);
+  expect(clipping.rimInside).toBe(false);
+});
+
 test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome content area", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.addInitScript(() => localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["conn"])));

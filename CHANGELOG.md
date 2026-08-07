@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Clipped every projected navball world layer to the spherical boundary so the
+  moving sky, horizon, grid, and cardinal labels cannot bleed beyond the globe.
 - Reflowed Ascension's orbital-stat rail before narrow panels can truncate
   labels or telemetry values, while retaining the single-row proposal-target
   layouts.
