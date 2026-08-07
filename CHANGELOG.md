@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Expanded the deterministic Flight mock with detailed component inventories
+  for all three System Heat loops, two fission reactors plus one fusion reactor,
+  and nuclear, cryogenic, ore, and depleted-fuel consumables for frontend stress
+  testing without a running KSP session.
+
 - Replaced the auto-hidden Datalink panel with a persistent utility-rail drawer
   containing browser-link status, endpoint and frame diagnostics, a bounded
   connection-event log, forced refresh, and explicit off/on controls. These
