@@ -10,6 +10,9 @@ All notable public changes will be recorded here.
   silhouette, including its smaller centered reference dot.
 - Rebalanced Flight staging columns so `Δv LIVE`, `Δv VAC`, and `TWR · LIVE`
   headings leave less unused width in TWR and more room for delta-v values.
+- Expanded the deterministic Flight mock to seven powered stages out of ten
+  total and added non-retractable, deploying, and damaged radiator states for
+  staging- and Heat-panel density testing.
 - Reflowed Ascension's orbital-stat rail before narrow panels can truncate
   labels or telemetry values, while retaining the single-row proposal-target
   layouts.

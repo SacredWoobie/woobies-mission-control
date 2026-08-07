@@ -8,11 +8,28 @@ import json
 import websockets
 
 
-STAGES = [
+EDITOR_STAGES = [
     {"index": 0, "ksp": 0, "dvAtmo": 500, "dvVac": 650,
      "twr": 0.8, "twrAtmo": 0.8, "twrVac": 1.0, "burn": 42},
     {"index": 2, "ksp": 2, "dvAtmo": 1000, "dvVac": 1200,
      "twr": 1.25, "twrAtmo": 1.25, "twrVac": 1.55, "burn": 75},
+]
+
+FLIGHT_STAGES = [
+    {"index": 0, "ksp": 0, "dvAtmo": 500, "dvVac": 650,
+     "twr": 0.80, "twrAtmo": 0.80, "twrVac": 1.00, "burn": 42},
+    {"index": 2, "ksp": 2, "dvAtmo": 640, "dvVac": 780,
+     "twr": 0.95, "twrAtmo": 0.95, "twrVac": 1.15, "burn": 51},
+    {"index": 3, "ksp": 3, "dvAtmo": 820, "dvVac": 980,
+     "twr": 1.08, "twrAtmo": 1.08, "twrVac": 1.32, "burn": 58},
+    {"index": 5, "ksp": 5, "dvAtmo": 1000, "dvVac": 1200,
+     "twr": 1.25, "twrAtmo": 1.25, "twrVac": 1.55, "burn": 75},
+    {"index": 6, "ksp": 6, "dvAtmo": 720, "dvVac": 890,
+     "twr": 1.42, "twrAtmo": 1.42, "twrVac": 1.68, "burn": 48},
+    {"index": 8, "ksp": 8, "dvAtmo": 360, "dvVac": 440,
+     "twr": 1.76, "twrAtmo": 1.76, "twrVac": 2.08, "burn": 29},
+    {"index": 9, "ksp": 9, "dvAtmo": 180, "dvVac": 230,
+     "twr": 2.10, "twrAtmo": 2.10, "twrVac": 2.45, "burn": 12},
 ]
 
 NOTE = {
@@ -124,10 +141,13 @@ SCENES = {
         "stage.available": True,
         "stage.complete": True,
         "stage.pending": False,
-        "stage.currentKsp": 2,
-        "stage.stages": STAGES,
-        "stage.totalDvAtmo": 1500,
-        "stage.totalDvVac": 1850,
+        "stage.currentKsp": 9,
+        "stage.count": 10,
+        "stage.unpoweredCount": 3,
+        "stage.stages": FLIGHT_STAGES,
+        "stage.totalDvAtmo": 4220,
+        "stage.totalDvVac": 5170,
+        "stage.totalBurnSeconds": 315,
         "heat.backend": "system_heat",
         "heat.systemHeatStatus": "known",
         "heat.generatedKw": 481.6,
@@ -137,6 +157,8 @@ SCENES = {
             {
                 "id": "1", "tempK": 771, "nominalTempK": 800,
                 "genKw": 215, "remKw": 155, "netKw": 60,
+                "radiatorState": "online",
+                "radiatorControlAvailable": False,
                 "producers": [
                     {"name": "Reactor", "role": "producer", "fluxKw": 120},
                     {"name": "Drill", "role": "producer", "count": 2,
@@ -151,6 +173,8 @@ SCENES = {
             {
                 "id": "0", "tempK": 612.4, "nominalTempK": 800,
                 "genKw": 166.6, "remKw": 201.6, "netKw": -35,
+                "radiatorState": "deploying",
+                "radiatorControlAvailable": False,
                 "producers": [
                     {"name": "MX-2C Hyperion Fission Reactor",
                      "role": "producer", "fluxKw": 92.4},
@@ -165,6 +189,8 @@ SCENES = {
             {
                 "id": "2", "tempK": 340, "nominalTempK": 1200,
                 "genKw": 100, "remKw": 100, "netKw": 0,
+                "radiatorState": "broken",
+                "radiatorControlAvailable": False,
                 "producers": [
                     {"name": "Cryogenic Fuel Plant", "role": "producer",
                      "fluxKw": 60},
@@ -301,7 +327,7 @@ SCENES = {
         "stage.complete": True,
         "stage.pending": False,
         "stage.currentKsp": 2,
-        "stage.stages": STAGES,
+        "stage.stages": EDITOR_STAGES,
         "stage.totalDvAtmo": 1500,
         "stage.totalDvVac": 1850,
         **NOTES,
