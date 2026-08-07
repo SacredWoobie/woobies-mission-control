@@ -1077,7 +1077,7 @@ button { font: inherit; }
 .asc-trajectory.elliptic { border-color: #245367; color: var(--cyan); background: rgba(32,85,105,.12); }
 .asc-trajectory.suborbital, .asc-trajectory.trajectory { border-color: var(--rule-bright); color: var(--slate); background: rgba(64,78,94,.12); }
 .asc-cockpit { display: grid; min-width: 0; min-height: 310px; align-items: stretch; grid-template-columns: 200px 44px minmax(0,1fr); gap: 12px; }
-.asc-instrument-column { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: space-between; gap: 8px; }
+.asc-instrument-column { display: grid; min-width: 0; min-height: 0; align-items: center; justify-items: center; grid-template-rows: 20px minmax(0,1fr) auto; gap: 8px; }
 .sas-box { display: flex; min-width: 0; min-height: 43px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); align-items: center; justify-content: space-between; gap: 12px; }
 .sas-primary { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
 .sas-val { overflow: hidden; color: var(--green); font-size: 20px; line-height: 1.15; letter-spacing: .02em; text-overflow: ellipsis; white-space: nowrap; }
@@ -1094,16 +1094,24 @@ button { font: inherit; }
 .asc-flight-subtitle { overflow: hidden; color: var(--slate-dim); font-size: 9px; letter-spacing: .02em; text-overflow: ellipsis; white-space: nowrap; }
 .target-metric { position: relative; }
 .target-metric .asc-flight-subtitle { position: absolute; top: 9px; right: 10px; max-width: 48%; text-align: right; }
-.navwrap { display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; gap: 4px; }
-.navball { width: 168px; height: 168px; }
+.navball-stage { display: grid; width: 100%; min-height: 0; place-items: center; }
+.navball { width: 168px; height: 168px; overflow: visible; filter: drop-shadow(0 7px 10px rgba(0,0,0,.5)); }
 .nav-empty, .nav-ring { fill: #05080c; stroke: var(--rule-bright); stroke-width: 2; }
 .nav-ring { fill: none; }
-.nav-sky { fill: var(--sky); }
-.nav-ground { fill: var(--ground); }
-.nav-horizon { stroke: #dfe7f0; stroke-width: 1.5; }
-.pitch-line { stroke: rgba(255,255,255,.7); stroke-width: 1; }
-.pitch-label { fill: rgba(255,255,255,.72); font: 7px var(--mono); text-anchor: end; }
+.nav-inner-ring { fill: none; stroke: rgba(116,201,244,.22); stroke-width: 1; }
+.nav-sky { fill: url(#react-navball-sky); }
+.nav-ground { fill: url(#react-navball-ground); }
+.nav-grid-line { fill: none; stroke: rgba(229,244,255,.22); stroke-width: .8; }
+.nav-grid-line.longitude { stroke-dasharray: 2 2.5; }
+.nav-grid-line.latitude { stroke: rgba(229,244,255,.18); }
+.nav-horizon-glow { stroke: rgba(255,255,255,.28); stroke-width: 4; }
+.nav-horizon { stroke: #f2f7fb; stroke-width: 1.4; }
+.pitch-line { stroke: rgba(255,255,255,.82); stroke-width: 1; }
+.pitch-label { fill: rgba(255,255,255,.82); font: 7px var(--mono); text-anchor: end; }
+.nav-glass { mix-blend-mode: screen; }
+.nav-bezel-ticks { stroke: #7f9aad; stroke-width: 1; }
 .aircraft { fill: none; stroke: var(--amber); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.aircraft-shadow { stroke: rgba(0,0,0,.68); stroke-width: 5; }
 .aircraft-dot { fill: var(--amber); }
 .roll-pointer { fill: var(--cyan); }
 .heading-tape { position: relative; width: 196px; height: 20px; overflow: hidden; border: 1px solid var(--rule-bright); border-radius: 2px; background: #05080c; }

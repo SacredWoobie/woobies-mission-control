@@ -74,6 +74,9 @@ describe("Ascension information hierarchy", () => {
     const view = render(<AscensionPanel snapshot={targetSnapshot} />);
 
     expect(view.container.querySelector(".attitude-strip")?.textContent).toContain("HDG");
+    expect(view.container.querySelector(".navball-stage .navball")).not.toBeNull();
+    expect(view.container.querySelectorAll(".navball .nav-grid-line")).toHaveLength(6);
+    expect(view.container.querySelector(".navball #react-navball-texture")).not.toBeNull();
     expect(view.container.querySelector(".altitude-hero")?.textContent).toContain("Altitude");
     expect(view.container.querySelector(".asc-speed-grid")?.textContent).toContain("Vertical speed");
     expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Target relative");

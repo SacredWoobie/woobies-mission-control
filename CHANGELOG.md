@@ -6,8 +6,9 @@ All notable public changes will be recorded here.
 
 - Reworked Flight Ascension around a persistent attitude instrument, trajectory
   annunciator, dedicated SAS strip, prominent altitude, 2x2 flight-speed grid,
-  and an explanatory orbital-stat rail; removed the lower sparklines without
-  adding RCS, vessel controls, or backend telemetry.
+  explanatory orbital-stat rail, and a centered, dimensional vector navball;
+  removed the lower sparklines without adding RCS, vessel controls, backend
+  telemetry, or bitmap assets.
 
 - Simplified Flight Consumables to the authoritative vessel-total inventory,
   giving resource names and amount meters substantially more horizontal room;
