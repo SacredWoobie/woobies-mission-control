@@ -348,11 +348,14 @@ describe("Dashboard lifecycle", () => {
     const editorWorkspace = document.querySelector(".editor-workspace");
     const editorPrimary = editorWorkspace?.querySelector(".editor-workspace-primary");
     const editorSecondary = editorWorkspace?.querySelector(".editor-workspace-secondary");
+    expect(editorWorkspace?.classList.contains("no-planning-companion")).toBe(true);
     expect(editorPrimary?.firstElementChild?.id).toBe("editorContext");
     expect(editorPrimary?.children[1]?.classList.contains("editor-staging-slice")).toBe(true);
     expect(editorPrimary?.lastElementChild?.id).toBe("editorSummary");
     expect(editorSecondary?.querySelector("#editorSummary")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Craft analysis" }));
+    const editorCollapse = screen.getByRole("button", { name: "Collapse Craft analysis" });
+    expect(editorCollapse.querySelector(".panel-collapse-chevron")).toBeTruthy();
+    fireEvent.click(editorCollapse);
     expect(document.querySelector("#editorContext")?.classList.contains("panel-collapsed")).toBe(true);
     expect(screen.queryByLabelText("Reference body")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand Craft analysis" }));

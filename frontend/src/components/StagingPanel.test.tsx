@@ -96,7 +96,12 @@ describe("StagingPanel", () => {
     expect(screen.getByText("Δv Atmo")).toBeTruthy();
     expect(screen.getByText("Δv Vac")).toBeTruthy();
     expect(screen.getByText("00:00:42")).toBeTruthy();
-    expect(container.querySelector(".stage-table.editor")).toBeTruthy();
+    const table = screen.getByRole("table", { name: "Editor stage performance" });
+    expect(table.getAttribute("tabindex")).toBe("0");
+    expect(screen.getAllByRole("row")).toHaveLength(8);
+    expect(screen.getByRole("row", { name: "Current stage S9" }).getAttribute("aria-current")).toBe("step");
+    expect(screen.getByText("3 non-propulsive stages omitted")).toBeTruthy();
+    expect(container.querySelector(".stage-table.editor")).toBe(table);
     expect(container.querySelector(".flight-stage-hero")).toBeNull();
     expect(container.querySelector("#stage > h2 .tag")).toBeTruthy();
   });
@@ -115,6 +120,7 @@ describe("StagingPanel", () => {
     expect(screen.getByText("Previous confirmed values — recalculating")).toBeTruthy();
     expect(container.querySelector(".stage-table.editor.editor-analysis-retained")).toBeTruthy();
     expect(container.querySelector(".stage-table.editor .st-row.cur")).toBeNull();
+    expect(container.querySelector('.stage-table.editor [aria-current="step"]')).toBeNull();
     expect(container.querySelector(".stage-table.editor .sname")?.textContent).toBe("S0");
     expect(screen.queryByText("Calculating staging simulation…")).toBeNull();
   });

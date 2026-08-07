@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   formatDistance,
   formatDuration,
@@ -66,6 +66,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const stale = editorMode && retained;
   const activeKsp = atmosphere.currentKsp ?? vacuum.currentKsp;
   const previousActiveKsp = useRef(activeKsp);
+  const editorStageTable = useRef<HTMLDivElement>(null);
   const [flashKsp, setFlashKsp] = useState<number>();
   const [showAllPoweredStages, setShowAllPoweredStages] = useState(false);
   const poweredRowsId = `powered-stage-rows-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -109,6 +110,22 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const displayedRows = groupedRowCount > 0 && !showAllPoweredStages
     ? rows.slice(groupedRowCount)
     : rows;
+
+  useLayoutEffect(() => {
+    const table = editorStageTable.current;
+    if (!editorMode || stale || !table || activeKsp === undefined) return;
+    const activeRow = table.querySelector<HTMLElement>(`[data-stage-ksp="${activeKsp}"]`);
+    if (!activeRow) return;
+    const header = table.querySelector<HTMLElement>(".st-head");
+    const tableBounds = table.getBoundingClientRect();
+    const rowBounds = activeRow.getBoundingClientRect();
+    const visibleTop = tableBounds.top + (header?.getBoundingClientRect().height ?? 0);
+    if (rowBounds.bottom > tableBounds.bottom) {
+      table.scrollTop += Math.ceil(rowBounds.bottom - tableBounds.bottom) + 1;
+    } else if (rowBounds.top < visibleTop) {
+      table.scrollTop = Math.max(0, table.scrollTop - (visibleTop - rowBounds.top));
+    }
+  }, [activeKsp, editorMode, rows.length, stale]);
 
   const renderFlightStageRow = (stage: StageViewModel) => {
     const isCurrent = activeKsp === stage.ksp;
@@ -172,30 +189,46 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
             </p>
           ) : (
             <div
+              aria-label="Editor stage performance"
               aria-busy={pending}
               className={`stage-table editor${stale ? " editor-analysis-retained" : ""}`}
+              ref={editorStageTable}
+              role="table"
+              tabIndex={0}
             >
-              <div className="st-row st-head" aria-hidden="true">
-                <span>Stage</span>
-                <span>Δv Atmo</span>
-                <span>Δv Vac</span>
-                <span>TWR Atmo</span>
-                <span>TWR Vac</span>
-                <span>Burn</span>
+              <div className="st-row st-head" role="row">
+                <span role="columnheader">Stage</span>
+                <span role="columnheader">Δv Atmo</span>
+                <span role="columnheader">Δv Vac</span>
+                <span role="columnheader">TWR Atmo</span>
+                <span role="columnheader">TWR Vac</span>
+                <span role="columnheader">Burn</span>
               </div>
               {rows.map((stage) => {
                 const isCurrent = !stale && atmosphere.current?.ksp === stage.ksp;
                 return (
-                  <div className={`st-row ${isCurrent ? "cur" : ""}`} key={stage.ksp}>
-                    <span className="sname">{isCurrent ? "▶ " : ""}S{stage.ksp}</span>
-                    <span>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
-                    <span>{formatStageDeltaV(stage.deltaVVacuum)}</span>
-                    <span>{formatTwr(stage.twrAtmosphere)}</span>
-                    <span>{formatTwr(stage.twrVacuum)}</span>
-                    <span>{formatDuration(stage.burnSeconds)}</span>
+                  <div
+                    aria-current={isCurrent ? "step" : undefined}
+                    aria-label={isCurrent ? `Current stage S${stage.ksp}` : undefined}
+                    className={`st-row ${isCurrent ? "cur" : ""}`}
+                    data-stage-ksp={stage.ksp}
+                    key={stage.ksp}
+                    role="row"
+                  >
+                    <span className="sname" role="cell">{isCurrent ? "▶ " : ""}S{stage.ksp}</span>
+                    <span role="cell">{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
+                    <span role="cell">{formatStageDeltaV(stage.deltaVVacuum)}</span>
+                    <span role="cell">{formatTwr(stage.twrAtmosphere)}</span>
+                    <span role="cell">{formatTwr(stage.twrVacuum)}</span>
+                    <span role="cell">{formatDuration(stage.burnSeconds)}</span>
                   </div>
                 );
               })}
+            </div>
+          )}
+          {unpoweredCount > 0 && (
+            <div className="editor-stage-footer">
+              {unpoweredCount} non-propulsive {unpoweredCount === 1 ? "stage" : "stages"} omitted
             </div>
           )}
         </>

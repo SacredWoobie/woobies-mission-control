@@ -37,6 +37,65 @@ test("native controls opt into the dark system color scheme", async ({ page }) =
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
 });
 
+test("dense Editor analysis uses the empty planning width and reveals the active stage", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "DEV" }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  await expect(page.getByRole("table", { name: "Editor stage performance" })).toBeVisible();
+  await expect(page.getByRole("row", { name: "Current stage S9" })).toHaveAttribute("aria-current", "step");
+  await expect(page.getByText("3 non-propulsive stages omitted", { exact: true })).toBeVisible();
+
+  const layout = await page.locator(".editor-workspace").evaluate((workspace) => {
+    const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const primary = bounds(".editor-workspace-primary");
+    const context = bounds("#editorContext");
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
+    const tableBounds = table.getBoundingClientRect();
+    const activeBounds = workspace.querySelector<HTMLElement>('.stage-table.editor [aria-current="step"]')!.getBoundingClientRect();
+    const collapseBounds = workspace.querySelector<HTMLElement>("#editorContext .panel-collapse-button")!.getBoundingClientRect();
+    const chevronBounds = workspace.querySelector<HTMLElement>("#editorContext .panel-collapse-chevron")!.getBoundingClientRect();
+    return {
+      activeFullyVisible: activeBounds.top >= tableBounds.top - 1
+        && activeBounds.bottom <= tableBounds.bottom + 1,
+      chevronHeight: chevronBounds.height,
+      chevronWidth: chevronBounds.width,
+      collapseHeight: collapseBounds.height,
+      collapseWidth: collapseBounds.width,
+      contextMatchesPrimary: Math.abs(context.width - primary.width),
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      overflowingSummaryValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorSummary .editor-summary-value strong"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      secondaryChildren: workspace.querySelector(".editor-workspace-secondary")!.children.length,
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      tableClientHeight: table.clientHeight,
+      tableScrollHeight: table.scrollHeight,
+    };
+  });
+
+  expect(layout.secondaryChildren).toBe(0);
+  expect(layout.contextMatchesPrimary).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.collapseWidth).toBeGreaterThanOrEqual(22);
+  expect(layout.collapseHeight).toBeGreaterThanOrEqual(22);
+  expect(layout.chevronWidth).toBeGreaterThan(0);
+  expect(layout.chevronHeight).toBeGreaterThan(0);
+  expect(layout.tableScrollHeight).toBeGreaterThan(layout.tableClientHeight);
+  expect(layout.activeFullyVisible).toBe(true);
+  expect(layout.overflowingSummaryValues).toBe(0);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+});
+
 test("the wide Flight context and annunciator fit long mission times in one compact row", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");

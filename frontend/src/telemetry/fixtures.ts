@@ -15,6 +15,19 @@ const flightStages = editorStages.map((stage) => ({
   twrEnd: stage.twrVac > 0 ? stage.twrVac * 1.45 : 0,
 }));
 
+const denseEditorStages = [
+  { index: 0, ksp: 0, dvAtmo: 500, dvVac: 650, twr: 0.8, twrAtmo: 0.8, twrVac: 1.0, burn: 42 },
+  { index: 1, ksp: 1, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
+  { index: 2, ksp: 2, dvAtmo: 640, dvVac: 780, twr: 0.95, twrAtmo: 0.95, twrVac: 1.15, burn: 51 },
+  { index: 3, ksp: 3, dvAtmo: 820, dvVac: 980, twr: 1.08, twrAtmo: 1.08, twrVac: 1.32, burn: 58 },
+  { index: 4, ksp: 4, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
+  { index: 5, ksp: 5, dvAtmo: 1000, dvVac: 1200, twr: 1.25, twrAtmo: 1.25, twrVac: 1.55, burn: 75 },
+  { index: 6, ksp: 6, dvAtmo: 720, dvVac: 890, twr: 1.42, twrAtmo: 1.42, twrVac: 1.68, burn: 48 },
+  { index: 7, ksp: 7, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
+  { index: 8, ksp: 8, dvAtmo: 360, dvVac: 440, twr: 1.76, twrAtmo: 1.76, twrVac: 2.08, burn: 29 },
+  { index: 9, ksp: 9, dvAtmo: 180, dvVac: 230, twr: 2.1, twrAtmo: 2.1, twrVac: 2.45, burn: 12 },
+];
+
 const activeNote: NoteTelemetry = {
   name: "log_Odyssey",
   relativePath: "log_Odyssey.txt",
@@ -241,7 +254,7 @@ export const editorTelemetryFixture: TelemetrySnapshot = {
   "editor.summaryAvailable": true,
   "editor.partCount": 31,
   "editor.crewCapacity": 3,
-  "editor.stageCount": 3,
+  "editor.stageCount": 10,
   "editor.wetMass": 18.742,
   "editor.dryMass": 7.416,
   "editor.resourceMass": 11.326,
@@ -260,10 +273,13 @@ export const editorTelemetryFixture: TelemetrySnapshot = {
   "stage.available": true,
   "stage.complete": true,
   "stage.pending": false,
-  "stage.currentKsp": 2,
-  "stage.stages": editorStages,
-  "stage.totalDvAtmo": 1500,
-  "stage.totalDvVac": 1850,
+  "stage.count": 10,
+  "stage.currentKsp": 9,
+  "stage.unpoweredCount": 3,
+  "stage.stages": denseEditorStages,
+  "stage.totalDvAtmo": 4220,
+  "stage.totalDvVac": 5170,
+  "stage.totalBurnSeconds": 315,
   ...notesFixture,
 };
 

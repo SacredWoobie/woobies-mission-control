@@ -201,11 +201,12 @@ export function EditorWorkspace({ context, snapshot, staging, summary }: { conte
   const { pinnedForTelemetry } = useDeltaVDraft();
   const pinnedOrbit = pinnedOrbitForTelemetry(snapshot);
   const pinnedDeltaV = pinnedForTelemetry(snapshot);
+  const hasPlanningCompanion = Boolean(pinnedOrbit || pinnedDeltaV);
   const available = useMemo(() => new Set<DashboardPanelId>(pinnedDeltaV ? ["editorDeltaVPlan"] : []), [pinnedDeltaV]);
   return (
     <>
       <PanelRestoreRail available={available} />
-      <div className="editor-workspace">
+      <div className={`editor-workspace${hasPlanningCompanion ? " has-planning-companion" : " no-planning-companion"}`}>
         <div className="editor-workspace-column editor-workspace-primary">
           {context}
           <div className="dashboard-slice editor-staging-slice">{staging}</div>

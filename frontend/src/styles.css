@@ -219,16 +219,25 @@ button { font: inherit; }
 }
 .panel-hide-button:hover { border-color: #3a6f86; color: var(--cyan); background: #12202c; }
 .panel-collapse-button {
-  min-height: 26px;
-  padding: 4px 7px;
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  place-items: center;
+  flex: 0 0 22px;
   border: 1px solid #315166;
+  border-radius: 2px;
   color: var(--cyan);
   background: #0b1821;
   cursor: pointer;
-  font: 9px var(--mono);
+  font: 9px/1 var(--mono);
   letter-spacing: .06em;
 }
 .panel-collapse-button:hover { border-color: #3a6f86; background: #12202c; }
+.panel-collapse-chevron { display: block; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); transform-origin: center; }
+.panel-collapsed .panel-collapse-chevron { transform: rotate(135deg); }
 .panel-collapsed > h2 { border-bottom: 0; }
 .datalink-rail-tab:hover { border-color: #3a6f86; color: var(--cyan); background: #152332; }
 .dashboard-rail {
@@ -536,7 +545,8 @@ button { font: inherit; }
 .stage-table.flight .st-row.cur > .sname { box-shadow: inset 3px 0 var(--green); }
 .stage-table.flight .st-row > .dim { color: var(--slate-dim); opacity: .48; }
 .stage-table.flight .stage-twr.danger { color: var(--danger); }
-.flight-stage-footer { padding-top: 1px; color: var(--slate-dim); font-size: 9px; letter-spacing: .04em; }
+.flight-stage-footer, .editor-stage-footer { padding-top: 1px; color: var(--slate-dim); font-size: 9px; letter-spacing: .04em; }
+.stage-table.editor:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 @keyframes staging-active-flash {
   0% { filter: brightness(1); }
   35% { filter: brightness(1.7); }
@@ -1096,15 +1106,12 @@ button { font: inherit; }
 .panel-compact > h2 .panel-title { min-width: 0; overflow: hidden; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
 .panel-compact > h2 .panel-heading-actions { margin-left: auto; flex: 1 1 auto; justify-content: flex-end; }
 .panel-compact > h2 .tag { min-width: 0; overflow: hidden; flex: 0 1 auto; text-overflow: ellipsis; }
-.panel-compact .panel-collapse-button { display: inline-grid; width: 22px; height: 22px; min-width: 22px; min-height: 22px; padding: 0; place-items: center; flex: 0 0 22px; border-radius: 2px; line-height: 1; }
 .panel-compact#target > h2 .panel-heading-actions { gap: 10px; }
 .panel-compact :is(.target-clear-button,.resonant-unpin,.flight-note-unpin),
 .panel-compact#flightNote .notes-font-controls button { min-height: 22px; }
-.panel-compact .panel-collapse-chevron { display: block; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); transform-origin: center; }
-.panel-compact.panel-collapsed .panel-collapse-chevron { transform: rotate(135deg); }
 @media (pointer: coarse) {
   :is(.flight-grid,.flight-workspace-shell) .panel-compact > h2 { min-height: 44px; padding-block: 4px; }
-  .panel-compact .panel-collapse-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex-basis: 36px; }
+  .panel-collapse-button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex-basis: 36px; }
   .panel-compact :is(.target-clear-button,.resonant-unpin,.flight-note-unpin),
   .panel-compact#flightNote .notes-font-controls button { min-height: 36px; }
 }
@@ -1832,12 +1839,6 @@ button { font: inherit; }
 
 @media (orientation: landscape) and (min-width: 1050px) {
   .editor-mode .wrap { max-width: 1760px; }
-  .editor-mode .editor-workspace {
-    display: grid;
-    grid-template-columns: minmax(600px,1fr) minmax(520px,635px);
-    gap: 12px;
-    align-items: start;
-  }
   .editor-mode .editor-workspace-column { align-self: start; }
   .editor-mode #editorContext,
   .editor-mode #editorSummary,
@@ -1852,6 +1853,26 @@ button { font: inherit; }
   .editor-mode .editor-staging-slice .stage-table.editor { max-height: clamp(150px,24vh,245px); overflow: auto; scrollbar-width: thin; }
   .editor-mode .editor-staging-slice .stage-table.editor .st-head { position: sticky; z-index: 1; top: 0; }
   .editor-mode .editor-orbit-plan-slice, .editor-mode .editor-delta-v-plan-slice { width: 100%; align-self: start; }
+}
+
+@media (orientation: landscape) and (min-width: 1220px) {
+  .editor-mode .editor-workspace.has-planning-companion {
+    display: grid;
+    grid-template-columns: minmax(600px,1fr) minmax(520px,635px);
+    gap: 12px;
+    align-items: start;
+  }
+  .editor-mode .editor-workspace.no-planning-companion .editor-workspace-primary {
+    display: grid;
+    width: 100%;
+    align-self: stretch;
+    grid-template-columns: minmax(600px,1.25fr) minmax(500px,.95fr);
+    align-items: start;
+  }
+  .editor-mode .editor-workspace.no-planning-companion #editorContext { grid-column: 1 / -1; }
+  .editor-mode .editor-workspace.no-planning-companion .editor-staging-slice { grid-column: 1; }
+  .editor-mode .editor-workspace.no-planning-companion #editorSummary { grid-column: 2; }
+  .editor-mode .editor-workspace.no-planning-companion #editorSummary .editor-summary-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 
 @media (orientation: landscape) and (min-width: 1500px) {

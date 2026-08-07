@@ -15,6 +15,10 @@ All notable public changes will be recorded here.
   staging- and Heat-panel density testing.
 - Reused that dense ten-stage mock craft in Editor so the same staged vehicle
   can be inspected across Flight and VAB layout states.
+- Reclaimed the empty Editor planning column for a full-width craft-analysis
+  row with side-by-side staging and craft summary, repaired shared collapse
+  chevrons, and made dense staging explain omitted stages while revealing and
+  accessibly identifying the active stage.
 - Grouped distant powered stages behind an expandable range row when Flight
   staging grows tall; expanded rows scroll inside the table while the active
   and nearest stages remain visible by default.
