@@ -8,6 +8,9 @@ All notable public changes will be recorded here.
   for all three System Heat loops, two fission reactors plus one fusion reactor,
   and nuclear, cryogenic, ore, and depleted-fuel consumables for frontend stress
   testing without a running KSP session.
+- Made System Heat loop details an accordion: opening one loop collapses the
+  previously expanded loop, preserving the bounded Heat Management footprint
+  while retaining automatic expansion for a newly critical loop.
 
 - Replaced the auto-hidden Datalink panel with a persistent utility-rail drawer
   containing browser-link status, endpoint and frame diagnostics, a bounded
