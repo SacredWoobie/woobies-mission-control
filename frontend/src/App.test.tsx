@@ -144,9 +144,11 @@ describe("Dashboard lifecycle", () => {
   it("renders the complete flight dashboard with in-place Flight panel collapse", () => {
     const firstView = render(<App />);
     expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.4 · Development")).toBeTruthy();
-    ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
+    ["Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
       expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });
+    expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Datalink controls" })).toBeNull();
     expect(screen.queryByRole("heading", { name: /^Pinned note/ })).toBeNull();
     expect(screen.getByRole("tab", { name: "MONITOR" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("false");
@@ -177,6 +179,7 @@ describe("Dashboard lifecycle", () => {
     const deltaVTool = screen.getByRole("button", { name: "Delta-v planner" });
     expect(toolsGroup.textContent).toContain("Tools");
     expect(toolsGroup.firstElementChild?.classList.contains("dashboard-rail-section-label")).toBe(true);
+    expect(toolsGroup.contains(screen.getByRole("button", { name: "Datalink" }))).toBe(true);
     expect(toolsGroup.contains(screen.getByRole("button", { name: "Notes" }))).toBe(true);
     expect(toolsGroup.contains(resonantTool)).toBe(true);
     expect(toolsGroup.contains(deltaVTool)).toBe(true);
@@ -184,7 +187,7 @@ describe("Dashboard lifecycle", () => {
     expect(deltaVTool.classList.contains("dashboard-tool-button")).toBe(true);
     expect(resonantTool.querySelector(".panel-rail-label")?.textContent).toBe("Resonant Orbit Planner");
     expect(deltaVTool.querySelector(".panel-rail-label")?.textContent).toBe("Delta-V Planner");
-    expect(firstView.container.querySelector("#conn")?.textContent).not.toContain("Notes");
+    expect(firstView.container.querySelector("#conn")).toBeNull();
     expect(firstView.container.querySelector("svg.spark")).toBeNull();
     expect(firstView.container.querySelector(".attitude-strip")).toBeTruthy();
     expect(firstView.container.querySelector(".nav-sky")).toBeTruthy();
@@ -294,13 +297,16 @@ describe("Dashboard lifecycle", () => {
 
     act(() => firstSocket.message(flightTelemetryFixture));
     expect(screen.queryByRole("heading", { name: /Datalink/ })).toBeNull();
-    const datalinkRestore = screen.getByRole("button", { name: "Datalink" });
-    expect(datalinkRestore.classList.contains("datalink-rail-tab")).toBe(true);
-    expect(datalinkRestore.querySelector(".panel-rail-icon-conn")).toBeTruthy();
+    const datalinkButton = screen.getByRole("button", { name: "Datalink" });
+    expect(datalinkButton.classList.contains("datalink-rail-tab")).toBe(true);
+    expect(datalinkButton.querySelector(".panel-rail-icon-conn")).toBeTruthy();
     expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("conn");
-    fireEvent.click(datalinkRestore);
-    expect(screen.getByRole("heading", { name: /Datalink/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Datalink" })).toBeNull();
+    fireEvent.click(datalinkButton);
+    const datalinkDrawer = screen.getByRole("dialog", { name: "Datalink controls" });
+    expect(datalinkDrawer).toBeTruthy();
+    expect(screen.getByText("Browser WebSocket", { exact: true })).toBeTruthy();
+    expect(datalinkDrawer.textContent).toContain("FRAMES THIS SESSION1");
+    fireEvent.click(screen.getByRole("button", { name: "Close Datalink drawer" }));
     fireEvent.click(screen.getByRole("button", { name: "Notes" }));
     expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close Notes drawer" })).toBeNull();
@@ -321,8 +327,8 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Notes reference" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close Notes preview" }));
-    expect(screen.getAllByText("EDITOR LINK", { exact: true })).toHaveLength(2);
-    expect(screen.getByRole("heading", { name: /Datalink/ })).toBeTruthy();
+    expect(screen.getAllByText("EDITOR LINK", { exact: true })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Craft summary/ })).toBeTruthy();
     expect(screen.getByText("Dual-condition regression craft", { exact: true })).toBeTruthy();
     expect(screen.getByText("Analysis current", { exact: true })).toBeTruthy();
@@ -397,9 +403,9 @@ describe("Dashboard lifecycle", () => {
     act(() => firstSocket.message(inactiveTelemetryFixture));
     expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close Notes preview" }));
-    expect(screen.getAllByText("MISSION CONTROL LINK", { exact: true })).toHaveLength(1);
+    expect(screen.queryByText("MISSION CONTROL LINK", { exact: true })).toBeNull();
     expect(document.querySelector(".inactive-mode .slice-status")).toBeNull();
-    expect(screen.getByRole("heading", { name: /Datalink/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Woobie's Mission Control" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Transfer windows" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Active vessels" })).toBeTruthy();
@@ -423,6 +429,41 @@ describe("Dashboard lifecycle", () => {
     });
     expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
     expect(screen.getAllByText("Odyssey", { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it("refreshes and toggles the browser datalink from its utility drawer", () => {
+    const firstSocket = openLiveConnection();
+    act(() => firstSocket.message(flightTelemetryFixture));
+    fireEvent.click(screen.getByRole("button", { name: "Datalink" }));
+
+    const drawer = screen.getByRole("dialog", { name: "Datalink controls" });
+    expect(drawer.textContent).toContain("LINKED");
+    expect(drawer.textContent).toContain("127.0.0.1:8091");
+    expect(drawer.textContent).toContain("FRAMES THIS SESSION");
+    expect(drawer.textContent).toContain("Browser telemetry socket linked.");
+
+    fireEvent.click(screen.getByRole("button", { name: /^REFRESH CONNECTION/ }));
+    expect(firstSocket.readyState).toBe(3);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(screen.getByText("Manual connection refresh requested.", { exact: true })).toBeTruthy();
+
+    const refreshedSocket = FakeWebSocket.instances[1];
+    act(() => {
+      refreshedSocket.open();
+      refreshedSocket.message(flightTelemetryFixture);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^TURN DATALINK OFF/ }));
+    expect(refreshedSocket.readyState).toBe(3);
+    expect(screen.getByText("DATALINK OFF", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^TURN DATALINK ON/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^TURN DATALINK ON/ }));
+    expect(FakeWebSocket.instances).toHaveLength(3);
+    const restartedSocket = FakeWebSocket.instances[2];
+    act(() => restartedSocket.open());
+    expect(screen.getByText("LINKED", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Manual datalink stop requested.", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Manual datalink start requested.", { exact: true })).toBeTruthy();
   });
 
   it("does not rerender a consumables subscriber for unrelated frames", () => {

@@ -6,43 +6,9 @@ import {
   isFiniteNumber,
 } from "../telemetry/formatters";
 import type { ReactNode } from "react";
-import type { SceneMode, TelemetrySnapshot } from "../telemetry/types";
+import type { TelemetrySnapshot } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { Panel } from "./Panel";
-
-interface FlightStatusPanelsProps {
-  connectionStatus: "offline" | "connecting" | "linked" | "retrying" | "fixture";
-  endpoint: string;
-  onDisconnect?(): void;
-  sceneMode?: SceneMode;
-  snapshot: TelemetrySnapshot;
-}
-
-export function DatalinkPanel({
-  connectionStatus,
-  endpoint,
-  onDisconnect,
-  sceneMode = "inactive",
-}: Omit<FlightStatusPanelsProps, "snapshot">) {
-  const sceneLabel = sceneMode === "flight" ? "FLIGHT" : sceneMode === "editor" ? "EDITOR" : "MISSION CONTROL";
-  const label = connectionStatus === "fixture" ? `FIXTURE · ${sceneLabel}`
-    : connectionStatus === "linked" ? `${sceneLabel} LINK`
-      : connectionStatus === "connecting" ? "Linking"
-        : connectionStatus === "retrying" ? "Retrying" : "Offline";
-  const ledClass = connectionStatus === "linked" || connectionStatus === "fixture"
-    ? "ok" : connectionStatus === "connecting" ? "wait" : connectionStatus === "retrying" ? "bad" : "";
-
-  return (
-    <Panel hideable id="conn" title="Datalink">
-      <div className="datalink-row">
-        <span className="label live">KRPC BRIDGE</span>
-        <span className="label">{endpoint.replace(/^ws:\/\//, "")}</span>
-        <span className="status"><span className={`led ${ledClass}`} />{label}</span>
-        {onDisconnect && <button className="datalink-disconnect" onClick={onDisconnect} type="button">Disconnect</button>}
-      </div>
-    </Panel>
-  );
-}
 
 export function ClockPanel({ annunciator, snapshot }: { annunciator?: ReactNode; snapshot: TelemetrySnapshot }) {
   const { system, toggleSystem } = useTimeSystem();

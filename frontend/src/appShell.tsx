@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type PropsWithChildren, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren, type ReactNode } from "react";
 import { dashboardFooter } from "./buildIdentity";
 import { AscensionPanel } from "./components/AscensionPanel";
 import { ConsumablesPanel } from "./components/ConsumablesPanel";
@@ -6,7 +6,8 @@ import { ElectricityPanel } from "./components/ElectricityPanel";
 import { EditorContextPanel } from "./components/EditorContextPanel";
 import { EditorSummaryPanel } from "./components/EditorSummaryPanel";
 import { FlightDashboard } from "./components/FlightDashboard";
-import { ClockPanel, DatalinkPanel } from "./components/FlightStatusPanels";
+import { ClockPanel } from "./components/FlightStatusPanels";
+import { DatalinkDrawer, type DatalinkEvent } from "./components/DatalinkDrawer";
 import { FlightAnnunciator } from "./annunciator/FlightAnnunciator";
 import { useFlightAnnunciator, type FlightAnnunciatorController } from "./annunciator/useFlightAnnunciator";
 import { HeatPanel } from "./components/HeatPanel";
@@ -18,7 +19,6 @@ import {
   HideablePanelSlot,
   PanelRestoreRail,
   PanelVisibilityProvider,
-  usePanelVisibility,
   type DashboardPanelId,
 } from "./components/PanelVisibility";
 import { PinnedNotePanel } from "./components/PinnedNotePanel";
@@ -51,13 +51,12 @@ import {
   targetSnapshotsEqual,
 } from "./telemetry/subscriptions";
 import type { SceneMode, TelemetryCommand, TelemetrySnapshot } from "./telemetry/types";
-import { shallowEqual, useLiveConnectionStatus, useLiveTelemetrySelector } from "./telemetry/useLiveTelemetry";
+import { shallowEqual, useLiveDiagnostics, useLiveTelemetrySelector } from "./telemetry/useLiveTelemetry";
 import { TimeSystemProvider } from "./timeSystem";
 
 export const DEFAULT_LIVE_ENDPOINT = "ws://127.0.0.1:8090";
 
 const emptyTelemetry: TelemetrySnapshot = { "context.mode": "inactive" };
-const datalinkPanel = new Set<DashboardPanelId>(["conn"]);
 const normalFlightPanels = new Set<DashboardPanelId>(["asc", "cons", "heat", "elec", "sci", "stage"]);
 
 export function availableFlightPanels(snapshot: TelemetrySnapshot, resonantPlanPinned = false, deltaVPlanPinned = false) {
@@ -69,7 +68,7 @@ export function availableFlightPanels(snapshot: TelemetrySnapshot, resonantPlanP
   return panels;
 }
 
-function connectionLabel(status: ReturnType<typeof useLiveConnectionStatus>["status"]) {
+function connectionLabel(status: ReturnType<typeof useLiveDiagnostics>["status"]) {
   if (status === "connecting") return "LINKING";
   if (status === "retrying") return "RETRYING";
   if (status === "linked") return "LINKED · AWAITING TELEMETRY";
@@ -116,8 +115,7 @@ export function DashboardAppFrame({ children, notesOpen }: PropsWithChildren<{ n
 
 interface DashboardSurfaceProps {
   children?: ReactNode;
-  datalink: ReactNode;
-  datalinkConnected?: boolean;
+  datalink(open: boolean, onClose: () => void): ReactNode;
   footerLabel: "Development" | "Production";
   identity?: string;
   linkText: string;
@@ -136,7 +134,6 @@ interface DashboardSurfaceProps {
 export function DashboardSurface({
   children,
   datalink,
-  datalinkConnected = false,
   footerLabel,
   identity,
   linkText,
@@ -152,32 +149,36 @@ export function DashboardSurface({
   waitingMessage = "Waiting for the first valid Mission Control telemetry frame.",
 }: DashboardSurfaceProps) {
   const showHeader = mode === "editor" || liveWaiting;
-  const { autoCollapsePanel, clearAutoCollapse } = usePanelVisibility();
-
-  useEffect(() => {
-    if (!datalinkConnected) {
-      clearAutoCollapse("conn");
-      return;
-    }
-    autoCollapsePanel("conn");
-    return () => clearAutoCollapse("conn");
-  }, [autoCollapsePanel, clearAutoCollapse, datalinkConnected]);
+  const [datalinkOpen, setDatalinkOpen] = useState(false);
+  const { closeDeltaVDrawer, closeDrawer } = useResonantOrbitState();
+  const closeDatalink = useCallback(() => setDatalinkOpen(false), []);
+  const closeOtherTools = useCallback(() => {
+    onCloseNotes();
+    closeDrawer();
+    closeDeltaVDrawer();
+  }, [closeDeltaVDrawer, closeDrawer, onCloseNotes]);
+  const toggleDatalink = useCallback(() => {
+    setDatalinkOpen((current) => {
+      if (!current) closeOtherTools();
+      return !current;
+    });
+  }, [closeOtherTools]);
 
   return (
     <section className={`dashboard-surface ${mode === "flight" ? "flight-mode" : mode === "editor" ? "editor-mode" : "inactive-mode"}`}>
       <NotesContinuityPreview commandEnabled={notesCommandEnabled} onClose={onCloseNotes} onSendCommand={onSendNotesCommand} open={notesOpen} snapshot={notesSnapshot} />
+      {datalink(datalinkOpen, closeDatalink)}
       <DashboardRail
-        notesButton={<NotesRailButton open={notesOpen} setOpen={onSetNotesOpen} />}
+        datalinkButton={<DatalinkRailButton onToggle={toggleDatalink} open={datalinkOpen} />}
+        notesButton={<NotesRailButton onOpen={closeDatalink} open={notesOpen} setOpen={onSetNotesOpen} />}
         tools={(
           <>
-            <ResonantOrbitTool mode={mode} onOpen={onCloseNotes} />
-            <DeltaVTool mode={mode} onOpen={onCloseNotes} snapshot={notesSnapshot} />
+            <ResonantOrbitTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} />
+            <DeltaVTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} snapshot={notesSnapshot} />
           </>
         )}
       />
-      <PanelRestoreRail available={datalinkPanel} />
       <div className="wrap">
-        <HideablePanelSlot id="conn"><div className="shared-datalink-slot">{datalink}</div></HideablePanelSlot>
         {showHeader && <div className="slice-status"><span><strong>{linkText}</strong>{identity && ` · ${identity}`}</span></div>}
         {liveWaiting ? (
           <section className="connection-state" aria-live="polite">
@@ -331,7 +332,6 @@ function LiveEditorSummaryPanel() {
 }
 
 interface LiveDashboardProps {
-  allowDisconnect?: boolean;
   endpointDraft: string;
   footerLabel: "Development" | "Production";
   notesOpen: boolean;
@@ -341,7 +341,6 @@ interface LiveDashboardProps {
 }
 
 export function LiveDashboard({
-  allowDisconnect = false,
   endpointDraft,
   footerLabel,
   notesOpen,
@@ -349,7 +348,13 @@ export function LiveDashboard({
   onSetNotesOpen,
   waitingMessage,
 }: LiveDashboardProps) {
-  const connection = useLiveConnectionStatus();
+  const connection = useLiveDiagnostics();
+  const [datalinkEvents, setDatalinkEvents] = useState<DatalinkEvent[]>([]);
+  const datalinkEventId = useRef(0);
+  const lastConnectionEvent = useRef("");
+  const recordDatalinkEvent = useCallback((message: string, status: DatalinkEvent["status"]) => {
+    setDatalinkEvents((current) => [{ at: Date.now(), id: ++datalinkEventId.current, message, status }, ...current].slice(0, 12));
+  }, []);
   const annunciatorInput = useLiveTelemetrySelector((state) => ({
     connectionState: state.status,
     frameCount: state.frameCount,
@@ -363,17 +368,55 @@ export function LiveDashboard({
   const waiting = headerSnapshot === null;
   const identity = mode === "flight" ? String(headerSnapshot?.["v.name"] ?? "Active vessel") : mode === "editor" ? String(headerSnapshot?.["editor.craftName"] ?? "Untitled craft") : undefined;
   const linkText = waiting ? connectionLabel(connection.status) : mode === "inactive" ? "MISSION CONTROL LINK" : mode === "editor" ? "EDITOR LINK" : "FLIGHT LINK";
+  const connectionEndpoint = connection.endpoint || endpointDraft;
+
+  useEffect(() => {
+    const key = `${connection.status}|${connection.message ?? ""}`;
+    if (lastConnectionEvent.current === key) return;
+    lastConnectionEvent.current = key;
+    const text = connection.status === "linked"
+      ? "Browser telemetry socket linked."
+      : connection.status === "connecting"
+        ? "Opening browser telemetry socket."
+        : connection.status === "retrying"
+          ? connection.message || "Link dropped; automatic retry scheduled."
+          : "Datalink is off.";
+    recordDatalinkEvent(text, connection.status);
+  }, [connection.message, connection.status, recordDatalinkEvent]);
+
+  const refreshDatalink = useCallback(() => {
+    recordDatalinkEvent("Manual connection refresh requested.", connection.status);
+    liveTelemetryStore.disconnect();
+    liveTelemetryStore.connect(connectionEndpoint);
+  }, [connection.status, connectionEndpoint, recordDatalinkEvent]);
+
+  const toggleDatalink = useCallback(() => {
+    if (connection.status === "offline") {
+      recordDatalinkEvent("Manual datalink start requested.", "connecting");
+      liveTelemetryStore.connect(connectionEndpoint);
+    } else {
+      recordDatalinkEvent("Manual datalink stop requested.", "offline");
+      liveTelemetryStore.disconnect();
+    }
+  }, [connection.status, connectionEndpoint, recordDatalinkEvent]);
+
   return (
     <DashboardSurface
-      datalink={(
-        <DatalinkPanel
+      datalink={(open, onClose) => (
+        <DatalinkDrawer
           connectionStatus={connection.status}
-          endpoint={connection.endpoint}
-          onDisconnect={allowDisconnect ? () => liveTelemetryStore.disconnect() : undefined}
+          endpoint={connectionEndpoint}
+          events={datalinkEvents}
+          frameCount={connection.frameCount}
+          lastFrameAt={connection.lastFrameAt}
+          message={connection.message}
+          onClose={onClose}
+          onRefresh={refreshDatalink}
+          onToggle={toggleDatalink}
+          open={open}
           sceneMode={mode}
         />
       )}
-      datalinkConnected={connection.status === "linked"}
       footerLabel={footerLabel}
       identity={identity}
       linkText={linkText}
@@ -397,7 +440,24 @@ export function LiveDashboard({
   );
 }
 
-function NotesRailButton({ open, setOpen }: { open: boolean; setOpen(value: boolean): void }) {
+function DatalinkRailButton({ onToggle, open }: { onToggle(): void; open: boolean }) {
+  return (
+    <button
+      aria-controls="datalink-drawer"
+      aria-expanded={open}
+      aria-label="Datalink"
+      className="datalink-rail-tab dashboard-tool-button panel-rail-button"
+      onClick={onToggle}
+      title="Open Datalink controls"
+      type="button"
+    >
+      <span aria-hidden="true" className="panel-rail-label">Datalink</span>
+      <PanelRailIcon name="conn" />
+    </button>
+  );
+}
+
+function NotesRailButton({ onOpen, open, setOpen }: { onOpen(): void; open: boolean; setOpen(value: boolean): void }) {
   const { closeDeltaVDrawer, closeDrawer } = useResonantOrbitState();
   return (
     <button
@@ -407,6 +467,7 @@ function NotesRailButton({ open, setOpen }: { open: boolean; setOpen(value: bool
       className="notes-rail-tab panel-rail-button"
       onClick={() => {
         if (!open) {
+          onOpen();
           closeDrawer();
           closeDeltaVDrawer();
         }

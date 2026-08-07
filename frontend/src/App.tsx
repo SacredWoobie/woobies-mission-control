@@ -12,12 +12,13 @@ import {
 } from "./appShell";
 import { AscensionPanel } from "./components/AscensionPanel";
 import { ConsumablesPanel } from "./components/ConsumablesPanel";
+import { DatalinkDrawer } from "./components/DatalinkDrawer";
 import { DeveloperDrawer, type TelemetrySource } from "./components/DeveloperDrawer";
 import { ElectricityPanel } from "./components/ElectricityPanel";
 import { EditorContextPanel } from "./components/EditorContextPanel";
 import { EditorSummaryPanel } from "./components/EditorSummaryPanel";
 import { FlightDashboard } from "./components/FlightDashboard";
-import { ClockPanel, DatalinkPanel } from "./components/FlightStatusPanels";
+import { ClockPanel } from "./components/FlightStatusPanels";
 import { HeatPanel } from "./components/HeatPanel";
 import { MissionOverview } from "./components/MissionOverview";
 import { PinnedNotePanel } from "./components/PinnedNotePanel";
@@ -73,7 +74,7 @@ function FixtureDashboard({ mode, notesOpen, onCloseNotes, onSetNotesOpen }: { m
   const identity = mode === "flight" ? String(snapshot["v.name"] ?? "Active vessel") : mode === "editor" ? String(snapshot["editor.craftName"] ?? "Untitled craft") : undefined;
   return (
     <DashboardSurface
-      datalink={<DatalinkPanel connectionStatus="fixture" endpoint="deterministic fixtures" sceneMode={mode} />}
+      datalink={(open, onClose) => <DatalinkDrawer connectionStatus="fixture" endpoint="deterministic fixtures" onClose={onClose} open={open} sceneMode={mode} />}
       footerLabel="Development"
       identity={identity}
       linkText={`FIXTURE · ${mode}`}
@@ -146,7 +147,6 @@ function DevelopmentDashboardApp() {
         />
       ) : (
         <LiveDashboard
-          allowDisconnect
           endpointDraft={endpoint}
           footerLabel="Development"
           notesOpen={notesOpen}

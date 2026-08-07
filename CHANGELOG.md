@@ -4,6 +4,12 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Replaced the auto-hidden Datalink panel with a persistent utility-rail drawer
+  containing browser-link status, endpoint and frame diagnostics, a bounded
+  connection-event log, forced refresh, and explicit off/on controls. These
+  controls affect only the dashboard WebSocket and leave Python, kRPC, and KSP
+  running.
+
 - Reworked Flight Ascension around a persistent attitude instrument, trajectory
   annunciator, dedicated SAS strip, prominent altitude, 2x2 flight-speed grid,
   explanatory orbital-stat rail, and a centered, dimensional vector navball;
