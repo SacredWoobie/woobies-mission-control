@@ -462,9 +462,9 @@ button { font: inherit; }
 .editor-resources-empty { margin: 4px 0; color: var(--slate-dim); font-size: 10px; text-align: center; }
 
 /* Consumables: production structure and measurements. */
-.col-heads { display: grid; grid-template-columns: 78px 1fr 1fr; gap: 8px; margin-bottom: 4px; }
+.col-heads { display: grid; grid-template-columns: minmax(110px,.65fr) minmax(0,1.35fr); gap: 8px; margin-bottom: 4px; }
 .col-heads span { color: var(--slate-dim); font-size: 8px; letter-spacing: .14em; text-transform: uppercase; }
-.res-row { display: grid; grid-template-columns: 78px 1fr 1fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--rule); }
+.res-row { display: grid; grid-template-columns: minmax(110px,.65fr) minmax(0,1.35fr); gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--rule); }
 .res-row:last-of-type { border-bottom: 0; }
 .res-name { overflow: hidden; color: var(--slate); font-size: 10px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .meter { position: relative; min-width: 0; }
@@ -491,7 +491,6 @@ button { font: inherit; }
 }
 .meter .cap .k { color: #c2ccd8; }
 .res-row .meter .cap .k { color: #eef3f8; font-size: 10px; font-weight: 650; text-shadow: 0 0 2px #05080c, 0 0 5px rgba(5,8,12,.95), 0 1px 3px #000; }
-.res-note { margin: 6px 0 0; color: var(--slate-dim); font-size: 9px; font-style: italic; }
 
 /* Staging: compact Flight planning surface and detailed Editor table. */
 #stage .body { display: flex; flex-direction: column; gap: 10px; }
@@ -1742,7 +1741,7 @@ button { font: inherit; }
   :is(.flight-grid,.flight-workspace-shell) .flight-note-unpin,
   :is(.flight-grid,.flight-workspace-shell) #flightNote .notes-font-controls button { min-width: 36px !important; min-height: 36px; font-size: 10px; }
   :is(.flight-grid,.flight-workspace-shell) #cons .col-heads,
-  :is(.flight-grid,.flight-workspace-shell) #cons .res-row { grid-template-columns: 120px minmax(0,1fr) minmax(0,1fr); gap: 6px; }
+  :is(.flight-grid,.flight-workspace-shell) #cons .res-row { grid-template-columns: 170px minmax(0,1fr); gap: 6px; }
   .flight-region-reference .panel > h2 .tag { letter-spacing: 0; }
   .flight-region-primary #asc .stat .v { font-size: 14px; }
   .flight-region-primary #asc .stats-grid .label { font-size: 9px; letter-spacing: .08em; white-space: nowrap; }
@@ -1864,7 +1863,7 @@ button { font: inherit; }
 @media (max-width: 440px) {
   .overview-transfer-windows .overview-section-head { flex-wrap: wrap; }
   .overview-transfer-windows .overview-section-actions { max-width: 100%; margin-left: auto; }
-  .col-heads, .res-row { grid-template-columns: 70px 1fr 1fr; gap: 5px; }
+  .col-heads, .res-row { grid-template-columns: minmax(110px,.8fr) minmax(0,1.2fr); gap: 5px; }
   .meter .cap { padding-inline: 3px; font-size: 8px; }
   .flight-stage-hero { grid-template-columns: minmax(0,1fr); }
   #flightNote > h2 { padding-inline: 6px; gap: 4px; }
@@ -1900,7 +1899,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-resource-amount small,
 .editor-resources-empty,
 .col-heads span,
-.res-note,
 .st-head > span,
 .overview-metrics span,
 .overview-metrics small,
@@ -2012,7 +2010,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   font-size: 12px;
 }
 
-.res-note,
 .notes-preview header p,
 .notes-preview-body > span,
 .notes-preview-body pre,

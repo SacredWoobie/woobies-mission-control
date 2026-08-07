@@ -4,6 +4,10 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Simplified Flight Consumables to the authoritative vessel-total inventory,
+  giving resource names and amount meters substantially more horizontal room;
+  current-stage telemetry remains available internally for future contextual use.
+
 - Reduced the fixed caution surface to an actionable 2x2 HEAT, REACTOR, COMMS,
   and POWER grid; dashboard-feed interruptions remain diagnostic history without
   relighting Master. Reactor detail now expands toward Electricity's existing

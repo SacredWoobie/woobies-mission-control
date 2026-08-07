@@ -265,6 +265,8 @@ describe("Dashboard lifecycle", () => {
     expect(container.querySelector("#cons > h2 .tag")).toBeNull();
     expect(container.textContent).not.toContain("Electric Charge");
     expect(container.textContent).toContain("Liquid Fuel");
+    expect(container.textContent).not.toContain("Current stage");
+    expect(container.querySelectorAll("#cons [role=\"meter\"]")).toHaveLength(2);
   });
 
   it("renders unavailable and pending lifecycle states without stale values", () => {
@@ -273,7 +275,8 @@ describe("Dashboard lifecycle", () => {
       "res.stageKnown": false,
     };
     const resourceView = render(<ConsumablesPanel snapshot={unavailableResources} />);
-    expect(resourceView.container.textContent).toContain("Current-stage column unavailable");
+    expect(resourceView.container.textContent).not.toContain("Current-stage column unavailable");
+    expect(resourceView.container.textContent).toContain("Vessel total");
     resourceView.unmount();
 
     render(<StagingPanel snapshot={{

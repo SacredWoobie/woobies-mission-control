@@ -40,14 +40,12 @@ function ResourceMeter({
 
 export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
   const resources = selectConsumables(snapshot);
-  const stageKnown = snapshot["res.stageKnown"] !== false;
 
   return (
     <Panel compact id="cons" title="Consumables">
       <div className="col-heads" aria-hidden="true">
-        <span />
+        <span>Resource</span>
         <span>Vessel total</span>
-        <span>Current stage</span>
       </div>
       {resources.length === 0 ? (
         <p className="empty-state">No consumable resources reported.</p>
@@ -58,14 +56,8 @@ export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
               {humanizeResourceName(resource.name)}
             </span>
             <ResourceMeter {...resource.vessel} />
-            <ResourceMeter {...(stageKnown ? resource.stage : {})} />
           </div>
         ))
-      )}
-      {!stageKnown && (
-        <p className="res-note">
-          Current-stage column unavailable — active-stage telemetry is not available.
-        </p>
       )}
     </Panel>
   );
