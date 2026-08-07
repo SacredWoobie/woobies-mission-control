@@ -1304,11 +1304,11 @@ button { font: inherit; }
 .sci-location strong { display: block; margin-top: 3px; overflow: hidden; color: var(--amber); font-size: 12px; font-weight: 600; line-height: 1.25; text-overflow: ellipsis; }
 .sci-location small { display: block; margin-top: 2px; color: var(--slate); font-size: 9px; }
 .sci-banked { border-top: 1px solid var(--rule); color: var(--slate); background: var(--panel-2); font-size: 9px; text-align: right; }
-.sci-banked.has-detail { display: grid; align-items: stretch; grid-template-columns: minmax(0,1fr) auto; }
-.sci-banked-value { display: flex; min-height: 30px; padding: 5px 11px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.sci-banked.has-detail { display: grid; align-items: stretch; grid-template-columns: clamp(155px,36%,180px) minmax(0,1fr); }
+.sci-banked-value { display: flex; min-width: 0; min-height: 30px; padding: 5px 11px; overflow: hidden; align-items: center; justify-content: flex-end; text-overflow: ellipsis; white-space: nowrap; }
 .sci-experiment-open { display: grid; min-width: 0; min-height: 30px; padding: 5px 8px 5px 11px; align-items: center; grid-template-columns: minmax(0,1fr) auto 10px; gap: 7px; border: 0; border-right: 1px solid var(--rule); color: var(--slate); background: transparent; cursor: pointer; font: 9px var(--mono); letter-spacing: .08em; text-align: left; text-transform: uppercase; }
 .sci-experiment-open > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sci-experiment-open > span:nth-child(2) { color: var(--slate-dim); font-variant-numeric: tabular-nums; }
+.sci-experiment-open > span:nth-child(2) { color: var(--slate-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
 .sci-experiment-open > span:last-child { color: var(--cyan); font-size: 16px; line-height: 1; text-align: center; }
 .sci-experiment-open:hover, .sci-experiment-open:focus-visible { color: var(--cyan); background: #12202c; outline: none; }
 .sci-content-slot { --sci-content-max: min(250px,35vh); min-height: 0; margin-top: 8px; }
