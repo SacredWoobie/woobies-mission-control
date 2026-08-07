@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import {
   acknowledgeAnnunciator,
+  acknowledgeAnnunciatorSubsystem,
   createAnnunciatorState,
   evaluateAnnunciatorSnapshot,
   reconcileAnnunciatorLifecycle,
@@ -83,7 +84,7 @@ describe("annunciator episode engine", () => {
     }))];
     let state = evaluateAt(createAnnunciatorState(), rules, 0);
     state = evaluateAt(state, rules, 100);
-    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "blinking", tier: "caution", tokens: ["REACTOR"] });
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "unacknowledged", tier: "caution", tokens: ["REACTOR"] });
 
     stateName = "clear";
     state = evaluateAt(state, rules, 150);
@@ -91,7 +92,7 @@ describe("annunciator episode engine", () => {
     expect(state.episodes[0].clearedAtMs).toBeNull();
     state = evaluateAt(state, rules, 350);
     expect(state.episodes[0].clearedAtMs).toBe(350);
-    expect(summarizeAnnunciator(state).lamp).toBe("blinking");
+    expect(summarizeAnnunciator(state).lamp).toBe("unacknowledged");
 
     state = acknowledgeAnnunciator(state);
     expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "dark", tokens: [] });
@@ -107,12 +108,34 @@ describe("annunciator episode engine", () => {
     let state = evaluateAt(createAnnunciatorState(), rules, 0);
     expect(state.episodes[0]).toMatchObject({ isBlip: false, seen: false, tier: "caution" });
     state = acknowledgeAnnunciator(state);
-    expect(summarizeAnnunciator(state).lamp).toBe("steady");
+    expect(summarizeAnnunciator(state).lamp).toBe("dark");
 
     tier = "warning";
     state = evaluateAt(state, rules, 10);
     expect(state.episodes[0]).toMatchObject({ seen: false, tier: "warning" });
-    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "blinking", tier: "warning" });
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "unacknowledged", tier: "warning" });
+  });
+
+  it("keeps an acknowledged condition quiet until it clears and recurs", () => {
+    let stateName: "active" | "clear" = "active";
+    const rules = [rule(() => ({
+      kind: "known",
+      complete: true,
+      observations: [{ instanceId: "active-vessel", state: stateName }],
+    }), { activationDwellMs: 0, ruleId: "comms-link-lost", sourceId: "comms", subsystem: "COMMS" })];
+    let state = evaluateAt(createAnnunciatorState(), rules, 0);
+    state = acknowledgeAnnunciatorSubsystem(state, "COMMS");
+    state = evaluateAt(state, rules, 50);
+    expect(summarizeAnnunciator(state).lamp).toBe("dark");
+
+    stateName = "clear";
+    state = evaluateAt(state, rules, 100);
+    state = evaluateAt(state, rules, 300);
+    stateName = "active";
+    state = evaluateAt(state, rules, 301);
+    expect(state.episodes).toHaveLength(2);
+    expect(state.episodes[1]).toMatchObject({ seen: false, subsystem: "COMMS" });
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "unacknowledged", tokens: ["COMMS"] });
   });
 
   it("holds omitted instances in incomplete frames and opens one source-integrity caution", () => {
@@ -175,6 +198,7 @@ describe("annunciator episode engine", () => {
       ruleId: "source-integrity",
       subsystem: "SYSTEMHEAT FEED",
     });
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "dark", tokens: [] });
   });
 
   it("clears a physically missing instance only from a complete authoritative frame", () => {
@@ -195,7 +219,7 @@ describe("annunciator episode engine", () => {
     expect(state.episodes[0].clearedAtMs).toBe(800);
   });
 
-  it("deduplicates tokens with warnings first and keeps acknowledged active episodes steady", () => {
+  it("deduplicates new-condition tokens and lets one subsystem acknowledge independently", () => {
     const rules = [
       rule(() => ({
         kind: "known",
@@ -217,12 +241,16 @@ describe("annunciator episode engine", () => {
     ];
     let state = evaluateAt(createAnnunciatorState(), rules, 0);
     expect(summarizeAnnunciator(state)).toMatchObject({
-      lamp: "blinking",
+      lamp: "unacknowledged",
       tier: "warning",
       tokens: ["REACTOR", "HEAT"],
     });
-    state = acknowledgeAnnunciator(state);
-    expect(summarizeAnnunciator(state).lamp).toBe("steady");
+    state = acknowledgeAnnunciatorSubsystem(state, "REACTOR");
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "unacknowledged", tokens: ["HEAT"] });
+    expect(state.episodes.filter((episode) => episode.subsystem === "REACTOR").every((episode) => episode.seen)).toBe(true);
+    expect(state.episodes.find((episode) => episode.subsystem === "HEAT")?.seen).toBe(false);
+    state = acknowledgeAnnunciatorSubsystem(state, "HEAT");
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "dark", tokens: [] });
   });
 
   it("retains all active episodes and only the newest cleared history", () => {
@@ -247,7 +275,7 @@ describe("annunciator lifecycle and watchdog", () => {
     state = tickAnnunciatorWatchdog(state, { nowMs: 499, connectionState: "connecting", flightActive: true }, policy);
     expect(state.episodes).toEqual([]);
     state = tickAnnunciatorWatchdog(state, { nowMs: 500, connectionState: "connecting", flightActive: true }, policy);
-    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "blinking", tokens: ["DATALINK"] });
+    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "unacknowledged", tokens: ["DATALINK"] });
 
     state = evaluateAt(state, [], 550);
     state = tickAnnunciatorWatchdog(state, { nowMs: 550, connectionState: "linked", flightActive: true }, policy);

@@ -40,15 +40,15 @@ describe("live Flight annunciator controller", () => {
     const { rerender } = render(
       <Harness connectionState="linked" frameCount={1} lastFrameAt={1_000} snapshot={flightTelemetryFixture} />,
     );
-    expect(screen.getByTestId("summary").textContent).toBe("blinking|HEAT|1");
+    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|1");
 
     rerender(<Harness connectionState="retrying" frameCount={1} lastFrameAt={1_000} snapshot={null} />);
     act(() => vi.advanceTimersByTime(5_250));
-    expect(screen.getByTestId("summary").textContent).toBe("blinking|HEAT,DATALINK|2");
+    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT,DATALINK|2");
 
     rerender(<Harness connectionState="linked" frameCount={2} lastFrameAt={6_250} snapshot={flightTelemetryFixture} />);
     act(() => vi.advanceTimersByTime(250));
-    expect(screen.getByTestId("summary").textContent).toBe("blinking|HEAT,DATALINK|1");
+    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT,DATALINK|1");
 
     rerender(<Harness connectionState="linked" frameCount={3} lastFrameAt={6_500} snapshot={inactiveTelemetryFixture} />);
     expect(screen.getByTestId("summary").textContent).toBe("dark||0");
@@ -74,7 +74,7 @@ describe("live Flight annunciator controller", () => {
     const { rerender } = render(
       <Harness connectionState="linked" frameCount={1} lastFrameAt={2_000} snapshot={hotSnapshot} />,
     );
-    expect(screen.getByTestId("summary").textContent).toBe("blinking|HEAT|1");
+    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|1");
 
     rerender(<Harness connectionState="offline" frameCount={1} lastFrameAt={2_000} snapshot={null} />);
     expect(screen.getByTestId("summary").textContent).toBe("dark||0");

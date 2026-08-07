@@ -106,7 +106,7 @@ export interface AnnunciatorState {
 }
 
 export interface AnnunciatorSummary {
-  lamp: "dark" | "steady" | "blinking";
+  lamp: "dark" | "unacknowledged";
   tier?: AnnunciatorTier;
   tokens: string[];
   active: AnnunciatorEpisode[];
@@ -594,6 +594,14 @@ export function acknowledgeAnnunciator(state: AnnunciatorState) {
   return next;
 }
 
+export function acknowledgeAnnunciatorSubsystem(state: AnnunciatorState, subsystem: string) {
+  const next = cloneState(state);
+  next.episodes.forEach((episode) => {
+    if (!episode.seen && episode.subsystem === subsystem) episode.seen = true;
+  });
+  return next;
+}
+
 export function summarizeAnnunciator(state: AnnunciatorState): AnnunciatorSummary {
   const active = state.episodes
     .filter((episode) => episode.clearedAtMs === null)
@@ -601,20 +609,19 @@ export function summarizeAnnunciator(state: AnnunciatorState): AnnunciatorSummar
   const cleared = state.episodes
     .filter((episode) => episode.clearedAtMs !== null)
     .sort((left, right) => (right.clearedAtMs ?? 0) - (left.clearedAtMs ?? 0));
-  const unseen = state.episodes.filter((episode) => !episode.seen);
-  const outstanding = state.episodes.filter((episode) => (
-    episode.clearedAtMs === null || !episode.seen
+  const unacknowledged = state.episodes.filter((episode) => (
+    !episode.seen && episode.ruleId !== SOURCE_INTEGRITY_RULE_ID
   ));
-  const tier = outstanding.some((episode) => episode.tier === "warning")
+  const tier = unacknowledged.some((episode) => episode.tier === "warning")
     ? "warning"
-    : outstanding.length > 0 ? "caution" : undefined;
+    : unacknowledged.length > 0 ? "caution" : undefined;
   const tokens = [...new Set(
-    [...outstanding]
+    [...unacknowledged]
       .sort((left, right) => tierRank(right.tier) - tierRank(left.tier) || left.onsetAtMs - right.onsetAtMs)
       .map((episode) => episode.subsystem),
   )];
   return {
-    lamp: unseen.length > 0 ? "blinking" : active.length > 0 ? "steady" : "dark",
+    lamp: unacknowledged.length > 0 ? "unacknowledged" : "dark",
     tier,
     tokens,
     active,

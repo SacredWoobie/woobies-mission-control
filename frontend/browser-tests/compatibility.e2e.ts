@@ -69,29 +69,31 @@ test("the wide Flight context and annunciator fit long mission times in one comp
   expect(layout.elapsedScrollWidth).toBeLessThanOrEqual(layout.elapsedClientWidth + 1);
 });
 
-test("the Flight annunciator acknowledges through its history and has a static reduced-motion warning", async ({ page }) => {
+test("the Flight annunciator uses fixed acknowledgement-state indicators", async ({ page }) => {
   await page.setViewportSize({ width: 1080, height: 1920 });
   await page.goto("/");
 
   const lamp = page.locator(".annunciator-lamp");
   await expect(lamp).toBeVisible();
   await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
-  await expect(page.locator(".annunciator-token-field")).toContainText("HEAT");
+  const indicators = page.getByRole("group", { name: "Flight alert indicators" });
+  await expect(indicators.getByRole("button")).toHaveCount(5);
+  const heat = indicators.getByRole("button", { name: "HEAT new warning. Acknowledge." });
+  await expect(heat).toHaveClass(/new/);
+  expect(await lamp.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+  const masterRect = await lamp.boundingBox();
+  expect(masterRect?.width).toBeGreaterThanOrEqual(94);
+  expect(masterRect?.height).toBeGreaterThanOrEqual(48);
 
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  const reducedMotionStyle = await lamp.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return { animationName: style.animationName, outlineStyle: style.outlineStyle };
-  });
-  expect(reducedMotionStyle.animationName).toBe("none");
-  expect(reducedMotionStyle.outlineStyle).toBe("double");
+  await heat.click();
+  await expect(lamp).toHaveAttribute("aria-label", /Master caution clear/);
+  await expect(indicators.getByRole("button", { name: "HEAT warning acknowledged and still active" })).toHaveClass(/acknowledged/);
 
   await lamp.click();
 
   const history = page.getByRole("dialog", { name: "Master caution history" });
   await expect(history).toBeVisible();
   await expect(history.getByRole("heading", { name: "Active 1" })).toBeVisible();
-  await expect(page.locator(".annunciator-lamp")).toHaveAttribute("aria-label", /Master warning, acknowledged/);
   await page.keyboard.press("Escape");
   await expect(history).toBeHidden();
   await expect(lamp).toBeFocused();

@@ -1,28 +1,30 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatMissionDuration } from "../telemetry/formatters";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { useDialogFocus } from "../deltaV/useDialogFocus";
-import type { AnnunciatorEpisode } from "./engine";
+import type { AnnunciatorEpisode, AnnunciatorSummary } from "./engine";
 import type { FlightAnnunciatorController } from "./useFlightAnnunciator";
 
-const TOKEN_GAP_PX = 5;
+const FIXED_INDICATORS = ["HEAT", "REACTOR", "POWER", "COMMS", "DATALINK"] as const;
+type FixedIndicator = typeof FIXED_INDICATORS[number];
+type IndicatorState = "clear" | "new" | "acknowledged";
 
-export function fitAnnunciatorTokenCount(
-  availableWidth: number,
-  tokenWidths: number[],
-  overflowWidth: number,
-  gap = TOKEN_GAP_PX,
-) {
-  if (tokenWidths.length === 0 || availableWidth <= 0) return 0;
-  let used = 0;
-  for (let count = 1; count <= tokenWidths.length; count += 1) {
-    used += (count > 1 ? gap : 0) + tokenWidths[count - 1];
-    if (count === tokenWidths.length && used <= availableWidth) return count;
-    const remainingWidth = gap + overflowWidth;
-    if (used + remainingWidth > availableWidth) return Math.max(0, count - 1);
-  }
-  return tokenWidths.length;
+function indicatorState(summary: AnnunciatorSummary, subsystem: FixedIndicator): IndicatorState {
+  const matching = [...summary.active, ...summary.cleared].filter((episode) => episode.subsystem === subsystem);
+  if (matching.some((episode) => !episode.seen)) return "new";
+  return summary.active.some((episode) => episode.subsystem === subsystem) ? "acknowledged" : "clear";
+}
+
+function indicatorLabel(summary: AnnunciatorSummary, subsystem: FixedIndicator, state: IndicatorState) {
+  if (state === "clear") return `${subsystem} clear`;
+  const relevant = (state === "new" ? [...summary.active, ...summary.cleared] : summary.active).filter((episode) => (
+    episode.subsystem === subsystem && (state !== "new" || !episode.seen)
+  ));
+  const level = relevant.some((episode) => episode.tier === "warning") ? "warning" : "caution";
+  return state === "new"
+    ? `${subsystem} new ${level}. Acknowledge.`
+    : `${subsystem} ${level} acknowledged and still active`;
 }
 
 function episodeTime(episode: AnnunciatorEpisode, kerbin: boolean) {
@@ -98,36 +100,11 @@ function AnnunciatorHistory({
 
 export function FlightAnnunciator({ controller }: { controller: FlightAnnunciatorController }) {
   const [open, setOpen] = useState(false);
-  const tokenFieldRef = useRef<HTMLDivElement>(null);
-  const measurementRef = useRef<HTMLDivElement>(null);
-  const [visibleTokenCount, setVisibleTokenCount] = useState(controller.summary.tokens.length);
-  const { lamp, tier, tokens } = controller.summary;
-  const tokenKey = tokens.join("\u0000");
-
-  useLayoutEffect(() => {
-    const tokenField = tokenFieldRef.current;
-    const measurements = measurementRef.current;
-    if (!tokenField || !measurements) return undefined;
-    const measure = () => {
-      const tokenElements = Array.from(measurements.querySelectorAll<HTMLElement>("[data-token-measure]"));
-      const overflowElement = measurements.querySelector<HTMLElement>("[data-overflow-measure]");
-      const tokenWidths = tokenElements.map((element) => element.getBoundingClientRect().width);
-      const overflowWidth = overflowElement?.getBoundingClientRect().width ?? 0;
-      setVisibleTokenCount(fitAnnunciatorTokenCount(tokenField.clientWidth, tokenWidths, overflowWidth));
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(tokenField);
-    return () => observer.disconnect();
-  }, [tokenKey]);
-
-  const visibleTokens = tokens.slice(0, visibleTokenCount);
-  const hiddenCount = Math.max(0, tokens.length - visibleTokens.length);
+  const { lamp, tier } = controller.summary;
   const label = useMemo(() => {
     if (lamp === "dark") return "Master caution clear. Open history.";
     const level = tier === "warning" ? "warning" : "caution";
-    return `Master ${level}, ${lamp === "blinking" ? "unacknowledged" : "acknowledged"}. Open history.`;
+    return `Master ${level}, unacknowledged. Open history.`;
   }, [lamp, tier]);
 
   return (
@@ -146,13 +123,18 @@ export function FlightAnnunciator({ controller }: { controller: FlightAnnunciato
         <span>MASTER</span>
         <strong>{tier === "warning" ? "WARNING" : "CAUTION"}</strong>
       </button>
-      <div aria-label={tokens.length > 0 ? `Conditions: ${tokens.join(", ")}` : "No outstanding conditions"} className="annunciator-token-field" ref={tokenFieldRef} role="status">
-        {visibleTokens.map((token) => <span className="annunciator-token" key={token}>{token}</span>)}
-        {hiddenCount > 0 && <span className="annunciator-token overflow">+{hiddenCount}</span>}
-        <div aria-hidden="true" className="annunciator-token-measure" ref={measurementRef}>
-          {tokens.map((token) => <span className="annunciator-token" data-token-measure key={token}>{token}</span>)}
-          <span className="annunciator-token overflow" data-overflow-measure>+99</span>
-        </div>
+      <div aria-label="Flight alert indicators" className="annunciator-indicators" role="group">
+        {FIXED_INDICATORS.map((subsystem) => {
+          const state = indicatorState(controller.summary, subsystem);
+          return <button
+            aria-label={indicatorLabel(controller.summary, subsystem, state)}
+            className={`annunciator-indicator ${state}`}
+            disabled={state !== "new"}
+            key={subsystem}
+            onClick={() => controller.acknowledgeSubsystem(subsystem)}
+            type="button"
+          >{subsystem}</button>;
+        })}
       </div>
       {open && <AnnunciatorHistory controller={controller} onClose={() => setOpen(false)} />}
     </div>

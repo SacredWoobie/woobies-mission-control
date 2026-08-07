@@ -4,6 +4,7 @@ import { isFiniteNumber } from "../formatting/numbers";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import {
   acknowledgeAnnunciator,
+  acknowledgeAnnunciatorSubsystem,
   createAnnunciatorState,
   evaluateAnnunciatorSnapshot,
   summarizeAnnunciator,
@@ -17,6 +18,7 @@ export interface FlightAnnunciatorController {
   state: AnnunciatorState;
   summary: AnnunciatorSummary;
   acknowledge(): void;
+  acknowledgeSubsystem(subsystem: string): void;
 }
 
 interface FlightAnnunciatorInput {
@@ -95,11 +97,15 @@ export function useFlightAnnunciator({
   const acknowledge = useCallback(() => {
     setState((current) => acknowledgeAnnunciator(current));
   }, []);
+  const acknowledgeSubsystem = useCallback((subsystem: string) => {
+    setState((current) => acknowledgeAnnunciatorSubsystem(current, subsystem));
+  }, []);
 
   return {
     state,
     summary: useMemo(() => summarizeAnnunciator(state), [state]),
     acknowledge,
+    acknowledgeSubsystem,
   };
 }
 

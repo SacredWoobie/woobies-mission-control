@@ -903,9 +903,12 @@ button { font: inherit; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock > .body { padding: 0; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .flight-context-grid {
     display: grid;
-    grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(115px,.9fr) minmax(105px,.8fr) minmax(185px,1.05fr);
+    grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(115px,.9fr) minmax(250px,1.45fr);
     gap: 1px;
     background: var(--rule);
+  }
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .flight-context-grid.remote-tech {
+    grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(115px,.9fr) minmax(105px,.8fr) minmax(250px,1.45fr);
   }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .clock-grid,
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .comms-strip { display: contents; }
@@ -992,19 +995,19 @@ button { font: inherit; }
 .cs-status { display: flex; align-items: center; gap: 7px; font-size: 15px; letter-spacing: .04em; }
 .cs-val { overflow: hidden; color: var(--cyan); font-size: 16px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .label-muted { color: var(--slate-dim); }
-.flight-annunciator { position: relative; display: grid; min-width: 0; padding: 5px 8px; align-items: center; grid-template-columns: 82px minmax(0,1fr); gap: 8px; border-top: 1px solid var(--rule); background: var(--panel); }
-.annunciator-lamp { display: flex; width: 82px; height: 42px; min-width: 82px; padding: 4px 5px; align-items: center; justify-content: center; border: 1px solid #3a4148; border-radius: 3px; color: #65707a; background: linear-gradient(180deg,#171b1e,#0c1013); cursor: pointer; font-family: var(--mono); line-height: 1; flex-direction: column; gap: 3px; }
-.annunciator-lamp span { font-size: 7px; letter-spacing: .16em; }
-.annunciator-lamp strong { font-size: 10px; letter-spacing: .08em; }
+.flight-annunciator { position: relative; display: grid; min-width: 0; padding: 5px 8px; align-items: center; grid-template-columns: 94px minmax(0,1fr); gap: 8px; border-top: 1px solid var(--rule); background: var(--panel); }
+.annunciator-lamp { display: flex; width: 94px; height: 48px; min-width: 94px; padding: 5px 6px; align-items: center; justify-content: center; border: 1px solid #3a4148; border-radius: 3px; color: #65707a; background: linear-gradient(180deg,#171b1e,#0c1013); cursor: pointer; font-family: var(--mono); line-height: 1; flex-direction: column; gap: 4px; }
+.annunciator-lamp span { font-size: 8px; letter-spacing: .16em; }
+.annunciator-lamp strong { font-size: 11px; letter-spacing: .08em; }
 .annunciator-lamp.caution:not(.dark) { border-color: #9c6b15; color: #1b1304; background: linear-gradient(180deg,#ffd75a,#d18b13); box-shadow: 0 0 10px rgba(251,191,36,.55), inset 0 0 7px rgba(255,248,194,.45); }
 .annunciator-lamp.warning:not(.dark) { border-color: #b74738; color: #200503; background: linear-gradient(180deg,#ff826f,#d84132); box-shadow: 0 0 11px rgba(255,107,91,.62), inset 0 0 7px rgba(255,220,211,.42); }
-.annunciator-lamp.blinking { animation: annunciator-pulse .72s step-end infinite; }
 .annunciator-lamp:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-@keyframes annunciator-pulse { 50% { filter: brightness(.38); box-shadow: none; } }
-.annunciator-token-field { position: relative; display: flex; min-width: 0; overflow: hidden; align-items: center; gap: 5px; }
-.annunciator-token { flex: 0 0 auto; padding: 4px 6px; border: 1px solid #745819; border-radius: 2px; color: var(--amber); background: #1d180d; font-size: 8px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; }
-.annunciator-token.overflow { border-color: var(--rule-bright); color: var(--slate); background: #111923; }
-.annunciator-token-measure { position: absolute; left: -10000px; display: flex; visibility: hidden; gap: 5px; pointer-events: none; }
+.annunciator-indicators { display: grid; min-width: 0; align-content: center; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }
+.annunciator-indicator { min-width: 0; min-height: 22px; padding: 3px 4px; overflow: hidden; border: 1px solid #303944; border-radius: 2px; color: #596572; background: #0b1117; cursor: default; font: 7px var(--mono); font-weight: 700; letter-spacing: .06em; text-overflow: ellipsis; white-space: nowrap; }
+.annunciator-indicator:disabled { opacity: 1; }
+.annunciator-indicator.new { border-color: #b74738; color: #240705; background: linear-gradient(180deg,#ff826f,#d84132); box-shadow: 0 0 8px rgba(255,107,91,.54), inset 0 0 5px rgba(255,220,211,.35); cursor: pointer; }
+.annunciator-indicator.acknowledged { border-color: #8d651a; color: #211503; background: linear-gradient(180deg,#ffd75a,#c98716); box-shadow: 0 0 6px rgba(251,191,36,.32), inset 0 0 4px rgba(255,248,194,.28); }
+.annunciator-indicator.new:hover, .annunciator-indicator.new:focus-visible { filter: brightness(1.12); outline: 2px solid var(--cyan); outline-offset: 1px; }
 .annunciator-backdrop { position: fixed; z-index: 1200; inset: 0; display: grid; padding: max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); place-items: center; background: rgba(2,6,9,.82); }
 .annunciator-history { display: flex; width: min(620px,100%); max-height: min(760px,92vh); overflow: hidden; border: 1px solid #315166; border-radius: 5px; outline: 0; background: #081019; box-shadow: 0 18px 60px rgba(0,0,0,.62); flex-direction: column; }
 .annunciator-history > header { display: flex; padding: 13px 16px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--rule); background: linear-gradient(135deg,#101c29,#0a1018); }
@@ -1025,10 +1028,6 @@ button { font: inherit; }
 .annunciator-episode p { margin: 6px 0; color: #d6dee8; font-size: 10px; line-height: 1.45; }
 .annunciator-episode small { color: var(--slate-dim); font-size: 8px; letter-spacing: .04em; }
 .annunciator-empty { margin: 0; padding: 14px; border: 1px dashed var(--rule); color: var(--slate-dim); background: #070c12; text-align: center; }
-
-@media (prefers-reduced-motion: reduce) {
-  .annunciator-lamp.blinking { animation: none; outline: 3px double currentColor; outline-offset: -5px; }
-}
 
 /* Flight information rails collapse in place; compact chrome is pointer-aware. */
 :is(.flight-grid,.flight-workspace-shell) .panel-compact > h2 { min-height: 26px; padding: 1px 6px 1px 9px; gap: 8px; font-size: 10px; }
