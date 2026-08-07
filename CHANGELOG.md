@@ -13,6 +13,8 @@ All notable public changes will be recorded here.
 - Expanded the deterministic Flight mock to seven powered stages out of ten
   total and added non-retractable, deploying, and damaged radiator states for
   staging- and Heat-panel density testing.
+- Reused that dense ten-stage mock craft in Editor so the same staged vehicle
+  can be inspected across Flight and VAB layout states.
 - Grouped distant powered stages behind an expandable range row when Flight
   staging grows tall; expanded rows scroll inside the table while the active
   and nearest stages remain visible by default.

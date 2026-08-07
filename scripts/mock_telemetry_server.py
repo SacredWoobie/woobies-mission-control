@@ -8,14 +8,7 @@ import json
 import websockets
 
 
-EDITOR_STAGES = [
-    {"index": 0, "ksp": 0, "dvAtmo": 500, "dvVac": 650,
-     "twr": 0.8, "twrAtmo": 0.8, "twrVac": 1.0, "burn": 42},
-    {"index": 2, "ksp": 2, "dvAtmo": 1000, "dvVac": 1200,
-     "twr": 1.25, "twrAtmo": 1.25, "twrVac": 1.55, "burn": 75},
-]
-
-FLIGHT_STAGES = [
+DENSE_STAGES = [
     {"index": 0, "ksp": 0, "dvAtmo": 500, "dvVac": 650,
      "twr": 0.80, "twrAtmo": 0.80, "twrVac": 1.00, "burn": 42},
     {"index": 2, "ksp": 2, "dvAtmo": 640, "dvVac": 780,
@@ -144,7 +137,7 @@ SCENES = {
         "stage.currentKsp": 9,
         "stage.count": 10,
         "stage.unpoweredCount": 3,
-        "stage.stages": FLIGHT_STAGES,
+        "stage.stages": DENSE_STAGES,
         "stage.totalDvAtmo": 4220,
         "stage.totalDvVac": 5170,
         "stage.totalBurnSeconds": 315,
@@ -305,7 +298,7 @@ SCENES = {
         "editor.summaryAvailable": True,
         "editor.partCount": 31,
         "editor.crewCapacity": 3,
-        "editor.stageCount": 3,
+        "editor.stageCount": 10,
         "editor.wetMass": 18.742,
         "editor.dryMass": 7.416,
         "editor.resourceMass": 11.326,
@@ -326,10 +319,13 @@ SCENES = {
         "stage.available": True,
         "stage.complete": True,
         "stage.pending": False,
-        "stage.currentKsp": 2,
-        "stage.stages": EDITOR_STAGES,
-        "stage.totalDvAtmo": 1500,
-        "stage.totalDvVac": 1850,
+        "stage.currentKsp": 9,
+        "stage.count": 10,
+        "stage.unpoweredCount": 3,
+        "stage.stages": DENSE_STAGES,
+        "stage.totalDvAtmo": 4220,
+        "stage.totalDvVac": 5170,
+        "stage.totalBurnSeconds": 315,
         **NOTES,
     },
     "inactive": {

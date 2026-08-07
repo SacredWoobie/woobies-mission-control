@@ -13,6 +13,7 @@ SPEC.loader.exec_module(mock_feed)
 class FlightMockTelemetryTests(unittest.TestCase):
     def setUp(self):
         self.flight = mock_feed.SCENES["flight"]
+        self.editor = mock_feed.SCENES["editor"]
 
     def test_all_system_heat_loops_have_expandable_component_details(self):
         loops = self.flight["heat.loops"]
@@ -39,6 +40,19 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual(self.flight["stage.totalDvAtmo"], 4220)
         self.assertEqual(self.flight["stage.totalDvVac"], 5170)
         self.assertEqual(self.flight["stage.totalBurnSeconds"], 315)
+
+    def test_editor_reuses_the_dense_staged_craft(self):
+        self.assertIs(
+            self.editor["stage.stages"],
+            self.flight["stage.stages"],
+        )
+        self.assertEqual(self.editor["editor.stageCount"], 10)
+        self.assertEqual(self.editor["stage.count"], 10)
+        self.assertEqual(self.editor["stage.unpoweredCount"], 3)
+        self.assertEqual(self.editor["stage.currentKsp"], 9)
+        self.assertEqual(self.editor["stage.totalDvAtmo"], 4220)
+        self.assertEqual(self.editor["stage.totalDvVac"], 5170)
+        self.assertEqual(self.editor["stage.totalBurnSeconds"], 315)
 
     def test_reactor_inventory_has_two_fission_and_one_fusion_reactor(self):
         reactors = self.flight["elec.reactors"]
