@@ -311,7 +311,7 @@ function ReactorDetail({
         <span>Reactors</span>
         <span>{reactors.length}</span>
       </button>
-      <div className="rx-scroll"><div className="rx-list">{reactors.map((reactor, index) => {
+      <div aria-label="Reactor list" className="rx-scroll" role="region" tabIndex={0}><div className="rx-list">{reactors.map((reactor, index) => {
         const isFusion = reactor.family === "fusion";
         const hasIntegrity = reactor.hasIntegrity !== false;
         const tempWarn = (

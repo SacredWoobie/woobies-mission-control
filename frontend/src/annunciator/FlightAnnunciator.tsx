@@ -6,7 +6,7 @@ import { useDialogFocus } from "../deltaV/useDialogFocus";
 import type { AnnunciatorEpisode, AnnunciatorSummary } from "./engine";
 import type { FlightAnnunciatorController } from "./useFlightAnnunciator";
 
-const FIXED_INDICATORS = ["HEAT", "REACTOR", "POWER", "COMMS", "DATALINK"] as const;
+const FIXED_INDICATORS = ["HEAT", "REACTOR", "COMMS", "POWER"] as const;
 type FixedIndicator = typeof FIXED_INDICATORS[number];
 type IndicatorState = "clear" | "new" | "acknowledged";
 

@@ -610,7 +610,9 @@ export function summarizeAnnunciator(state: AnnunciatorState): AnnunciatorSummar
     .filter((episode) => episode.clearedAtMs !== null)
     .sort((left, right) => (right.clearedAtMs ?? 0) - (left.clearedAtMs ?? 0));
   const unacknowledged = state.episodes.filter((episode) => (
-    !episode.seen && episode.ruleId !== SOURCE_INTEGRITY_RULE_ID
+    !episode.seen
+    && episode.ruleId !== SOURCE_INTEGRITY_RULE_ID
+    && episode.ruleId !== FEED_RULE_ID
   ));
   const tier = unacknowledged.some((episode) => episode.tier === "warning")
     ? "warning"

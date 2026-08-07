@@ -91,14 +91,15 @@ describe("Flight annunciator surface", () => {
     expect(document.activeElement).toBe(lamp);
   });
 
-  it("keeps five fixed indicators and acknowledges only the selected subsystem", async () => {
+  it("keeps four fixed indicators in a two-row order and acknowledges only the selected subsystem", async () => {
     const user = userEvent.setup();
     render(<Harness initialState={multipleActiveState()} />);
     const group = screen.getByRole("group", { name: "Flight alert indicators" });
-    expect(within(group).getAllByRole("button")).toHaveLength(5);
+    expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "HEAT", "REACTOR", "COMMS", "POWER",
+    ]);
     expect(within(group).getByRole("button", { name: "REACTOR clear" }).hasAttribute("disabled")).toBe(true);
     expect(within(group).getByRole("button", { name: "COMMS clear" }).className).toContain("clear");
-    expect(within(group).getByRole("button", { name: "DATALINK clear" }).className).toContain("clear");
 
     await user.click(within(group).getByRole("button", { name: "HEAT new warning. Acknowledge." }));
     expect(within(group).getByRole("button", { name: "HEAT warning acknowledged and still active" }).className).toContain("acknowledged");

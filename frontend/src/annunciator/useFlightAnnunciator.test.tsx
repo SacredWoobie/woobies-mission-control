@@ -34,7 +34,7 @@ describe("live Flight annunciator controller", () => {
     vi.useRealTimers();
   });
 
-  it("retains Flight state through retry, raises DATALINK on a stale feed, and resets on a confirmed scene change", () => {
+  it("retains Flight state through retry, records a stale feed without relighting Master, and resets on a confirmed scene change", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const { rerender } = render(
@@ -44,11 +44,11 @@ describe("live Flight annunciator controller", () => {
 
     rerender(<Harness connectionState="retrying" frameCount={1} lastFrameAt={1_000} snapshot={null} />);
     act(() => vi.advanceTimersByTime(5_250));
-    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT,DATALINK|2");
+    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|2");
 
     rerender(<Harness connectionState="linked" frameCount={2} lastFrameAt={6_250} snapshot={flightTelemetryFixture} />);
     act(() => vi.advanceTimersByTime(250));
-    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT,DATALINK|1");
+    expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|1");
 
     rerender(<Harness connectionState="linked" frameCount={3} lastFrameAt={6_500} snapshot={inactiveTelemetryFixture} />);
     expect(screen.getByTestId("summary").textContent).toBe("dark||0");

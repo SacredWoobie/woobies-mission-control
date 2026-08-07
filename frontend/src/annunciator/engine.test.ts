@@ -275,7 +275,11 @@ describe("annunciator lifecycle and watchdog", () => {
     state = tickAnnunciatorWatchdog(state, { nowMs: 499, connectionState: "connecting", flightActive: true }, policy);
     expect(state.episodes).toEqual([]);
     state = tickAnnunciatorWatchdog(state, { nowMs: 500, connectionState: "connecting", flightActive: true }, policy);
-    expect(summarizeAnnunciator(state)).toMatchObject({ lamp: "unacknowledged", tokens: ["DATALINK"] });
+    expect(summarizeAnnunciator(state)).toMatchObject({
+      active: [expect.objectContaining({ subsystem: "DATALINK" })],
+      lamp: "dark",
+      tokens: [],
+    });
 
     state = evaluateAt(state, [], 550);
     state = tickAnnunciatorWatchdog(state, { nowMs: 550, connectionState: "linked", flightActive: true }, policy);

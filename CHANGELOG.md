@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced the fixed caution surface to an actionable 2x2 HEAT, REACTOR, COMMS,
+  and POWER grid; dashboard-feed interruptions remain diagnostic history without
+  relighting Master. Reactor detail now stays bounded inside Electricity and
+  exposes a dedicated wheel- and keyboard-scrollable list.
+
 - Simplified the persistent Flight panel chrome by removing redundant
   Consumables and Staging header summaries, moved the Tools label to the top of
   the utility rail with a unified amber control treatment, and aligned System

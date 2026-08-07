@@ -77,7 +77,7 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await expect(lamp).toBeVisible();
   await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
   const indicators = page.getByRole("group", { name: "Flight alert indicators" });
-  await expect(indicators.getByRole("button")).toHaveCount(5);
+  await expect(indicators.getByRole("button")).toHaveCount(4);
   const heat = indicators.getByRole("button", { name: "HEAT new warning. Acknowledge." });
   await expect(heat).toHaveClass(/new/);
   expect(await lamp.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
@@ -190,6 +190,32 @@ test("fixed Flight headers, utility rail, and Heat rows use the compact aligned 
   expect(bars.length).toBeGreaterThanOrEqual(2);
   expect(Math.max(...bars.map((bar) => bar.left)) - Math.min(...bars.map((bar) => bar.left))).toBeLessThanOrEqual(1);
   expect(Math.max(...bars.map((bar) => bar.right)) - Math.min(...bars.map((bar) => bar.right))).toBeLessThanOrEqual(1);
+});
+
+test("reactor detail remains bounded and scrollable inside Electricity", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  const electricity = page.locator("#elec");
+  const initialHeight = await electricity.evaluate((element) => element.getBoundingClientRect().height);
+  await electricity.getByRole("button", { name: "Open reactor detail" }).click();
+  const list = electricity.getByRole("region", { name: "Reactor list" });
+  await expect(list).toBeVisible();
+  const scrolling = await list.evaluate((element) => {
+    const before = element.scrollTop;
+    element.scrollTop = element.scrollHeight;
+    return {
+      after: element.scrollTop,
+      before,
+      clientHeight: element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+    };
+  });
+  expect(scrolling.overflowY).toBe("auto");
+  expect(scrolling.scrollHeight).toBeGreaterThan(scrolling.clientHeight);
+  expect(scrolling.after).toBeGreaterThan(scrolling.before);
+  expect(await electricity.evaluate((element) => element.getBoundingClientRect().height)).toBeCloseTo(initialHeight, 0);
 });
 
 test("Mission Control gives transfer-window cards the full panel body", async ({ page }) => {
