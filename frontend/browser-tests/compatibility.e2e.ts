@@ -131,6 +131,36 @@ test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", asy
   }
 });
 
+test("the Ascension orbit rail reflows before telemetry values truncate", async ({ page }) => {
+  await page.setViewportSize({ width: 969, height: 900 });
+  await page.goto("/");
+
+  const narrow = await page.locator("#asc .orbit-rail").evaluate((rail) => {
+    const stats = Array.from(rail.querySelectorAll<HTMLElement>(".stat"));
+    const readouts = Array.from(rail.querySelectorAll<HTMLElement>(".label, .v"));
+    return {
+      overflowingReadouts: readouts.filter((readout) => readout.scrollWidth > readout.clientWidth + 1).length,
+      rows: new Set(stats.map((stat) => Math.round(stat.getBoundingClientRect().top))).size,
+    };
+  });
+  expect(narrow.rows).toBe(2);
+  expect(narrow.overflowingReadouts).toBe(0);
+
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  const portraitTarget = await page.locator("#asc .orbit-rail").evaluate((rail) => {
+    const stats = Array.from(rail.querySelectorAll<HTMLElement>(".stat"));
+    return new Set(stats.map((stat) => Math.round(stat.getBoundingClientRect().top))).size;
+  });
+  expect(portraitTarget).toBe(1);
+
+  await page.setViewportSize({ width: 1920, height: 889 });
+  const wideTarget = await page.locator("#asc .orbit-rail").evaluate((rail) => {
+    const stats = Array.from(rail.querySelectorAll<HTMLElement>(".stat"));
+    return new Set(stats.map((stat) => Math.round(stat.getBoundingClientRect().top))).size;
+  });
+  expect(wideTarget).toBe(1);
+});
+
 test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome content area", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.addInitScript(() => localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["conn"])));
@@ -157,9 +187,15 @@ test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome conte
   const expanded = await layout();
   expect(expanded.documentScrollHeight).toBeLessThanOrEqual(expanded.documentClientHeight);
   expect(expanded.shellBottom).toBeLessThanOrEqual(expanded.documentClientHeight);
-  const scienceList = page.locator("#sci .sci-list");
-  await expect(scienceList).toBeVisible();
-  expect(await scienceList.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  const scienceScroller = page.locator("#sci .sci-experiment-scroll");
+  await expect(scienceScroller).toBeVisible();
+  const scienceListBounds = await scienceScroller.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    overflowY: getComputedStyle(element).overflowY,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(scienceListBounds.overflowY).toBe("auto");
+  expect(scienceListBounds.clientHeight).toBeLessThanOrEqual(scienceListBounds.scrollHeight);
 
   await page.getByRole("tab", { name: "PLAN", exact: true }).click();
   const plan = await layout();

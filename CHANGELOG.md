@@ -4,6 +4,9 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reflowed Ascension's orbital-stat rail before narrow panels can truncate
+  labels or telemetry values, while retaining the single-row proposal-target
+  layouts.
 - Expanded the deterministic Flight mock with detailed component inventories
   for all three System Heat loops, two fission reactors plus one fusion reactor,
   and nuclear, cryogenic, ore, and depleted-fuel consumables for frontend stress

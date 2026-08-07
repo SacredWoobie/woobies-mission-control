@@ -1167,12 +1167,15 @@ button { font: inherit; }
 .orbit-rail.stats-grid { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,1fr) minmax(0,1.18fr) minmax(0,1.18fr) minmax(0,1.18fr); }
 .orbit-rail .stat { justify-content: center; }
 
+@container (max-width: 960px) {
+  .flight-workspace-shell[data-arrangement="stacked"] #asc .orbit-rail.stats-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+}
+
 @container (max-width: 700px) {
   #asc .asc-cockpit { grid-template-columns: minmax(0,1fr) 44px; }
   #asc .asc-instrument-column { grid-column: 1; }
   #asc .throttle-col { grid-column: 2; }
   #asc .asc-flight-state { padding-top: 10px; padding-left: 0; border-top: 1px solid var(--rule); border-left: 0; grid-column: 1 / -1; }
-  #asc .orbit-rail.stats-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 
 @container (max-width: 520px) {
