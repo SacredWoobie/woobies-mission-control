@@ -46,7 +46,7 @@ test("dense Editor analysis uses the empty planning width and reveals the active
 
   await expect(page.getByRole("table", { name: "Editor stage performance" })).toBeVisible();
   await expect(page.getByRole("row", { name: "Current stage S9" })).toHaveAttribute("aria-current", "step");
-  await expect(page.getByText("3 non-propulsive stages omitted", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 non-propulsive stages omitted", { exact: true })).toBeVisible();
 
   const layout = await page.locator(".editor-workspace").evaluate((workspace) => {
     const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
@@ -59,6 +59,12 @@ test("dense Editor analysis uses the empty planning width and reveals the active
     const activeBounds = workspace.querySelector<HTMLElement>('.stage-table.editor [aria-current="step"]')!.getBoundingClientRect();
     const collapseBounds = workspace.querySelector<HTMLElement>("#editorContext .panel-collapse-button")!.getBoundingClientRect();
     const chevronBounds = workspace.querySelector<HTMLElement>("#editorContext .panel-collapse-chevron")!.getBoundingClientRect();
+    const ninthRow = table.querySelector<HTMLElement>('[role="row"][data-stage-ksp]')!.cloneNode(true) as HTMLElement;
+    ninthRow.removeAttribute("aria-current");
+    ninthRow.removeAttribute("aria-label");
+    table.append(ninthRow);
+    const ninthRowScrolls = table.scrollHeight > table.clientHeight + 1;
+    ninthRow.remove();
     return {
       activeFullyVisible: activeBounds.top >= tableBounds.top - 1
         && activeBounds.bottom <= tableBounds.bottom + 1,
@@ -71,8 +77,10 @@ test("dense Editor analysis uses the empty planning width and reveals the active
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      ninthRowScrolls,
       overflowingSummaryValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorSummary .editor-summary-value strong"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      poweredRows: workspace.querySelectorAll('.stage-table.editor [role="row"][data-stage-ksp]').length,
       secondaryChildren: workspace.querySelector(".editor-workspace-secondary")!.children.length,
       stageSummaryGap: summary.left - stage.right,
       stageSummaryTopDifference: Math.abs(stage.top - summary.top),
@@ -89,7 +97,9 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.collapseHeight).toBeGreaterThanOrEqual(22);
   expect(layout.chevronWidth).toBeGreaterThan(0);
   expect(layout.chevronHeight).toBeGreaterThan(0);
-  expect(layout.tableScrollHeight).toBeGreaterThan(layout.tableClientHeight);
+  expect(layout.poweredRows).toBe(8);
+  expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
+  expect(layout.ninthRowScrolls).toBe(true);
   expect(layout.activeFullyVisible).toBe(true);
   expect(layout.overflowingSummaryValues).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);

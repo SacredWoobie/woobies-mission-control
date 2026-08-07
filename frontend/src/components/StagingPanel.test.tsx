@@ -98,9 +98,9 @@ describe("StagingPanel", () => {
     expect(screen.getByText("00:00:42")).toBeTruthy();
     const table = screen.getByRole("table", { name: "Editor stage performance" });
     expect(table.getAttribute("tabindex")).toBe("0");
-    expect(screen.getAllByRole("row")).toHaveLength(8);
+    expect(screen.getAllByRole("row")).toHaveLength(9);
     expect(screen.getByRole("row", { name: "Current stage S9" }).getAttribute("aria-current")).toBe("step");
-    expect(screen.getByText("3 non-propulsive stages omitted")).toBeTruthy();
+    expect(screen.getByText("2 non-propulsive stages omitted")).toBeTruthy();
     expect(container.querySelector(".stage-table.editor")).toBe(table);
     expect(container.querySelector(".flight-stage-hero")).toBeNull();
     expect(container.querySelector("#stage > h2 .tag")).toBeTruthy();

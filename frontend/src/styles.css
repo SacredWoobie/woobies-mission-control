@@ -1850,7 +1850,7 @@ button { font: inherit; }
   .editor-mode .editor-resource-row { grid-template-columns: minmax(0,1fr) auto; gap: 3px 8px; min-height: 28px; padding: 4px 7px; }
   .editor-mode .editor-resource-meter { grid-row: 2; grid-column: 1 / -1; }
   .editor-mode .editor-resource-amount { text-align: right; }
-  .editor-mode .editor-staging-slice .stage-table.editor { max-height: clamp(150px,24vh,245px); overflow: auto; scrollbar-width: thin; }
+  .editor-mode .editor-staging-slice .stage-table.editor { max-height: clamp(210px,31vh,285px); overflow: auto; scrollbar-width: thin; }
   .editor-mode .editor-staging-slice .stage-table.editor .st-head { position: sticky; z-index: 1; top: 0; }
   .editor-mode .editor-orbit-plan-slice, .editor-mode .editor-delta-v-plan-slice { width: 100%; align-self: start; }
 }

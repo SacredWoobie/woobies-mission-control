@@ -29,17 +29,17 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual(states, {"0": "deploying", "1": "online", "2": "broken"})
         self.assertTrue(all(not loop["radiatorControlAvailable"] for loop in loops))
 
-    def test_flight_staging_stresses_seven_powered_rows(self):
+    def test_flight_staging_stresses_eight_powered_rows(self):
         stages = self.flight["stage.stages"]
 
-        self.assertEqual(len(stages), 7)
-        self.assertEqual([stage["ksp"] for stage in stages], [0, 2, 3, 5, 6, 8, 9])
+        self.assertEqual(len(stages), 8)
+        self.assertEqual([stage["ksp"] for stage in stages], [0, 2, 3, 5, 6, 7, 8, 9])
         self.assertEqual(self.flight["stage.count"], 10)
-        self.assertEqual(self.flight["stage.unpoweredCount"], 3)
+        self.assertEqual(self.flight["stage.unpoweredCount"], 2)
         self.assertEqual(self.flight["stage.currentKsp"], 9)
-        self.assertEqual(self.flight["stage.totalDvAtmo"], 4220)
-        self.assertEqual(self.flight["stage.totalDvVac"], 5170)
-        self.assertEqual(self.flight["stage.totalBurnSeconds"], 315)
+        self.assertEqual(self.flight["stage.totalDvAtmo"], 4460)
+        self.assertEqual(self.flight["stage.totalDvVac"], 5470)
+        self.assertEqual(self.flight["stage.totalBurnSeconds"], 335)
 
     def test_editor_reuses_the_dense_staged_craft(self):
         self.assertIs(
@@ -48,11 +48,11 @@ class FlightMockTelemetryTests(unittest.TestCase):
         )
         self.assertEqual(self.editor["editor.stageCount"], 10)
         self.assertEqual(self.editor["stage.count"], 10)
-        self.assertEqual(self.editor["stage.unpoweredCount"], 3)
+        self.assertEqual(self.editor["stage.unpoweredCount"], 2)
         self.assertEqual(self.editor["stage.currentKsp"], 9)
-        self.assertEqual(self.editor["stage.totalDvAtmo"], 4220)
-        self.assertEqual(self.editor["stage.totalDvVac"], 5170)
-        self.assertEqual(self.editor["stage.totalBurnSeconds"], 315)
+        self.assertEqual(self.editor["stage.totalDvAtmo"], 4460)
+        self.assertEqual(self.editor["stage.totalDvVac"], 5470)
+        self.assertEqual(self.editor["stage.totalBurnSeconds"], 335)
 
     def test_reactor_inventory_has_two_fission_and_one_fusion_reactor(self):
         reactors = self.flight["elec.reactors"]

@@ -10,7 +10,7 @@ All notable public changes will be recorded here.
   silhouette, including its smaller centered reference dot.
 - Rebalanced Flight staging columns so `Δv LIVE`, `Δv VAC`, and `TWR · LIVE`
   headings leave less unused width in TWR and more room for delta-v values.
-- Expanded the deterministic Flight mock to seven powered stages out of ten
+- Expanded the deterministic Flight mock to eight powered stages out of ten
   total and added non-retractable, deploying, and damaged radiator states for
   staging- and Heat-panel density testing.
 - Reused that dense ten-stage mock craft in Editor so the same staged vehicle

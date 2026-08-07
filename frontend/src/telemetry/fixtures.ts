@@ -23,7 +23,7 @@ const denseEditorStages = [
   { index: 4, ksp: 4, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
   { index: 5, ksp: 5, dvAtmo: 1000, dvVac: 1200, twr: 1.25, twrAtmo: 1.25, twrVac: 1.55, burn: 75 },
   { index: 6, ksp: 6, dvAtmo: 720, dvVac: 890, twr: 1.42, twrAtmo: 1.42, twrVac: 1.68, burn: 48 },
-  { index: 7, ksp: 7, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
+  { index: 7, ksp: 7, dvAtmo: 240, dvVac: 300, twr: 1.58, twrAtmo: 1.58, twrVac: 1.88, burn: 20 },
   { index: 8, ksp: 8, dvAtmo: 360, dvVac: 440, twr: 1.76, twrAtmo: 1.76, twrVac: 2.08, burn: 29 },
   { index: 9, ksp: 9, dvAtmo: 180, dvVac: 230, twr: 2.1, twrAtmo: 2.1, twrVac: 2.45, burn: 12 },
 ];
@@ -275,11 +275,11 @@ export const editorTelemetryFixture: TelemetrySnapshot = {
   "stage.pending": false,
   "stage.count": 10,
   "stage.currentKsp": 9,
-  "stage.unpoweredCount": 3,
+  "stage.unpoweredCount": 2,
   "stage.stages": denseEditorStages,
-  "stage.totalDvAtmo": 4220,
-  "stage.totalDvVac": 5170,
-  "stage.totalBurnSeconds": 315,
+  "stage.totalDvAtmo": 4460,
+  "stage.totalDvVac": 5470,
+  "stage.totalBurnSeconds": 335,
   ...notesFixture,
 };
 
