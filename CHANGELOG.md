@@ -23,6 +23,9 @@ All notable public changes will be recorded here.
   Reactors drill-in that temporarily replaces the power-source ledger at the
   same measured height, keeps multi-reactor detail internally scrollable, and
   returns focus to the Reactors source row when closed.
+- Allocated stable wide-layout heights to Electricity and Heat Management,
+  aligned every source's numeric output against a shared `EC/s` unit column,
+  and capped expanded Heat loops inside an internally scrolling list.
 
 ## v0.4.4 - Launcher usability fixes
 

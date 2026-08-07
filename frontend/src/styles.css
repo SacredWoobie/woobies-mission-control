@@ -1214,15 +1214,19 @@ button { font: inherit; }
 .ec-source-row { display: flex; min-width: 0; padding: 7px 10px; align-items: center; gap: 9px; background: var(--panel); }
 .ec-source-button { width: 100%; border: 0; color: inherit; cursor: pointer; font-family: var(--mono); text-align: left; }
 .ec-source-button:hover, .ec-source-button:focus-visible { background: #12202c; outline: none; }
-.ec-source-drill { flex: 0 0 auto; color: var(--cyan); font-size: 17px; line-height: 1; }
+.ec-source-drill { width: 10px; flex: 0 0 10px; color: var(--cyan); font-size: 17px; line-height: 1; text-align: center; }
+.ec-source-drill.placeholder { visibility: hidden; }
 .ec-source-row.idle { background: var(--panel-2); }
 .ec-source-chip { width: 3px; height: 24px; border-radius: 2px; flex: 0 0 3px; }
 .ec-source-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .ec-source-copy strong { overflow: hidden; color: #c6d1dd; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .ec-source-copy small { overflow: hidden; color: var(--slate); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.ec-source-output { display: flex; flex: 0 0 auto; align-items: flex-end; flex-direction: column; gap: 1px; }
+.ec-source-output { display: flex; width: 82px; flex: 0 0 82px; align-items: stretch; flex-direction: column; gap: 1px; }
 .ec-source-output strong { color: var(--cyan); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ec-source-rate { display: grid; align-items: baseline; grid-template-columns: minmax(0,1fr) 30px; gap: 4px; }
+.ec-source-rate > span { text-align: right; }
 .ec-source-output small { color: var(--slate); font-size: 9px; }
+.ec-source-output > small { text-align: right; }
 .ec-source-row.idle :is(.ec-source-copy strong, .ec-source-copy small, .ec-source-output strong, .ec-source-output small) { color: var(--slate-dim); }
 .rx-detail-view { display: grid; height: 100%; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel-2); grid-template-rows: auto minmax(0,1fr) auto; }
 .rx-detail-view[hidden], .ec-source-ledger[hidden] { display: none; }
@@ -1254,6 +1258,38 @@ button { font: inherit; }
 .rx-stat { display: flex; min-width: 0; justify-content: space-between; gap: 8px; font-size: 10px; }
 .rx-stat label { color: var(--slate-dim); }
 .rx-stat .rv { min-width: 0; overflow: hidden; color: var(--amber); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) {
+  display: flex;
+  height: 384px;
+  flex-direction: column;
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) > .body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-slot { min-height: 0; flex: 1; }
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-ledger { height: 100%; }
+.flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-row { flex: 1; }
+.flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) {
+  display: flex;
+  height: 306px;
+  flex-direction: column;
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) > .body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) .heat-entity-list {
+  min-height: 0;
+  max-height: none;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
 .sci-label { display: block; color: var(--slate); font-size: 8px; letter-spacing: .14em; text-transform: uppercase; }
 .sci-overview-card { overflow: hidden; border: 1px solid var(--rule); border-radius: 5px; background: var(--panel); }
 .sci-overview-row { display: flex; min-width: 0; padding: 10px 11px 9px; align-items: flex-start; justify-content: space-between; gap: 14px; }

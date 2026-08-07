@@ -81,6 +81,18 @@ function sourceDetail(source: ElectricitySourceViewModel) {
   return source.detail ?? `${source.count} installed`;
 }
 
+function SourceRate({ value }: { value: number | undefined }) {
+  const rendered = ecRate(value);
+  const suffix = " EC/s";
+  const amount = rendered.endsWith(suffix) ? rendered.slice(0, -suffix.length) : rendered;
+  return (
+    <strong className="ec-source-rate">
+      <span>{amount}</span>
+      <span>EC/s</span>
+    </strong>
+  );
+}
+
 function ChargeMeter({ model }: { model: ElectricityViewModel }) {
   const percent = isFiniteNumber(model.chargeFraction)
     ? Math.round(model.chargeFraction * 100)
@@ -177,7 +189,7 @@ function SourceLedger({
               <small>{sourceDetail(source)}</small>
             </span>
             <span className="ec-source-output">
-              <strong>{ecRate(source.outputEcPerSec)}</strong>
+              <SourceRate value={source.outputEcPerSec} />
               <small>{share}</small>
             </span>
           </>;
@@ -194,7 +206,10 @@ function SourceLedger({
             <span aria-hidden="true" className="ec-source-drill">›</span>
           </button>
         ) : (
-          <div className={`ec-source-row ${idle ? "idle" : ""}`} key={source.kind}>{content}</div>
+          <div className={`ec-source-row ${idle ? "idle" : ""}`} key={source.kind}>
+            {content}
+            <span aria-hidden="true" className="ec-source-drill placeholder">›</span>
+          </div>
         );
       })}
     </div>

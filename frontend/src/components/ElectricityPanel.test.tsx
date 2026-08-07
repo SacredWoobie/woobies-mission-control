@@ -36,6 +36,11 @@ describe("ElectricityPanel", () => {
     expect(within(ledger).getByText("RTG", { exact: true })).toBeTruthy();
     expect(within(ledger).getByText("Solar", { exact: true })).toBeTruthy();
     expect(within(ledger).getByText("Other", { exact: true })).toBeTruthy();
+    expect([...ledger.querySelectorAll(".ec-source-rate > span:last-child")].map((unit) => unit.textContent)).toEqual([
+      "EC/s", "EC/s", "EC/s", "EC/s",
+    ]);
+    expect(ledger.querySelectorAll(".ec-source-drill")).toHaveLength(4);
+    expect(ledger.querySelectorAll(".ec-source-drill.placeholder")).toHaveLength(3);
     expect(screen.getByText("DEGRADED", { exact: true })).toBeTruthy();
     expect(container.querySelector('[role="meter"][aria-label="83% electric charge remaining"]')).toBeTruthy();
     expect(container.querySelector(".ec-charge-fill.healthy")).toBeTruthy();
