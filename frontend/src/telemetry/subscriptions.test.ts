@@ -60,6 +60,11 @@ describe("panel telemetry subscriptions", () => {
       ...flightTelemetryFixture,
       "n.heading": 92,
     })).toBe(false);
+    expect(ascensionSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      "tar.name": "Kerbin",
+      "tar.o.relativeVelocity": 12,
+    })).toBe(false);
     expect(heatSnapshotsEqual(flightTelemetryFixture, {
       ...flightTelemetryFixture,
       "heat.netKw": -12,

@@ -185,7 +185,8 @@ describe("Dashboard lifecycle", () => {
     expect(resonantTool.querySelector(".panel-rail-label")?.textContent).toBe("Resonant Orbit Planner");
     expect(deltaVTool.querySelector(".panel-rail-label")?.textContent).toBe("Delta-V Planner");
     expect(firstView.container.querySelector("#conn")?.textContent).not.toContain("Notes");
-    expect(firstView.container.querySelector("svg.spark")?.getAttribute("preserveAspectRatio")).toBe("none");
+    expect(firstView.container.querySelector("svg.spark")).toBeNull();
+    expect(firstView.container.querySelector(".attitude-strip")).toBeTruthy();
     expect(firstView.container.querySelector(".nav-sky")).toBeTruthy();
     expect(firstView.container.querySelector(".nav-ground")).toBeTruthy();
     const fixedRegion = firstView.container.querySelector('[data-flight-region="fixed"]');

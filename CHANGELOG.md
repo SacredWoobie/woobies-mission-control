@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reworked Flight Ascension around a persistent attitude instrument, separate
+  heading/pitch/roll readouts, prominent altitude and vertical speed, compact
+  surface/orbital/target-relative speeds, and a paired orbital-stat rail;
+  removed the lower sparklines without adding vessel controls or new telemetry.
+
 - Simplified Flight Consumables to the authoritative vessel-total inventory,
   giving resource names and amount meters substantially more horizontal room;
   current-stage telemetry remains available internally for future contextual use.

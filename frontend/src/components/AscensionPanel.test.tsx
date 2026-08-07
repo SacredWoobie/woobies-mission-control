@@ -64,6 +64,29 @@ describe("Ascension orbital formatting", () => {
   });
 });
 
+describe("Ascension information hierarchy", () => {
+  it("separates attitude and flight-state readouts and adds target speed only when present", () => {
+    const targetSnapshot: TelemetrySnapshot = {
+      ...flightTelemetryFixture,
+      "tar.name": "Kerbin",
+      "tar.o.relativeVelocity": 12.4,
+    };
+    const view = render(<AscensionPanel snapshot={targetSnapshot} />);
+
+    expect(view.container.querySelector(".attitude-strip")?.textContent).toContain("HDG");
+    expect(view.container.querySelector(".asc-hero-grid")?.textContent).toContain("Altitude");
+    expect(view.container.querySelector(".asc-hero-grid")?.textContent).toContain("Vertical speed");
+    expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Target relative");
+    expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Kerbin");
+    expect(view.container.querySelectorAll(".orbit-rail .stat")).toHaveLength(7);
+    expect(view.container.querySelector("svg.spark")).toBeNull();
+
+    view.rerender(<AscensionPanel snapshot={{ ...targetSnapshot, "tar.name": "" }} />);
+    expect(view.container.querySelector(".asc-speed-grid.has-target")).toBeNull();
+    expect(view.container.textContent).not.toContain("Target relative");
+  });
+});
+
 describe("Ascension SAS source display", () => {
   it("gives active Smart A.S.S. precedence over a stock SAS pulse", () => {
     expect(resolveSasDisplay({
@@ -90,12 +113,12 @@ describe("Ascension SAS source display", () => {
       "mj.sasMode": "SmartASSAutopilotMode.off",
     };
     const view = render(<AscensionPanel snapshot={smartAss} />);
-    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("Smart A.S.S (MechJeb)");
+    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("SMART A.S.S");
     expect(view.container.querySelector(".sas-val")?.textContent).toBe("ORBIT PROGRADE");
 
     view.rerender(<AscensionPanel snapshot={stock} />);
     act(() => vi.advanceTimersByTime(749));
-    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("Smart A.S.S (MechJeb)");
+    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("SMART A.S.S");
     expect(view.container.querySelector(".sas-val")?.textContent).toBe("ORBIT PROGRADE");
 
     act(() => vi.advanceTimersByTime(1));
