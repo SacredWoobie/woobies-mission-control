@@ -39,6 +39,15 @@ function HeadingTape({ heading }: { heading?: number }) {
   return <svg aria-label={`Heading ${Math.round(normalized)} degrees`} viewBox={`0 0 ${width} 20`}><rect width={width} height="20" />{marks}<path className="tape-pointer" d={`M${center} 20 l-4 -5 h8 z`} /></svg>;
 }
 
+function NavballAircraftSymbol() {
+  return (
+    <>
+      <path className="aircraft" d="M52 84 H71 L84 95 L97 84 H116" />
+      <circle className="aircraft-dot" cx="84" cy="84" r="2" />
+    </>
+  );
+}
+
 function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; roll?: number }) {
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const geometry = useMemo(
@@ -46,7 +55,7 @@ function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; r
     [heading, pitch, roll],
   );
   if (!isFiniteNumber(pitch) || !isFiniteNumber(roll)) {
-    return <svg aria-label="Attitude indicator awaiting telemetry" className="navball" viewBox="0 0 168 168"><circle className="nav-empty" cx="84" cy="84" r="78" /><path className="aircraft" d="M52 84 h18 v6 M98 84 h18 v6" /><circle className="aircraft-dot" cx="84" cy="84" r="2.5" /></svg>;
+    return <svg aria-label="Attitude indicator awaiting telemetry" className="navball" viewBox="0 0 168 168"><circle className="nav-empty" cx="84" cy="84" r="78" /><NavballAircraftSymbol /></svg>;
   }
   const skyGradientId = `navball-sky-${id}`;
   const clipId = `navball-clip-${id}`;
@@ -73,13 +82,7 @@ function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; r
         </g>
       </g>
       <circle className="nav-sphere-rim" cx="84" cy="84" r="78" />
-      <g className="aircraft">
-        <line x1="52" x2="70" y1="84" y2="84" />
-        <line x1="98" x2="116" y1="84" y2="84" />
-        <line x1="70" x2="70" y1="84" y2="90" />
-        <line x1="116" x2="116" y1="84" y2="90" />
-      </g>
-      <circle className="aircraft-dot" cx="84" cy="84" r="2.5" />
+      <NavballAircraftSymbol />
     </svg>
   );
 }

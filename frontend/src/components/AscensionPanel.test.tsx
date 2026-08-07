@@ -84,6 +84,8 @@ describe("Ascension information hierarchy", () => {
     expect(clippedWorld?.querySelector(".nav-spherical-grid")).not.toBeNull();
     expect(clippedWorld?.querySelector(".nav-cardinals")).not.toBeNull();
     expect(clippedWorld?.contains(view.container.querySelector(".nav-sphere-rim"))).toBe(false);
+    expect(view.container.querySelector(".navball .aircraft")?.getAttribute("d")).toBe("M52 84 H71 L84 95 L97 84 H116");
+    expect(view.container.querySelector(".navball .aircraft-dot")?.getAttribute("r")).toBe("2");
     expect(view.container.querySelector(".altitude-hero")?.textContent).toContain("Altitude");
     expect(view.container.querySelector(".asc-speed-grid")?.textContent).toContain("Vertical speed");
     expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Target relative");

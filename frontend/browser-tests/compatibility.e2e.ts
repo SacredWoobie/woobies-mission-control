@@ -188,6 +188,14 @@ test("the navball clips every projected world layer to the globe", async ({ page
   expect(clipping.rimInside).toBe(false);
 });
 
+test("the navball aircraft marker keeps the KSP-style silhouette", async ({ page }) => {
+  await page.goto("/");
+
+  const marker = page.locator("#asc .navball");
+  await expect(marker.locator(".aircraft")).toHaveAttribute("d", "M52 84 H71 L84 95 L97 84 H116");
+  await expect(marker.locator(".aircraft-dot")).toHaveAttribute("r", "2");
+});
+
 test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome content area", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.addInitScript(() => localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["conn"])));
