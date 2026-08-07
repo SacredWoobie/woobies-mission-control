@@ -13,6 +13,11 @@ All notable public changes will be recorded here.
 - Expanded the deterministic Flight mock to seven powered stages out of ten
   total and added non-retractable, deploying, and damaged radiator states for
   staging- and Heat-panel density testing.
+- Grouped distant powered stages behind an expandable range row when Flight
+  staging grows tall; expanded rows scroll inside the table while the active
+  and nearest stages remain visible by default.
+- Tightened Heat radiator-status spacing and raised the wide Heat panel cap
+  slightly so loop state controls sit closer to their temperature readouts.
 - Reflowed Ascension's orbital-stat rail before narrow panels can truncate
   labels or telemetry values, while retaining the single-row proposal-target
   layouts.

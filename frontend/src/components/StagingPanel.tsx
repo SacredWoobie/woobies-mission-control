@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   formatDistance,
   formatDuration,
@@ -16,6 +16,8 @@ import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
 interface StagingPanelProps {
   snapshot: TelemetrySnapshot;
 }
+
+const VISIBLE_POWERED_STAGE_ROWS = 4;
 
 function deltaVWithUnit(value: number | undefined) {
   const formatted = formatStageDeltaV(value);
@@ -65,6 +67,8 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const activeKsp = atmosphere.currentKsp ?? vacuum.currentKsp;
   const previousActiveKsp = useRef(activeKsp);
   const [flashKsp, setFlashKsp] = useState<number>();
+  const [showAllPoweredStages, setShowAllPoweredStages] = useState(false);
+  const poweredRowsId = `powered-stage-rows-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   useEffect(() => {
     if (
@@ -93,6 +97,38 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const throttlePercent = isFiniteNumber(throttle)
     ? Math.round(Math.max(0, Math.min(1, throttle)) * 100)
     : undefined;
+  const activeRowIndex = rows.findIndex((stage) => stage.ksp === activeKsp);
+  const groupedRowCount = rows.length > VISIBLE_POWERED_STAGE_ROWS + 1
+    && (activeRowIndex < 0 || activeRowIndex >= rows.length - VISIBLE_POWERED_STAGE_ROWS)
+    ? rows.length - VISIBLE_POWERED_STAGE_ROWS
+    : 0;
+  const groupedRows = groupedRowCount > 0 ? rows.slice(0, groupedRowCount) : [];
+  const groupedRange = groupedRows.length > 0
+    ? `S${groupedRows[0].ksp}–S${groupedRows[groupedRows.length - 1].ksp}`
+    : "";
+  const displayedRows = groupedRowCount > 0 && !showAllPoweredStages
+    ? rows.slice(groupedRowCount)
+    : rows;
+
+  const renderFlightStageRow = (stage: StageViewModel) => {
+    const isCurrent = activeKsp === stage.ksp;
+    const danger = isCurrent
+      && isSurfaceSituation(situation)
+      && isFiniteNumber(stage.twrStart)
+      && stage.twrStart < 1;
+    return (
+      <div
+        className={`st-row${isCurrent ? " cur" : ""}${flashKsp === stage.ksp ? " newly-active" : ""}`}
+        key={stage.ksp}
+      >
+        <span className="sname">S{stage.ksp}</span>
+        <span className={dimCurrentDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
+        <span className={dimVacuumDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVVacuum)}</span>
+        <span className={`stage-twr${danger ? " danger" : ""}`}>{twrRange(stage)}</span>
+        <span>{compactDuration(stage.burnSeconds)}</span>
+      </div>
+    );
+  };
 
   return (
     <Panel
@@ -208,7 +244,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
               </div>
             </div>
           ) : (
-            <div className="stage-table flight">
+            <div className={`stage-table flight${groupedRowCount > 0 ? " has-stage-group" : ""}${showAllPoweredStages ? " expanded" : ""}`}>
               <div className="st-row st-head" aria-hidden="true">
                 <span>ST</span>
                 <span className={dimCurrentDeltaV ? "dim" : ""} title="Delta-v at live flight conditions">Δv LIVE</span>
@@ -216,25 +252,24 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
                 <span title={`Full-throttle TWR at live body gravity (${body})`}>TWR · LIVE</span>
                 <span>Burn</span>
               </div>
-              {rows.map((stage) => {
-                const isCurrent = activeKsp === stage.ksp;
-                const danger = isCurrent
-                  && isSurfaceSituation(situation)
-                  && isFiniteNumber(stage.twrStart)
-                  && stage.twrStart < 1;
-                return (
-                  <div
-                    className={`st-row${isCurrent ? " cur" : ""}${flashKsp === stage.ksp ? " newly-active" : ""}`}
-                    key={stage.ksp}
-                  >
-                    <span className="sname">S{stage.ksp}</span>
-                    <span className={dimCurrentDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
-                    <span className={dimVacuumDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVVacuum)}</span>
-                    <span className={`stage-twr${danger ? " danger" : ""}`}>{twrRange(stage)}</span>
-                    <span>{compactDuration(stage.burnSeconds)}</span>
-                  </div>
-                );
-              })}
+              {groupedRowCount > 0 && (
+                <div className="flight-stage-group">
+                  <span>
+                    <strong>{groupedRange}</strong>
+                    <small>{groupedRowCount} earlier powered stages</small>
+                  </span>
+                  <button
+                    aria-controls={poweredRowsId}
+                    aria-expanded={showAllPoweredStages}
+                    aria-label={`${showAllPoweredStages ? "Collapse" : "Expand"} ${groupedRowCount} earlier powered stages, ${groupedRange.replace("–", " through ")}`}
+                    onClick={() => setShowAllPoweredStages((expanded) => !expanded)}
+                    type="button"
+                  >{showAllPoweredStages ? "COLLAPSE" : "EXPAND"}</button>
+                </div>
+              )}
+              <div className="flight-stage-rows" id={poweredRowsId}>
+                {displayedRows.map(renderFlightStageRow)}
+              </div>
             </div>
           )}
 

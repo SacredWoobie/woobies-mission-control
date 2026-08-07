@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   editorTelemetryFixture,
@@ -30,6 +30,37 @@ describe("StagingPanel", () => {
     expect(screen.getByText("1 unpowered stage hidden")).toBeTruthy();
     expect(container.querySelector(".st-row.cur .sname")?.textContent).toBe("S2");
     expect(container.querySelector("#stage > h2 .tag")).toBeNull();
+  });
+
+  it("groups distant powered stages and expands them inside a bounded row region", () => {
+    const stages = [0, 2, 3, 5, 6, 8, 9].map((ksp, index) => ({
+      index,
+      ksp,
+      dvAtmo: 200 + index * 100,
+      dvVac: 250 + index * 100,
+      twrAtmo: 0.8 + index * 0.2,
+      burn: 20 + index,
+    }));
+    const { container } = render(<StagingPanel snapshot={{
+      ...flightTelemetryFixture,
+      "stage.activeKsp": 9,
+      "stage.currentKsp": 9,
+      "stage.count": 10,
+      "stage.unpoweredCount": 3,
+      "stage.stages": stages,
+    }} />);
+
+    const expand = screen.getByRole("button", { name: "Expand 3 earlier powered stages, S0 through S3" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByText("S0–S3")).toBeTruthy();
+    expect(Array.from(container.querySelectorAll(".flight-stage-rows .sname"), (node) => node.textContent)).toEqual([
+      "S5", "S6", "S8", "S9",
+    ]);
+
+    fireEvent.click(expand);
+    expect(screen.getByRole("button", { name: "Collapse 3 earlier powered stages, S0 through S3" }).getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".stage-table.flight.expanded .flight-stage-rows")).toBeTruthy();
+    expect(container.querySelectorAll(".flight-stage-rows .sname")).toHaveLength(7);
   });
 
   it("collapses a one-stage Flight craft and applies surface TWR danger narrowly", () => {

@@ -523,6 +523,15 @@ button { font: inherit; }
 .stage-table.flight { overflow-x: auto; scrollbar-width: thin; }
 .stage-table.flight .st-row { min-width: 352px; grid-template-columns: 42px minmax(64px,1fr) minmax(64px,1fr) minmax(86px,1fr) 54px; }
 .stage-table.flight .st-row > span { padding: 5px 6px; text-align: right; }
+.flight-stage-rows { display: flex; flex-direction: column; gap: 1px; background: var(--rule); }
+.stage-table.flight.has-stage-group .st-row > span { padding-block: 3px; }
+.flight-stage-group { display: grid; min-width: 352px; min-height: 23px; padding: 2px 6px 2px 8px; align-items: center; grid-template-columns: minmax(0,1fr) auto; gap: 8px; background: var(--panel-2); }
+.flight-stage-group > span { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+.flight-stage-group strong { color: var(--cyan); font-size: 10px; font-weight: 600; white-space: nowrap; }
+.flight-stage-group small { overflow: hidden; color: var(--slate-dim); font-size: 8px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.flight-stage-group button { min-height: 18px; padding: 1px 7px; border: 1px solid #315166; border-radius: 2px; color: var(--cyan); background: rgba(78,201,224,.05); cursor: pointer; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; }
+.flight-stage-group button:hover, .flight-stage-group button:focus-visible { border-color: var(--cyan); background: rgba(78,201,224,.1); outline: none; }
+.stage-table.flight.has-stage-group.expanded .flight-stage-rows { max-height: 92px; overflow-y: auto; scrollbar-gutter: stable; }
 .stage-table.flight .st-row > .sname { padding-left: 8px; text-align: left; }
 .stage-table.flight .st-row.cur > .sname { box-shadow: inset 3px 0 var(--green); }
 .stage-table.flight .st-row > .dim { color: var(--slate-dim); opacity: .48; }
@@ -1214,7 +1223,7 @@ button { font: inherit; }
 .heat-entity.no-radiators { border-color: #4b2930; }
 .heat-entity-summary { position: relative; }
 .heat-entity-main { display: grid; width: 100%; min-height: 45px; padding: 7px 9px 6px 6px; align-items: stretch; grid-template-columns: 10px 3px minmax(0,1fr); gap: 7px; border: 0; color: inherit; background: transparent; text-align: left; }
-.heat-entity-main.has-loop-control { min-height: 65px; padding-bottom: 27px; }
+.heat-entity-main.has-loop-control { min-height: 60px; padding-bottom: 22px; }
 .heat-entity-main:disabled { cursor: default; opacity: 1; }
 .heat-entity-main.expandable { cursor: pointer; }
 .heat-entity-main.expandable:hover { background: rgba(78,201,224,.035); }
@@ -1247,7 +1256,7 @@ button { font: inherit; }
 .heat-entity-subline > span:last-child { flex: 0 0 auto; color: var(--slate); text-align: right; }
 .heat-entity.critical .heat-entity-subline > span:last-child,
 .heat-entity.no-radiators .heat-entity-subline > span:last-child { color: var(--warn); }
-.heat-loop-control { position: absolute; right: 65px; bottom: 6px; width: 134px; min-height: 18px; padding: 2px 8px; border: 1px solid var(--cyan); border-radius: 2px; color: var(--cyan); background: rgba(45,212,191,.08); font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }
+.heat-loop-control { position: absolute; right: 65px; bottom: 7px; width: 134px; min-height: 18px; padding: 2px 8px; border: 1px solid var(--cyan); border-radius: 2px; color: var(--cyan); background: rgba(45,212,191,.08); font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }
 .heat-loop-control.online { border-color: var(--green); color: var(--green); background: rgba(74,222,128,.08); }
 .heat-loop-control.partial { border-color: var(--amber); color: var(--amber); background: rgba(251,191,36,.08); }
 .heat-loop-control.broken { border-color: var(--warn); color: var(--warn); background: rgba(255,107,91,.08); }
@@ -1376,7 +1385,7 @@ button { font: inherit; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-row { flex: 1; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) {
   display: flex;
-  max-height: 306px;
+  max-height: 320px;
   flex-direction: column;
 }
 .flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) > .body {
