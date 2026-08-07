@@ -19,6 +19,10 @@ All notable public changes will be recorded here.
   persistently expanded, while workspace panels collapse in place with useful
   status and native controls visible and mounted state preserved. Older
   hidden-Flight preferences migrate back into their owning workspace.
+- Replaced Electricity's separate Reactor Detail footer with an in-place
+  Reactors drill-in that temporarily replaces the power-source ledger at the
+  same measured height, keeps multi-reactor detail internally scrollable, and
+  returns focus to the Reactors source row when closed.
 
 ## v0.4.4 - Launcher usability fixes
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
 import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
@@ -17,19 +17,43 @@ function renderPanel(snapshot: TelemetrySnapshot) {
   );
 }
 
+function openReactorDetail() {
+  fireEvent.click(screen.getByRole("button", { name: "Open reactor detail" }));
+  return screen.getByRole("region", { name: "Reactor detail" });
+}
+
 describe("ElectricityPanel", () => {
-  it("shows the automatic source ledger and no By source control", () => {
+  it("replaces the source ledger with reactor detail without changing the slot height", () => {
     const { container } = renderPanel(flightTelemetryFixture);
 
     expect(screen.queryByText("By source", { exact: true })).toBeNull();
-    expect(screen.getByLabelText("Electricity generation by source")).toBeTruthy();
-    expect(screen.getByText("Reactors", { exact: true })).toBeTruthy();
-    expect(screen.getByText("RTG", { exact: true })).toBeTruthy();
-    expect(screen.getByText("Solar", { exact: true })).toBeTruthy();
-    expect(screen.getByText("Other", { exact: true })).toBeTruthy();
+    const ledger = container.querySelector(".ec-source-ledger") as HTMLDivElement;
+    const detail = container.querySelector(".rx-detail-view") as HTMLElement;
+    const slot = container.querySelector(".ec-source-slot") as HTMLElement;
+    expect(ledger.hidden).toBe(false);
+    expect(detail.hidden).toBe(true);
+    expect(within(ledger).getByText("Reactors", { exact: true })).toBeTruthy();
+    expect(within(ledger).getByText("RTG", { exact: true })).toBeTruthy();
+    expect(within(ledger).getByText("Solar", { exact: true })).toBeTruthy();
+    expect(within(ledger).getByText("Other", { exact: true })).toBeTruthy();
     expect(screen.getByText("DEGRADED", { exact: true })).toBeTruthy();
     expect(container.querySelector('[role="meter"][aria-label="83% electric charge remaining"]')).toBeTruthy();
     expect(container.querySelector(".ec-charge-fill.healthy")).toBeTruthy();
+
+    vi.spyOn(ledger, "getBoundingClientRect").mockReturnValue({ height: 164 } as DOMRect);
+    const open = screen.getByRole("button", { name: "Open reactor detail" });
+    fireEvent.click(open);
+    expect(ledger.hidden).toBe(true);
+    expect(detail.hidden).toBe(false);
+    expect(slot.style.height).toBe("164px");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Back to power sources" }));
+    expect(screen.queryByRole("button", { name: "Open reactor detail" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to power sources" }));
+    expect(ledger.hidden).toBe(false);
+    expect(detail.hidden).toBe(true);
+    expect(slot.style.height).toBe("");
+    expect(document.activeElement).toBe(open);
   });
 
   it("hides the ledger for a single source family", () => {
@@ -124,6 +148,7 @@ describe("ElectricityPanel", () => {
         fuel: "10y",
       }],
     });
+    openReactorDetail();
 
     expect(screen.getByText("1,499/1,500", { exact: true })).toBeTruthy();
     expect(screen.getByText("2,400 K", { exact: true })).toBeTruthy();
@@ -146,6 +171,7 @@ describe("ElectricityPanel", () => {
         throttle: 2.5,
       }],
     });
+    openReactorDetail();
 
     expect(screen.getByText("FX-2 Fusion Reactor", { exact: true })).toBeTruthy();
     expect(screen.getByText("Throttle", { exact: true })).toBeTruthy();
@@ -173,6 +199,7 @@ describe("ElectricityPanel", () => {
         throttle: 100,
       }],
     });
+    openReactorDetail();
 
     expect(screen.getByText("Life", { exact: true })).toBeTruthy();
     const life = screen.getByText("112y 4d 3h 2m", { exact: true });
@@ -207,6 +234,7 @@ describe("ElectricityPanel", () => {
       </PanelVisibilityProvider>,
     );
 
+    openReactorDetail();
     fireEvent.click(screen.getByRole("button", { name: "Begin startup charging for FX-2 Fusion Reactor" }));
     expect(onSendCommand).toHaveBeenCalledOnce();
     expect(onSendCommand.mock.calls[0][0]).toMatchObject({
@@ -262,6 +290,7 @@ describe("ElectricityPanel", () => {
       </PanelVisibilityProvider>,
     );
 
+    openReactorDetail();
     fireEvent.click(screen.getByRole("button", { name: "Start FX-2 Fusion Reactor" }));
     expect(onSendCommand.mock.calls[0][0]).toMatchObject({ action: "start" });
 
@@ -303,6 +332,7 @@ describe("ElectricityPanel", () => {
       </PanelVisibilityProvider>,
     );
 
+    openReactorDetail();
     fireEvent.click(screen.getByRole("button", { name: "Start MX-1 Fission Reactor" }));
     expect(onSendCommand.mock.calls[0][0]).toMatchObject({
       type: "reactor.control",
@@ -338,6 +368,7 @@ describe("ElectricityPanel", () => {
         </PanelVisibilityProvider>,
       );
 
+      openReactorDetail();
       fireEvent.click(screen.getByRole("button", { name: "Shut down MX-1 Fission Reactor" }));
       const request = onSendCommand.mock.calls[0][0];
       if (request.type !== "reactor.control") throw new Error("Expected a reactor command.");
