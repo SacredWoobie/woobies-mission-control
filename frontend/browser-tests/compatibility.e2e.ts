@@ -161,20 +161,37 @@ test("a pinned Editor plan keeps staging and craft summary side by side on wide 
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 
   await page.setViewportSize({ width: 1280, height: 800 });
+  await page.reload();
+  await page.getByRole("button", { name: "DEV" }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+  await expect(page.locator("#editorDeltaVPlan")).toBeVisible();
   const medium = await workspace.evaluate((element) => {
     const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
     const primary = bounds(".editor-workspace-primary");
     const secondary = bounds(".editor-workspace-secondary");
+    const table = element.querySelector<HTMLElement>(".stage-table.editor")!;
+    const tableBounds = table.getBoundingClientRect();
+    const activeBounds = table.querySelector<HTMLElement>('[aria-current="step"]')!.getBoundingClientRect();
     return {
+      activeFullyVisible: activeBounds.top >= tableBounds.top - 1
+        && activeBounds.bottom <= tableBounds.bottom + 1,
       columnGap: secondary.left - primary.right,
+      documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      tableClientHeight: table.clientHeight,
+      tableScrollHeight: table.scrollHeight,
       topDifference: Math.abs(primary.top - secondary.top),
     };
   });
+  expect(medium.activeFullyVisible).toBe(true);
   expect(medium.columnGap).toBeGreaterThanOrEqual(10);
   expect(medium.topDifference).toBeLessThanOrEqual(1);
+  expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
   expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);
+  expect(medium.documentScrollHeight).toBeLessThanOrEqual(medium.documentClientHeight);
 
   await page.setViewportSize({ width: 1080, height: 1920 });
   const portrait = await workspace.evaluate((element) => {

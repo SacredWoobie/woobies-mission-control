@@ -22,6 +22,10 @@ All notable public changes will be recorded here.
 - Reused that side-by-side staging and craft-summary row when a plan is pinned
   on wide Editor screens, keeping craft analysis compact beside its planning
   companion.
+- Restored bounded staging and compact two-column resources in short-landscape
+  Editor layouts so dense craft analysis stays within the viewport.
+- Grouped Editor craft totals into Mass, Build, and Cost rails so the summary
+  scans consistently in both wide and pinned layouts.
 - Grouped distant powered stages behind an expandable range row when Flight
   staging grows tall; expanded rows scroll inside the table while the active
   and nearest stages remain visible by default.

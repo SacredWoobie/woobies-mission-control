@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   formatResourcePair,
   humanizeResourceName,
@@ -36,6 +37,15 @@ function SummaryValue({ label, value, note }: { label: string; value: string; no
   );
 }
 
+function SummaryGroup({ children, label, type }: { children: ReactNode; label: string; type: "mass" | "build" | "cost" }) {
+  return (
+    <div aria-label={`${label} summary`} className={`editor-summary-group ${type}`} role="group">
+      <span className="editor-summary-group-label">{label}</span>
+      <div className="editor-summary-group-values">{children}</div>
+    </div>
+  );
+}
+
 function EditorSummaryContent({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const names = Array.isArray(snapshot["editor.res.names"])
     ? snapshot["editor.res.names"].filter((name): name is string => typeof name === "string")
@@ -43,15 +53,21 @@ function EditorSummaryContent({ snapshot }: { snapshot: TelemetrySnapshot }) {
 
   return (
     <>
-      <div className="editor-summary-grid">
-        <SummaryValue label="Wet mass" value={formatMass(snapshot["editor.wetMass"])} />
-        <SummaryValue label="Dry mass" value={formatMass(snapshot["editor.dryMass"])} />
-        <SummaryValue label="Resource mass" value={formatMass(snapshot["editor.resourceMass"])} />
-        <SummaryValue label="Parts" value={formatCount(snapshot["editor.partCount"])} />
-        <SummaryValue label="Stages" value={formatCount(snapshot["editor.stageCount"])} />
-        <SummaryValue label="Crew capacity" value={formatCount(snapshot["editor.crewCapacity"])} />
-        <SummaryValue label="Total cost" value={formatFunds(snapshot["editor.totalCost"])} />
-        <SummaryValue label="Resource cost" value={formatFunds(snapshot["editor.resourceCost"])} />
+      <div className="editor-summary-groups">
+        <SummaryGroup label="Mass" type="mass">
+          <SummaryValue label="Wet" value={formatMass(snapshot["editor.wetMass"])} />
+          <SummaryValue label="Dry" value={formatMass(snapshot["editor.dryMass"])} />
+          <SummaryValue label="Resources" value={formatMass(snapshot["editor.resourceMass"])} />
+        </SummaryGroup>
+        <SummaryGroup label="Build" type="build">
+          <SummaryValue label="Parts" value={formatCount(snapshot["editor.partCount"])} />
+          <SummaryValue label="Stages" value={formatCount(snapshot["editor.stageCount"])} />
+          <SummaryValue label="Crew" value={formatCount(snapshot["editor.crewCapacity"])} />
+        </SummaryGroup>
+        <SummaryGroup label="Cost" type="cost">
+          <SummaryValue label="Total" value={formatFunds(snapshot["editor.totalCost"])} />
+          <SummaryValue label="Resources" value={formatFunds(snapshot["editor.resourceCost"])} />
+        </SummaryGroup>
       </div>
       <div className="editor-resource-head">
         <span className="label">Resources aboard</span>

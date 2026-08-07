@@ -330,6 +330,9 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getAllByText("EDITOR LINK", { exact: true })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Craft summary/ })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Mass summary" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Build summary" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Cost summary" })).toBeTruthy();
     expect(screen.getByText("Dual-condition regression craft", { exact: true })).toBeTruthy();
     expect(screen.getByText("Analysis current", { exact: true })).toBeTruthy();
     expect(screen.queryByText("KSP stages activate from the highest stage number down to S0.")).toBeNull();

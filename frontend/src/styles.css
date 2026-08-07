@@ -437,7 +437,13 @@ button { font: inherit; }
 .editor-recalculation-note { margin: 0; color: var(--slate-muted-text); font-size: 12px; line-height: 1.4; }
 #editorSummary .body { display: flex; flex-direction: column; gap: 11px; }
 .editor-summary-content { display: flex; flex-direction: column; gap: inherit; }
-.editor-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
+.editor-summary-groups { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,3fr) minmax(0,2fr); gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
+.editor-summary-group { min-width: 0; background: var(--panel-2); }
+.editor-summary-group-label { display: block; padding: 4px 8px; border-bottom: 1px solid var(--rule); color: var(--slate-dim); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+.editor-summary-group-values { display: grid; min-width: 0; gap: 1px; background: var(--rule); }
+.editor-summary-group.mass .editor-summary-group-values,
+.editor-summary-group.build .editor-summary-group-values { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.editor-summary-group.cost .editor-summary-group-values { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .editor-summary-value { display: flex; min-width: 0; min-height: 72px; padding: 9px 10px; justify-content: center; background: var(--panel-2); flex-direction: column; gap: 3px; }
 .editor-summary-value strong { overflow: hidden; color: var(--amber); font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .editor-summary-note { overflow: hidden; color: var(--slate-dim); font-size: 8px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
@@ -1872,7 +1878,6 @@ button { font: inherit; }
   .editor-mode .editor-workspace.no-planning-companion #editorContext { grid-column: 1 / -1; }
   .editor-mode .editor-workspace.no-planning-companion .editor-staging-slice { grid-column: 1; }
   .editor-mode .editor-workspace.no-planning-companion #editorSummary { grid-column: 2; }
-  .editor-mode .editor-workspace.no-planning-companion #editorSummary .editor-summary-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 
 @media (orientation: landscape) and (min-width: 1500px) {
@@ -1886,9 +1891,8 @@ button { font: inherit; }
   .editor-mode .editor-workspace.has-planning-companion #editorContext { grid-column: 1 / -1; }
   .editor-mode .editor-workspace.has-planning-companion .editor-staging-slice { grid-column: 1; }
   .editor-mode .editor-workspace.has-planning-companion #editorSummary { grid-column: 2; }
-  .editor-mode .editor-workspace.has-planning-companion #editorSummary .editor-summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .editor-mode .editor-workspace.has-planning-companion #editorSummary .editor-summary-groups { grid-template-columns: minmax(0,1fr); }
   .editor-mode .editor-workspace.has-planning-companion #editorSummary .editor-resource-list { grid-template-columns: minmax(0,1fr); }
-  .editor-mode .editor-summary-grid { grid-template-columns: repeat(8,minmax(0,1fr)); }
   .editor-mode .editor-resource-list {
     display: grid;
     grid-template-columns: repeat(2,minmax(0,1fr));
@@ -1936,7 +1940,7 @@ button { font: inherit; }
   .editor-head { grid-template-columns: 1fr; }
   .editor-controls { grid-template-columns: 1fr 1fr; }
   .editor-control:first-child { grid-column: 1 / -1; }
-  .editor-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .editor-summary-groups { grid-template-columns: minmax(0,1fr); }
   .overview-vessel-split { max-height: none; grid-template-columns: 1fr; grid-template-rows: minmax(180px,38vh) auto; }
   .overview-vessel-index { border-right: 0; border-bottom: 1px solid var(--rule); }
   .overview-roster-table-wrap { max-height: 360px; }
@@ -2218,6 +2222,5 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .inactive-mode .overview-command-grid,
   .inactive-mode .overview-data-grid { overflow: visible; }
   .inactive-mode .overview-data-grid { grid-auto-rows: minmax(320px,auto); }
-  .editor-mode .editor-resource-list,
-  .editor-mode .editor-staging-slice .stage-table.editor { max-height: none; }
+  .editor-mode .editor-resource-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
