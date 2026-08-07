@@ -1071,22 +1071,29 @@ button { font: inherit; }
 
 /* Ascension instruments. */
 #asc .body { display: flex; flex-direction: column; gap: 10px; }
-.asc-cockpit { display: grid; min-width: 0; min-height: 250px; align-items: stretch; grid-template-columns: 200px 44px minmax(0,1fr); gap: 12px; }
+:is(.flight-grid,.flight-workspace-shell) #asc.panel-compact > h2 { min-height: 38px; padding: 4px 12px; }
+.asc-trajectory { display: inline-flex; min-width: 0; padding: 4px 9px; align-items: center; gap: 7px; overflow: hidden; border: 1px solid #6c4c20; border-radius: 2px; color: var(--amber); background: rgba(63,39,12,.32); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-overflow: ellipsis; white-space: nowrap; }
+.asc-trajectory-dot { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: currentColor; }
+.asc-trajectory.elliptic { border-color: #245367; color: var(--cyan); background: rgba(32,85,105,.12); }
+.asc-trajectory.suborbital, .asc-trajectory.trajectory { border-color: var(--rule-bright); color: var(--slate); background: rgba(64,78,94,.12); }
+.asc-cockpit { display: grid; min-width: 0; min-height: 310px; align-items: stretch; grid-template-columns: 200px 44px minmax(0,1fr); gap: 12px; }
 .asc-instrument-column { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: space-between; gap: 8px; }
 .sas-box { display: flex; min-width: 0; min-height: 43px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); align-items: center; justify-content: space-between; gap: 12px; }
 .sas-primary { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
-.sas-val { overflow: hidden; color: var(--cyan); font-size: 20px; line-height: 1.15; letter-spacing: .02em; text-overflow: ellipsis; white-space: nowrap; }
+.sas-val { overflow: hidden; color: var(--green); font-size: 20px; line-height: 1.15; letter-spacing: .02em; text-overflow: ellipsis; white-space: nowrap; }
 .sas-val.off { color: var(--slate-dim); }
-.sas-provider { flex: 0 0 auto; color: var(--slate-dim); font-size: 8px; letter-spacing: .12em; }
-.asc-flight-state { display: flex; min-width: 0; padding-left: 14px; border-left: 1px solid var(--rule); flex-direction: column; gap: 8px; }
-.asc-hero-grid, .asc-speed-grid { display: grid; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-.asc-speed-grid { flex: 1 1 auto; }
-.asc-speed-grid.has-target { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.sas-hint { min-width: 0; overflow: hidden; flex: 0 1 auto; color: var(--slate); font-size: 9px; letter-spacing: .05em; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.asc-flight-state { display: flex; min-width: 0; padding-left: 14px; border-left: 1px solid var(--rule); flex-direction: column; gap: 10px; }
+.asc-flight-layout { display: grid; min-width: 0; min-height: 0; flex: 1 1 auto; grid-template-columns: minmax(180px,.92fr) minmax(0,1.5fr); gap: 10px; }
+.asc-speed-grid { display: grid; min-width: 0; min-height: 0; grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-rows: repeat(2,minmax(0,1fr)); gap: 8px; }
+.asc-speed-grid:not(.has-target) .asc-flight-metric:last-child { grid-column: 1 / -1; }
 .asc-flight-metric { display: flex; min-width: 0; min-height: 58px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--panel); flex-direction: column; justify-content: center; gap: 3px; }
-.asc-flight-metric.hero { min-height: 88px; border-color: var(--rule-bright); background: linear-gradient(180deg,#101826,var(--panel-2)); }
+.asc-flight-metric.hero { min-height: 88px; border: 0; background: transparent; }
 .asc-flight-value { overflow: hidden; color: var(--amber); font-size: 16px; line-height: 1.1; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.asc-flight-metric.hero .asc-flight-value { font-size: clamp(22px,3cqi,28px); }
+.asc-flight-metric.hero .asc-flight-value { font-size: clamp(30px,5.1cqi,46px); }
 .asc-flight-subtitle { overflow: hidden; color: var(--slate-dim); font-size: 9px; letter-spacing: .02em; text-overflow: ellipsis; white-space: nowrap; }
+.target-metric { position: relative; }
+.target-metric .asc-flight-subtitle { position: absolute; top: 9px; right: 10px; max-width: 48%; text-align: right; }
 .navwrap { display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; gap: 4px; }
 .navball { width: 168px; height: 168px; }
 .nav-empty, .nav-ring { fill: #05080c; stroke: var(--rule-bright); stroke-width: 2; }
@@ -1117,7 +1124,8 @@ button { font: inherit; }
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
 .stats-grid .stat { display: flex; min-width: 0; padding: 9px 12px; background: var(--panel); flex-direction: column; gap: 3px; }
 .stats-grid .stat .v { overflow: hidden; color: var(--amber); font-size: 20px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.orbit-rail.stats-grid { grid-template-columns: minmax(0,1fr) minmax(0,1.22fr) minmax(0,1fr) minmax(0,1.22fr) minmax(0,.9fr) minmax(0,.95fr) minmax(0,1.22fr); }
+.stat-subtitle { overflow: hidden; color: var(--slate-dim); font-size: 8px; letter-spacing: .03em; text-overflow: ellipsis; white-space: nowrap; }
+.orbit-rail.stats-grid { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,1fr) minmax(0,1.18fr) minmax(0,1.18fr) minmax(0,1.18fr); }
 .orbit-rail .stat { justify-content: center; }
 
 @container (max-width: 700px) {
@@ -1129,10 +1137,13 @@ button { font: inherit; }
 }
 
 @container (max-width: 520px) {
-  #asc .asc-speed-grid.has-target { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  #asc .asc-speed-grid.has-target .asc-flight-metric:last-child { grid-column: 1 / -1; }
+  #asc .asc-flight-layout { grid-template-columns: minmax(0,1fr); }
   #asc .orbit-rail.stats-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   #asc .asc-flight-metric.hero .asc-flight-value { font-size: 20px; }
+}
+
+@media (pointer: coarse) {
+  :is(.flight-grid,.flight-workspace-shell) #asc.panel-compact > h2 { min-height: 44px; }
 }
 
 /* Heat, electricity, science, target, and pinned note. */

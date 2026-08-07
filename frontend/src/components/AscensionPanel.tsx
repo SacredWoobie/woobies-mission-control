@@ -52,8 +52,8 @@ function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; r
   );
 }
 
-function Stat({ label, title, value }: { label: string; title?: string; value: string }) {
-  return <div className="stat"><span className="label">{label}</span><span className="v" title={title}>{value}</span></div>;
+function Stat({ label, subtitle, title, value }: { label: string; subtitle?: string; title?: string; value: string }) {
+  return <div className="stat"><span className="label">{label}</span><span className="v" title={title}>{value}</span>{subtitle && <span className="stat-subtitle">{subtitle}</span>}</div>;
 }
 
 function FlightMetric({
@@ -120,6 +120,25 @@ function verticalMotion(value: number | undefined) {
   return "level";
 }
 
+function trajectoryDisplay(snapshot: TelemetrySnapshot) {
+  const eccentricity = snapshot["o.eccentricity"];
+  const situation = typeof snapshot["v.situationString"] === "string"
+    ? snapshot["v.situationString"].trim().toUpperCase()
+    : "";
+  const body = typeof snapshot["v.body"] === "string"
+    ? snapshot["v.body"].trim().toUpperCase()
+    : "";
+  const kind = isFiniteNumber(eccentricity) && eccentricity >= 1
+    ? "HYPERBOLIC"
+    : situation.includes("SUB ORBITAL")
+      ? "SUBORBITAL"
+      : isFiniteNumber(eccentricity)
+        ? "ELLIPTIC"
+        : "TRAJECTORY";
+  const context = [situation, body].filter(Boolean).join(" ");
+  return { kind, label: context ? `${kind} \u00b7 ${context}` : kind };
+}
+
 export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const { system } = useTimeSystem();
   const kerbinTime = isKerbinTime(system);
@@ -129,6 +148,21 @@ export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const roll = snapshot["n.roll"];
   const sas = useStableSasDisplay(snapshot);
   const targetName = snapshot["tar.name"]?.trim();
+  const trajectory = trajectoryDisplay(snapshot);
+  const hyperbolic = isFiniteNumber(snapshot["o.eccentricity"])
+    && snapshot["o.eccentricity"] >= 1;
+  const periapsisSubtitle = hyperbolic && isFiniteNumber(snapshot["v.verticalSpeed"])
+    ? Math.abs(snapshot["v.verticalSpeed"]) <= .05
+      ? "at periapsis"
+      : snapshot["v.verticalSpeed"] > 0
+        ? "passed"
+        : "approaching"
+    : undefined;
+  const sasHint = sas.source === "mj"
+    ? "autopilot holding"
+    : sas.source === "stock"
+      ? "SAS holding"
+      : "SAS disengaged";
   const exactAltitude = isFiniteNumber(snapshot["v.altitude"])
     ? `Exact: ${formatTelemetryNumber(snapshot["v.altitude"])} m` : undefined;
   const altitudeContext = [
@@ -137,7 +171,12 @@ export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   ].filter(Boolean).join(" \u00b7 ");
 
   return (
-    <Panel compact id="asc" title="Ascension">
+    <Panel
+      compact
+      id="asc"
+      tag={<span className={`asc-trajectory ${trajectory.kind.toLowerCase()}`}><span aria-hidden="true" className="asc-trajectory-dot" />{trajectory.label}</span>}
+      title="Ascension"
+    >
       <div className="asc-cockpit">
         <div className="asc-instrument-column">
           <div className="navwrap"><div className="heading-tape"><HeadingTape heading={heading} /></div><Navball heading={heading} pitch={pitch} roll={roll} /></div>
@@ -150,21 +189,21 @@ export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
         <div className="throttle-col"><span className="label">THR</span><div aria-label="Throttle" aria-valuemax={100} aria-valuemin={0} aria-valuenow={throttle} className="thr-track" role="meter"><span className="thr-fill" style={{ "--throttle-width": `${throttle}%`, height: `${throttle}%` } as CSSProperties} /></div><span className="thr-pct">{formatPercent(throttle)}</span></div>
         <div className="asc-flight-state">
           <div className="sas-box">
-            <div className="sas-primary"><span className="label">{sas.source === "mj" ? "SMART A.S.S" : "SAS"}</span><span className={`sas-val ${sas.source === "off" ? "off" : ""}`}>{sas.mode}</span></div>
-            <span className="sas-provider">{sas.source === "mj" ? "MECHJEB" : sas.source === "stock" ? "STOCK" : "INACTIVE"}</span>
+            <div className="sas-primary"><span className="label">SAS</span><span className={`sas-val ${sas.source === "off" ? "off" : ""}`} title={sas.source === "mj" ? "MechJeb Smart A.S.S" : sas.source === "stock" ? "Stock SAS" : "SAS off"}>{sas.mode}</span></div>
+            <span className="sas-hint">{sasHint}</span>
           </div>
-          <div className="asc-hero-grid">
-            <FlightMetric className="hero" label="Altitude" subtitle={altitudeContext} title={exactAltitude} value={formatDistance(snapshot["v.altitude"], "live")} />
-            <FlightMetric className="hero" label="Vertical speed" value={formatSpeed(snapshot["v.verticalSpeed"])} />
-          </div>
-          <div className={`asc-speed-grid${targetName ? " has-target" : ""}`}>
-            <FlightMetric label="Surface speed" value={formatSpeed(snapshot["v.surfaceSpeed"])} />
-            <FlightMetric label="Orbital velocity" value={formatSpeed(snapshot["v.orbitalVelocity"])} />
-            {targetName && <FlightMetric label="Target relative" subtitle={targetName} value={formatSpeed(snapshot["tar.o.relativeVelocity"])} />}
+          <div className="asc-flight-layout">
+            <FlightMetric className="hero altitude-hero" label="Altitude" subtitle={altitudeContext} title={exactAltitude} value={formatDistance(snapshot["v.altitude"], "live")} />
+            <div className={`asc-speed-grid${targetName ? " has-target" : ""}`}>
+              <FlightMetric label="Vertical speed" value={formatSpeed(snapshot["v.verticalSpeed"])} />
+              <FlightMetric label="Orbital velocity" value={formatSpeed(snapshot["v.orbitalVelocity"])} />
+              <FlightMetric label="Surface speed" value={formatSpeed(snapshot["v.surfaceSpeed"])} />
+              {targetName && <FlightMetric className="target-metric" label="Target relative" subtitle={targetName} value={formatSpeed(snapshot["tar.o.relativeVelocity"])} />}
+            </div>
           </div>
         </div>
       </div>
-      <div className="orbit-rail stats-grid"><Stat label="Apoapsis" value={formatDistance(snapshot["o.ApA"], "live")} /><Stat label={"T\u2192Ap"} value={formatOrbitApoapsisCountdown(snapshot["o.timeToAp"], snapshot["o.eccentricity"], kerbinTime)} /><Stat label="Periapsis" value={formatDistance(snapshot["o.PeA"], "live")} /><Stat label={"T\u2192Pe"} value={formatOrbitPeriapsisCountdown(snapshot["o.timeToPe"], snapshot["o.eccentricity"], snapshot["v.verticalSpeed"], kerbinTime)} /><Stat label="Inclination" value={formatInclination(snapshot["o.inclination"])} /><Stat label="Eccentricity" value={formatEccentricity(snapshot["o.eccentricity"])} /><Stat label="Period" value={formatOrbitPeriod(snapshot["o.period"], snapshot["o.eccentricity"], kerbinTime)} /></div>
+      <div className="orbit-rail stats-grid"><Stat label="Apoapsis" value={formatDistance(snapshot["o.ApA"], "live")} /><Stat label="Periapsis" value={formatDistance(snapshot["o.PeA"], "live")} /><Stat label="Inclination" value={formatInclination(snapshot["o.inclination"])} /><Stat label="Eccentricity" value={formatEccentricity(snapshot["o.eccentricity"])} /><Stat label={"T \u2192 AP"} subtitle={hyperbolic ? "never \u2014 escape" : undefined} value={formatOrbitApoapsisCountdown(snapshot["o.timeToAp"], snapshot["o.eccentricity"], kerbinTime)} /><Stat label={"T \u2192 PE"} subtitle={periapsisSubtitle} value={formatOrbitPeriapsisCountdown(snapshot["o.timeToPe"], snapshot["o.eccentricity"], snapshot["v.verticalSpeed"], kerbinTime)} /><Stat label="Period" subtitle={hyperbolic ? "open orbit" : undefined} value={formatOrbitPeriod(snapshot["o.period"], snapshot["o.eccentricity"], kerbinTime)} /></div>
     </Panel>
   );
 }

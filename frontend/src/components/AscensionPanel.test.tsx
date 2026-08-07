@@ -36,7 +36,7 @@ describe("Ascension orbital formatting", () => {
       </TimeSystemProvider>,
     );
 
-    expect(ascensionStat(view.container, "T→Ap")).toBe("27d 18:40:00");
+    expect(ascensionStat(view.container, "T → AP")).toBe("27d 18:40:00");
   });
 
   it("uses radial velocity to distinguish hyperbolic orbit states", () => {
@@ -49,18 +49,18 @@ describe("Ascension orbital formatting", () => {
       "v.verticalSpeed": -1,
     };
     const view = render(<AscensionPanel snapshot={base} />);
-    expect(ascensionStat(view.container, "T→Ap")).toBe("∞");
-    expect(ascensionStat(view.container, "T→Pe")).toBe("00:40:00");
+    expect(ascensionStat(view.container, "T → AP")).toBe("∞");
+    expect(ascensionStat(view.container, "T → PE")).toBe("00:40:00");
     expect(ascensionStat(view.container, "Period")).toBe("—");
 
     view.rerender(<AscensionPanel snapshot={{ ...base, "v.verticalSpeed": 1 }} />);
-    expect(ascensionStat(view.container, "T→Pe")).toBe("—");
+    expect(ascensionStat(view.container, "T → PE")).toBe("—");
 
     view.rerender(<AscensionPanel snapshot={{ ...base, "v.verticalSpeed": -0.01 }} />);
-    expect(ascensionStat(view.container, "T→Pe")).toBe("NOW");
+    expect(ascensionStat(view.container, "T → PE")).toBe("NOW");
 
     view.rerender(<AscensionPanel snapshot={{ ...base, "v.verticalSpeed": undefined }} />);
-    expect(ascensionStat(view.container, "T→Pe")).toBe("—");
+    expect(ascensionStat(view.container, "T → PE")).toBe("—");
   });
 });
 
@@ -74,8 +74,8 @@ describe("Ascension information hierarchy", () => {
     const view = render(<AscensionPanel snapshot={targetSnapshot} />);
 
     expect(view.container.querySelector(".attitude-strip")?.textContent).toContain("HDG");
-    expect(view.container.querySelector(".asc-hero-grid")?.textContent).toContain("Altitude");
-    expect(view.container.querySelector(".asc-hero-grid")?.textContent).toContain("Vertical speed");
+    expect(view.container.querySelector(".altitude-hero")?.textContent).toContain("Altitude");
+    expect(view.container.querySelector(".asc-speed-grid")?.textContent).toContain("Vertical speed");
     expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Target relative");
     expect(view.container.querySelector(".asc-speed-grid.has-target")?.textContent).toContain("Kerbin");
     expect(view.container.querySelectorAll(".orbit-rail .stat")).toHaveLength(7);
@@ -84,6 +84,22 @@ describe("Ascension information hierarchy", () => {
     view.rerender(<AscensionPanel snapshot={{ ...targetSnapshot, "tar.name": "" }} />);
     expect(view.container.querySelector(".asc-speed-grid.has-target")).toBeNull();
     expect(view.container.textContent).not.toContain("Target relative");
+  });
+
+  it("surfaces trajectory context and explains open-orbit values without adding RCS", () => {
+    const view = render(<AscensionPanel snapshot={{
+      ...flightTelemetryFixture,
+      "v.body": "Sarnus",
+      "v.situationString": "Escaping",
+      "v.verticalSpeed": 1,
+      "o.eccentricity": 1.2,
+    }} />);
+
+    expect(view.container.querySelector(".asc-trajectory")?.textContent).toBe("HYPERBOLIC · ESCAPING SARNUS");
+    expect(view.container.querySelector(".orbit-rail")?.textContent).toContain("never — escape");
+    expect(view.container.querySelector(".orbit-rail")?.textContent).toContain("passed");
+    expect(view.container.querySelector(".orbit-rail")?.textContent).toContain("open orbit");
+    expect(view.container.textContent).not.toContain("RCS");
   });
 });
 
@@ -113,12 +129,12 @@ describe("Ascension SAS source display", () => {
       "mj.sasMode": "SmartASSAutopilotMode.off",
     };
     const view = render(<AscensionPanel snapshot={smartAss} />);
-    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("SMART A.S.S");
+    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("SAS");
     expect(view.container.querySelector(".sas-val")?.textContent).toBe("ORBIT PROGRADE");
 
     view.rerender(<AscensionPanel snapshot={stock} />);
     act(() => vi.advanceTimersByTime(749));
-    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("SMART A.S.S");
+    expect(view.container.querySelector(".sas-box .label")?.textContent).toBe("SAS");
     expect(view.container.querySelector(".sas-val")?.textContent).toBe("ORBIT PROGRADE");
 
     act(() => vi.advanceTimersByTime(1));

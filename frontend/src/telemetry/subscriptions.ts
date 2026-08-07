@@ -163,7 +163,7 @@ export function clockSnapshotsEqual(left: TelemetrySnapshot | null, right: Telem
 }
 
 export function ascensionSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "krpc.throttle", "krpc.sas", "krpc.sasMode", "n.heading", "n.pitch", "n.roll", "v.body", "v.altitude", "v.verticalSpeed", "v.surfaceSpeed", "v.orbitalVelocity", "o.ApA", "o.PeA", "o.timeToAp", "o.timeToPe", "o.inclination", "o.eccentricity", "o.period", "mj.sasActive", "mj.sasMode", "tar.name", "tar.o.relativeVelocity"]);
+  return fieldsEqual(left, right, ["context.mode", "krpc.throttle", "krpc.sas", "krpc.sasMode", "n.heading", "n.pitch", "n.roll", "v.body", "v.situationString", "v.altitude", "v.verticalSpeed", "v.surfaceSpeed", "v.orbitalVelocity", "o.ApA", "o.PeA", "o.timeToAp", "o.timeToPe", "o.inclination", "o.eccentricity", "o.period", "mj.sasActive", "mj.sasMode", "tar.name", "tar.o.relativeVelocity"]);
 }
 
 export function heatSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
