@@ -1260,7 +1260,7 @@ button { font: inherit; }
 .rx-stat .rv { min-width: 0; overflow: hidden; color: var(--amber); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) {
   display: flex;
-  height: 384px;
+  max-height: 384px;
   flex-direction: column;
 }
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) > .body {
@@ -1274,7 +1274,7 @@ button { font: inherit; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #elec:not(.panel-collapsed) .ec-source-row { flex: 1; }
 .flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) {
   display: flex;
-  height: 306px;
+  max-height: 306px;
   flex-direction: column;
 }
 .flight-workspace-shell[data-arrangement="side-by-side"] #heat:not(.panel-collapsed) > .body {
