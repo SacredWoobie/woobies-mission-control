@@ -19,9 +19,9 @@ describe("StagingPanel", () => {
     const { container } = render(<StagingPanel snapshot={flightTelemetryFixture} />);
 
     expect(screen.getByText("Total Δv · vacuum")).toBeTruthy();
-    expect(screen.getByText("Δv current")).toBeTruthy();
-    expect(screen.getByText("Δv vac")).toBeTruthy();
-    expect(screen.getByText("TWR · Kerbin")).toBeTruthy();
+    expect(screen.getByText("Δv LIVE").getAttribute("title")).toBe("Delta-v at live flight conditions");
+    expect(screen.getByText("Δv VAC").getAttribute("title")).toBe("Delta-v in vacuum");
+    expect(screen.getByText("TWR · LIVE").getAttribute("title")).toBe("Full-throttle TWR at live body gravity (Kerbin)");
     expect(screen.queryByRole("button", { name: "CURRENT" })).toBeNull();
     expect(screen.queryByRole("button", { name: "VACUUM" })).toBeNull();
     expect(screen.getByText("S0")).toBeTruthy();

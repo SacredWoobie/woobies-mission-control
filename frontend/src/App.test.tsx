@@ -221,8 +221,8 @@ describe("Dashboard lifecycle", () => {
     expect(screen.queryByRole("button", { name: "CURRENT" })).toBeNull();
     expect(screen.queryByRole("button", { name: "VACUUM" })).toBeNull();
     expect(screen.getByText("Total Δv · vacuum", { exact: true })).toBeTruthy();
-    expect(screen.getByText("Δv current", { exact: true })).toBeTruthy();
-    expect(screen.getByText("Δv vac", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Δv LIVE", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Δv VAC", { exact: true })).toBeTruthy();
 
     const heatNode = firstView.container.querySelector("#heat");
     fireEvent.click(screen.getByRole("button", { name: "Collapse Heat Management" }));

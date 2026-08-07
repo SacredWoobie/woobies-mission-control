@@ -8,6 +8,8 @@ All notable public changes will be recorded here.
   moving sky, horizon, grid, and cardinal labels cannot bleed beyond the globe.
 - Reshaped the navball aircraft marker to match KSP's connected wing-and-chevron
   silhouette, including its smaller centered reference dot.
+- Rebalanced Flight staging columns so `Δv LIVE`, `Δv VAC`, and `TWR · LIVE`
+  headings leave less unused width in TWR and more room for delta-v values.
 - Reflowed Ascension's orbital-stat rail before narrow panels can truncate
   labels or telemetry values, while retaining the single-row proposal-target
   layouts.

@@ -521,7 +521,7 @@ button { font: inherit; }
 .flight-stage-single strong { overflow: hidden; color: var(--amber); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .flight-stage-single strong.danger { color: var(--danger); }
 .stage-table.flight { overflow-x: auto; scrollbar-width: thin; }
-.stage-table.flight .st-row { min-width: 352px; grid-template-columns: 42px 72px 72px minmax(96px,1fr) 54px; }
+.stage-table.flight .st-row { min-width: 352px; grid-template-columns: 42px minmax(64px,1fr) minmax(64px,1fr) minmax(86px,1fr) 54px; }
 .stage-table.flight .st-row > span { padding: 5px 6px; text-align: right; }
 .stage-table.flight .st-row > .sname { padding-left: 8px; text-align: left; }
 .stage-table.flight .st-row.cur > .sname { box-shadow: inset 3px 0 var(--green); }
@@ -969,7 +969,7 @@ button { font: inherit; }
   .flight-workspace-shell #asc .orbit-rail .stat { padding: 7px 8px; }
   .flight-workspace-shell #asc .orbit-rail .stat .v { font-size: 13px; }
   .flight-workspace-shell[data-arrangement="stacked"] #stage .stage-table.flight .st-row {
-    grid-template-columns: 42px 72px 72px minmax(96px,1fr) 72px;
+    grid-template-columns: 42px minmax(64px,1fr) minmax(64px,1fr) minmax(86px,1fr) 72px;
   }
 }
 .project-footer { align-items: center; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; max-width: 1180px; margin: 12px auto 2px; padding: 10px 4px 2px; border-top: 1px solid var(--rule); color: var(--slate-dim); font-size: 9px; letter-spacing: .08em; text-align: center; text-transform: uppercase; }

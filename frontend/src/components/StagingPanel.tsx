@@ -188,7 +188,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
           ) : rows.length === 1 ? (
             <div className="flight-stage-single">
               <div>
-                <span>TWR · {body}</span>
+                <span title={`Full-throttle TWR at live body gravity (${body})`}>TWR · LIVE</span>
                 <strong className={
                   isSurfaceSituation(situation)
                   && rows[0].ksp === activeKsp
@@ -211,9 +211,9 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
             <div className="stage-table flight">
               <div className="st-row st-head" aria-hidden="true">
                 <span>ST</span>
-                <span className={dimCurrentDeltaV ? "dim" : ""}>Δv current</span>
-                <span className={dimVacuumDeltaV ? "dim" : ""}>Δv vac</span>
-                <span>TWR · {body}</span>
+                <span className={dimCurrentDeltaV ? "dim" : ""} title="Delta-v at live flight conditions">Δv LIVE</span>
+                <span className={dimVacuumDeltaV ? "dim" : ""} title="Delta-v in vacuum">Δv VAC</span>
+                <span title={`Full-throttle TWR at live body gravity (${body})`}>TWR · LIVE</span>
                 <span>Burn</span>
               </div>
               {rows.map((stage) => {

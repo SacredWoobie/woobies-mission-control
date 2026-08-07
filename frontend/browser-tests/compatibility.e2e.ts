@@ -340,8 +340,9 @@ test("Flight staging presents both conditions without a mode toggle", async ({ p
 
   const panel = page.locator("#stage");
   await expect(panel.getByText("Total Δv · vacuum")).toBeVisible();
-  await expect(panel.getByText("Δv current")).toBeVisible();
-  await expect(panel.getByText("Δv vac")).toBeVisible();
+  await expect(panel.getByText("Δv LIVE")).toBeVisible();
+  await expect(panel.getByText("Δv VAC")).toBeVisible();
+  await expect(panel.getByText("TWR · LIVE", { exact: true })).toHaveAttribute("title", "Full-throttle TWR at live body gravity (Kerbin)");
   await expect(panel.getByRole("button", { name: "CURRENT" })).toHaveCount(0);
   await expect(panel.getByRole("button", { name: "VACUUM" })).toHaveCount(0);
   await expect(panel.getByText("1 unpowered stage hidden")).toBeVisible();
@@ -351,4 +352,16 @@ test("Flight staging presents both conditions without a mode toggle", async ({ p
     scrollWidth: element.scrollWidth,
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+
+  const columns = await panel.locator(".stage-table.flight .st-head").evaluate((row) => (
+    Array.from(row.children).map((cell) => ({
+      clientWidth: (cell as HTMLElement).clientWidth,
+      scrollWidth: (cell as HTMLElement).scrollWidth,
+      width: cell.getBoundingClientRect().width,
+    }))
+  ));
+  expect(columns[1].scrollWidth).toBeLessThanOrEqual(columns[1].clientWidth);
+  expect(columns[2].scrollWidth).toBeLessThanOrEqual(columns[2].clientWidth);
+  expect(columns[3].scrollWidth).toBeLessThanOrEqual(columns[3].clientWidth);
+  expect(columns[3].width).toBeLessThanOrEqual(columns[1].width + 1);
 });
