@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   formatDistance,
   formatEccentricity,
@@ -15,6 +15,7 @@ import {
 } from "../formatting/numbers";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
+import { buildNavballGeometry } from "./navballGeometry";
 import { Panel } from "./Panel";
 
 function normalHeading(value: number | undefined) {
@@ -39,58 +40,44 @@ function HeadingTape({ heading }: { heading?: number }) {
 }
 
 function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; roll?: number }) {
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const geometry = useMemo(
+    () => buildNavballGeometry({ heading, pitch, roll }),
+    [heading, pitch, roll],
+  );
   if (!isFiniteNumber(pitch) || !isFiniteNumber(roll)) {
-    return <svg aria-label="Attitude indicator awaiting telemetry" className="navball" viewBox="0 0 168 168"><circle className="nav-empty" cx="84" cy="84" r="72" /><path className="aircraft" d="M54 84 h20 v6 M114 84 h-20 v6" /><circle className="aircraft-dot" cx="84" cy="84" r="2.4" /></svg>;
+    return <svg aria-label="Attitude indicator awaiting telemetry" className="navball" viewBox="0 0 168 168"><circle className="nav-empty" cx="84" cy="84" r="78" /><path className="aircraft" d="M52 84 h18 v6 M98 84 h18 v6" /><circle className="aircraft-dot" cx="84" cy="84" r="2.5" /></svg>;
   }
-  const offset = pitch * .8;
+  const skyGradientId = `navball-sky-${id}`;
+  const clipId = `navball-clip-${id}`;
   return (
-    <svg aria-label={`Pitch ${Math.round(pitch)}, roll ${Math.round(roll)}, heading ${Math.round(normalHeading(heading) ?? 0)}`} className="navball" viewBox="0 0 168 168">
+    <svg aria-label={`Navball at heading ${Math.round(geometry.heading)}, pitch ${Math.round(geometry.pitch)}, roll ${Math.round(geometry.roll)}`} className="navball" role="img" viewBox="0 0 168 168">
       <defs>
-        <clipPath id="react-navball-clip"><circle cx="84" cy="84" r="72" /></clipPath>
-        <linearGradient id="react-navball-sky" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#74c9f4" /><stop offset="48%" stopColor="#438dcc" /><stop offset="100%" stopColor="#20527f" />
+        <linearGradient id={skyGradientId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="#63a9dd" />
+          <stop offset=".72" stopColor="#3577b0" />
+          <stop offset="1" stopColor="#28618f" />
         </linearGradient>
-        <linearGradient id="react-navball-ground" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#a66b36" /><stop offset="48%" stopColor="#724725" /><stop offset="100%" stopColor="#34251d" />
-        </linearGradient>
-        <radialGradient id="react-navball-shade" cx="37%" cy="31%" r="78%">
-          <stop offset="0%" stopColor="#fff" stopOpacity=".18" /><stop offset="56%" stopColor="#000" stopOpacity="0" /><stop offset="100%" stopColor="#000" stopOpacity=".56" />
-        </radialGradient>
-        <linearGradient id="react-navball-glass" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stopColor="#fff" stopOpacity=".20" /><stop offset="32%" stopColor="#fff" stopOpacity=".035" /><stop offset="68%" stopColor="#71d7ff" stopOpacity="0" /><stop offset="100%" stopColor="#000" stopOpacity=".18" />
-        </linearGradient>
-        <pattern id="react-navball-texture" width="9" height="9" patternUnits="userSpaceOnUse">
-          <circle cx="1.5" cy="1.5" r=".55" fill="#fff" opacity=".10" /><circle cx="6" cy="5" r=".45" fill="#08101a" opacity=".14" />
-        </pattern>
+        <clipPath id={clipId}><circle cx="84" cy="84" r="78" /></clipPath>
       </defs>
-      <g clipPath="url(#react-navball-clip)">
-        <g transform={`rotate(${-roll} 84 84)`}>
-          <g transform={`translate(0 ${offset})`}>
-            <rect className="nav-sky" x="12" y="-132" width="144" height="216" />
-            <rect className="nav-ground" x="12" y="84" width="144" height="216" />
-            <g className="nav-grid">
-              <path className="nav-grid-line longitude" d="M42 -20 C68 22 68 146 42 188" />
-              <path className="nav-grid-line longitude" d="M126 -20 C100 22 100 146 126 188" />
-              <path className="nav-grid-line latitude" d="M14 38 Q84 18 154 38" />
-              <path className="nav-grid-line latitude" d="M12 61 Q84 49 156 61" />
-              <path className="nav-grid-line latitude" d="M12 107 Q84 119 156 107" />
-              <path className="nav-grid-line latitude" d="M14 130 Q84 150 154 130" />
-            </g>
-            <line className="nav-horizon-glow" x1="12" x2="156" y1="84" y2="84" />
-            <line className="nav-horizon" x1="12" x2="156" y1="84" y2="84" />
-            {[-60,-30,30,60].map((degree) => <g key={degree}><line className="pitch-line" x1={degree % 60 === 0 ? 58 : 68} x2={degree % 60 === 0 ? 110 : 100} y1={84 - degree * .8} y2={84 - degree * .8} /><text className="pitch-label" x="54" y={87 - degree * .8}>{Math.abs(degree)}</text></g>)}
-          </g>
-        </g>
-        <circle cx="84" cy="84" fill="url(#react-navball-texture)" r="72" />
-        <circle cx="84" cy="84" fill="url(#react-navball-shade)" r="72" />
-        <circle className="nav-glass" cx="84" cy="84" fill="url(#react-navball-glass)" r="70" />
+      <circle className="nav-sphere-bezel" cx="84" cy="84" r="82" />
+      <circle className="nav-sphere-ground" cx="84" cy="84" r="78" />
+      {geometry.skyPath && <path d={geometry.skyPath} fill={`url(#${skyGradientId})`} />}
+      <g className="nav-spherical-grid" clipPath={`url(#${clipId})`}>
+        {geometry.grid.map((line, index) => <path d={line.path} key={index} opacity={line.opacity} />)}
       </g>
-      <circle className="nav-inner-ring" cx="84" cy="84" r="69" />
-      <circle className="nav-ring" cx="84" cy="84" r="72" />
-      <g className="nav-bezel-ticks"><line x1="84" x2="84" y1="12" y2="18" /><line x1="84" x2="84" y1="150" y2="156" /><line x1="12" x2="18" y1="84" y2="84" /><line x1="150" x2="156" y1="84" y2="84" /></g>
-      <path className="aircraft aircraft-shadow" d="M54 84 h20 v6 M114 84 h-20 v6" />
-      <path className="aircraft" d="M54 84 h20 v6 M114 84 h-20 v6" />
-      <circle className="aircraft-dot" cx="84" cy="84" r="2.4" /><path className="roll-pointer" d="M84 14 l-5 -8 h10 z" transform={`rotate(${-roll} 84 84)`} />
+      {geometry.horizonPath && <path className="nav-spherical-horizon" d={geometry.horizonPath} />}
+      <g className="nav-cardinals">
+        {geometry.cardinals.map((cardinal) => <text key={cardinal.label} x={cardinal.x.toFixed(1)} y={cardinal.y.toFixed(1)}>{cardinal.label}</text>)}
+      </g>
+      <circle className="nav-sphere-rim" cx="84" cy="84" r="78" />
+      <g className="aircraft">
+        <line x1="52" x2="70" y1="84" y2="84" />
+        <line x1="98" x2="116" y1="84" y2="84" />
+        <line x1="70" x2="70" y1="84" y2="90" />
+        <line x1="116" x2="116" y1="84" y2="90" />
+      </g>
+      <circle className="aircraft-dot" cx="84" cy="84" r="2.5" />
     </svg>
   );
 }

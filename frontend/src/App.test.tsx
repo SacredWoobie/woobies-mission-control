@@ -190,8 +190,8 @@ describe("Dashboard lifecycle", () => {
     expect(firstView.container.querySelector("#conn")).toBeNull();
     expect(firstView.container.querySelector("svg.spark")).toBeNull();
     expect(firstView.container.querySelector(".attitude-strip")).toBeTruthy();
-    expect(firstView.container.querySelector(".nav-sky")).toBeTruthy();
-    expect(firstView.container.querySelector(".nav-ground")).toBeTruthy();
+    expect(firstView.container.querySelector(".nav-sphere-ground")).toBeTruthy();
+    expect(firstView.container.querySelector(".nav-spherical-grid")).toBeTruthy();
     const fixedRegion = firstView.container.querySelector('[data-flight-region="fixed"]');
     const tabbedRegion = firstView.container.querySelector('[data-flight-region="tabbed"]');
     const monitorView = tabbedRegion?.querySelector('[data-flight-workspace-view="monitor"]');

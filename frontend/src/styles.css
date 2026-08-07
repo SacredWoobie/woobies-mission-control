@@ -1136,24 +1136,15 @@ button { font: inherit; }
 .target-metric .asc-flight-subtitle { position: absolute; top: 9px; right: 10px; max-width: 48%; text-align: right; }
 .navball-stage { display: grid; width: 100%; min-height: 0; place-items: center; }
 .navball { width: 168px; height: 168px; overflow: visible; filter: drop-shadow(0 7px 10px rgba(0,0,0,.5)); }
-.nav-empty, .nav-ring { fill: #05080c; stroke: var(--rule-bright); stroke-width: 2; }
-.nav-ring { fill: none; }
-.nav-inner-ring { fill: none; stroke: rgba(116,201,244,.22); stroke-width: 1; }
-.nav-sky { fill: url(#react-navball-sky); }
-.nav-ground { fill: url(#react-navball-ground); }
-.nav-grid-line { fill: none; stroke: rgba(229,244,255,.22); stroke-width: .8; }
-.nav-grid-line.longitude { stroke-dasharray: 2 2.5; }
-.nav-grid-line.latitude { stroke: rgba(229,244,255,.18); }
-.nav-horizon-glow { stroke: rgba(255,255,255,.28); stroke-width: 4; }
-.nav-horizon { stroke: #f2f7fb; stroke-width: 1.4; }
-.pitch-line { stroke: rgba(255,255,255,.82); stroke-width: 1; }
-.pitch-label { fill: rgba(255,255,255,.82); font: 7px var(--mono); text-anchor: end; }
-.nav-glass { mix-blend-mode: screen; }
-.nav-bezel-ticks { stroke: #7f9aad; stroke-width: 1; }
+.nav-empty { fill: #0a1119; stroke: #22364a; stroke-width: 1; }
+.nav-sphere-bezel { fill: #0a1119; stroke: #22364a; stroke-width: 1; }
+.nav-sphere-ground { fill: #6b4f33; }
+.nav-spherical-grid { fill: none; stroke: #fff; stroke-width: .8; }
+.nav-spherical-horizon { fill: none; stroke: #f2f8fc; stroke-width: 1.4; stroke-opacity: .9; }
+.nav-cardinals { fill: #fff; font: 9px var(--mono); text-anchor: middle; }
+.nav-sphere-rim { fill: none; stroke: #0a1119; stroke-width: 2; stroke-opacity: .55; }
 .aircraft { fill: none; stroke: var(--amber); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.aircraft-shadow { stroke: rgba(0,0,0,.68); stroke-width: 5; }
 .aircraft-dot { fill: var(--amber); }
-.roll-pointer { fill: var(--cyan); }
 .heading-tape { position: relative; width: 196px; height: 20px; overflow: hidden; border: 1px solid var(--rule-bright); border-radius: 2px; background: #05080c; }
 .heading-tape svg { display: block; width: 196px; height: 20px; }
 .heading-tape rect { fill: #05080c; }
