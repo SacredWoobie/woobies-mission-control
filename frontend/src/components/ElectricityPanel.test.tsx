@@ -51,6 +51,7 @@ describe("ElectricityPanel", () => {
     expect(ledger.hidden).toBe(true);
     expect(detail.hidden).toBe(false);
     expect(slot.style.height).toBe("164px");
+    expect(slot.style.flex).toBe("0 0 auto");
     const reactorList = screen.getByRole("region", { name: "Reactor list" });
     expect(reactorList.tabIndex).toBe(0);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Back to power sources" }));
@@ -60,6 +61,7 @@ describe("ElectricityPanel", () => {
     expect(ledger.hidden).toBe(false);
     expect(detail.hidden).toBe(true);
     expect(slot.style.height).toBe("");
+    expect(slot.style.flex).toBe("");
     expect(document.activeElement).toBe(open);
   });
 

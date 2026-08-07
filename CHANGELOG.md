@@ -21,11 +21,10 @@ All notable public changes will be recorded here.
 - Added a software master caution and warning system with latched Flight safety
   episodes, feed/source-integrity monitoring, condition-state annunciation,
   and an accessible acknowledgement and history drawer.
-- Replaced transient caution tokens with permanent HEAT, REACTOR, POWER, COMMS,
-  and DATALINK indicators. New conditions illuminate red, individually
-  acknowledged active conditions remain amber, cleared conditions rearm, and
-  source-integrity FEED diagnostics remain in history without lighting Master
-  Caution.
+- Replaced transient caution tokens with permanent HEAT, REACTOR, COMMS, and
+  POWER indicators. New conditions illuminate red, individually acknowledged
+  active conditions remain amber, cleared conditions rearm, and dashboard-feed
+  diagnostics remain in history without lighting Master Caution.
 - Replaced the Target panel's passive type label with a guarded `UNSET TARGET`
   control that revalidates the active vessel and exact selected kRPC object
   before clearing it in KSP.

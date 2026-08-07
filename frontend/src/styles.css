@@ -1228,7 +1228,7 @@ button { font: inherit; }
 .ec-meter-value.unknown { color: var(--slate); }
 .ec-flow-caption { display: flex; margin-top: 7px; color: var(--slate); font-size: 9px; justify-content: space-between; gap: 10px; }
 .ec-flow-caption .danger { color: var(--warn); }
-.ec-source-slot { min-height: 0; margin-top: 8px; overflow: hidden; }
+.ec-source-slot { position: relative; min-height: 0; margin-top: 8px; overflow: hidden; }
 .ec-source-ledger { display: flex; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; background: var(--rule); flex-direction: column; gap: 1px; }
 .ec-source-row { display: flex; min-width: 0; padding: 7px 10px; align-items: center; gap: 9px; background: var(--panel); }
 .ec-source-button { width: 100%; border: 0; color: inherit; cursor: pointer; font-family: var(--mono); text-align: left; }
@@ -1247,7 +1247,7 @@ button { font: inherit; }
 .ec-source-output small { color: var(--slate); font-size: 9px; }
 .ec-source-output > small { text-align: right; }
 .ec-source-row.idle :is(.ec-source-copy strong, .ec-source-copy small, .ec-source-output strong, .ec-source-output small) { color: var(--slate-dim); }
-.rx-detail-view { display: grid; box-sizing: border-box; height: 100%; min-height: 0; max-height: 100%; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel-2); grid-template-rows: auto minmax(0,1fr) auto; }
+.rx-detail-view { position: absolute; inset: 0; display: grid; box-sizing: border-box; min-height: 0; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel-2); grid-template-rows: auto minmax(0,1fr) auto; }
 .rx-detail-view[hidden], .ec-source-ledger[hidden] { display: none; }
 .rx-detail-back { display: grid; width: 100%; min-height: 31px; padding: 5px 9px; border: 0; align-items: center; grid-template-columns: 16px minmax(0,1fr) auto; gap: 6px; color: var(--slate); background: var(--panel); cursor: pointer; font: 10px var(--mono); letter-spacing: .1em; text-align: left; text-transform: uppercase; }
 .rx-detail-back > span:first-child { color: var(--cyan); font-size: 17px; line-height: 1; }

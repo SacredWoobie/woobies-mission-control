@@ -490,7 +490,10 @@ export function ElectricityPanel({
         </div>
       </div>
       {(model.tier === 3 || model.reactors.length > 0) && (
-        <div className="ec-source-slot" style={sourceSlotHeight ? { height: `${sourceSlotHeight}px` } : undefined}>
+        <div
+          className="ec-source-slot"
+          style={sourceSlotHeight ? { flex: "0 0 auto", height: `${sourceSlotHeight}px` } : undefined}
+        >
           <SourceLedger
             generation={model.generationEcPerSec}
             hidden={reactorDetailOpen}
