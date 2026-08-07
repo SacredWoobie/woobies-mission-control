@@ -148,7 +148,7 @@ export function DashboardSurface({
   onSendNotesCommand = () => false,
   waitingMessage = "Waiting for the first valid Mission Control telemetry frame.",
 }: DashboardSurfaceProps) {
-  const showHeader = mode === "editor" || liveWaiting;
+  const showHeader = liveWaiting;
   const [datalinkOpen, setDatalinkOpen] = useState(false);
   const { closeDeltaVDrawer, closeDrawer } = useResonantOrbitState();
   const closeDatalink = useCallback(() => setDatalinkOpen(false), []);
@@ -207,14 +207,16 @@ export function EditorWorkspace({ context, snapshot, staging, summary }: { conte
     <>
       <PanelRestoreRail available={available} />
       <div className={`editor-workspace${hasPlanningCompanion ? " has-planning-companion" : " no-planning-companion"}`}>
-        <div className="editor-workspace-column editor-workspace-primary">
-          {context}
-          <div className="dashboard-slice editor-staging-slice">{staging}</div>
-          {summary}
-        </div>
-        <div className="editor-workspace-column editor-workspace-secondary">
-          {pinnedOrbit && <div className="dashboard-slice editor-orbit-plan-slice"><PinnedResonantOrbitPanel scene="editor" snapshot={snapshot} /></div>}
-          {pinnedDeltaV && <HideablePanelSlot id="editorDeltaVPlan"><div className="dashboard-slice editor-delta-v-plan-slice"><PinnedDeltaVPlanPanel scene="editor" snapshot={snapshot} /></div></HideablePanelSlot>}
+        {context}
+        <div className="editor-workspace-content">
+          <div className="editor-workspace-column editor-workspace-primary">
+            <div className="dashboard-slice editor-staging-slice">{staging}</div>
+            {summary}
+          </div>
+          <div className="editor-workspace-column editor-workspace-secondary">
+            {pinnedOrbit && <div className="dashboard-slice editor-orbit-plan-slice"><PinnedResonantOrbitPanel scene="editor" snapshot={snapshot} /></div>}
+            {pinnedDeltaV && <HideablePanelSlot id="editorDeltaVPlan"><div className="dashboard-slice editor-delta-v-plan-slice"><PinnedDeltaVPlanPanel scene="editor" snapshot={snapshot} /></div></HideablePanelSlot>}
+          </div>
         </div>
       </div>
     </>

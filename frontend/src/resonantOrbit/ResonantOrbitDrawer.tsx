@@ -210,6 +210,10 @@ export function ResonantOrbitDrawer({ mode, snapshot }: { mode: SceneMode; snaps
       : Date.parse(right.updatedAt || "1970-01-01") - Date.parse(left.updatedAt || "1970-01-01")
         || left.name.localeCompare(right.name));
   }, [currentSavePlans, loadFromAllSaves, savedPlans]);
+  const activeSavedPlan = useMemo(
+    () => savedPlans.find((record) => record.id === activeSavedPlanId) ?? null,
+    [activeSavedPlanId, savedPlans],
+  );
   const savedPlanGroups = useMemo(() => {
     const groups = new Map<string, typeof savedPlans>();
     visibleSavedPlans.forEach((record) => {
@@ -249,6 +253,22 @@ export function ResonantOrbitDrawer({ mode, snapshot }: { mode: SceneMode; snaps
     setBodyChoice(matchingBody.name);
     setBody({ ...matchingBody });
   }, [availableBodies, contextBodyName, drawerOpen]);
+
+  useEffect(() => {
+    if (!drawerOpen || !activeSavedPlan) return;
+    const saved = activeSavedPlan.plan;
+    const knownBody = availableBodies.find((candidate) => candidate.name === saved.body.name);
+    setBodyChoice(knownBody ? knownBody.name : "custom");
+    setBody({ ...saved.body });
+    setCustomBody({ ...saved.body });
+    setSatelliteCount(saved.satelliteCount);
+    setTargetAltitude(saved.targetAltitude);
+    setResonanceMode(saved.requestedMode);
+    setUseOcclusion(activeSavedPlan.useOcclusionModifiers);
+    setPlanName(activeSavedPlan.name);
+    setSaveError(false);
+    setSavedNotice("");
+  }, [activeSavedPlan, availableBodies, drawerOpen]);
 
   if (!drawerOpen) return null;
   const plan = calculation.plan;

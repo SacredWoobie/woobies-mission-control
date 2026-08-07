@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import {
   formatResourcePair,
   humanizeResourceName,
@@ -9,70 +8,9 @@ import { Panel } from "./Panel";
 import { resourceSeverity } from "./resourceMeter";
 import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
 
-function formatMass(value: unknown) {
-  if (!isFiniteNumber(value)) return "—";
-  const kilograms = value * 1_000;
-  return `${kilograms.toLocaleString("en-US", {
-    maximumFractionDigits: 1,
-  })} kg`;
-}
-
-function formatFunds(value: unknown) {
-  return isFiniteNumber(value)
-    ? `√${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-    : "—";
-}
-
-function formatCount(value: unknown) {
-  return isFiniteNumber(value) ? Math.max(0, Math.round(value)).toLocaleString("en-US") : "—";
-}
-
-function SummaryValue({ label, value, note }: { label: string; value: string; note?: string }) {
+function EditorSummaryContent({ names, snapshot }: { names: string[]; snapshot: TelemetrySnapshot }) {
   return (
-    <div className="editor-summary-value">
-      <span className="label">{label}</span>
-      <strong>{value}</strong>
-      {note && <span className="editor-summary-note">{note}</span>}
-    </div>
-  );
-}
-
-function SummaryGroup({ children, label, type }: { children: ReactNode; label: string; type: "mass" | "build" | "cost" }) {
-  return (
-    <div aria-label={`${label} summary`} className={`editor-summary-group ${type}`} role="group">
-      <span className="editor-summary-group-label">{label}</span>
-      <div className="editor-summary-group-values">{children}</div>
-    </div>
-  );
-}
-
-function EditorSummaryContent({ snapshot }: { snapshot: TelemetrySnapshot }) {
-  const names = Array.isArray(snapshot["editor.res.names"])
-    ? snapshot["editor.res.names"].filter((name): name is string => typeof name === "string")
-    : [];
-
-  return (
-    <>
-      <div className="editor-summary-groups">
-        <SummaryGroup label="Mass" type="mass">
-          <SummaryValue label="Wet" value={formatMass(snapshot["editor.wetMass"])} />
-          <SummaryValue label="Dry" value={formatMass(snapshot["editor.dryMass"])} />
-          <SummaryValue label="Resources" value={formatMass(snapshot["editor.resourceMass"])} />
-        </SummaryGroup>
-        <SummaryGroup label="Build" type="build">
-          <SummaryValue label="Parts" value={formatCount(snapshot["editor.partCount"])} />
-          <SummaryValue label="Stages" value={formatCount(snapshot["editor.stageCount"])} />
-          <SummaryValue label="Crew" value={formatCount(snapshot["editor.crewCapacity"])} />
-        </SummaryGroup>
-        <SummaryGroup label="Cost" type="cost">
-          <SummaryValue label="Total" value={formatFunds(snapshot["editor.totalCost"])} />
-          <SummaryValue label="Resources" value={formatFunds(snapshot["editor.resourceCost"])} />
-        </SummaryGroup>
-      </div>
-      <div className="editor-resource-head">
-        <span className="label">Resources aboard</span>
-        <span>{names.length} {names.length === 1 ? "type" : "types"}</span>
-      </div>
+    <div aria-label="Craft resource inventory" className="editor-summary-content" role="group">
       {names.length === 0 ? (
         <p className="editor-resources-empty">No stored resources on this craft.</p>
       ) : (
@@ -109,11 +47,14 @@ function EditorSummaryContent({ snapshot }: { snapshot: TelemetrySnapshot }) {
           })}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
 export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
+  const names = Array.isArray(snapshot["editor.res.names"])
+    ? snapshot["editor.res.names"].filter((name): name is string => typeof name === "string")
+    : [];
   const available = snapshot["editor.summaryAvailable"];
   const {
     pending,
@@ -123,15 +64,15 @@ export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }
   const retainedSummary = retained && available === true;
 
   return (
-    <Panel id="editorSummary" title="Craft summary" tag="VAB · SPH · build totals">
+    <Panel id="editorSummary" title="Resource inventory" tag={`${names.length} ${names.length === 1 ? "type" : "types"} · vessel totals`}>
       {pending && !retainedSummary ? (
-        <p className="editor-summary-state wait">Recalculating craft totals…</p>
+        <p className="editor-summary-state wait">Recalculating resource totals…</p>
       ) : available === false ? (
         <p className="editor-summary-state bad">
           Updated StageStats service required · install the new DLL and restart KSP
         </p>
       ) : available !== true ? (
-        <p className="editor-summary-state">Awaiting editor craft summary…</p>
+        <p className="editor-summary-state">Awaiting editor resource inventory…</p>
       ) : (
         <>
           {retainedSummary && (
@@ -141,9 +82,9 @@ export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }
           )}
           <div
             aria-busy={pending}
-            className={`editor-summary-content${retainedSummary ? " editor-analysis-retained" : ""}`}
+            className={`editor-summary-content-shell${retainedSummary ? " editor-analysis-retained" : ""}`}
           >
-            <EditorSummaryContent snapshot={snapshot} />
+            <EditorSummaryContent names={names} snapshot={snapshot} />
           </div>
         </>
       )}

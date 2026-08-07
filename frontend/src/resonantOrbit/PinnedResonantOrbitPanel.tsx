@@ -6,6 +6,7 @@ import {
   formatDistance,
   formatDuration,
   type DistanceUnit,
+  type ResonantOrbitPlan,
 } from "./calculations";
 import { useResonantOrbitState } from "./state";
 
@@ -51,8 +52,54 @@ function OrbitTargetMetric({
   );
 }
 
+function EditorOrbitSchematic({ plan }: { plan: ResonantOrbitPlan }) {
+  const centerX = 110;
+  const centerY = 62;
+  const bodyRadius = plan.body.radius;
+  const targetRadius = bodyRadius + plan.targetAltitude;
+  const apoapsisRadius = bodyRadius + plan.carrierApoapsis;
+  const periapsisRadius = bodyRadius + plan.carrierPeriapsis;
+  const maximumRadius = Math.max(targetRadius, apoapsisRadius, periapsisRadius);
+  const scale = 61 / maximumRadius;
+  const finalOrbitRadius = targetRadius * scale;
+  const carrierSemiMajor = (apoapsisRadius + periapsisRadius) / 2 * scale;
+  const carrierEccentricity = Math.abs(apoapsisRadius - periapsisRadius) / (apoapsisRadius + periapsisRadius);
+  const carrierSemiMinor = carrierSemiMajor * Math.sqrt(Math.max(0, 1 - carrierEccentricity ** 2));
+  const carrierFocus = carrierSemiMajor * carrierEccentricity;
+  const bodyPixels = Math.max(8, bodyRadius * scale);
+  const satelliteRadius = plan.satelliteCount > 20 ? 1.1 : plan.satelliteCount > 10 ? 1.6 : 3;
+  const releaseAngle = plan.releaseAt === "periapsis" ? 0 : Math.PI;
+
+  return (
+    <svg aria-hidden="true" className="resonant-editor-orbit-graphic" viewBox="0 0 200 145">
+      <circle className="resonant-editor-orbit-grid" cx={centerX} cy={centerY} r="65" />
+      <circle className="resonant-editor-final-orbit" cx={centerX} cy={centerY} r={finalOrbitRadius} />
+      <ellipse
+        className="resonant-editor-carrier-orbit"
+        cx={centerX - carrierFocus}
+        cy={centerY}
+        rx={carrierSemiMajor}
+        ry={carrierSemiMinor}
+      />
+      <circle className="resonant-editor-body" cx={centerX} cy={centerY} r={bodyPixels} />
+      {Array.from({ length: plan.satelliteCount }, (_, index) => {
+        const angle = releaseAngle + index * Math.PI * 2 / plan.satelliteCount;
+        return (
+          <circle
+            className={index === 0 ? "resonant-editor-satellite release" : "resonant-editor-satellite"}
+            cx={centerX + Math.cos(angle) * finalOrbitRadius}
+            cy={centerY + Math.sin(angle) * finalOrbitRadius}
+            key={index}
+            r={index === 0 ? satelliteRadius + .5 : satelliteRadius}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 export function PinnedResonantOrbitPanel({ scene = "flight", snapshot }: { scene?: "flight" | "editor"; snapshot?: TelemetrySnapshot }) {
-  const { openDrawer, pinnedForTelemetry, setReleaseCount, unit, unpinPlan } = useResonantOrbitState();
+  const { loadPlan, openDrawer, pinnedForTelemetry, setReleaseCount, unit, unpinPlan } = useResonantOrbitState();
   const liveSnapshot = useLiveTelemetrySelector((state) => state.snapshot);
   const activeSnapshot = snapshot ?? liveSnapshot;
   const pinned = pinnedForTelemetry(activeSnapshot);
@@ -69,19 +116,69 @@ export function PinnedResonantOrbitPanel({ scene = "flight", snapshot }: { scene
     : plan.warnings.some((warning) => warning.level === "warning")
       ? "Review plan"
       : "Calculated profile nominal";
+  const planStatusTone = plan.warnings.some((warning) => warning.level === "danger")
+    ? "danger"
+    : plan.warnings.some((warning) => warning.level === "warning")
+      ? "warning"
+      : "nominal";
+  const resonanceRatio = plan.mode === "raise"
+    ? `${plan.satelliteCount + 1}:${plan.satelliteCount}`
+    : `${plan.satelliteCount - 1}:${plan.satelliteCount}`;
+  const planIssueLabels = plan.warnings.map((warning) => {
+    if (warning.code === "los") return "No continuous LOS";
+    if (warning.code === "impact") return "PE impact";
+    if (warning.code === "atmosphere") return "PE too low";
+    if (warning.code === "soi") return "AP too high";
+    return "Review details";
+  });
+  const editorPlanStatus = planStatusTone === "nominal"
+    ? "Profile nominal"
+    : `${planStatus} — ${planIssueLabels.join(" · ")}`;
+  const pinnedPlanId = pinned.id;
+
+  function editPinnedPlan() {
+    loadPlan(pinnedPlanId);
+    openDrawer();
+  }
 
   return (
     <Panel
       collapsible={scene === "flight"}
       compact={scene === "flight"}
-      headingActions={<button className="resonant-unpin" onClick={unpinPlan} type="button">Unpin</button>}
+      headingActions={scene === "editor" ? (
+        <>
+          <button className="resonant-edit-plan" onClick={editPinnedPlan} type="button">Edit plan</button>
+          <button className="resonant-unpin" onClick={unpinPlan} type="button">Unpin</button>
+        </>
+      ) : <button className="resonant-unpin" onClick={unpinPlan} type="button">Unpin</button>}
       id={scene === "flight" ? "flightOrbitPlan" : "editorOrbitPlan"}
-      tag={scene === "flight" ? planStatus : "Saved"}
-      title={pinned.name}
+      tag={scene === "flight" ? planStatus : undefined}
+      title={scene === "flight" ? pinned.name : "Resonant Orbit Plan"}
     >
-      <div className="resonant-flight-summary">
-        {scene === "flight" ? (
-          <>
+      {scene === "editor" ? (
+        <div className="resonant-editor-plan">
+          <div className="resonant-editor-constellation">
+            <EditorOrbitSchematic plan={plan} />
+            <div className="resonant-editor-satellite-count"><strong>{plan.satelliteCount}</strong><span>Satellites</span></div>
+          </div>
+          <div className="resonant-editor-plan-details">
+            <header><strong>{pinned.name}</strong><span>{plan.body.name}</span></header>
+            <div className="resonant-editor-plan-metrics carrier">
+              <div><span>Carrier Ap</span><strong>{formatDistance(plan.carrierApoapsis, unit)}</strong></div>
+              <div><span>Carrier Pe</span><strong>{formatDistance(plan.carrierPeriapsis, unit)}</strong></div>
+              <div><span>Resonance</span><strong>{resonanceRatio} {plan.mode}</strong></div>
+            </div>
+            <div className="resonant-editor-plan-metrics execution">
+              <div><span>Injection Δv</span><strong>{plan.injectionDeltaV.toFixed(2)} m/s</strong></div>
+              <div><span>Carrier period</span><strong>{formatDuration(plan.carrierPeriod)}</strong></div>
+              <div><span>Release at</span><strong>{plan.releaseAt === "apoapsis" ? "AP" : "PE"}</strong></div>
+            </div>
+            <footer className={`resonant-editor-plan-status ${planStatusTone}`}><i />{editorPlanStatus}</footer>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="resonant-flight-summary">
             <OrbitTargetMetric
               bodyRadius={plan.body.radius}
               currentAltitude={currentApoapsis}
@@ -96,17 +193,8 @@ export function PinnedResonantOrbitPanel({ scene = "flight", snapshot }: { scene
               targetAltitude={plan.carrierPeriapsis}
               unit={unit}
             />
-          </>
-        ) : (
-          <>
-            <div><span>Target Ap</span><strong>{formatDistance(plan.carrierApoapsis, unit)}</strong></div>
-            <div><span>Target Pe</span><strong>{formatDistance(plan.carrierPeriapsis, unit)}</strong></div>
-          </>
-        )}
-        <div><span>Injection Δv</span><strong>{plan.injectionDeltaV.toFixed(2)} m/s</strong></div>
-      </div>
-      {scene === "flight" ? (
-        <>
+            <div><span>Injection Δv</span><strong>{plan.injectionDeltaV.toFixed(2)} m/s</strong></div>
+          </div>
           <div className="resonant-flight-guidance">
             <span>01</span>
             <div>
@@ -123,17 +211,6 @@ export function PinnedResonantOrbitPanel({ scene = "flight", snapshot }: { scene
             </div>
           </div>
         </>
-      ) : (
-        <div className="resonant-flight-guidance resonant-editor-guidance">
-          <span>DESIGN</span>
-          <div>
-            <strong>{planStatus}</strong>
-            <p>{plan.satelliteCount} satellites at {formatDistance(plan.targetAltitude, unit)} final altitude. Carrier period {formatDuration(plan.carrierPeriod)}.</p>
-            <div className="resonant-deployment-actions">
-              <button onClick={openDrawer} type="button">Open planner</button>
-            </div>
-          </div>
-        </div>
       )}
     </Panel>
   );

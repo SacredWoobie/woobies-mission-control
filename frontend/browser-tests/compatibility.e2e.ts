@@ -50,15 +50,14 @@ test("dense Editor analysis uses the empty planning width and reveals the active
 
   const layout = await page.locator(".editor-workspace").evaluate((workspace) => {
     const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-    const primary = bounds(".editor-workspace-primary");
+    const workspaceBounds = workspace.getBoundingClientRect();
+    const content = bounds(".editor-workspace-content");
     const context = bounds("#editorContext");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
     const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
     const tableBounds = table.getBoundingClientRect();
     const activeBounds = workspace.querySelector<HTMLElement>('.stage-table.editor [aria-current="step"]')!.getBoundingClientRect();
-    const collapseBounds = workspace.querySelector<HTMLElement>("#editorContext .panel-collapse-button")!.getBoundingClientRect();
-    const chevronBounds = workspace.querySelector<HTMLElement>("#editorContext .panel-collapse-chevron")!.getBoundingClientRect();
     const ninthRow = table.querySelector<HTMLElement>('[role="row"][data-stage-ksp]')!.cloneNode(true) as HTMLElement;
     ninthRow.removeAttribute("aria-current");
     ninthRow.removeAttribute("aria-label");
@@ -68,17 +67,14 @@ test("dense Editor analysis uses the empty planning width and reveals the active
     return {
       activeFullyVisible: activeBounds.top >= tableBounds.top - 1
         && activeBounds.bottom <= tableBounds.bottom + 1,
-      chevronHeight: chevronBounds.height,
-      chevronWidth: chevronBounds.width,
-      collapseHeight: collapseBounds.height,
-      collapseWidth: collapseBounds.width,
-      contextMatchesPrimary: Math.abs(context.width - primary.width),
+      contextContentGap: content.top - context.bottom,
+      contextMatchesWorkspace: Math.abs(context.width - workspaceBounds.width),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
       ninthRowScrolls,
-      overflowingSummaryValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorSummary .editor-summary-value strong"))
+      overflowingHeaderValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorContext h1, #editorContext .editor-overview-metric strong, #editorContext .editor-overview-metric small"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       poweredRows: workspace.querySelectorAll('.stage-table.editor [role="row"][data-stage-ksp]').length,
       secondaryChildren: workspace.querySelector(".editor-workspace-secondary")!.children.length,
@@ -90,18 +86,15 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   });
 
   expect(layout.secondaryChildren).toBe(0);
-  expect(layout.contextMatchesPrimary).toBeLessThanOrEqual(1);
+  expect(layout.contextMatchesWorkspace).toBeLessThanOrEqual(1);
+  expect(layout.contextContentGap).toBeGreaterThanOrEqual(10);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
   expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
-  expect(layout.collapseWidth).toBeGreaterThanOrEqual(22);
-  expect(layout.collapseHeight).toBeGreaterThanOrEqual(22);
-  expect(layout.chevronWidth).toBeGreaterThan(0);
-  expect(layout.chevronHeight).toBeGreaterThan(0);
   expect(layout.poweredRows).toBe(8);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.ninthRowScrolls).toBe(true);
   expect(layout.activeFullyVisible).toBe(true);
-  expect(layout.overflowingSummaryValues).toBe(0);
+  expect(layout.overflowingHeaderValues).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 });
@@ -125,6 +118,17 @@ test("Editor planning companions preserve the dense workspace alone and together
   await expect(workspace).toHaveClass(/has-planning-companion/);
   await expect(page.locator("#editorOrbitPlan")).toBeVisible();
   await expect(page.locator("#editorDeltaVPlan")).toHaveCount(0);
+  await expect(page.locator("#editorOrbitPlan > h2 .panel-title")).toHaveText("Resonant Orbit Plan");
+  await expect(page.locator("#editorOrbitPlan .resonant-editor-plan-details > header > strong")).toHaveText("Editor orbit review");
+  await expect(page.locator("#editorOrbitPlan .resonant-editor-plan-details > header > span")).toHaveText("Kerbin");
+  await expect(page.locator("#editorOrbitPlan .resonant-editor-satellite")).toHaveCount(3);
+  await expect(page.locator("#editorOrbitPlan .resonant-editor-plan-status")).toContainText("No continuous LOS");
+  await expect(page.getByRole("button", { name: "Open planner" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Edit plan" }).click();
+  await expect(page.getByRole("dialog", { name: "Resonant orbit planner" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Plan name" })).toHaveValue("Editor orbit review");
+  await page.getByRole("button", { name: "Close resonant orbit planner" }).click();
 
   const orbitOnly = await workspace.evaluate((element) => {
     const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
@@ -135,12 +139,14 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
-      orbitContextTopDifference: Math.abs(orbit.top - context.top),
+      orbitContextGap: orbit.top - context.bottom,
+      orbitHeight: orbit.height,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
     };
   });
   expect(orbitOnly.secondaryChildren).toBe(1);
-  expect(orbitOnly.orbitContextTopDifference).toBeLessThanOrEqual(1);
+  expect(orbitOnly.orbitContextGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.orbitHeight).toBeLessThanOrEqual(220);
   expect(orbitOnly.documentScrollWidth).toBeLessThanOrEqual(orbitOnly.documentClientWidth);
   expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight);
 
@@ -156,28 +162,64 @@ test("Editor planning companions preserve the dense workspace alone and together
 
   await expect(page.locator("#editorOrbitPlan")).toBeVisible();
   await expect(page.locator("#editorDeltaVPlan")).toBeVisible();
+  const missionPlan = page.locator("#editorDeltaVPlan");
+  await expect(missionPlan.getByText("Editor layout review", { exact: true })).toBeVisible();
+  await expect(missionPlan.getByText("Kerbin → Duna", { exact: true })).toBeVisible();
+  await expect(missionPlan.getByText("Mission budget", { exact: true })).toBeVisible();
+  await expect(missionPlan.getByText(/Craft coverage/)).toBeVisible();
+  await expect(missionPlan.locator(".delta-v-editor-coverage footer")).toContainText("reserve");
+  await expect(missionPlan.locator(".delta-v-editor-route-heading")).toContainText("4 steps");
+  await expect(missionPlan.getByText("Assisted", { exact: true })).toBeVisible();
+  await expect(missionPlan.getByText("READ ONLY", { exact: true })).toHaveCount(0);
+
+  await missionPlan.getByRole("button", { name: "Edit plan" }).click();
+  await expect(page.getByRole("dialog", { name: "Delta-v planner" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Delta-v plan name" })).toHaveValue("Editor layout review");
+  await page.getByRole("button", { name: "Close delta-v planner" }).click();
 
   const layout = await workspace.evaluate((element) => {
     const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-    const primary = bounds(".editor-workspace-primary");
+    const workspaceBounds = element.getBoundingClientRect();
+    const content = bounds(".editor-workspace-content");
     const context = bounds("#editorContext");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
     const orbit = bounds("#editorOrbitPlan");
     const deltaV = bounds("#editorDeltaVPlan");
+    const orbitHeader = element.querySelector<HTMLElement>("#editorOrbitPlan > h2")!.getBoundingClientRect();
+    const deltaVHeader = element.querySelector<HTMLElement>("#editorDeltaVPlan > h2")!.getBoundingClientRect();
+    const orbitEdit = element.querySelector<HTMLElement>("#editorOrbitPlan .resonant-edit-plan")!.getBoundingClientRect();
+    const orbitUnpin = element.querySelector<HTMLElement>("#editorOrbitPlan .resonant-unpin")!.getBoundingClientRect();
+    const deltaVEdit = element.querySelector<HTMLElement>("#editorDeltaVPlan .resonant-edit-plan")!.getBoundingClientRect();
+    const deltaVUnpin = element.querySelector<HTMLElement>("#editorDeltaVPlan .resonant-unpin")!.getBoundingClientRect();
     const table = element.querySelector<HTMLElement>(".stage-table.editor")!;
     return {
       companionGap: deltaV.top - orbit.bottom,
-      contextMatchesPrimary: Math.abs(context.width - primary.width),
+      conditionNumberAppearances: Array.from(element.querySelectorAll<HTMLElement>('.editor-sim-control input[type="number"]'))
+        .map((input) => getComputedStyle(input).appearance),
+      contextContentGap: content.top - context.bottom,
+      contextMatchesWorkspace: Math.abs(context.width - workspaceBounds.width),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      deltaVHeaderHeight: deltaVHeader.height,
+      deltaVEditHeight: deltaVEdit.height,
+      deltaVHeight: deltaV.height,
+      deltaVUnpinHeight: deltaVUnpin.height,
+      coverageFooterFontSize: Number.parseFloat(getComputedStyle(element.querySelector<HTMLElement>("#editorDeltaVPlan .delta-v-editor-coverage footer")!).fontSize),
+      overflowingMissionValues: Array.from(element.querySelectorAll<HTMLElement>("#editorDeltaVPlan strong, #editorDeltaVPlan .delta-v-pinned-step-copy"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
-      overflowingSummaryValues: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-summary-value strong"))
+      overflowingHeaderValues: Array.from(element.querySelectorAll<HTMLElement>("#editorContext h1, #editorContext .editor-overview-metric strong, #editorContext .editor-overview-metric small"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
-      orbitContextTopDifference: Math.abs(orbit.top - context.top),
+      overflowingOrbitValues: Array.from(element.querySelectorAll<HTMLElement>("#editorOrbitPlan .resonant-editor-plan-details strong, #editorOrbitPlan .resonant-editor-plan-details > header > span"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      orbitContextGap: orbit.top - context.bottom,
+      orbitEditHeight: orbitEdit.height,
+      orbitHeaderHeight: orbitHeader.height,
+      orbitUnpinHeight: orbitUnpin.height,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
       stageSummaryGap: summary.left - stage.right,
       stageSummaryTopDifference: Math.abs(stage.top - summary.top),
@@ -188,12 +230,24 @@ test("Editor planning companions preserve the dense workspace alone and together
 
   expect(layout.secondaryChildren).toBe(2);
   expect(layout.companionGap).toBeGreaterThanOrEqual(10);
-  expect(layout.contextMatchesPrimary).toBeLessThanOrEqual(1);
-  expect(layout.orbitContextTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.orbitHeaderHeight).toBeLessThanOrEqual(30);
+  expect(layout.deltaVHeaderHeight).toBeLessThanOrEqual(30);
+  expect(layout.orbitEditHeight).toBeLessThanOrEqual(24);
+  expect(layout.orbitUnpinHeight).toBeLessThanOrEqual(24);
+  expect(layout.deltaVEditHeight).toBeLessThanOrEqual(24);
+  expect(layout.deltaVUnpinHeight).toBeLessThanOrEqual(24);
+  expect(layout.deltaVHeight).toBeLessThanOrEqual(360);
+  expect(layout.coverageFooterFontSize).toBeGreaterThanOrEqual(10);
+  expect(layout.conditionNumberAppearances).toEqual(["textfield", "textfield"]);
+  expect(layout.contextMatchesWorkspace).toBeLessThanOrEqual(1);
+  expect(layout.contextContentGap).toBeGreaterThanOrEqual(10);
+  expect(layout.orbitContextGap).toBeGreaterThanOrEqual(10);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
   expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
-  expect(layout.overflowingSummaryValues).toBe(0);
+  expect(layout.overflowingHeaderValues).toBe(0);
+  expect(layout.overflowingMissionValues).toBe(0);
+  expect(layout.overflowingOrbitValues).toBe(0);
   expect(layout.overflowingResourceNames).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
@@ -223,6 +277,8 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      overflowingOrbitValues: Array.from(element.querySelectorAll<HTMLElement>("#editorOrbitPlan .resonant-editor-plan-details strong, #editorOrbitPlan .resonant-editor-plan-details > header > span"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
@@ -233,6 +289,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(medium.activeFullyVisible).toBe(true);
   expect(medium.columnGap).toBeGreaterThanOrEqual(10);
   expect(medium.companionGap).toBeGreaterThanOrEqual(6);
+  expect(medium.overflowingOrbitValues).toBe(0);
   expect(medium.topDifference).toBeLessThanOrEqual(1);
   expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
   expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);

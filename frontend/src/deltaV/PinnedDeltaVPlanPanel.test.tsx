@@ -136,13 +136,56 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByLabelText("Mission plan steps").children).toHaveLength(5);
     expect(screen.getByText("Atmospheric entry", { exact: true })).toBeTruthy();
     expect(screen.getAllByText("6,095 m/s", { exact: true })).toHaveLength(1);
-    expect(screen.getByText("595 m/s", { exact: true })).toBeTruthy();
-    expect(screen.getByRole("alert").textContent).toContain("Craft does not cover this plan");
+    expect(screen.getByText("595 m/s needed · 9.8% short", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("SHORTFALL");
+    expect(screen.getByRole("alert").textContent).toContain("595 m/s needed");
+    expect(screen.getByRole("button", { name: "Edit plan" })).toBeTruthy();
+    expect(screen.queryByText("READ ONLY", { exact: true })).toBeNull();
+    expect(screen.getByText("No burn", { exact: true })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Mark .* complete/ })).toBeNull();
     expect(document.body.textContent).toContain("Kerbin \u2192 Duna");
+    expect(screen.getByText(/Mission route/).textContent).toContain("5 steps");
     expect(screen.getByLabelText("Mission delta-v overview").children).toHaveLength(2);
-    expect(document.body.textContent).toContain("VAC \u0394v");
+    expect(document.body.textContent).toContain("Craft VAC \u0394v");
     expect(document.body.textContent).not.toMatch(/[ÃÂâ]/);
+  });
+
+  it("summarizes long editor routes until the operator expands the scrollable rail", () => {
+    seedPinnedPlan(false);
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
+    library.plans[0].plan.legs = Array.from({ length: 9 }, (_, index) => ({
+      ...plan.legs[index % plan.legs.length],
+      id: `long-route-${index + 1}`,
+      label: `Mission step ${index + 1}`,
+    }));
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
+
+    renderPanel("editor");
+
+    expect(screen.getByLabelText("Mission plan steps").querySelectorAll('[role="listitem"]')).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: /4 intermediate steps/ }));
+    expect(screen.getByLabelText("Mission plan steps").querySelectorAll('[role="listitem"]')).toHaveLength(9);
+    expect(screen.getByLabelText("Mission plan steps").classList.contains("expanded")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse route" }));
+    expect(screen.getByLabelText("Mission plan steps").querySelectorAll('[role="listitem"]')).toHaveLength(5);
+  });
+
+  it("labels returning multi-stop plans as round trips instead of identical endpoints", () => {
+    seedPinnedPlan(false);
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
+    library.plans[0].plan.destination = kerbin;
+    library.plans[0].draft.stops = [
+      { ...library.plans[0].draft.nextStop, id: "segment-1", bodyName: "Duna" },
+      { ...library.plans[0].draft.nextStop, id: "segment-2", bodyName: "Kerbin" },
+    ];
+    library.plans[0].draft.nextStop.bodyName = "";
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
+
+    renderPanel("editor");
+
+    expect(screen.getByText("Kerbin round trip · 2 stops", { exact: true }).getAttribute("title")).toBe("Kerbin → Duna → Kerbin");
+    expect(screen.queryByText("Kerbin → Kerbin", { exact: true })).toBeNull();
   });
 
   it("shows flight burn dates and countdowns, then persists completed steps", async () => {

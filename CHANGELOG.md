@@ -17,6 +17,17 @@ All notable public changes will be recorded here.
   Resonant Orbit and Delta-V plans can be pinned safely during layout testing.
 - Aligned the Resonant Orbit planner with the selected dashboard telemetry so
   fixture and live Editor sessions use the same save context when pinning plans.
+- Redesigned the pinned Editor Resonant Orbit plan as a compact constellation
+  and carrier-orbit card, with the saved plan name and key maneuver facts in the
+  body plus an `EDIT PLAN` header action that restores that exact plan.
+- Redesigned the pinned Editor Mission Plan as a compact budget-versus-craft
+  briefing and connected route rail, with explicit reserve or shortfall,
+  larger coverage detail, assisted zero-burn steps, round-trip-aware route
+  summaries, exact-plan editing, and bounded expansion for long routes.
+- Consolidated Editor craft identity, wet mass, cost, and simulation conditions
+  into one full-width header, removed the redundant Editor Link strip, and
+  refocused Craft Summary as a dedicated resource inventory. Altitude and Mach
+  remain directly editable without native increment/decrement controls.
 - Reused that dense ten-stage mock craft in Editor so the same staged vehicle
   can be inspected across Flight and VAB layout states.
 - Reclaimed the empty Editor planning column for a full-width craft-analysis

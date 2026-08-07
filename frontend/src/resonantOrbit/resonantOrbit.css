@@ -511,6 +511,38 @@
 .panel-restore-rail .panel-rail-button-flightOrbitPlan { margin-top: 4px; border-color: #74552d; color: var(--amber); background: #211a12; }
 .panel-restore-rail .panel-rail-button-flightDeltaVPlan, .panel-restore-rail .panel-rail-button-editorDeltaVPlan { margin-top: 4px; border-color: #315166; color: var(--cyan); background: #101c27; }
 .resonant-unpin { padding: 3px 6px; border: 1px solid #74552d; color: var(--amber); background: #1d1710; cursor: pointer; font-size: 9px; text-transform: uppercase; }
+.resonant-edit-plan { padding: 3px 7px; border: 1px solid #315166; color: var(--cyan); background: #0b1821; cursor: pointer; font-size: 9px; text-transform: uppercase; }
+.resonant-editor-plan { display: grid; grid-template-columns: minmax(174px,.85fr) minmax(0,1.55fr); gap: 7px; }
+.resonant-editor-constellation, .resonant-editor-plan-details { min-width: 0; border: 1px solid var(--rule); background: #090f17; }
+.resonant-editor-constellation { position: relative; min-height: 164px; padding: 4px; }
+.resonant-editor-orbit-graphic { display: block; width: 100%; height: 100%; min-height: 154px; overflow: visible; }
+.resonant-editor-orbit-grid { fill: none; stroke: rgba(78,201,224,.08); stroke-width: 1; }
+.resonant-editor-final-orbit { fill: none; stroke: var(--cyan); stroke-width: 1.4; }
+.resonant-editor-carrier-orbit { fill: none; stroke: var(--amber); stroke-width: 1.4; stroke-dasharray: 5 3; }
+.resonant-editor-body { fill: #18313b; stroke: #426a78; stroke-width: 1; }
+.resonant-editor-satellite { fill: var(--cyan); stroke: #08111a; stroke-width: .7; }
+.resonant-editor-satellite.release { fill: var(--green); }
+.resonant-editor-satellite-count { position: absolute; left: 9px; bottom: 8px; display: flex; align-items: baseline; gap: 7px; }
+.resonant-editor-satellite-count strong { color: var(--cyan); font-size: 23px; line-height: 1; }
+.resonant-editor-satellite-count span { color: #d7e2ee; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.resonant-editor-plan-details { display: flex; flex-direction: column; }
+.resonant-editor-plan-details > header { display: flex; min-width: 0; padding: 7px 8px; align-items: baseline; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--rule); }
+.resonant-editor-plan-details > header strong { display: block; overflow: hidden; color: var(--amber); font-size: 12px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.resonant-editor-plan-details > header span { flex: 0 0 auto; color: var(--green); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.resonant-editor-plan-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.resonant-editor-plan-metrics + .resonant-editor-plan-metrics { border-top: 1px solid var(--rule); }
+.resonant-editor-plan-metrics > div { min-width: 0; min-height: 49px; padding: 7px 8px; border-right: 1px solid var(--rule); }
+.resonant-editor-plan-metrics > div:last-child { border-right: 0; }
+.resonant-editor-plan-metrics span, .resonant-editor-plan-metrics strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resonant-editor-plan-metrics span { margin-bottom: 5px; color: var(--slate); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+.resonant-editor-plan-metrics strong { color: var(--cyan); font-size: 11px; }
+.resonant-editor-plan-metrics.carrier > div:last-child strong, .resonant-editor-plan-metrics.execution > div:first-child strong { color: var(--amber); }
+.resonant-editor-plan-status { display: flex; min-height: 27px; margin-top: auto; padding: 6px 8px; align-items: center; gap: 7px; border-top: 1px solid var(--rule); color: var(--slate); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.resonant-editor-plan-status i { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px rgba(126,231,135,.35); }
+.resonant-editor-plan-status.warning { color: var(--amber); }
+.resonant-editor-plan-status.warning i { background: var(--amber); box-shadow: 0 0 6px rgba(255,180,84,.35); }
+.resonant-editor-plan-status.danger { color: #ff9b90; }
+.resonant-editor-plan-status.danger i { background: #ff6b5b; box-shadow: 0 0 6px rgba(255,107,91,.35); }
 .resonant-flight-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .resonant-flight-summary > div { min-width: 0; padding: 8px; border: 1px solid var(--rule); background: #090f17; }
 .resonant-flight-summary span { display: block; margin-bottom: 5px; color: var(--slate); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
@@ -541,6 +573,9 @@
 .delta-v-pinned-identity { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
 .delta-v-pinned-identity strong { overflow: hidden; color: #d7e2ee; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .delta-v-pinned-identity span { flex: 0 1 auto; color: var(--slate); font-size: 9px; text-align: right; }
+.delta-v-pinned-identity.editor { min-height: 29px; margin-bottom: 7px; padding: 6px 8px; border: 1px solid var(--rule); background: #090f17; }
+.delta-v-pinned-identity.editor strong { color: var(--amber); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-pinned-identity.editor span { flex: 0 0 auto; color: var(--green); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .delta-v-pinned-scope { margin: -2px 0 7px; color: var(--cyan); font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
 .delta-v-pinned-scope.legacy { color: var(--amber); }
 .delta-v-pinned-scope-warning { margin: 0 0 7px; padding: 6px 8px; border: 1px solid rgba(255,180,84,.45); color: #f0c987; background: rgba(255,180,84,.06); font-size: 8px; line-height: 1.35; }
@@ -549,6 +584,32 @@
 .delta-v-pinned-facts > div { min-width: 0; padding: 6px 7px; border: 1px solid var(--rule); background: #090f17; }
 .delta-v-pinned-facts span, .delta-v-pinned-window span { display: block; margin-bottom: 3px; color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-facts strong { display: block; color: var(--cyan); font-size: 10px; overflow-wrap: anywhere; }
+.delta-v-editor-briefing { display: grid; grid-template-columns: minmax(0,.98fr) minmax(0,1.02fr); gap: 7px; }
+.delta-v-editor-budget, .delta-v-editor-coverage { min-width: 0; min-height: 99px; border: 1px solid var(--rule); background: #090f17; }
+.delta-v-editor-budget > header, .delta-v-editor-coverage > header { display: flex; min-height: 32px; padding: 6px 8px; align-items: baseline; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--rule); }
+.delta-v-editor-budget > header span, .delta-v-editor-coverage > header span { overflow: hidden; color: var(--slate); font-size: 9px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.delta-v-editor-budget > header strong { color: var(--amber); font-size: 15px; white-space: nowrap; }
+.delta-v-editor-budget-breakdown { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.delta-v-editor-budget-breakdown > div { min-width: 0; min-height: 53px; padding: 7px 8px; border-right: 1px solid var(--rule); }
+.delta-v-editor-budget-breakdown > div:last-child { border-right: 0; }
+.delta-v-editor-budget-breakdown span, .delta-v-editor-budget-breakdown strong, .delta-v-editor-budget-breakdown small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delta-v-editor-budget-breakdown span { margin-bottom: 5px; color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-editor-budget-breakdown strong { color: var(--cyan); font-size: 12px; }
+.delta-v-editor-budget-breakdown small { margin-top: 3px; color: var(--slate); font-size: 11px; }
+.delta-v-editor-coverage { display: flex; flex-direction: column; border-color: rgba(78,201,224,.32); }
+.delta-v-editor-coverage > header strong { color: var(--cyan); font-size: 9px; letter-spacing: .06em; }
+.delta-v-editor-coverage > div { display: flex; min-width: 0; padding: 8px; align-items: baseline; justify-content: space-between; gap: 8px; }
+.delta-v-editor-coverage > div strong { overflow: hidden; color: var(--cyan); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.delta-v-editor-coverage > div span { flex: 0 0 auto; color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+.delta-v-editor-coverage > footer { min-height: 26px; margin-top: auto; padding: 6px 8px; border-top: 1px solid var(--rule); color: var(--cyan); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-editor-coverage.surplus { border-color: rgba(126,231,135,.38); background: rgba(126,231,135,.045); }
+.delta-v-editor-coverage.surplus > header strong, .delta-v-editor-coverage.surplus > footer { color: var(--green); }
+.delta-v-editor-coverage.tight { border-color: rgba(255,180,84,.48); background: rgba(255,180,84,.06); }
+.delta-v-editor-coverage.tight > header strong, .delta-v-editor-coverage.tight > footer { color: var(--amber); }
+.delta-v-editor-coverage.shortfall { border-color: rgba(255,107,91,.58); background: rgba(255,107,91,.07); }
+.delta-v-editor-coverage.shortfall > header strong, .delta-v-editor-coverage.shortfall > footer { color: #ff9b8f; }
+.delta-v-editor-coverage.unavailable { border-color: rgba(255,180,84,.38); }
+.delta-v-editor-coverage.unavailable > header strong, .delta-v-editor-coverage.unavailable > footer { color: var(--amber); }
 .delta-v-pinned-progress { display: flex; min-width: 0; margin-top: 7px; padding: 6px 8px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--rule); background: #090f17; }
 .delta-v-pinned-progress > span { color: var(--slate); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-progress strong { color: #d7e2ee; font-size: 9px; white-space: nowrap; }
@@ -623,10 +684,26 @@
 .delta-v-pinned-route-toggle > span { color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
 .delta-v-pinned-route-toggle > button { min-height: 26px; padding: 4px 8px; border: 1px solid #315166; color: var(--cyan); background: #0a131d; cursor: pointer; font: 8px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-route-toggle > button:hover, .delta-v-pinned-route-toggle > button:focus-visible { border-color: var(--cyan); background: rgba(78,201,224,.08); }
+.delta-v-editor-route-heading { display: flex; min-height: 26px; margin-top: 7px; padding: 5px 7px; align-items: center; gap: 8px; border: 1px solid var(--rule); background: rgba(9,15,23,.65); }
+.delta-v-editor-route-heading > span { min-width: 0; overflow: hidden; color: var(--slate); font-size: 9px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.delta-v-editor-route-heading > span b { color: #d7e2ee; font-weight: 600; }
+.delta-v-editor-route-heading > strong { margin-left: auto; color: var(--cyan); font-size: 11px; white-space: nowrap; }
+.delta-v-editor-route-heading > button { min-height: 22px; padding: 2px 6px; border: 1px solid #315166; color: var(--cyan); background: #0a131d; cursor: pointer; font: 8px var(--mono); text-transform: uppercase; }
 .delta-v-pinned-route { display: grid; gap: 3px; margin-top: 7px; }
 .delta-v-pinned-route > div { display: grid; min-width: 0; gap: 6px; padding: 5px 6px; align-items: center; border: 1px solid var(--rule); background: rgba(9,15,23,.8); }
 .delta-v-pinned-route.flight > div { grid-template-columns: 28px 21px minmax(0,1fr) auto; }
 .delta-v-pinned-route.editor > div { grid-template-columns: 21px minmax(0,1fr) auto; }
+.delta-v-pinned-route.editor { gap: 0; margin-top: 3px; border: 1px solid var(--rule); background: rgba(9,15,23,.8); }
+.delta-v-pinned-route.editor.expanded { max-height: 204px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.delta-v-pinned-route.editor > div { min-height: 31px; padding: 5px 7px; grid-template-columns: 25px minmax(0,1fr) auto; border: 0; border-bottom: 1px solid var(--rule); background: transparent; }
+.delta-v-pinned-route.editor > div:last-child { border-bottom: 0; }
+.delta-v-pinned-route.editor .delta-v-pinned-step-number { position: relative; z-index: 0; display: grid; width: 19px; height: 19px; place-items: center; border: 1px solid #315166; border-radius: 50%; color: var(--cyan); background: #0a131d; }
+.delta-v-pinned-route.editor > div:not(:last-child) .delta-v-pinned-step-number::after { position: absolute; top: 18px; left: 8px; z-index: -1; width: 1px; height: 13px; background: #315166; content: ""; }
+.delta-v-pinned-route.editor .delta-v-pinned-step-copy > strong { font-size: 11px; }
+.delta-v-pinned-route.editor > div > b { font-size: 11px; }
+.delta-v-pinned-route.editor > div > b.assisted { padding: 2px 5px; border: 1px solid rgba(255,180,84,.42); color: var(--amber); background: rgba(255,180,84,.06); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-editor-route-omitted { display: flex; min-height: 29px; padding: 5px 8px 5px 33px; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: rgba(78,201,224,.035); cursor: pointer; font: 8px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-editor-route-omitted span { color: var(--cyan); }
 .delta-v-pinned-check { display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid #315166; color: transparent; background: #0a131d; cursor: pointer; }
 .delta-v-pinned-check:hover, .delta-v-pinned-check:focus-visible { border-color: var(--green); color: var(--green); background: rgba(126,231,135,.07); }
 .delta-v-pinned-check span { color: inherit !important; font-size: 11px !important; }
@@ -1236,6 +1313,16 @@
   }
 }
 
+/* Editor planning companions use the same compact rail contract as the rest of
+   the dense Editor workspace while retaining larger coarse-pointer targets. */
+.editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 { min-height: 28px; padding: 3px 8px; gap: 8px; font-size: 10px; }
+.editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 :is(.resonant-edit-plan,.resonant-unpin) { height: 22px; min-height: 22px; padding: 2px 6px; font-size: 8px; }
+
+@media (pointer: coarse) {
+  .editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 { min-height: 44px; padding-block: 4px; }
+  .editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 :is(.resonant-edit-plan,.resonant-unpin) { height: 36px; min-height: 36px; }
+}
+
 .resonant-drawer input[type="number"] {
   appearance: textfield;
   -moz-appearance: textfield;
@@ -1288,6 +1375,21 @@
 
 @container (max-width: 360px) {
   .delta-v-pinned-overview { grid-template-columns: minmax(0,1fr); }
+  .delta-v-editor-briefing { grid-template-columns: minmax(0,1fr); }
+  .resonant-editor-plan { grid-template-columns: minmax(0,1fr); }
+  .resonant-editor-constellation { min-height: 132px; }
+  .resonant-editor-orbit-graphic { height: 122px; min-height: 122px; }
+}
+
+@container (min-width: 361px) and (max-width: 480px) {
+  .resonant-editor-plan { grid-template-columns: minmax(104px,.55fr) minmax(0,1.45fr); gap: 5px; }
+  .resonant-editor-constellation { min-height: 154px; padding-inline: 4px; }
+  .resonant-editor-orbit-graphic { height: 144px; min-height: 144px; }
+  .resonant-editor-satellite-count strong { font-size: 19px; }
+  .resonant-editor-satellite-count span { font-size: 8px; }
+  .resonant-editor-plan-details > header, .resonant-editor-plan-metrics > div { padding-inline: 6px; }
+  .resonant-editor-plan-metrics span { font-size: 8px; letter-spacing: .02em; }
+  .resonant-editor-plan-metrics strong { font-size: 9px; }
 }
 
 @media (orientation: landscape) and (max-height: 700px) {
