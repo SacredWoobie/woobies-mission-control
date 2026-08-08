@@ -68,11 +68,14 @@ density.
 - Do not mechanically collapse near colors, replace all raw literals, or remove
   `!important`. Each can encode state, cascade, opacity, or instrument geometry;
   change it only with selector-level evidence and rendered review.
-- `pnpm test:css` is the executable contract. It rejects undefined custom
-  properties, direct reuse of migrated literals, undersized pixel text,
-  low-contrast `--slate-dim` text, and regressions in selected semantic-token
-  contrast pairs. Expand it incrementally when a new role is fully migrated;
-  do not turn current literal counts into a brittle pass/fail target.
+- `pnpm test:css` is the executable lexical contract. Across the two app
+  stylesheets it rejects references whose property name has no declaration or
+  runtime allowlist entry, direct reuse of migrated literals, direct and
+  `clamp()` pixel minima below 8 px, `--slate-dim` text declarations, and
+  regressions in selected opaque semantic-token contrast pairs. It does not
+  prove selector scope, inheritance, computed styles, alpha/gradient contrast,
+  or semantic correctness. Expand it incrementally when a new role is fully
+  migrated; do not turn current literal counts into a brittle pass/fail target.
 
 ### Layout and responsive behavior
 

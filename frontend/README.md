@@ -76,14 +76,17 @@ pnpm test:browser
 ```
 
 The CSS contract reads both production stylesheets without network access. It
-checks custom-property declarations and references, prevents migrated palette
-values from drifting back into raw literals, enforces the 8 px operational text
-floor, keeps the low-contrast `--slate-dim` role out of text colors, and checks
-selected semantic text tokens against the panel background. When adding a
-shared token, audit the exact literal across both stylesheets and add it to the
-contract only after every compatible use is migrated. Keep local gradients,
-alpha overlays, shadows, SVG/instrument colors, and data-visualization endpoints
-local when they do not share one honest role.
+lexically checks property names against declarations/runtime entries, prevents
+migrated palette values from drifting back into raw literals, enforces direct
+and `clamp()` pixel minima at the 8 px operational text floor, keeps the
+low-contrast `--slate-dim` role out of text declarations, and checks selected
+opaque semantic text tokens against the panel background. It cannot prove
+selector scope, inheritance, computed styles, alpha/gradient contrast, or
+semantic correctness, so rendered review remains required. When adding a shared
+token, audit the exact literal across both stylesheets and add it to the contract
+only after every compatible use is migrated. Keep local gradients, alpha
+overlays, shadows, SVG/instrument colors, and data-visualization endpoints local
+when they do not share one honest role.
 
 The repository wrapper also audits the production result for development-only
 UI:
