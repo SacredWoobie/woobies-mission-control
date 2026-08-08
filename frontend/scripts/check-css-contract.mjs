@@ -18,17 +18,31 @@ const runtimeCustomProperties = new Set([
 // Literal enforcement is deliberately incremental. Add a token here only
 // after every ordinary use of its exact color has migrated to var(...).
 const canonicalLiteralTokens = new Set([
+  "--accent-border",
+  "--accent-border-hover",
+  "--amber-accent",
+  "--control-surface",
+  "--control-surface-hover",
   "--danger",
+  "--error-text",
+  "--error-text-muted",
+  "--instrument-surface",
+  "--success-border",
+  "--text-primary",
+  "--text-value",
 ]);
 
 const contrastContracts = [
   { foreground: "--slate-muted-text", background: "--panel", minimum: 4.5 },
   { foreground: "--slate", background: "--panel", minimum: 4.5 },
   { foreground: "--text-primary", background: "--panel", minimum: 4.5 },
+  { foreground: "--text-value", background: "--panel", minimum: 4.5 },
   { foreground: "--cyan", background: "--panel", minimum: 4.5 },
   { foreground: "--amber", background: "--panel", minimum: 4.5 },
   { foreground: "--warn", background: "--panel", minimum: 4.5 },
   { foreground: "--danger", background: "--panel", minimum: 4.5 },
+  { foreground: "--error-text", background: "--panel", minimum: 4.5 },
+  { foreground: "--error-text-muted", background: "--panel", minimum: 4.5 },
 ];
 
 export function maskCommentsAndStrings(source) {
