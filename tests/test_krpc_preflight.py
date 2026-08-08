@@ -164,9 +164,17 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             self.assertEqual(inventory["status"], "issues")
             self.assertEqual(len(inventory["embedded_packages"]), 1)
             package = inventory["embedded_packages"][0]
-            self.assertEqual(package["root"], release_root)
-            self.assertEqual(package["release_root"], release_root)
-            self.assertEqual(package["dlls"], [packaged])
+            # Hosted Windows runners may expose the temporary directory through
+            # its 8.3 alias while Path.resolve() returns the long form.
+            self.assertEqual(package["root"].resolve(), release_root.resolve())
+            self.assertEqual(
+                package["release_root"].resolve(),
+                release_root.resolve(),
+            )
+            self.assertEqual(
+                [path.resolve() for path in package["dlls"]],
+                [packaged.resolve()],
+            )
 
             recommendations = app.installation_recommendations(
                 app.ksp_installation_inventory(root),
