@@ -3713,7 +3713,35 @@ def _gather_overview_fleet(sc):
     }
 
 
-def _gather_overview_contracts(sc):
+def _overview_contract_deadline(contract, mission_overview=None):
+    if mission_overview is not None:
+        schema = _overview_value(
+            mission_overview, "contract_deadline_schema"
+        )
+        if (
+            isinstance(schema, int)
+            and not isinstance(schema, bool)
+            and schema >= 1
+        ):
+            try:
+                deadline = _overview_finite_float(
+                    mission_overview.contract_deadline(contract)
+                )
+                if deadline is not None and deadline > 0:
+                    return deadline
+            except Exception:
+                pass
+
+    for attribute in ("date_deadline", "deadline"):
+        deadline = _overview_finite_float(
+            _overview_value(contract, attribute)
+        )
+        if deadline is not None and deadline > 0:
+            return deadline
+    return None
+
+
+def _gather_overview_contracts(sc, mission_overview=None):
     manager = _overview_value(sc, "contract_manager")
     if manager is None:
         return {
@@ -3731,13 +3759,7 @@ def _gather_overview_contracts(sc):
     }
     active_rows = []
     for contract in groups["active"]:
-        deadline = _overview_finite_float(
-            _overview_value(contract, "date_deadline")
-        )
-        if deadline is None:
-            deadline = _overview_finite_float(
-                _overview_value(contract, "deadline")
-            )
+        deadline = _overview_contract_deadline(contract, mission_overview)
         row = {
             "title": (
                 _overview_contract_text(contract, "title", 512) or
@@ -3939,6 +3961,7 @@ def _gather_overview_telemetry(conn, scene, now=None):
     }
     try:
         sc = conn.space_center
+        mission_overview = _overview_value(conn, "mission_overview")
         current_ut = sc.ut
         data["t.universalTime"] = current_ut
         if _overview_last_ut is not None and current_ut < _overview_last_ut:
@@ -3962,7 +3985,7 @@ def _gather_overview_telemetry(conn, scene, now=None):
         ("fleet", fleet_interval,
          lambda: _gather_overview_fleet(sc)),
         ("contracts", OVERVIEW_CONTRACTS_POLL_SECONDS,
-         lambda: _gather_overview_contracts(sc)),
+         lambda: _gather_overview_contracts(sc, mission_overview)),
         ("roster", OVERVIEW_ROSTER_POLL_SECONDS,
          lambda: _gather_overview_roster(conn)),
     )

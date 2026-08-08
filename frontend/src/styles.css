@@ -804,13 +804,10 @@ button { font: inherit; }
 .overview-contract-focus-list .overview-contract-title strong { display: -webkit-box; overflow: hidden; line-height: 1.45; text-overflow: clip; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .overview-contract-focus-list .overview-contract-time { align-items: flex-start; grid-column: 2; text-align: left; }
 .overview-contract-focus-reader { display: grid; min-width: 0; min-height: 0; overflow: hidden; grid-template-rows: auto minmax(0,1fr); background: rgba(2,7,11,.3); }
-.overview-contract-focus-head { display: grid; min-width: 0; min-height: 82px; padding: 13px 16px; align-items: center; grid-template-columns: minmax(0,1fr) auto; gap: 16px; border-bottom: 1px solid var(--rule-bright); background: linear-gradient(90deg,rgba(78,201,224,.075),rgba(8,13,20,.72)); }
+.overview-contract-focus-head { display: grid; min-width: 0; min-height: 82px; padding: 13px 16px; align-items: center; grid-template-columns: minmax(0,1fr); gap: 16px; border-bottom: 1px solid var(--rule-bright); background: linear-gradient(90deg,rgba(78,201,224,.075),rgba(8,13,20,.72)); }
 .overview-contract-focus-head > div { display: grid; min-width: 0; gap: 5px; }
 .overview-contract-focus-head span { color: var(--slate); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
 .overview-contract-focus-head h3 { margin: 0; overflow: hidden; color: #e3ebf2; font-size: 16px; font-weight: 560; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
-.overview-contract-focus-head time { display: grid; align-items: end; gap: 4px; text-align: right; }
-.overview-contract-focus-head time strong { color: var(--amber); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.overview-contract-focus-head time span { color: var(--slate); font-size: 9px; font-variant-numeric: tabular-nums; }
 .overview-contract-focus-scroll { display: grid; min-width: 0; min-height: 0; padding: 16px 18px 22px; align-content: start; overflow: auto; gap: 14px; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .overview-contract-focus-scroll p { margin: 0; color: #aebdca; font-size: 11px; line-height: 1.58; white-space: pre-line; }
 .overview-contract-focus-scroll .overview-contract-synopsis { color: #dde6ee; font-size: 12px; font-weight: 500; line-height: 1.55; }
@@ -818,6 +815,7 @@ button { font: inherit; }
 .overview-contract-focus-overview > div:not(.overview-contract-rewards) { display: grid; min-width: 145px; gap: 4px; }
 .overview-contract-focus-overview > div > span { color: var(--slate); font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
 .overview-contract-focus-overview > div > strong { color: var(--cyan); font-size: 11px; font-weight: 550; }
+.overview-contract-focus-overview > div > small { color: var(--slate-muted-text); font-size: 9px; font-variant-numeric: tabular-nums; }
 .overview-contract-focus-overview .overview-contract-rewards { display: flex; min-width: 0; margin-left: auto; flex-flow: row wrap; justify-content: flex-end; gap: 5px 16px; }
 .overview-contract-rewards span { color: var(--slate); }
 .overview-contract-rewards strong { color: var(--cyan); }

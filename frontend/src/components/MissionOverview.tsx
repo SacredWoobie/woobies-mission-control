@@ -753,6 +753,24 @@ function formatContractType(type: string) {
   return spaced ? `${spaced.charAt(0).toLocaleUpperCase()}${spaced.slice(1)}` : "Contract";
 }
 
+function formatContractCountdown(deadline: number | null | undefined, universalTime: number | undefined, kerbin: boolean) {
+  if (!isFiniteNumber(deadline) || !isFiniteNumber(universalTime)) return null;
+  const remaining = Math.max(0, deadline - universalTime);
+  if (remaining === 0) return "DUE";
+  const secondsPerDay = kerbin ? 21_600 : 86_400;
+  if (remaining >= secondsPerDay) {
+    const days = Math.floor(remaining / secondsPerDay);
+    const hours = Math.floor((remaining % secondsPerDay) / 3_600);
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  }
+  if (remaining < 60) return "<1m";
+  const totalMinutes = Math.floor(remaining / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
 function ContractParameterList({ className, depthOffset = 0, parameters }: { className?: string; depthOffset?: number; parameters: ContractParameter[] }) {
   return <ul className={className}>{parameters.map((parameter, parameterIndex) => <li className={parameter.status} key={`${parameter.title}-${parameterIndex}`} style={{ "--contract-depth": Math.max(0, (parameter.depth ?? 0) - depthOffset) } as CSSProperties}>
     <span aria-label={parameter.status} className="overview-contract-parameter-status" />
@@ -760,7 +778,7 @@ function ContractParameterList({ className, depthOffset = 0, parameters }: { cla
   </li>)}</ul>;
 }
 
-function ContractFocusDetail({ contract, detailsId, kerbin, universalTime }: { contract: OverviewContractTelemetry; detailsId: string; kerbin: boolean; universalTime?: number }) {
+function ContractFocusDetail({ contract, detailsId, kerbin }: { contract: OverviewContractTelemetry; detailsId: string; kerbin: boolean }) {
   const due = isFiniteNumber(contract.deadline) ? formatUniversalTime(contract.deadline, kerbin) : null;
   const parameters = contract.parameters ?? [];
   const shallowParameters = parameters.filter((parameter) => (parameter.depth ?? 0) <= 1);
@@ -770,13 +788,12 @@ function ContractFocusDetail({ contract, detailsId, kerbin, universalTime }: { c
   return <article aria-labelledby={`${detailsId}-title`} className="overview-contract-focus-reader" id={detailsId}>
     <header className="overview-contract-focus-head">
       <div><span>Contract briefing</span><h3 id={`${detailsId}-title`}>{contract.title}</h3></div>
-      {due && <time dateTime={`UT ${contract.deadline}`}><strong>Due {due.big}</strong><span>{due.sub}</span></time>}
     </header>
     <div className="overview-contract-focus-scroll">
       {contract.synopsis && <p className="overview-contract-synopsis">{contract.synopsis}</p>}
       <div className="overview-contract-focus-overview">
         <div><span>Category</span><strong>{formatContractType(contract.type)}</strong></div>
-        {due && <div><span>Time remaining</span><strong>T- {formatMissionDuration(Math.max(0, contract.deadline! - (universalTime ?? contract.deadline!)), kerbin)}</strong></div>}
+        {due && <div><span>Due date</span><strong>{due.big}</strong><small>{due.sub}</small></div>}
         <ContractRewards contract={contract} />
       </div>
       {contract.description && contract.description !== contract.synopsis && <details className="overview-contract-more"><summary>More briefing</summary><p>{contract.description}</p></details>}
@@ -832,7 +849,7 @@ function ContractSection({ rows, universalTime, kerbin, onFocusChange }: { rows:
     const key = contractKey(contract, index);
     const expanded = expandedKey === key;
     const detailsId = `overview-contract-${index}-details`;
-    const due = isFiniteNumber(contract.deadline) ? formatUniversalTime(contract.deadline, kerbin) : null;
+    const countdown = formatContractCountdown(contract.deadline, universalTime, kerbin);
     return <article className={`overview-contract-card${expanded ? " expanded" : ""}`} key={key}>
       <button
         aria-controls={expanded ? detailsId : undefined}
@@ -851,14 +868,14 @@ function ContractSection({ rows, universalTime, kerbin, onFocusChange }: { rows:
       >
         <span aria-hidden="true" className="overview-contract-chevron" />
         <span className="overview-contract-title"><strong>{contract.title}</strong></span>
-        {due && <span className="overview-contract-time"><strong>Due {due.big}</strong><span>{due.sub}</span></span>}
+        {countdown && <span className="overview-contract-time"><strong>T− {countdown}</strong></span>}
       </button>
     </article>;
   })}</div>;
   return <section className={`overview-section overview-contracts${focusedContract ? " focused" : ""}`} ref={sectionRef}>
     <SectionHeader count={rows.length} title="Active contracts">{focusedContract && <button aria-label="Return to contract list" className="overview-header-button" onClick={() => closeFocus()} type="button">BACK</button>}</SectionHeader>
     {rows.length > 0 && (focusedContract
-      ? <div className="overview-contract-focus-body">{contractList}<ContractFocusDetail contract={focusedContract} detailsId={`overview-contract-${focusedIndex}-details`} kerbin={kerbin} key={expandedKey} universalTime={universalTime} /></div>
+      ? <div className="overview-contract-focus-body">{contractList}<ContractFocusDetail contract={focusedContract} detailsId={`overview-contract-${focusedIndex}-details`} kerbin={kerbin} key={expandedKey} /></div>
       : contractList)}
   </section>;
 }

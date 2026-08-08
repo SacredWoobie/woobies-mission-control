@@ -31,11 +31,11 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-For Mission Control v0.5.0, the selected set remains:
+The current development manifest selects:
 
 | Service | Release |
 | --- | --- |
-| WoobiesControlStats | 0.2.6 |
+| WoobiesControlStats | 0.2.7 |
 | KRPC.StageStats | 0.2.7 |
 | KRPC.SystemHeat | 0.2.9 |
 | KRPC.WoobiesMechJeb | 0.8.6 |

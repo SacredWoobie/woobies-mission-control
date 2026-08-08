@@ -190,12 +190,34 @@ describe("MissionOverview", () => {
 
     expect(within(contracts).queryByText("Exploration", { exact: true })).toBeNull();
     expect(within(contracts).queryByText("Satellite", { exact: true })).toBeNull();
-    expect(within(contracts).getAllByText(/Due Y2 · D/)).toHaveLength(3);
+    expect(within(contracts).getAllByText(/^T− \d+d \d+h$/)).toHaveLength(3);
     fireEvent.click(within(contracts).getByRole("button", { name: "Expand contract Explore Duna" }));
+    const detail = contracts.querySelector<HTMLElement>(".overview-contract-focus-reader")!;
+    expect(within(detail).getByText("Due date", { exact: true })).toBeTruthy();
+    expect(within(detail).getByText("Y2 · D186", { exact: true })).toBeTruthy();
+    expect(within(detail).queryByText("Time remaining", { exact: true })).toBeNull();
     expect(within(contracts).getAllByRole("generic", { name: "Completion rewards" })).toHaveLength(1);
     expect(within(contracts).getByText("+185,000", { exact: true })).toBeTruthy();
     expect(within(contracts).getByText("+22", { exact: true })).toBeTruthy();
     expect(within(contracts).getByText("+8", { exact: true })).toBeTruthy();
+  });
+
+  it("keeps compact contract countdowns useful without showing seconds", () => {
+    renderOverview({
+      ...inactiveTelemetryFixture,
+      "t.universalTime": 1_000,
+      "overview.contracts": [
+        { title: "Beyond one day", type: "Test", deadline: 1_000 + 21_600 + 7_200 + 599 },
+        { title: "Inside one day", type: "Test", deadline: 1_000 + 7_200 + 20 * 60 + 59 },
+        { title: "Inside one minute", type: "Test", deadline: 1_059 },
+      ],
+    });
+    const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
+
+    expect(within(contracts).getByText("T− 1d 2h", { exact: true })).toBeTruthy();
+    expect(within(contracts).getByText("T− 2h 20m", { exact: true })).toBeTruthy();
+    expect(within(contracts).getByText("T− <1m", { exact: true })).toBeTruthy();
+    expect(contracts.textContent).not.toMatch(/\d{1,2}:\d{2}:\d{2}/);
   });
 
   it("keeps one contract briefing expanded at a time", async () => {
