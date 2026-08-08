@@ -115,6 +115,10 @@ def dashboard_asset(request_target, web_root):
         return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", "no-store", b"Not found\n"
 
     media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    # Match the production loopback contract even when the host MIME database
+    # registers JavaScript as application/javascript.
+    if target.suffix.casefold() == ".js":
+        media_type = "text/javascript"
     if media_type.startswith("text/") or media_type in {
         "application/javascript", "application/json", "image/svg+xml"
     }:

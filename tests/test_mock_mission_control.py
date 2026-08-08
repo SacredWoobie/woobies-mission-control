@@ -43,13 +43,16 @@ class MockMissionControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "index.html").write_text("Mission Control", encoding="utf-8")
+            (root / "app.js").write_text("export {};", encoding="utf-8")
             status, media, cache, body = mock_server.dashboard_asset("/", root)
+            script = mock_server.dashboard_asset("/app.js", root)
             traversal = mock_server.dashboard_asset("/%2e%2e/secret.txt", root)
 
             self.assertEqual(status, HTTPStatus.OK)
             self.assertEqual(media, "text/html; charset=utf-8")
             self.assertEqual(cache, "no-cache")
             self.assertIn(b"Mission Control", body)
+            self.assertEqual(script[1], "text/javascript; charset=utf-8")
             self.assertEqual(traversal[0], HTTPStatus.NOT_FOUND)
 
 

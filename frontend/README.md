@@ -64,8 +64,32 @@ the same populated telemetry on the production loopback port `8090`.
 pnpm check
 ```
 
-This runs Vitest, TypeScript checking, and the Vite production build. The
-repository wrapper also audits the result for development-only UI:
+This runs the CSS contract, Vitest, strict TypeScript/Vite production build,
+and the maintained Chrome/Edge compatibility suite. Use the narrower commands
+while iterating:
+
+```powershell
+pnpm test:css
+pnpm test:unit
+pnpm build
+pnpm test:browser
+```
+
+The CSS contract reads both production stylesheets without network access. It
+lexically checks property names against declarations/runtime entries, prevents
+migrated palette values from drifting back into raw literals, enforces direct
+and `clamp()` pixel minima at the 8 px operational text floor, keeps the
+low-contrast `--slate-dim` role out of text declarations, and checks selected
+opaque semantic text tokens against the panel background. It cannot prove
+selector scope, inheritance, computed styles, alpha/gradient contrast, or
+semantic correctness, so rendered review remains required. When adding a shared
+token, audit the exact literal across both stylesheets and add it to the contract
+only after every compatible use is migrated. Keep local gradients, alpha
+overlays, shadows, SVG/instrument colors, and data-visualization endpoints local
+when they do not share one honest role.
+
+The repository wrapper also audits the production result for development-only
+UI:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-Frontend.ps1 -InstallDependencies
@@ -79,6 +103,13 @@ developer drawer, and use relative assets so the Python telemetry process can
 serve them from `http://127.0.0.1:8090/`.
 
 Generated `node_modules`, `dist`, `.dev`, and coverage directories are ignored.
+
+Pull requests and pushes to `main` run the same locked frontend check plus the
+Python runtime suite in `.github/workflows/ci.yml`. A green local build is useful
+iteration evidence; the CI run is the shared merge evidence. After the workflow
+first succeeds on the default branch, repository administrators should make
+both job names required in branch protection as described in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ## UI review matrix
 
