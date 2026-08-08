@@ -1,8 +1,6 @@
 # Woobie's Mission Control
 
-Current public release: **v0.4.4**
-
-Next release candidate: **v0.5.0**
+Current release: **v0.5.0**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
@@ -12,8 +10,7 @@ ESP32 bridge provides physical stage and abort controls.
 Version 0.5.0 introduces persistent Flight Monitor and Plan workspaces, a
 telemetry-projected navball, a software Master Caution surface, denser staging
 and craft analysis, and expanded Mission Control contract, fleet, roster, and
-alarm briefings. The current public v0.4.4 release remains available while this
-candidate completes live-KSP acceptance and release packaging.
+alarm briefings.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -23,8 +20,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.4.2/space-center-overview.png">
-    <img src="docs/images/v0.4.2/space-center-overview.png" width="900" alt="Mission Control overview with program totals, contracts, tracked vessels, Kerbonauts, alarms, transfer windows, and vessel-management actions">
+  <a href="docs/images/v0.5.0/space-center-overview.png">
+    <img src="docs/images/v0.5.0/space-center-overview.png" width="900" alt="Mission Control overview with program status, transfer windows, solar-hierarchy fleet groups, Kerbonaut roster, alarms, and active contracts">
   </a>
 </p>
 
@@ -66,8 +63,8 @@ custom allowances, and craft assignment.
 ### VAB and SPH
 
 <p align="center">
-  <a href="docs/images/v0.4.0/editor-vab-mission-plan.png">
-    <img src="docs/images/v0.4.0/editor-vab-mission-plan.png" width="900" alt="VAB craft analysis with staging data and a pinned resonant-orbit plan">
+  <a href="docs/images/v0.5.0/editor-craft-analysis.png">
+    <img src="docs/images/v0.5.0/editor-craft-analysis.png" width="900" alt="VAB craft analysis with consolidated craft totals, dense staging, resource inventory, and planning tools">
   </a>
 </p>
 
@@ -80,8 +77,8 @@ briefings beside the vehicle, with exact-plan editing when assumptions change.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.4.3/flight-dashboard-mission-planning.png">
-    <img src="docs/images/v0.4.3/flight-dashboard-mission-planning.png" width="900" alt="Flight dashboard with reactor controls, heat-loop controls, science operations, staging analysis, and a pinned mission plan">
+  <a href="docs/images/v0.5.0/flight-monitor.png">
+    <img src="docs/images/v0.5.0/flight-monitor.png" width="900" alt="Flight Monitor workspace with persistent vessel state, projected navball, Master Caution, electricity, heat, science, and target panels">
   </a>
 </p>
 
