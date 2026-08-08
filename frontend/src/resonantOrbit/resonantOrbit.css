@@ -4,7 +4,7 @@
 .delta-v-rail-tab:hover, .delta-v-rail-tab[aria-expanded="true"] { border-color: var(--amber-dim); color: #ffd498; background: #2b2115; }
 .delta-v-rail-icon { display: flex; width: 29px; height: 28px; align-items: center; justify-content: center; flex: 0 0 29px; flex-direction: column; line-height: 1; text-transform: none; }
 .delta-v-rail-icon b { font: 700 12px var(--mono); letter-spacing: -.08em; }
-.delta-v-rail-icon small { margin-top: 3px; color: var(--amber-dim); font: 700 6px var(--mono); letter-spacing: .12em; }
+.delta-v-rail-icon small { margin-top: 3px; color: var(--amber-dim); font: 700 8px var(--mono); letter-spacing: .12em; }
 .delta-v-rail-tab:hover .delta-v-rail-icon small, .delta-v-rail-tab[aria-expanded="true"] .delta-v-rail-icon small { color: currentColor; }
 .resonant-rail-icon { position: relative; display: block; width: 29px; height: 24px; flex: 0 0 29px; }
 .resonant-rail-icon::before, .resonant-rail-icon::after { position: absolute; box-sizing: border-box; border-radius: 50%; content: ""; transform: rotate(-16deg); }

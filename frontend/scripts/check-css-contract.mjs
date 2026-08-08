@@ -45,6 +45,8 @@ const contrastContracts = [
   { foreground: "--error-text-muted", background: "--panel", minimum: 4.5 },
 ];
 
+const minimumPixelFontSize = 8;
+
 export function maskCommentsAndStrings(source) {
   let output = "";
   let state = "code";
@@ -101,6 +103,21 @@ export function lineNumberAt(source, index) {
   return source.slice(0, index).split("\n").length;
 }
 
+export function collectPixelFontSizes(source) {
+  const masked = maskCommentsAndStrings(source);
+  const sizes = [];
+  for (const match of masked.matchAll(/\b(font-size|font)\s*:\s*([^;{}]+)/gi)) {
+    const property = match[1].toLowerCase();
+    const value = match[2];
+    const sizeMatch = property === "font-size"
+      ? value.match(/^\s*(\d*\.?\d+)px\b/i)
+      : value.match(/(?:^|\s)(\d*\.?\d+)px(?:\s*\/|\s|$)/i);
+    if (!sizeMatch) continue;
+    sizes.push({ index: match.index, pixels: Number.parseFloat(sizeMatch[1]) });
+  }
+  return sizes;
+}
+
 function expandHex(value) {
   const normalized = value.toLowerCase();
   if (/^#[0-9a-f]{3}$/.test(normalized)) {
@@ -143,6 +160,17 @@ export function checkCssContract(sources) {
   for (const reference of references) {
     if (declarations.has(reference.name) || runtimeCustomProperties.has(reference.name)) continue;
     failures.push(`${reference.file}:${lineNumberAt(reference.text, reference.index)} references undefined ${reference.name}.`);
+  }
+
+  for (const source of sources) {
+    for (const size of collectPixelFontSizes(source.text)) {
+      if (size.pixels >= minimumPixelFontSize) continue;
+      failures.push(`${source.file}:${lineNumberAt(source.text, size.index)} sets ${size.pixels}px text; the operational text floor is ${minimumPixelFontSize}px.`);
+    }
+    const masked = maskCommentsAndStrings(source.text);
+    for (const match of masked.matchAll(/(?:^|[;{])\s*color\s*:\s*var\(\s*--slate-dim\s*\)/gim)) {
+      failures.push(`${source.file}:${lineNumberAt(source.text, match.index)} uses low-contrast --slate-dim for text; use --slate-muted-text or a stronger semantic text token.`);
+    }
   }
 
   const rootSource = sources.find((source) => source.file === "src/styles.css");
