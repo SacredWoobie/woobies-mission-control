@@ -175,12 +175,8 @@ class ReleaseContractTests(unittest.TestCase):
         release_pack = (
             ROOT / "tools" / "Release-Pack-v0.4.4.psd1"
         ).read_text(encoding="utf-8")
-        manifest = (
-            ROOT / "tools" / "Release-Manifest.psd1"
-        ).read_text(encoding="utf-8")
 
         self.assertIn('ProductVersion = "0.4.4"', release_pack)
-        self.assertIn('ProductVersion = "0.4.4"', manifest)
         for service, version, sha256 in (
             (
                 "WoobiesControlStats",
@@ -203,12 +199,28 @@ class ReleaseContractTests(unittest.TestCase):
                 "0B6EF8FDF2567F6BDD80C639C06C3707B02C6B6BDEDEF65A8DE9EEED3FF94C3A",
             ),
         ):
-            for contract in (release_pack, manifest):
-                self.assertRegex(
-                    contract,
-                    rf'(?s)Folder = "{re.escape(service)}".*?'
-                    rf'Version = "{re.escape(version)}".*?Sha256 = "{sha256}"',
-                )
+            self.assertRegex(
+                release_pack,
+                rf'(?s)Folder = "{re.escape(service)}".*?'
+                rf'Version = "{re.escape(version)}".*?Sha256 = "{sha256}"',
+            )
+
+    def test_v050_release_pack_reuses_the_v044_service_set(self):
+        v044_product, v044_services = read_manifest(
+            ROOT / "tools" / "Release-Pack-v0.4.4.psd1"
+        )
+        v050_product, v050_services = read_manifest(
+            ROOT / "tools" / "Release-Pack-v0.5.0.psd1"
+        )
+        manifest_product, manifest_services = read_manifest(
+            ROOT / "tools" / "Release-Manifest.psd1"
+        )
+
+        self.assertEqual(v044_product, "0.4.4")
+        self.assertEqual(v050_product, "0.5.0")
+        self.assertEqual(manifest_product, "0.5.0")
+        self.assertEqual(v050_services, v044_services)
+        self.assertEqual(manifest_services, v050_services)
 
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
@@ -242,6 +254,21 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('DASHBOARD_URL = "http://127.0.0.1:8090/"', launcher)
         self.assertIn('DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"', telemetry)
 
+    def test_managed_frontend_server_uses_the_configured_vite_port(self):
+        dev_script = (ROOT / "scripts" / "dashboard-dev.ps1").read_text(
+            encoding="utf-8"
+        )
+        vite_config = (ROOT / "frontend" / "vite.config.ts").read_text(
+            encoding="utf-8"
+        )
+        frontend_readme = (ROOT / "frontend" / "README.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('$DashboardUrl = "http://127.0.0.1:5174/"', dev_script)
+        self.assertIn("port: 5174", vite_config)
+        self.assertIn("http://127.0.0.1:5174/", frontend_readme)
+
     def test_component_specific_first_run_menu_is_packaged(self):
         menu = (ROOT / "Select Mission Control Setup.ps1").read_text(encoding="utf-8")
         batch = (ROOT / "Start KSP Dashboard.bat").read_text(encoding="utf-8")
@@ -273,25 +300,16 @@ class ReleaseContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         screenshot_brief = (
-            ROOT / "docs" / "images" / "v0.4.0" / "README.md"
+            ROOT / "docs" / "images" / "v0.5.0" / "README.md"
         ).read_text(encoding="utf-8")
-        gallery_brief, supplemental_brief = screenshot_brief.split(
-            "## Supplemental documentation captures", 1
+        required = re.findall(
+            r"\| \d \| (?:not ready|ready|captured|approved) "
+            r"\| `([^`]+\.png)` \|",
+            screenshot_brief,
         )
-        required = re.findall(r"`([^`]+\.png)`", gallery_brief)
-        supplemental = re.findall(r"`([^`]+\.png)`", supplemental_brief)
         self.assertEqual(len(required), 5)
-        self.assertIn(
-            "docs/images/v0.4.2/space-center-overview.png", publish_script
-        )
-        for name in required[1:4]:
-            self.assertIn(f"docs/images/v0.4.0/{name}", publish_script)
-        self.assertIn(
-            "docs/images/v0.4.4/launcher-scroll.png",
-            publish_script,
-        )
-        for name in supplemental:
-            self.assertNotIn(f"docs/images/v0.4.0/{name}", publish_script)
+        for name in required:
+            self.assertIn(f"docs/images/v0.5.0/{name}", publish_script)
         self.assertFalse(any(" " in name or "&" in name for name in required))
 
     def test_release_assets_sort_zip_before_curated_images(self):
@@ -306,19 +324,19 @@ class ReleaseContractTests(unittest.TestCase):
             image_names,
             [
                 "zz-01-space-center-overview.png",
-                "zz-02-resonant-orbit-planner.png",
-                "zz-03-delta-v-planner.png",
-                "zz-04-editor-vab-mission-plan.png",
-                "zz-05-launcher-scroll.png",
+                "zz-02-active-contract-focus.png",
+                "zz-03-editor-craft-analysis.png",
+                "zz-04-flight-monitor.png",
+                "zz-05-flight-plan-workspace.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.4.4.zip"
+        zip_name = "Woobies-Mission-Control-v0.5.0.zip"
         checksum_name = f"{zip_name}.sha256"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.4.4.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.5.0.{name}" for name in image_names
         ]
         source_archive_name = (
-            "Woobies-Mission-Control-v0.4.4.zz-00-"
+            "Woobies-Mission-Control-v0.5.0.zz-00-"
             "KRPC.WoobiesMechJeb-0.8.6-source.zip"
         )
         self.assertEqual(

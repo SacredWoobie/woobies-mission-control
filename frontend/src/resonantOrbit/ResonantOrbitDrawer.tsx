@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CelestialBodyTelemetry, SceneMode } from "../telemetry/types";
+import type { CelestialBodyTelemetry, SceneMode, TelemetrySnapshot } from "../telemetry/types";
 import { useLiveTelemetrySelector } from "../telemetry/useLiveTelemetry";
 import {
   DISTANCE_UNITS,
@@ -139,7 +139,7 @@ function OrbitPlot({ plan }: { plan: ResonantOrbitPlan }) {
   return <canvas ref={canvasRef} />;
 }
 
-export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
+export function ResonantOrbitDrawer({ mode, snapshot }: { mode: SceneMode; snapshot?: TelemetrySnapshot }) {
   const {
     activeSavedPlanId,
     closeDrawer,
@@ -158,20 +158,28 @@ export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
     (state): CelestialBodyTelemetry[] => state.snapshot?.["catalog.bodies"] ?? [],
     bodyCatalogEqual,
   );
-  const contextBodyName = useLiveTelemetrySelector((state) => {
+  const liveContextBodyName = useLiveTelemetrySelector((state) => {
     const snapshot = state.snapshot;
     return String(snapshot?.["v.body"] ?? snapshot?.["editor.body"] ?? "");
   });
-  const currentSaveFolder = useLiveTelemetrySelector((state) => {
+  const liveSaveFolder = useLiveTelemetrySelector((state) => {
     const value = state.snapshot?.["game.saveFolder"];
     return typeof value === "string" ? value.trim() : "";
   });
+  const availableTelemetryBodies = snapshot?.["catalog.bodies"] ?? liveBodies;
+  const contextBodyName = snapshot
+    ? String(snapshot["v.body"] ?? snapshot["editor.body"] ?? "")
+    : liveContextBodyName;
+  const snapshotSaveFolder = snapshot?.["game.saveFolder"];
+  const currentSaveFolder = snapshot
+    ? typeof snapshotSaveFolder === "string" ? snapshotSaveFolder.trim() : ""
+    : liveSaveFolder;
   const availableBodies = useMemo(() => {
     const merged = new Map<string, BodyDefinition>();
     Object.values(STOCK_BODIES).forEach((definition) => merged.set(definition.name, definition));
-    liveBodies.forEach((definition) => merged.set(definition.name, { ...definition }));
+    availableTelemetryBodies.forEach((definition) => merged.set(definition.name, { ...definition }));
     return [...merged.values()].sort((left, right) => left.name.localeCompare(right.name));
-  }, [liveBodies]);
+  }, [availableTelemetryBodies]);
   const [bodyChoice, setBodyChoice] = useState("Minmus");
   const [body, setBody] = useState<BodyDefinition>({ ...STOCK_BODIES.Minmus });
   const [customBody, setCustomBody] = useState<BodyDefinition>({ ...STOCK_BODIES.Kerbin, name: "Custom body" });
@@ -202,6 +210,10 @@ export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
       : Date.parse(right.updatedAt || "1970-01-01") - Date.parse(left.updatedAt || "1970-01-01")
         || left.name.localeCompare(right.name));
   }, [currentSavePlans, loadFromAllSaves, savedPlans]);
+  const activeSavedPlan = useMemo(
+    () => savedPlans.find((record) => record.id === activeSavedPlanId) ?? null,
+    [activeSavedPlanId, savedPlans],
+  );
   const savedPlanGroups = useMemo(() => {
     const groups = new Map<string, typeof savedPlans>();
     visibleSavedPlans.forEach((record) => {
@@ -241,6 +253,22 @@ export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
     setBodyChoice(matchingBody.name);
     setBody({ ...matchingBody });
   }, [availableBodies, contextBodyName, drawerOpen]);
+
+  useEffect(() => {
+    if (!drawerOpen || !activeSavedPlan) return;
+    const saved = activeSavedPlan.plan;
+    const knownBody = availableBodies.find((candidate) => candidate.name === saved.body.name);
+    setBodyChoice(knownBody ? knownBody.name : "custom");
+    setBody({ ...saved.body });
+    setCustomBody({ ...saved.body });
+    setSatelliteCount(saved.satelliteCount);
+    setTargetAltitude(saved.targetAltitude);
+    setResonanceMode(saved.requestedMode);
+    setUseOcclusion(activeSavedPlan.useOcclusionModifiers);
+    setPlanName(activeSavedPlan.name);
+    setSaveError(false);
+    setSavedNotice("");
+  }, [activeSavedPlan, availableBodies, drawerOpen]);
 
   if (!drawerOpen) return null;
   const plan = calculation.plan;
@@ -340,7 +368,7 @@ export function ResonantOrbitDrawer({ mode }: { mode: SceneMode }) {
             <label className="resonant-control-satellites"><span>Satellites</span><input min="2" max="99" step="1" type="number" value={satelliteCount} onChange={(event) => setSatelliteCount(Number(event.target.value))} /></label>
             <label className="resonant-control-altitude"><span>Final circular altitude</span><div className="resonant-input-unit"><input min={1 / DISTANCE_UNITS[unit].factor} step={1 / DISTANCE_UNITS[unit].factor} type="number" value={Number(distanceToUnit(targetAltitude, unit).toFixed(DISTANCE_UNITS[unit].inputDecimals))} onChange={(event) => setTargetAltitude(distanceFromUnit(Number(event.target.value), unit))} /><span>{unit}</span></div></label>
             <fieldset className="resonant-carrier-control"><legend>Carrier orbit</legend><div className="resonant-segments">{(["auto", "raise", "dive"] as ResonanceMode[]).map((value) => <label key={value}><input checked={resonanceMode === value} name="resonanceMode" type="radio" value={value} onChange={() => setResonanceMode(value)} /><span>{value}</span></label>)}</div></fieldset>
-            <fieldset className="resonant-unit-control"><legend>Display units</legend><div className="resonant-segments">{(Object.keys(DISTANCE_UNITS) as (keyof typeof DISTANCE_UNITS)[]).map((value) => <label key={value}><input checked={unit === value} name="distanceUnit" type="radio" value={value} onChange={() => setUnit(value)} /><span>{value}</span></label>)}</div></fieldset>
+            <fieldset className="resonant-unit-control"><legend>Altitude input units</legend><div className="resonant-segments">{(Object.keys(DISTANCE_UNITS) as (keyof typeof DISTANCE_UNITS)[]).map((value) => <label key={value}><input checked={unit === value} name="distanceUnit" type="radio" value={value} onChange={() => setUnit(value)} /><span>{value}</span></label>)}</div></fieldset>
           </section>
 
           <details className="resonant-advanced">

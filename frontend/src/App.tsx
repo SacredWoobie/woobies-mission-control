@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { FlightAnnunciator } from "./annunciator/FlightAnnunciator";
+import { useFixtureFlightAnnunciator } from "./annunciator/useFlightAnnunciator";
 import {
   availableFlightPanels,
   DashboardAppFrame,
@@ -10,12 +12,13 @@ import {
 } from "./appShell";
 import { AscensionPanel } from "./components/AscensionPanel";
 import { ConsumablesPanel } from "./components/ConsumablesPanel";
+import { DatalinkDrawer } from "./components/DatalinkDrawer";
 import { DeveloperDrawer, type TelemetrySource } from "./components/DeveloperDrawer";
 import { ElectricityPanel } from "./components/ElectricityPanel";
 import { EditorContextPanel } from "./components/EditorContextPanel";
 import { EditorSummaryPanel } from "./components/EditorSummaryPanel";
 import { FlightDashboard } from "./components/FlightDashboard";
-import { ClockPanel, DatalinkPanel } from "./components/FlightStatusPanels";
+import { ClockPanel } from "./components/FlightStatusPanels";
 import { HeatPanel } from "./components/HeatPanel";
 import { MissionOverview } from "./components/MissionOverview";
 import { PinnedNotePanel } from "./components/PinnedNotePanel";
@@ -41,6 +44,7 @@ const fixtures: Record<SceneMode, TelemetrySnapshot> = {
 };
 
 function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
+  const annunciator = useFixtureFlightAnnunciator(snapshot);
   const { pinnedForTelemetry: pinnedOrbitForTelemetry } = useResonantOrbitState();
   const { pinnedForTelemetry } = useDeltaVDraft();
   const pinnedOrbit = pinnedOrbitForTelemetry(snapshot);
@@ -50,7 +54,7 @@ function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
     <FlightDashboard
       ascension={<AscensionPanel snapshot={snapshot} />}
       availablePanels={available}
-      clock={<ClockPanel snapshot={snapshot} />}
+      clock={<ClockPanel annunciator={<FlightAnnunciator controller={annunciator} />} snapshot={snapshot} />}
       consumables={<ConsumablesPanel snapshot={snapshot} />}
       electricity={<ElectricityPanel snapshot={snapshot} />}
       heat={<HeatPanel snapshot={snapshot} />}
@@ -60,6 +64,7 @@ function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
       science={<SciencePanel snapshot={snapshot} />}
       staging={<StagingPanel snapshot={snapshot} />}
       target={snapshot["tar.name"]?.trim() ? <TargetPanel snapshot={snapshot} /> : undefined}
+      vesselIdentity={String(snapshot["v.persistentId"] ?? snapshot["v.guid"] ?? snapshot["v.name"] ?? "fixture-vessel")}
     />
   );
 }
@@ -69,7 +74,7 @@ function FixtureDashboard({ mode, notesOpen, onCloseNotes, onSetNotesOpen }: { m
   const identity = mode === "flight" ? String(snapshot["v.name"] ?? "Active vessel") : mode === "editor" ? String(snapshot["editor.craftName"] ?? "Untitled craft") : undefined;
   return (
     <DashboardSurface
-      datalink={<DatalinkPanel connectionStatus="fixture" endpoint="deterministic fixtures" sceneMode={mode} />}
+      datalink={(open, onClose) => <DatalinkDrawer connectionStatus="fixture" endpoint="deterministic fixtures" onClose={onClose} open={open} sceneMode={mode} />}
       footerLabel="Development"
       identity={identity}
       linkText={`FIXTURE · ${mode}`}
@@ -142,7 +147,6 @@ function DevelopmentDashboardApp() {
         />
       ) : (
         <LiveDashboard
-          allowDisconnect
           endpointDraft={endpoint}
           footerLabel="Development"
           notesOpen={notesOpen}

@@ -52,6 +52,10 @@ describe("panel telemetry subscriptions", () => {
     };
 
     expect(consumablesSnapshotsEqual(flightTelemetryFixture, resourceChange)).toBe(false);
+    expect(consumablesSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      "res.status": "incomplete",
+    })).toBe(false);
     expect(stagingSnapshotsEqual(flightTelemetryFixture, resourceChange)).toBe(true);
     expect(stagingSnapshotsEqual(flightTelemetryFixture, stageChange)).toBe(false);
     expect(clockSnapshotsEqual(flightTelemetryFixture, vesselIdentityChange)).toBe(false);
@@ -59,6 +63,15 @@ describe("panel telemetry subscriptions", () => {
     expect(ascensionSnapshotsEqual(flightTelemetryFixture, {
       ...flightTelemetryFixture,
       "n.heading": 92,
+    })).toBe(false);
+    expect(ascensionSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      "tar.name": "Kerbin",
+      "tar.o.relativeVelocity": 12,
+    })).toBe(false);
+    expect(ascensionSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      "v.situationString": "Escaping",
     })).toBe(false);
     expect(heatSnapshotsEqual(flightTelemetryFixture, {
       ...flightTelemetryFixture,
@@ -105,6 +118,23 @@ describe("panel telemetry subscriptions", () => {
     })).toBe(false);
   });
 
+  it.each([
+    ["editor.partCount", 42],
+    ["editor.stageCount", 12],
+    ["editor.crewCapacity", 7],
+    ["editor.wetMass", 20.5],
+    ["editor.dryMass", 13.5],
+    ["editor.resourceMass", 7],
+    ["editor.totalCost", 125_000],
+    ["editor.resourceCost", 25_000],
+    ["catalog.bodies", [{ name: "Kerbin", radius: 600_000, atmosphereDepth: 75_000 }]],
+  ] as const)("delivers Editor Context changes for %s", (field, value) => {
+    expect(editorSnapshotsEqual(editorTelemetryFixture, {
+      ...editorTelemetryFixture,
+      [field]: value,
+    })).toBe(false);
+  });
+
   it("delivers editor revision and analysis provenance changes to both analysis panels", () => {
     const nextRevision = {
       ...editorTelemetryFixture,
@@ -119,6 +149,37 @@ describe("panel telemetry subscriptions", () => {
     expect(editorSummarySnapshotsEqual(editorTelemetryFixture, nextRevision)).toBe(false);
     expect(stagingSnapshotsEqual(editorTelemetryFixture, nextAnalysis)).toBe(false);
     expect(editorSummarySnapshotsEqual(editorTelemetryFixture, nextAnalysis)).toBe(false);
+  });
+
+  it.each([
+    ["stage.count", 4],
+    ["stage.unpoweredCount", 2],
+    ["stage.totalBurnSeconds", 321],
+    ["stage.staticPressureAtm", 0.25],
+    ["stage.altitude", 12_000],
+    ["stage.body", "Duna"],
+    ["stage.situation", "Landed"],
+    ["stage.throttle", 0.35],
+    ["v.thrust", 350_000],
+    ["v.availableThrust", 900_000],
+    ["v.altitude", 12_000],
+    ["v.body", "Duna"],
+    ["v.situationString", "Landed"],
+  ] as const)("delivers staging display changes for %s", (field, value) => {
+    expect(stagingSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      [field]: value,
+    })).toBe(false);
+  });
+
+  it.each([
+    ["v.thrust", 350_000],
+    ["v.availableThrust", 900_000],
+  ] as const)("delivers Ascension thrust fallback changes for %s", (field, value) => {
+    expect(ascensionSnapshotsEqual(flightTelemetryFixture, {
+      ...flightTelemetryFixture,
+      [field]: value,
+    })).toBe(false);
   });
 
   it("invalidates mission-plan subscriptions when the active vessel identity changes", () => {

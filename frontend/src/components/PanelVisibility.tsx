@@ -21,10 +21,6 @@ export const panelLabels = {
   sci: "Science",
   stage: "Staging",
   target: "Target",
-  overviewTransfers: "Transfer windows",
-  overviewFleet: "Active vessels",
-  overviewRoster: "Astronaut roster",
-  overviewAlarms: "Upcoming alarms",
   flightNote: "Pinned note",
   flightOrbitPlan: "Resonant orbit plan",
   flightDeltaVPlan: "Mission Plan",
@@ -41,10 +37,6 @@ const panelRailDescriptions: Record<keyof typeof panelLabels, string> = {
   sci: "Science",
   stage: "Staging Analysis",
   target: "Target",
-  overviewTransfers: "Transfer Windows",
-  overviewFleet: "Active Vessels",
-  overviewRoster: "Astronaut Roster",
-  overviewAlarms: "Upcoming Alarms",
   flightNote: "Pinned Note",
   flightOrbitPlan: "Resonant Orbit Plan",
   flightDeltaVPlan: "Mission Plan",
@@ -54,6 +46,10 @@ const panelRailDescriptions: Record<keyof typeof panelLabels, string> = {
 export type DashboardPanelId = keyof typeof panelLabels;
 
 const storageKey = "wmc-hidden-panels-v1";
+const flightInPlacePanelIds = new Set<DashboardPanelId>([
+  "asc", "cons", "heat", "elec", "sci", "stage", "target",
+  "flightNote", "flightOrbitPlan", "flightDeltaVPlan",
+]);
 const panelOrder: DashboardPanelId[] = [
   "conn",
   "clock",
@@ -64,10 +60,6 @@ const panelOrder: DashboardPanelId[] = [
   "sci",
   "stage",
   "target",
-  "overviewTransfers",
-  "overviewFleet",
-  "overviewRoster",
-  "overviewAlarms",
   "flightNote",
   "flightOrbitPlan",
   "flightDeltaVPlan",
@@ -78,6 +70,7 @@ interface PanelVisibilityValue {
   availablePanels: ReadonlySet<DashboardPanelId>;
   centralizedRail: boolean;
   hiddenPanels: ReadonlySet<DashboardPanelId>;
+  lastRestore: { id: DashboardPanelId; sequence: number } | null;
   autoCollapsePanel(id: DashboardPanelId): void;
   clearAutoCollapse(id: DashboardPanelId): void;
   hidePanel(id: DashboardPanelId): void;
@@ -89,6 +82,7 @@ const fallbackVisibility: PanelVisibilityValue = {
   availablePanels: new Set<DashboardPanelId>(),
   centralizedRail: false,
   hiddenPanels: new Set<DashboardPanelId>(),
+  lastRestore: null,
   autoCollapsePanel() {},
   clearAutoCollapse() {},
   hidePanel() {},
@@ -100,11 +94,16 @@ const PanelVisibilityContext = createContext<PanelVisibilityValue>(fallbackVisib
 function initialHiddenPanels() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
-    return new Set<DashboardPanelId>(
-      Array.isArray(saved)
-        ? saved.filter((id): id is DashboardPanelId => id in panelLabels)
-        : [],
-    );
+    const valid = Array.isArray(saved)
+      ? saved.filter((id): id is DashboardPanelId => id in panelLabels)
+      : [];
+    const migrated = valid.filter((id) => id !== "conn" && !flightInPlacePanelIds.has(id));
+    if (
+      !Array.isArray(saved)
+      || saved.length !== migrated.length
+      || migrated.some((id, index) => id !== saved[index])
+    ) localStorage.setItem(storageKey, JSON.stringify(migrated));
+    return new Set<DashboardPanelId>(migrated);
   } catch {
     return new Set<DashboardPanelId>();
   }
@@ -119,6 +118,7 @@ export function PanelVisibilityProvider({
   const [availablePanelSources, setAvailablePanelSources] = useState(
     () => new Map<string, ReadonlySet<DashboardPanelId>>(),
   );
+  const [lastRestore, setLastRestore] = useState<PanelVisibilityValue["lastRestore"]>(null);
 
   const persist = useCallback((next: Set<DashboardPanelId>) => {
     try {
@@ -178,6 +178,7 @@ export function PanelVisibilityProvider({
 
   const hidePanel = useCallback((id: DashboardPanelId) => {
     setPreferenceHiddenPanels((current) => {
+      if (id === "conn" || flightInPlacePanelIds.has(id)) return current;
       const next = new Set(current);
       next.add(id);
       persist(next);
@@ -198,12 +199,14 @@ export function PanelVisibilityProvider({
       next.delete(id);
       return next;
     });
+    setLastRestore((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
   }, [persist]);
 
   const value = useMemo<PanelVisibilityValue>(() => ({
     availablePanels,
     centralizedRail,
     hiddenPanels,
+    lastRestore,
     autoCollapsePanel,
     clearAutoCollapse,
     hidePanel,
@@ -216,6 +219,7 @@ export function PanelVisibilityProvider({
     clearAutoCollapse,
     hiddenPanels,
     hidePanel,
+    lastRestore,
     registerAvailablePanels,
     restorePanel,
   ]);
@@ -253,60 +257,52 @@ export function PanelRestoreRail({ available }: { available: ReadonlySet<Dashboa
   }, [available, centralizedRail, registerAvailablePanels, sourceId]);
   if (centralizedRail) return null;
 
-  const datalinkHidden = hiddenPanels.has("conn") && available.has("conn");
-  const visibleTabs = panelOrder.filter((id) => id !== "conn" && hiddenPanels.has(id) && available.has(id));
-  if (!datalinkHidden && visibleTabs.length === 0) return null;
+  const visibleTabs = panelOrder.filter((id) => id !== "conn" && !flightInPlacePanelIds.has(id) && hiddenPanels.has(id) && available.has(id));
+  if (visibleTabs.length === 0) return null;
 
   return (
-    <>
-      {datalinkHidden && (
-        <button aria-label={panelLabels.conn} className="datalink-rail-tab panel-rail-button" onClick={() => restorePanel("conn")} title={`Restore ${panelLabels.conn}`} type="button">
-          <span aria-hidden="true" className="panel-rail-label">{panelRailDescriptions.conn}</span>
-          <PanelRailIcon name="conn" />
-        </button>
-      )}
-      {visibleTabs.length > 0 && (
-        <nav aria-label="Hidden dashboard panels" className="panel-restore-rail">
-          {visibleTabs.map((id) => (
-            <button aria-label={panelLabels[id]} className={`panel-rail-button panel-rail-button-${id}`} key={id} onClick={() => restorePanel(id)} title={`Restore ${panelLabels[id]}`} type="button">
-              <span aria-hidden="true" className="panel-rail-label">{panelRailDescriptions[id]}</span>
-              <PanelRailIcon name={id} />
-            </button>
-          ))}
-        </nav>
-      )}
-    </>
-  );
-}
-
-export function DashboardRail({
-  notesButton,
-  tools,
-}: {
-  notesButton: ReactNode;
-  tools: ReactNode;
-}) {
-  const { availablePanels, hiddenPanels, restorePanel } = usePanelVisibility();
-  const visibleTabs = panelOrder.filter((id) => hiddenPanels.has(id) && availablePanels.has(id));
-
-  return (
-    <nav aria-label="Dashboard controls" className="dashboard-rail">
+    <nav aria-label="Hidden dashboard panels" className="panel-restore-rail">
       {visibleTabs.map((id) => (
-        <button
-          aria-label={panelLabels[id]}
-          className={`panel-rail-button panel-rail-button-${id}${id === "conn" ? " datalink-rail-tab" : ""}`}
-          key={id}
-          onClick={() => restorePanel(id)}
-          title={`Restore ${panelLabels[id]}`}
-          type="button"
-        >
+        <button aria-label={panelLabels[id]} className={`panel-rail-button panel-rail-button-${id}`} key={id} onClick={() => restorePanel(id)} title={`Restore ${panelLabels[id]}`} type="button">
           <span aria-hidden="true" className="panel-rail-label">{panelRailDescriptions[id]}</span>
           <PanelRailIcon name={id} />
         </button>
       ))}
-      {notesButton}
+    </nav>
+  );
+}
+
+export function DashboardRail({
+  datalinkButton,
+  notesButton,
+  tools,
+}: {
+  datalinkButton: ReactNode;
+  notesButton: ReactNode;
+  tools: ReactNode;
+}) {
+  const { availablePanels, hiddenPanels, restorePanel } = usePanelVisibility();
+  const visibleTabs = panelOrder.filter((id) => id !== "conn" && !flightInPlacePanelIds.has(id) && hiddenPanels.has(id) && availablePanels.has(id));
+
+  return (
+    <nav aria-label="Dashboard controls" className="dashboard-rail">
       <div aria-label="Tools" className="dashboard-rail-tools" role="group">
         <div aria-hidden="true" className="dashboard-rail-section-label"><span>Tools</span></div>
+        {datalinkButton}
+        {visibleTabs.map((id) => (
+          <button
+            aria-label={panelLabels[id]}
+            className={`panel-rail-button panel-rail-button-${id}${id === "conn" ? " datalink-rail-tab" : ""}`}
+            key={id}
+            onClick={() => restorePanel(id)}
+            title={`Restore ${panelLabels[id]}`}
+            type="button"
+          >
+            <span aria-hidden="true" className="panel-rail-label">{panelRailDescriptions[id]}</span>
+            <PanelRailIcon name={id} />
+          </button>
+        ))}
+        {notesButton}
         {tools}
       </div>
     </nav>

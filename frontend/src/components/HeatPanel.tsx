@@ -61,20 +61,20 @@ function HeatComponentRow({ component, fallbackUnit }: {
   );
 }
 
-function HeatEntityRow({ autoExpand, controlPending, entity, onControl }: {
-  autoExpand: boolean;
-  controlPending: boolean;
-  entity: HeatEntity;
-  onControl?: (entity: HeatEntity) => void;
-}) {
-  const hasDetails = entity.kind === "loop"
+function heatEntityHasDetails(entity: HeatEntity) {
+  return entity.kind === "loop"
     && Boolean(entity.components)
     && ((entity.components?.producers.length ?? 0) + (entity.components?.radiators.length ?? 0) > 0);
-  const [expanded, setExpanded] = useState(autoExpand && hasDetails);
+}
 
-  useEffect(() => {
-    if (autoExpand && hasDetails) setExpanded(true);
-  }, [autoExpand, hasDetails]);
+function HeatEntityRow({ controlPending, entity, expanded, onControl, onToggle }: {
+  controlPending: boolean;
+  entity: HeatEntity;
+  expanded: boolean;
+  onControl?: (entity: HeatEntity) => void;
+  onToggle: (entity: HeatEntity) => void;
+}) {
+  const hasDetails = heatEntityHasDetails(entity);
 
   const unit = entity.kind === "loop" ? "kW" : "W";
   const ratioPercent = isFiniteNumber(entity.ratio) ? Math.max(0, entity.ratio * 100) : 0;
@@ -136,7 +136,7 @@ function HeatEntityRow({ autoExpand, controlPending, entity, onControl }: {
           aria-label={hasDetails ? `${expanded ? "Collapse" : "Expand"} ${entity.name}` : undefined}
           className={`heat-entity-main${hasDetails ? " expandable" : ""}${showLoopControl ? " has-loop-control" : ""}`}
           disabled={!hasDetails}
-          onClick={() => hasDetails && setExpanded((current) => !current)}
+          onClick={() => hasDetails && onToggle(entity)}
           type="button"
         >
           <span className="heat-caret" aria-hidden="true">{hasDetails ? (expanded ? "⌄" : "›") : ""}</span>
@@ -216,9 +216,24 @@ export function HeatPanel({
   const autoExpandedId = entities.find((entity) => (
     entity.severity === "critical" || entity.severity === "no-radiators"
   ))?.id;
+  const [expandedEntityId, setExpandedEntityId] = useState<string | null>(autoExpandedId ?? null);
+  const expandableEntityIds = entities
+    .filter(heatEntityHasDetails)
+    .map((entity) => entity.id)
+    .join("\u0000");
   const result = controlResult?.requestId === lastRequestId
     ? controlResult
     : undefined;
+
+  useEffect(() => {
+    if (autoExpandedId) setExpandedEntityId(autoExpandedId);
+  }, [autoExpandedId]);
+
+  useEffect(() => {
+    if (expandedEntityId && !expandableEntityIds.split("\u0000").includes(expandedEntityId)) {
+      setExpandedEntityId(null);
+    }
+  }, [expandableEntityIds, expandedEntityId]);
 
   useEffect(() => {
     if (!pending) return;
@@ -275,7 +290,8 @@ export function HeatPanel({
 
   return (
     <Panel
-      hideable
+      collapsible
+      compact
       id="heat"
       title="Heat Management"
       tag={entities.length > 0 ? (
@@ -298,11 +314,14 @@ export function HeatPanel({
         <div className={`heat-entity-list ${stock ? "stock" : "system-heat"}`}>
           {entities.map((entity) => (
             <HeatEntityRow
-              autoExpand={entity.id === autoExpandedId}
               controlPending={Boolean(pending && pending.loopId === entity.loopId)}
               entity={entity}
+              expanded={entity.id === expandedEntityId}
               key={entity.id}
               onControl={commandEnabled ? sendControl : undefined}
+              onToggle={(selected) => setExpandedEntityId((current) => (
+                current === selected.id ? null : selected.id
+              ))}
             />
           ))}
         </div>

@@ -3,7 +3,6 @@ import type {
   ElectricitySourceKind,
   ElectricitySourceTelemetry,
   ReactorTelemetry,
-  SolarForecastTelemetry,
   TelemetrySnapshot,
 } from "../telemetry/types";
 
@@ -43,7 +42,6 @@ export interface ElectricityViewModel {
   etaKind: "full" | "empty" | "steady" | "calibrating" | "unavailable";
   etaSeconds?: number;
   status: ElectricityStatusViewModel;
-  solarForecast?: SolarForecastTelemetry;
 }
 
 const sourceOrder: ElectricitySourceKind[] = [
@@ -327,6 +325,5 @@ export function selectElectricity(snapshot: TelemetrySnapshot): ElectricityViewM
     etaKind,
     etaSeconds,
     status: reactors.length > 0 ? reactorStatus(reactors) : sourceStatus(sources, netEcPerSec),
-    solarForecast: snapshot["solar.forecast"],
   };
 }

@@ -7,8 +7,8 @@ import { STOCK_BODIES, calculateResonantOrbit } from "./calculations";
 import { ResonantOrbitProvider, useResonantOrbitState } from "./state";
 
 function DrawerState() {
-  const { drawerOpen } = useResonantOrbitState();
-  return <output data-testid="drawer-state">{drawerOpen ? "open" : "closed"}</output>;
+  const { activeSavedPlanId, drawerOpen } = useResonantOrbitState();
+  return <><output data-testid="drawer-state">{drawerOpen ? "open" : "closed"}</output><output data-testid="active-plan">{activeSavedPlanId ?? "none"}</output></>;
 }
 
 describe("pinned resonant orbit panel", () => {
@@ -54,7 +54,7 @@ describe("pinned resonant orbit panel", () => {
     expect(screen.getByLabelText("Target Pe high")).toBeTruthy();
   });
 
-  it("renders Editor design guidance without Flight deployment controls", () => {
+  it("renders the Editor plan card and opens the pinned record for editing", () => {
     const plan = calculateResonantOrbit({ body: STOCK_BODIES.Duna, satelliteCount: 4, targetAltitude: 600_000, mode: "raise" });
     localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
       schemaVersion: 2,
@@ -70,11 +70,21 @@ describe("pinned resonant orbit panel", () => {
     );
 
     expect(view.container.querySelector("#editorOrbitPlan")).toBeTruthy();
-    expect(screen.getByText("DESIGN").parentElement?.classList.contains("resonant-editor-guidance")).toBe(true);
+    expect(screen.getByText("Resonant Orbit Plan")).toBeTruthy();
     expect(screen.getByText("Duna Editor Relay")).toBeTruthy();
-    expect(screen.getByText(/4 satellites at 600 km final altitude/)).toBeTruthy();
-    expect(screen.getByText("Calculated profile nominal")).toBeTruthy();
+    expect(screen.getByText("4")).toBeTruthy();
+    expect(screen.getByText("Satellites")).toBeTruthy();
+    expect(screen.getByText("Duna")).toBeTruthy();
+    expect(screen.getByText("Carrier Ap")).toBeTruthy();
+    expect(screen.getByText("Carrier Pe")).toBeTruthy();
+    expect(screen.getByText("Resonance")).toBeTruthy();
+    expect(screen.getByText("5:4 raise")).toBeTruthy();
+    expect(screen.getByText("Injection Δv")).toBeTruthy();
+    expect(screen.getByText("Carrier period")).toBeTruthy();
+    expect(screen.getByText("Release at")).toBeTruthy();
+    expect(screen.getByText("Profile nominal")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Hide Duna Editor Relay panel" })).toBeNull();
+    expect(screen.queryByText("Saved")).toBeNull();
     expect(screen.queryByText("Deployment tracking")).toBeNull();
     expect(screen.queryByText("0 / 4")).toBeNull();
     expect(screen.queryByText("Release at apoapsis")).toBeNull();
@@ -82,8 +92,33 @@ describe("pinned resonant orbit panel", () => {
     expect(screen.queryByRole("button", { name: "Mark satellite released" })).toBeNull();
 
     expect(screen.getByTestId("drawer-state").textContent).toBe("closed");
-    fireEvent.click(screen.getByRole("button", { name: "Open planner" }));
+    expect(screen.getByTestId("active-plan").textContent).toBe("none");
+    expect(screen.queryByRole("button", { name: "Open planner" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
     expect(screen.getByTestId("drawer-state").textContent).toBe("open");
+    expect(screen.getByTestId("active-plan").textContent).toBe("editor-plan");
+  });
+
+  it("names the warning reasons in the Editor status footer", () => {
+    const warningPlan = calculateResonantOrbit({ body: STOCK_BODIES.Kerbin, satelliteCount: 3, targetAltitude: 100_000, mode: "raise" });
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
+      schemaVersion: 4,
+      pinnedPlanId: "warning-plan",
+      plans: [{ id: "warning-plan", name: "Kerbin warning", plan: warningPlan, releaseCount: 0, saveFolder: "", useOcclusionModifiers: true, createdAt: "", updatedAt: "" }],
+    }));
+
+    render(<ResonantOrbitProvider><PinnedResonantOrbitPanel scene="editor" /></ResonantOrbitProvider>);
+    expect(screen.getByText("Review plan — No continuous LOS")).toBeTruthy();
+
+    cleanup();
+    const conflictPlan = calculateResonantOrbit({ body: STOCK_BODIES.Kerbin, satelliteCount: 3, targetAltitude: 100_000, mode: "dive" });
+    localStorage.setItem("wmc-resonant-library-v2", JSON.stringify({
+      schemaVersion: 4,
+      pinnedPlanId: "conflict-plan",
+      plans: [{ id: "conflict-plan", name: "Kerbin conflict", plan: conflictPlan, releaseCount: 0, saveFolder: "", useOcclusionModifiers: true, createdAt: "", updatedAt: "" }],
+    }));
+    render(<ResonantOrbitProvider><PinnedResonantOrbitPanel scene="editor" /></ResonantOrbitProvider>);
+    expect(screen.getByText("Plan conflict — PE impact · No continuous LOS")).toBeTruthy();
   });
 
   it("does not show a pinned plan while a different game save is active", () => {

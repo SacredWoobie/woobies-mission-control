@@ -226,6 +226,12 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
   const [savedNotice, setSavedNotice] = useState("");
   const [saveError, setSaveError] = useState(false);
   const [loadFromAllSaves, setLoadFromAllSaves] = useState(false);
+  useEffect(() => {
+    if (!activeSavedPlanId) return;
+    const activePlan = savedPlans.find((record) => record.id === activeSavedPlanId);
+    if (!activePlan) return;
+    setPlanName(activePlan.name);
+  }, [activeSavedPlanId, savedPlans]);
   const currentSaveFolder = typeof telemetry?.["game.saveFolder"] === "string"
     ? telemetry["game.saveFolder"].trim()
     : "";

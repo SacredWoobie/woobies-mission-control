@@ -1,15 +1,19 @@
 # Woobie's Mission Control
 
-Current release: **v0.4.4**
+Current public release: **v0.4.4**
+
+Next release candidate: **v0.5.0**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.4.4 keeps every launcher control reachable on short displays, gives
-Mission Log its own resizable pane, and clearly explains how to fix a complete
-release accidentally extracted inside KSP's `GameData` folder.
+Version 0.5.0 introduces persistent Flight Monitor and Plan workspaces, a
+telemetry-projected navball, a software Master Caution surface, denser staging
+and craft analysis, and expanded Mission Control contract, fleet, roster, and
+alarm briefings. The current public v0.4.4 release remains available while this
+candidate completes live-KSP acceptance and release packaging.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -25,13 +29,16 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 </p>
 
 At the Space Center and Tracking Station, the dashboard becomes a program
-overview. It brings together funds, science, reputation, contracts, tracked
-vessels, the astronaut roster, and Stock or Kerbal Alarm Clock alarms. Guarded
-actions can switch to or edit the vessel selected in the fleet detail. A
-contextual confirmation can recover eligible craft through KSP's stock path or
-terminate an ineligible craft, naming any aboard Kerbals who would be killed.
-The transfer-window board uses the current game's body catalog, so supported
-planet packs appear alongside the stock system.
+overview. It combines content-weighted program status with transfer windows,
+tracked vessels grouped by the current solar-system hierarchy, the astronaut
+roster, Stock or Kerbal Alarm Clock alarms, and active contracts. Selecting a
+contract opens a readable rail-and-briefing workspace without mixing it into the
+alarm list. The fleet briefing brings together useful orbital facts,
+roster-backed crew roles, and the next linked event. Guarded actions can switch
+to, edit, recover, or terminate the selected vessel, with contextual
+confirmation and an explicit warning naming any aboard Kerbals who would be
+killed. The body catalog and transfer board support installed planet packs
+alongside the stock system.
 
 ### Mission planning
 
@@ -64,9 +71,11 @@ custom allowances, and craft assignment.
   </a>
 </p>
 
-The editor view combines stock craft totals with MechJeb staging analysis.
-Reference body, altitude, and Mach can be changed before launch, while a pinned
-mission plan stays visible beside the vehicle it was designed for.
+The editor view places craft identity, mass, cost, build counts, and simulation
+conditions in one overview above MechJeb staging analysis and the resource
+inventory. Reference body, altitude, and Mach can be changed directly before
+launch. Pinned Mission and Resonant Orbit plans remain compact operational
+briefings beside the vehicle, with exact-plan editing when assumptions change.
 
 ### Flight
 
@@ -76,10 +85,13 @@ mission plan stays visible beside the vehicle it was designed for.
   </a>
 </p>
 
-Flight keeps navigation, orbit, resources, electricity, heat, science, staging,
-target, docking, Notes, and mission progress on one responsive screen. Panels
-can collapse to the instrument rail and return without disturbing the rest of
-the layout.
+Flight keeps Ascension, Consumables, and Staging Analysis in a persistent
+vessel-state region beside switchable MONITOR and PLAN workspaces. Electricity,
+heat, science, and target monitoring remain separate from mission and reference
+plans, while the software Master Caution surface reports vessel-wide conditions.
+Workspace panels collapse in place without losing their state; utility drawers
+for Datalink, Notes, and planning tools remain available from the instrument
+rail.
 
 For an interplanetary departure, Mission Control can preview one maneuver
 against the active orbit and show the resulting burn before anything is changed

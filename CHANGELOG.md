@@ -4,6 +4,150 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+_No changes yet._
+
+## v0.5.0 - Flight dashboard workspaces
+
+- Corrected both Flight throttle readouts for mod-controlled engines when kRPC's
+  vessel control reports zero despite active thrust; limiter-adjusted current
+  versus available thrust now provides a source-backed fallback.
+- Clipped every projected navball world layer to the spherical boundary so the
+  moving sky, horizon, grid, and cardinal labels cannot bleed beyond the globe.
+- Reshaped the navball aircraft marker to match KSP's connected wing-and-chevron
+  silhouette, including its smaller centered reference dot.
+- Rebalanced Flight staging columns so `Δv LIVE`, `Δv VAC`, and `TWR · LIVE`
+  headings leave less unused width in TWR and more room for delta-v values.
+- Expanded the deterministic Flight mock to eight powered stages out of ten
+  total and added non-retractable, deploying, and damaged radiator states for
+  staging- and Heat-panel density testing.
+- Added deterministic save and craft identity to the live Editor mock so
+  Resonant Orbit and Delta-V plans can be pinned safely during layout testing.
+- Populated the deterministic inactive mock with a completed nine-destination
+  transfer-window board for overview-scene density and layout review.
+- Consolidated inactive-scene identity and content-weighted program status into
+  one header, expanded Active Vessels into a source-backed orbit, crew, and
+  next-event briefing with three equal command actions, and added collapsible
+  celestial-body groups ordered outward from the system primary with each moon
+  immediately after its parent. The astronaut roster now keeps roster-wide
+  status totals in the header while its count and readable table remain
+  filterable.
+- Repositioned the separate Upcoming Alarms and Active Contracts panels below
+  the astronaut roster on wide inactive screens, bounded alarm overflow with an
+  internal scroll, and added a contract focus mode that promotes a selected
+  briefing into the full right column with a persistent contract rail, readable
+  synopsis and objectives, collapsible flavor copy and technical conditions,
+  due dates, rewards, and notes when KSP exposes those fields. `BACK`, Escape,
+  and outside-click return paths restore the compact dashboard and selected
+  contract focus;
+  alarm countdowns now anchor the right edge after their source/type tags, and
+  contract due dates use a larger high-contrast treatment.
+- Removed panel hide and restore controls from the main inactive overview so
+  Transfer Windows, Active Vessels, Astronaut Roster, Upcoming Alarms, and
+  Active Contracts remain consistently available; celestial-body disclosures
+  and contract focus controls are unchanged.
+- Aligned the Resonant Orbit planner with the selected dashboard telemetry so
+  fixture and live Editor sessions use the same save context when pinning plans.
+- Redesigned the pinned Editor Resonant Orbit plan as a compact constellation
+  and carrier-orbit card, with the saved plan name and key maneuver facts in the
+  body plus an `EDIT PLAN` header action that restores that exact plan.
+- Redesigned the pinned Editor Mission Plan as a compact budget-versus-craft
+  briefing and connected route rail, with explicit reserve or shortfall,
+  larger coverage detail, assisted zero-burn steps, round-trip-aware route
+  summaries, exact-plan editing, and bounded expansion for long routes.
+- Consolidated Editor craft identity, wet mass, cost, and simulation conditions
+  into one full-width header, removed the redundant Editor Link strip, and
+  refocused Craft Summary as a dedicated resource inventory. Altitude and Mach
+  remain directly editable without native increment/decrement controls.
+- Reused that dense ten-stage mock craft in Editor so the same staged vehicle
+  can be inspected across Flight and VAB layout states.
+- Reclaimed the empty Editor planning column for a full-width craft-analysis
+  row with side-by-side staging and craft summary, repaired shared collapse
+  chevrons, and made dense staging explain omitted stages while revealing and
+  accessibly identifying the active stage.
+- Reused that side-by-side staging and craft-summary row when a plan is pinned
+  on wide Editor screens, keeping craft analysis compact beside its planning
+  companion.
+- Restored bounded staging and compact two-column resources in short-landscape
+  Editor layouts so dense craft analysis stays within the viewport.
+- Grouped Editor craft totals into higher-contrast Mass, Build, and Cost rails
+  so the summary scans consistently in both wide and pinned layouts.
+- Grouped distant powered stages behind an expandable range row when Flight
+  staging grows tall; expanded rows scroll inside the table while the active
+  and nearest stages remain visible by default.
+- Tightened Heat radiator-status spacing and raised the wide Heat panel cap
+  slightly so loop state controls sit closer to their temperature readouts.
+- Reflowed Ascension's orbital-stat rail before narrow panels can truncate
+  labels or telemetry values, while retaining the single-row proposal-target
+  layouts.
+- Expanded the deterministic Flight mock with detailed component inventories
+  for all three System Heat loops, two fission reactors plus one fusion reactor,
+  and nuclear, cryogenic, ore, and depleted-fuel consumables for frontend stress
+  testing without a running KSP session.
+- Made System Heat loop details an accordion: opening one loop collapses the
+  previously expanded loop, preserving the bounded Heat Management footprint
+  while retaining automatic expansion for a newly critical loop.
+
+- Replaced the auto-hidden Datalink panel with a persistent utility-rail drawer
+  containing browser-link status, endpoint and frame diagnostics, a bounded
+  connection-event log, forced refresh, and explicit off/on controls. These
+  controls affect only the dashboard WebSocket and leave Python, kRPC, and KSP
+  running.
+
+- Reworked Flight Ascension around a persistent attitude instrument, trajectory
+  annunciator, dedicated SAS strip, width-safe prominent altitude, 2x2
+  flight-speed grid, explanatory orbital-stat rail, and a centered
+  telemetry-projected spherical navball with curved coordinates, a true horizon,
+  and heading-aware cardinals;
+  removed the lower sparklines without adding RCS, vessel controls, backend
+  telemetry, or bitmap assets.
+
+- Simplified Flight Consumables to the authoritative vessel-total inventory,
+  giving resource names and amount meters substantially more horizontal room;
+  current-stage telemetry remains available internally for future contextual
+  use, while incomplete or unavailable polls no longer present cached resource
+  amounts as current.
+
+- Reduced the fixed caution surface to an actionable 2x2 HEAT, REACTOR, COMMS,
+  and POWER grid; dashboard-feed interruptions remain diagnostic history without
+  relighting Master. Reactor detail now expands toward Electricity's existing
+  height cap instead of inheriting the aggregate source ledger's height, then
+  exposes a dedicated wheel- and keyboard-scrollable list for any overflow.
+
+- Simplified the persistent Flight panel chrome by removing redundant
+  Consumables and Staging header summaries, moved the Tools label to the top of
+  the utility rail with a unified amber control treatment, and aligned System
+  Heat loop temperature bars to shared columns.
+
+- Restructured Flight around a persistent vessel-state region and switchable
+  MONITOR and PLAN workspaces. Responsive lane placement, Rebalance, and panel
+  restoration preserve mounted panel state while inactive or hidden panels
+  leave layout and accessibility flow and suspend their telemetry updates.
+- Added a software master caution and warning system with latched Flight safety
+  episodes, feed/source-integrity monitoring, condition-state annunciation,
+  and an accessible acknowledgement and history drawer.
+- Replaced transient caution tokens with permanent HEAT, REACTOR, COMMS, and
+  POWER indicators. New conditions illuminate red, individually acknowledged
+  active conditions remain amber, cleared conditions rearm, and dashboard-feed
+  diagnostics remain in history without lighting Master Caution.
+- Replaced the Target panel's passive type label with a guarded `UNSET TARGET`
+  control that revalidates the active vessel and exact selected kRPC object
+  before clearing it in KSP.
+- Replaced Flight panel hide-to-rail controls with compact, pointer-aware
+  information rails. Fixed Ascension, Consumables, and Staging Analysis remain
+  persistently expanded, while workspace panels collapse in place with useful
+  status and native controls visible and mounted state preserved. Older
+  hidden-Flight preferences migrate back into their owning workspace.
+- Replaced Electricity's separate Reactor Detail footer with an in-place
+  Reactors drill-in that temporarily replaces the power-source ledger at the
+  same measured height, keeps multi-reactor detail internally scrollable, and
+  returns focus to the Reactors source row when closed.
+- Moved Experiment Detail into Science's banked-data row and made it replace
+  lab data inside the same bounded, internally scrolling content slot, keeping
+  panel height stable and returning focus to its trigger when closed.
+- Set wide-layout maximum heights for Electricity and Heat Management,
+  aligned every source's numeric output against a shared `EC/s` unit column,
+  and capped expanded Heat loops inside an internally scrolling list.
+
 ## v0.4.4 - Launcher usability fixes
 
 - Kept every launcher control reachable on laptop-height displays with a

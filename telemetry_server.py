@@ -21,6 +21,7 @@ import json
 import math
 import mimetypes
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -75,6 +76,8 @@ OVERVIEW_MAX_VESSELS = 500
 OVERVIEW_MAX_VESSEL_NAME_LENGTH = 80
 OVERVIEW_MAX_VESSEL_CREW = 256
 OVERVIEW_MAX_KERBAL_NAME_LENGTH = 128
+OVERVIEW_MAX_CONTRACT_TEXT_LENGTH = 4000
+OVERVIEW_MAX_CONTRACT_PARAMETERS = 64
 OVERVIEW_TRACKED_VESSEL_TYPES = frozenset({
     "Debris", "Probe", "Rover", "Lander", "Ship", "Station", "Base",
     "Plane", "Relay",
@@ -957,12 +960,12 @@ def _current_stage_authority(stage_result):
 # ---------------------------------------------------------------------------
 def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
     """Return vessel and current-stage resources for dashboard rendering."""
-    out = {}
+    out = {"res.status": "known"}
     try:
         res = vessel.resources
         names = [name for name in res.names if _is_consumable_resource(name)]
     except Exception:
-        return {}
+        return {"res.status": "unknown"}
 
     out["res.names"] = names
     for n in names:
@@ -970,7 +973,7 @@ def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
             out[f"r.resource[{n}]"] = res.amount(n)
             out[f"r.resourceMax[{n}]"] = res.max(n)
         except Exception:
-            pass
+            out["res.status"] = "incomplete"
 
     stage = (
         _current_stage(vessel)
@@ -1035,46 +1038,54 @@ def _gather_dock(vessel, target_port):
     }
 
 
+def _current_target(space_center):
+    """Return the exact selected kRPC target proxy and its dashboard type."""
+    for attribute, target_type in (
+        ("target_docking_port", "dockingport"),
+        ("target_vessel", "vessel"),
+        ("target_body", "body"),
+    ):
+        try:
+            target = getattr(space_center, attribute)
+            if target is not None:
+                return target, target_type
+        except Exception:
+            pass
+    return None, ""
+
+
 def _gather_target(conn, vessel):
     sc = conn.space_center
     out = {}
-    tgt = None
-    ttype = ""
+    tgt, ttype = _current_target(sc)
     tport = None
     target_part = None
     target_vessel = None
 
-    try:
-        tport = sc.target_docking_port
-        if tport is not None:
-            tgt, ttype = tport, "dockingport"
-            try:
-                target_part = tport.part
-            except Exception:
-                target_part = None
-            try:
-                target_vessel = target_part.vessel
-            except Exception:
-                target_vessel = None
-    except Exception:
-        pass
-    if tgt is None:
+    if ttype == "dockingport":
+        tport = tgt
         try:
-            tv = sc.target_vessel
-            if tv is not None:
-                tgt, ttype = tv, "vessel"
+            target_part = tport.part
         except Exception:
-            pass
-    if tgt is None:
+            target_part = None
         try:
-            tb = sc.target_body
-            if tb is not None:
-                tgt, ttype = tb, "body"
+            target_vessel = target_part.vessel
         except Exception:
-            pass
+            target_vessel = None
 
     if tgt is None:
         return {"tar.name": ""}   # explicit "no target" -- dashboard hides the panel
+
+    try:
+        target_object_id = getattr(tgt, "_object_id")
+        if (
+            isinstance(target_object_id, int)
+            and not isinstance(target_object_id, bool)
+            and target_object_id > 0
+        ):
+            out["tar.objectId"] = str(target_object_id)
+    except Exception:
+        pass
 
     if ttype == "dockingport":
         try:
@@ -2091,6 +2102,9 @@ def _apply_telemetry_command(conn, command):
     if command.get("type") == "heat.loop.control":
         return _apply_heat_loop_control_command(conn, command)
 
+    if command.get("type") == "target.clear":
+        return _apply_target_clear_command(conn, command)
+
     if command.get("type") == "notes.pin":
         pinned = command.get("relativePath")
         if pinned is None or pinned == "":
@@ -2825,16 +2839,31 @@ def _gather_stock_heat(conn):
 
 def _gather_heat(conn):
     """Prefer real System Heat loops, then fall back to stock vessel heat."""
+    system_heat_status = "not_applicable"
     try:
-        result = _gather_system_heat(conn)
+        system_heat = conn.system_heat
+    except AttributeError:
+        system_heat = None
+    except Exception:
+        system_heat = None
+        system_heat_status = "unknown"
+    if system_heat is not None:
+        try:
+            if bool(system_heat.available):
+                result = _gather_system_heat(conn)
+                if result:
+                    result["heat.systemHeatStatus"] = "known"
+                    return result
+        except Exception:
+            system_heat_status = "unknown"
+    try:
+        result = _gather_stock_heat(conn)
         if result:
+            result["heat.systemHeatStatus"] = system_heat_status
             return result
     except Exception:
         pass
-    try:
-        return _gather_stock_heat(conn)
-    except Exception:
-        return None
+    return {"heat.systemHeatStatus": system_heat_status}
 
 
 def _overview_label(value, fallback=""):
@@ -2868,6 +2897,63 @@ def _overview_list(obj, name):
         return []
 
 
+def _overview_contract_text(obj, name, limit=OVERVIEW_MAX_CONTRACT_TEXT_LENGTH):
+    """Return bounded plain text from KSP's contract briefing fields."""
+    value = _overview_value(obj, name)
+    if value is None:
+        return ""
+    try:
+        text = str(value).strip()
+    except Exception:
+        return ""
+    if not text:
+        return ""
+    # KSP contract text can include Unity rich-text tags. The dashboard renders
+    # a compact plain-text briefing, so do not expose the markup as content.
+    text = re.sub(r"</?[A-Za-z][A-Za-z0-9-]*(?:=[^<>]*)?\s*>", "", text)
+    text = "".join(
+        character if character in "\n\t" or ord(character) >= 32 else " "
+        for character in text
+    ).strip()
+    return text[:limit]
+
+
+def _overview_contract_parameters(contract):
+    """Flatten a bounded contract-parameter tree for an accessible summary."""
+    rows = []
+
+    def append(parameters, depth):
+        if depth > 8:
+            return
+        for parameter in parameters:
+            if len(rows) >= OVERVIEW_MAX_CONTRACT_PARAMETERS:
+                return
+            title = _overview_contract_text(parameter, "title", 512)
+            if title:
+                completed = _overview_value(parameter, "completed") is True
+                failed = _overview_value(parameter, "failed") is True
+                row = {
+                    "title": title,
+                    "status": (
+                        "complete" if completed else
+                        "failed" if failed else
+                        "incomplete"
+                    ),
+                    "depth": depth,
+                }
+                optional = _overview_value(parameter, "optional")
+                if isinstance(optional, bool):
+                    row["optional"] = optional
+                notes = _overview_contract_text(parameter, "notes", 1000)
+                if notes:
+                    row["notes"] = notes
+                rows.append(row)
+            append(_overview_list(parameter, "children"), depth + 1)
+
+    append(_overview_list(contract, "parameters"), 0)
+    return rows
+
+
 def _overview_crew_names(vessel):
     """Return an exact bounded crew list, or None when it cannot be trusted."""
     try:
@@ -2895,6 +2981,90 @@ def _overview_vessel_switch_result(request_id, status, message):
         "status": status,
         "message": message,
     }
+
+
+def _target_clear_result(request_id, status, message):
+    return {
+        "type": "target.clear.result",
+        "requestId": request_id if isinstance(request_id, str) else "",
+        "status": status,
+        "message": message,
+    }
+
+
+def _apply_target_clear_command(conn, command):
+    """Clear the exact target observed on the expected active vessel."""
+    request_id = command.get("requestId")
+
+    def reject(message):
+        return _target_clear_result(request_id, "error", message)
+
+    if (
+        not isinstance(request_id, str)
+        or not request_id
+        or len(request_id) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid target-clear request ID is required.")
+
+    expected_vessel_guid = command.get("expectedVesselGuid")
+    if (
+        not isinstance(expected_vessel_guid, str)
+        or not expected_vessel_guid
+        or len(expected_vessel_guid) > MAX_ACTION_ID_LENGTH
+    ):
+        return reject("A valid expected vessel ID is required.")
+
+    expected_target_object_id = command.get("expectedTargetObjectId")
+    if (
+        not isinstance(expected_target_object_id, str)
+        or not expected_target_object_id.isdecimal()
+        or len(expected_target_object_id) > 20
+    ):
+        return reject("A valid expected target identity is required.")
+    target_object_id = int(expected_target_object_id)
+    if target_object_id <= 0:
+        return reject("A valid expected target identity is required.")
+
+    expected_target_type = command.get("expectedTargetType")
+    if expected_target_type not in {"body", "dockingport", "vessel"}:
+        return reject("A valid expected target type is required.")
+
+    expected_target_name = command.get("expectedTargetName")
+    if (
+        not isinstance(expected_target_name, str)
+        or not expected_target_name.strip()
+        or len(expected_target_name) > 256
+    ):
+        return reject("A valid expected target name is required.")
+    expected_target_name = expected_target_name.strip()
+
+    try:
+        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+            return reject("Targets can be cleared only in flight.")
+
+        current_identity = _mission_planning.current_craft_identity(conn, "flight")
+        current_vessel_guid = str(current_identity.get("v.guid", "")).strip()
+        if current_vessel_guid != expected_vessel_guid:
+            return reject("The active vessel changed; refresh before clearing its target.")
+
+        current_target, current_target_type = _current_target(conn.space_center)
+        if current_target is None:
+            return reject("KSP no longer has a target selected.")
+        current_target_object_id = getattr(current_target, "_object_id", None)
+        if (
+            current_target_type != expected_target_type
+            or current_target_object_id != target_object_id
+        ):
+            return reject("The selected target changed; refresh before clearing it.")
+
+        conn.space_center.clear_target()
+        return _target_clear_result(
+            request_id,
+            "accepted",
+            f"Target {expected_target_name} cleared.",
+        )
+    except Exception as exc:
+        return reject(f"Target clear failed: {exc}")
 
 
 _HEAT_LOOP_CONTROL_ACTIONS = {"start", "stop"}
@@ -3556,11 +3726,39 @@ def _gather_overview_contracts(sc):
     }
     active_rows = []
     for contract in groups["active"]:
+        deadline = _overview_finite_float(
+            _overview_value(contract, "date_deadline")
+        )
+        if deadline is None:
+            deadline = _overview_finite_float(
+                _overview_value(contract, "deadline")
+            )
         row = {
-            "title": _overview_value(contract, "title", "Untitled contract"),
+            "title": (
+                _overview_contract_text(contract, "title", 512) or
+                "Untitled contract"
+            ),
             "type": _overview_label(_overview_value(contract, "type"), "Contract"),
-            "deadline": _overview_value(contract, "date_deadline"),
+            "deadline": deadline,
         }
+        contract_object_id = _overview_value(contract, "_object_id")
+        if (
+            isinstance(contract_object_id, int)
+            and not isinstance(contract_object_id, bool)
+            and contract_object_id > 0
+        ):
+            row["objectId"] = str(contract_object_id)
+        for source, target in (
+            ("synopsis", "synopsis"),
+            ("description", "description"),
+            ("notes", "notes"),
+        ):
+            text = _overview_contract_text(contract, source)
+            if text:
+                row[target] = text
+        parameters = _overview_contract_parameters(contract)
+        if parameters:
+            row["parameters"] = parameters
         for source, target in (
             ("funds_completion", "fundsCompletion"),
             ("reputation_completion", "reputationCompletion"),
@@ -4004,6 +4202,40 @@ def _gather_reactors(system_heat):
     return reactors
 
 
+def _gather_reactor_telemetry(conn):
+    """Return reactors plus an explicit completeness state for alarm rules."""
+    try:
+        service = conn.system_heat
+    except AttributeError:
+        return {"elec.reactorsStatus": "not_applicable"}
+    except Exception:
+        return {"elec.reactorsStatus": "unknown"}
+    try:
+        if not service.available:
+            return {"elec.reactorsStatus": "not_applicable"}
+        return {
+            "elec.reactors": _gather_reactors(service),
+            "elec.reactorsStatus": "known",
+        }
+    except Exception:
+        return {"elec.reactorsStatus": "unknown"}
+
+
+def _gather_throttle_state(vessel):
+    """Return commanded throttle plus limiter-adjusted vessel thrust."""
+    out = {}
+    try:
+        out["krpc.throttle"] = vessel.control.throttle
+    except Exception:
+        pass
+    try:
+        out["v.thrust"] = vessel.thrust
+        out["v.availableThrust"] = vessel.available_thrust
+    except Exception:
+        pass
+    return out
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_current_authority
     global _stage_last_poll, _stage_last_ut
@@ -4099,11 +4331,8 @@ def gather_telemetry(conn):
     except Exception:
         pass
 
-    # ---- throttle ----
-    try:
-        d["krpc.throttle"] = vessel.control.throttle
-    except Exception:
-        pass
+    # ---- throttle + active-engine thrust ----
+    d.update(_gather_throttle_state(vessel))
 
     # ---- navball + flight + orbit (every tick; all cheap) ----
     try:
@@ -4209,11 +4438,9 @@ def gather_telemetry(conn):
     if now - _res_last_poll >= RES_POLL_SECONDS:
         _res_last_poll = now
         try:
-            r = _gather_resources(vessel, current_stage=cs)
-            if r:
-                _res_cache = r
+            _res_cache = _gather_resources(vessel, current_stage=cs)
         except Exception:
-            pass
+            _res_cache = {"res.status": "unknown"}
     d.update(_res_cache)
 
     # ---- target + docking ----
@@ -4274,11 +4501,7 @@ def gather_telemetry(conn):
         except Exception:
             pass
 
-        try:
-            sh = conn.system_heat
-            elec["elec.reactors"] = _gather_reactors(sh)
-        except Exception:
-            pass  # service not present / scene change
+        elec.update(_gather_reactor_telemetry(conn))
 
         try:
             sh = conn.system_heat

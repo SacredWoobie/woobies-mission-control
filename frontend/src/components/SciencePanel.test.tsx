@@ -30,6 +30,33 @@ describe("SciencePanel", () => {
     expect(container.querySelector('[role="meter"][aria-label*="science 0% full"]')).toBeTruthy();
   });
 
+  it("replaces lab data with experiment detail without changing the content-slot height", () => {
+    const { container } = renderPanel(flightTelemetryFixture);
+    const baseline = container.querySelector(".sci-baseline-view") as HTMLDivElement;
+    const detail = container.querySelector(".sci-experiment-view") as HTMLElement;
+    const slot = container.querySelector(".sci-content-slot") as HTMLElement;
+    const open = screen.getByRole("button", { name: "Open experiment detail" });
+
+    expect(open.closest(".sci-banked")).toBeTruthy();
+    expect(container.querySelector(".sci-details")).toBeNull();
+    expect(baseline.hidden).toBe(false);
+    expect(detail.hidden).toBe(true);
+    expect(screen.getByLabelText("Science laboratories")).toBeTruthy();
+    vi.spyOn(baseline, "getBoundingClientRect").mockReturnValue({ height: 214 } as DOMRect);
+
+    fireEvent.click(open);
+    expect(baseline.hidden).toBe(true);
+    expect(detail.hidden).toBe(false);
+    expect(slot.style.height).toBe("214px");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Back to lab data" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to lab data" }));
+    expect(baseline.hidden).toBe(false);
+    expect(detail.hidden).toBe(true);
+    expect(slot.style.height).toBe("");
+    expect(document.activeElement).toBe(open);
+  });
+
   it("shows the cap-blocked guidance only for a full lab", () => {
     const base = flightTelemetryFixture["sci.krpc.labs"]?.[0] as ScienceLabTelemetry;
     renderPanel({
@@ -102,6 +129,7 @@ describe("SciencePanel", () => {
       }],
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Open experiment detail" }));
     expect(screen.getByText((_, element) => element?.textContent === "12.0 / 7.0 tx")).toBeTruthy();
     expect(screen.getByText("Goo canister · 4 data", { exact: true })).toBeTruthy();
   });

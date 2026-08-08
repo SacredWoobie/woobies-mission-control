@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMissionUT } from "../deltaV/PorkchopPlotModal";
 import type { TelemetryCommand, TelemetrySnapshot, TransferWindowTelemetry } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
-import { usePanelVisibility } from "./PanelVisibility";
 
 let autoRefreshRequestedForPage = false;
 
@@ -55,7 +54,6 @@ export function TransferWindowsPanel({
   onSendCommand?(command: TelemetryCommand): boolean;
   snapshot: TelemetrySnapshot;
 }) {
-  const { hidePanel } = usePanelVisibility();
   const { system } = useTimeSystem();
   const kerbin = isKerbinTime(system);
   const [sendError, setSendError] = useState("");
@@ -144,7 +142,6 @@ export function TransferWindowsPanel({
           ? <button aria-label="Cancel refresh" className="overview-header-button" disabled={!commandEnabled || state === "cancelling"} onClick={cancel} title="Cancel transfer-window refresh" type="button">Cancel</button>
           : <button aria-label={expired ? "Refresh expired windows" : rows.length ? "Refresh windows" : "Calculate windows"} className="overview-header-button" disabled={!commandEnabled || !serviceReady} onClick={refresh} title={expired ? "Refresh expired transfer windows" : rows.length ? "Refresh transfer windows" : "Calculate transfer windows"} type="button">{expired ? "Refresh expired" : rows.length ? "Refresh" : "Calculate"}</button>}
         <strong>{rows.length}</strong>
-        <button aria-label="Hide Transfer windows panel" className="panel-hide-button" onClick={() => hidePanel("overviewTransfers")} title="Hide panel" type="button">{"\u2039"}</button>
       </div>
     </header>
     <div className="transfer-window-body">

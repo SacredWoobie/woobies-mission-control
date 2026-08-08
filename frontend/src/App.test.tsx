@@ -4,8 +4,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ConsumablesPanel } from "./components/ConsumablesPanel";
-import { cascadeFlightPanels, flightPanelRegion } from "./components/FlightDashboard";
 import { StagingPanel } from "./components/StagingPanel";
+import { balanceContiguousPanelLanes, flightPanelOwner } from "./flight/layout";
 import {
   editorTelemetryFixture,
   flightTelemetryFixture,
@@ -80,21 +80,20 @@ afterEach(() => {
 });
 
 describe("Dashboard lifecycle", () => {
-  it("assigns every flight panel to a stable semantic region", () => {
-    expect(flightPanelRegion("asc")).toBe("primary");
-    ["cons", "heat", "elec", "sci"].forEach((id) => {
-      expect(flightPanelRegion(id as "cons")).toBe("health");
+  it("assigns every flight panel to its stable fixed or workspace owner", () => {
+    ["asc", "cons", "stage"].forEach((id) => {
+      expect(flightPanelOwner(id as "asc")).toBe("fixed");
     });
-    ["stage", "target"].forEach((id) => {
-      expect(flightPanelRegion(id as "stage")).toBe("operations");
+    ["heat", "elec", "sci", "target"].forEach((id) => {
+      expect(flightPanelOwner(id as "elec")).toBe("monitor");
     });
     ["flightNote", "flightOrbitPlan", "flightDeltaVPlan"].forEach((id) => {
-      expect(flightPanelRegion(id as "flightNote")).toBe("reference");
+      expect(flightPanelOwner(id as "flightNote")).toBe("plan");
     });
   });
 
   it("cascades wide flight panels vertically before moving to the next lane", () => {
-    expect(cascadeFlightPanels(
+    expect(balanceContiguousPanelLanes(
       ["elec", "heat", "sci", "stage", "flightOrbitPlan", "flightDeltaVPlan"],
       {
         heat: 229,
@@ -112,7 +111,7 @@ describe("Dashboard lifecycle", () => {
   });
 
   it("fills wide flow lanes to the fixed primary-column height before moving right", () => {
-    expect(cascadeFlightPanels(
+    expect(balanceContiguousPanelLanes(
       ["elec", "heat", "sci", "stage"],
       {
         elec: 197,
@@ -142,94 +141,125 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("button", { name: "Time system: Earth" })).toBeTruthy();
   });
 
-  it("renders the complete flight dashboard and restores hidden panels from the left rail", () => {
+  it("renders the complete flight dashboard with in-place Flight panel collapse", () => {
     const firstView = render(<App />);
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.4 · Development")).toBeTruthy();
-    ["Datalink", "Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target", "Pinned note"].forEach((heading) => {
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.5.0 · Development")).toBeTruthy();
+    ["Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
       expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });
+    expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Datalink controls" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /^Pinned note/ })).toBeNull();
+    expect(screen.getByRole("tab", { name: "MONITOR" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("false");
+    const monitorTab = screen.getByRole("tab", { name: "MONITOR" });
+    const planTab = screen.getByRole("tab", { name: "PLAN" });
+    monitorTab.focus();
+    fireEvent.keyDown(monitorTab, { key: "ArrowRight" });
+    expect(planTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(planTab);
+    fireEvent.keyDown(planTab, { key: "Home" });
+    expect(monitorTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(monitorTab);
     const flightContext = firstView.container.querySelector("#clock");
     expect(flightContext?.textContent).toContain("Odyssey");
     expect(flightContext?.textContent).toContain("Kerbin");
     expect(flightContext?.textContent).toContain("Orbiting");
     expect(screen.queryByRole("button", { name: "Hide Flight context panel" })).toBeNull();
-    expect(firstView.container.querySelector("#target .tag")?.textContent).toBe("Docking port");
+    expect(firstView.container.querySelector("#target .tag")?.textContent).toBe("Odyssey Station Docking Port");
+    expect((screen.getByRole("button", { name: "UNSET TARGET" }) as HTMLButtonElement).disabled).toBe(true);
     expect(firstView.container.querySelector("#target .tgt-name")?.textContent).toBe("Odyssey Station Docking Port");
     expect(firstView.container.querySelector("#target")?.textContent).toContain("2.3\u2009m/s");
     expect(screen.getAllByRole("button", { name: "Notes" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Notes" }).querySelector(".panel-rail-icon-notes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Notes" }).querySelector(".panel-rail-label")?.textContent).toBe("Notes");
-    const dashboardRail = screen.getByRole("navigation", { name: "Dashboard controls" });
+    screen.getByRole("navigation", { name: "Dashboard controls" });
     const toolsGroup = screen.getByRole("group", { name: "Tools" });
     const resonantTool = screen.getByRole("button", { name: "Resonant orbit planner" });
     const deltaVTool = screen.getByRole("button", { name: "Delta-v planner" });
     expect(toolsGroup.textContent).toContain("Tools");
+    expect(toolsGroup.firstElementChild?.classList.contains("dashboard-rail-section-label")).toBe(true);
+    expect(toolsGroup.contains(screen.getByRole("button", { name: "Datalink" }))).toBe(true);
+    expect(toolsGroup.contains(screen.getByRole("button", { name: "Notes" }))).toBe(true);
     expect(toolsGroup.contains(resonantTool)).toBe(true);
     expect(toolsGroup.contains(deltaVTool)).toBe(true);
     expect(resonantTool.classList.contains("dashboard-tool-button")).toBe(true);
     expect(deltaVTool.classList.contains("dashboard-tool-button")).toBe(true);
     expect(resonantTool.querySelector(".panel-rail-label")?.textContent).toBe("Resonant Orbit Planner");
     expect(deltaVTool.querySelector(".panel-rail-label")?.textContent).toBe("Delta-V Planner");
-    expect(firstView.container.querySelector("#conn")?.textContent).not.toContain("Notes");
-    expect(firstView.container.querySelector("svg.spark")?.getAttribute("preserveAspectRatio")).toBe("none");
-    expect(firstView.container.querySelector(".nav-sky")).toBeTruthy();
-    expect(firstView.container.querySelector(".nav-ground")).toBeTruthy();
-    const primaryRegion = firstView.container.querySelector('[data-flight-region="primary"]');
-    const operationsRegion = firstView.container.querySelector('[data-flight-region="operations"]');
-    const healthRegion = firstView.container.querySelector('[data-flight-region="health"]');
-    const referenceRegion = firstView.container.querySelector('[data-flight-region="reference"]');
-    const ascensionSlot = primaryRegion?.querySelector(".flight-panel-slot-asc");
+    expect(firstView.container.querySelector("#conn")).toBeNull();
+    expect(firstView.container.querySelector("svg.spark")).toBeNull();
+    expect(firstView.container.querySelector(".attitude-strip")).toBeTruthy();
+    expect(firstView.container.querySelector(".nav-sphere-ground")).toBeTruthy();
+    expect(firstView.container.querySelector(".nav-spherical-grid")).toBeTruthy();
+    const fixedRegion = firstView.container.querySelector('[data-flight-region="fixed"]');
+    const tabbedRegion = firstView.container.querySelector('[data-flight-region="tabbed"]');
+    const monitorView = tabbedRegion?.querySelector('[data-flight-workspace-view="monitor"]');
+    const planView = tabbedRegion?.querySelector('[data-flight-workspace-view="plan"]');
+    const ascensionSlot = fixedRegion?.querySelector(".flight-panel-slot-asc");
     expect(ascensionSlot?.querySelector("#asc")).toBeTruthy();
-    expect(operationsRegion?.querySelector("#stage")).toBeTruthy();
-    expect(operationsRegion?.querySelector("#target")).toBeTruthy();
-    expect(healthRegion?.querySelector("#cons")).toBeTruthy();
-    expect(healthRegion?.querySelector(".flight-health-lane-resources #heat")).toBeTruthy();
-    expect(healthRegion?.querySelector(".flight-health-lane-systems #elec")).toBeTruthy();
-    expect(healthRegion?.querySelector(".flight-health-lane-systems #sci")).toBeTruthy();
-    expect(referenceRegion?.querySelector("#flightNote")).toBeTruthy();
+    expect(fixedRegion?.querySelector("#cons")).toBeTruthy();
+    expect(fixedRegion?.querySelector("#stage")).toBeTruthy();
+    expect(monitorView?.querySelector("#target")).toBeTruthy();
+    expect(monitorView?.querySelector("#heat")).toBeTruthy();
+    expect(monitorView?.querySelector("#elec")).toBeTruthy();
+    expect(monitorView?.querySelector("#sci")).toBeTruthy();
+    expect(planView?.querySelector("#flightNote")).toBeTruthy();
     expect([...firstView.container.querySelectorAll("[data-flight-panel]")].map((slot) => slot.getAttribute("data-flight-panel"))).toEqual([
-      "asc", "stage", "target", "cons", "heat", "elec", "sci", "flightNote",
+      "asc", "cons", "stage", "elec", "heat", "sci", "target", "flightNote",
     ]);
     const pinnedNote = firstView.container.querySelector("#flightNote");
     expect(pinnedNote?.querySelector("h2 .flight-note-name")?.textContent).toBe("log_Odyssey");
     expect(pinnedNote?.querySelector("h2 .notes-font-controls")).toBeTruthy();
     expect(pinnedNote?.querySelector("h2 .flight-note-unpin")).toBeTruthy();
     expect(pinnedNote?.querySelector(".body")?.firstElementChild?.className).toBe("flight-note-meta");
+    fireEvent.click(screen.getByRole("tab", { name: "PLAN" }));
+    expect(screen.getByRole("heading", { name: /^Pinned note/ })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /^Electricity/ })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "MONITOR" }));
     expect(flightTelemetryFixture["stage.totalDvAtmo"]).toBe(flightTelemetryFixture["stage.totalDvVac"]);
     expect(screen.queryByRole("button", { name: "CURRENT" })).toBeNull();
     expect(screen.queryByRole("button", { name: "VACUUM" })).toBeNull();
     expect(screen.getByText("Total Δv · vacuum", { exact: true })).toBeTruthy();
-    expect(screen.getByText("Δv current", { exact: true })).toBeTruthy();
-    expect(screen.getByText("Δv vac", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Δv LIVE", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Δv VAC", { exact: true })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide Heat Management panel" }));
-    expect(firstView.container.querySelector("#heat")).toBeNull();
-    const restore = screen.getByRole("button", { name: "Heat" });
-    expect(restore.querySelector(".panel-rail-label")?.textContent).toBe("Heat Management");
-    expect(restore.querySelector(".panel-rail-icon-heat")).toBeTruthy();
-    const railButtons = [...dashboardRail.querySelectorAll<HTMLElement>("button")];
-    expect(railButtons.indexOf(restore)).toBeLessThan(railButtons.indexOf(resonantTool));
-    expect(railButtons.indexOf(restore)).toBeLessThan(railButtons.indexOf(deltaVTool));
-    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).toContain("heat");
-    fireEvent.click(restore);
-    expect(firstView.container.querySelector("#heat")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Hide Ascension panel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide Consumables panel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide Pinned note panel" }));
-    const pinnedRestore = screen.getByRole("button", { name: "Pinned note" });
-    expect(pinnedRestore.querySelector(".panel-rail-icon-flightNote")).toBeTruthy();
-    expect(pinnedRestore.nextElementSibling).toBe(screen.getByRole("button", { name: "Notes" }));
-    expect(firstView.container.querySelector("[data-flight-panel=\"asc\"]")).toBeNull();
-    expect(firstView.container.querySelector("[data-flight-panel=\"cons\"]")).toBeNull();
+    const heatNode = firstView.container.querySelector("#heat");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Heat Management" }));
+    expect(firstView.container.querySelector("#heat")).toBe(heatNode);
+    expect(heatNode?.classList.contains("panel-collapsed")).toBe(true);
+    expect((heatNode?.querySelector(".body") as HTMLElement).hidden).toBe(true);
+    expect(screen.queryByRole("button", { name: "Heat" })).toBeNull();
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("heat");
+    fireEvent.click(screen.getByRole("button", { name: "Expand Heat Management" }));
+    expect((heatNode?.querySelector(".body") as HTMLElement).hidden).toBe(false);
+    expect(screen.queryByRole("button", { name: "Collapse Ascension" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Collapse Consumables" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Collapse Staging analysis" })).toBeNull();
+    expect(fixedRegion?.hasAttribute("hidden")).toBe(false);
+    expect(firstView.container.querySelector(".flight-workspace-shell")?.getAttribute("data-fixed-empty")).toBe("false");
+    fireEvent.click(screen.getByRole("tab", { name: "PLAN" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Pinned note" }));
+    expect(firstView.container.querySelector("#flightNote")?.classList.contains("panel-collapsed")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Pinned note" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand Pinned note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase pinned note text size" }));
+    expect(screen.getByRole("button", { name: "Reset pinned note text size" }).textContent).toBe("15px");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Pinned note" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand Pinned note" }));
+    expect(screen.getByRole("button", { name: "Reset pinned note text size" }).textContent).toBe("15px");
+    expect(firstView.container.querySelector("[data-flight-panel=\"asc\"]")).toBeTruthy();
+    expect(firstView.container.querySelector("[data-flight-panel=\"cons\"]")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "MONITOR" }));
     firstView.unmount();
 
     localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["sci"]));
     const packedView = render(<App />);
-    expect(screen.queryByRole("heading", { name: "Science" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Science" }).querySelector(".panel-rail-label")?.textContent).toBe("Science");
-    expect([...packedView.container.querySelectorAll("[data-flight-panel]")].map((slot) => slot.getAttribute("data-flight-panel"))).toEqual([
-      "asc", "stage", "target", "cons", "heat", "elec", "flightNote",
-    ]);
+    expect(screen.getByRole("heading", { name: /^Science/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Science" })).toBeNull();
+    expect(packedView.container.querySelector("#sci")).toBeTruthy();
+    expect(packedView.container.querySelector('[data-flight-panel-host="sci"]')?.getAttribute("aria-hidden")).not.toBe("true");
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("sci");
   });
 
   it("removes ElectricCharge from Flight Consumables", () => {
@@ -239,16 +269,33 @@ describe("Dashboard lifecycle", () => {
     expect(container.querySelector("#cons > h2 .tag")).toBeNull();
     expect(container.textContent).not.toContain("Electric Charge");
     expect(container.textContent).toContain("Liquid Fuel");
+    expect(container.textContent).not.toContain("Current stage");
+    expect(container.querySelectorAll("#cons [role=\"meter\"]")).toHaveLength(2);
   });
 
   it("renders unavailable and pending lifecycle states without stale values", () => {
     const unavailableResources = {
       ...flightTelemetryFixture,
+      "res.status": "unknown" as const,
       "res.stageKnown": false,
     };
     const resourceView = render(<ConsumablesPanel snapshot={unavailableResources} />);
-    expect(resourceView.container.textContent).toContain("Current-stage column unavailable");
+    expect(resourceView.container.textContent).not.toContain("Current-stage column unavailable");
+    expect(resourceView.container.textContent).toContain("Consumable telemetry unavailable.");
+    expect(resourceView.container.textContent).not.toContain("Liquid Fuel");
     resourceView.unmount();
+
+    const incompleteResources = {
+      ...flightTelemetryFixture,
+      "res.status": "incomplete" as const,
+      "r.resource[Oxidizer]": undefined,
+      "r.resourceMax[Oxidizer]": undefined,
+    };
+    const incompleteView = render(<ConsumablesPanel snapshot={incompleteResources} />);
+    expect(incompleteView.container.textContent).toContain("Consumable telemetry incomplete.");
+    expect(incompleteView.container.textContent).toContain("Liquid Fuel");
+    expect(incompleteView.container.textContent).not.toContain("Oxidizer");
+    incompleteView.unmount();
 
     render(<StagingPanel snapshot={{
       ...flightTelemetryFixture,
@@ -264,13 +311,16 @@ describe("Dashboard lifecycle", () => {
 
     act(() => firstSocket.message(flightTelemetryFixture));
     expect(screen.queryByRole("heading", { name: /Datalink/ })).toBeNull();
-    const datalinkRestore = screen.getByRole("button", { name: "Datalink" });
-    expect(datalinkRestore.classList.contains("datalink-rail-tab")).toBe(true);
-    expect(datalinkRestore.querySelector(".panel-rail-icon-conn")).toBeTruthy();
+    const datalinkButton = screen.getByRole("button", { name: "Datalink" });
+    expect(datalinkButton.classList.contains("datalink-rail-tab")).toBe(true);
+    expect(datalinkButton.querySelector(".panel-rail-icon-conn")).toBeTruthy();
     expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("conn");
-    fireEvent.click(datalinkRestore);
-    expect(screen.getByRole("heading", { name: /Datalink/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Datalink" })).toBeNull();
+    fireEvent.click(datalinkButton);
+    const datalinkDrawer = screen.getByRole("dialog", { name: "Datalink controls" });
+    expect(datalinkDrawer).toBeTruthy();
+    expect(screen.getByText("Browser WebSocket", { exact: true })).toBeTruthy();
+    expect(datalinkDrawer.textContent).toContain("FRAMES THIS SESSION1");
+    fireEvent.click(screen.getByRole("button", { name: "Close Datalink drawer" }));
     fireEvent.click(screen.getByRole("button", { name: "Notes" }));
     expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close Notes drawer" })).toBeNull();
@@ -291,10 +341,12 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Notes reference" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close Notes preview" }));
-    expect(screen.getAllByText("EDITOR LINK", { exact: true })).toHaveLength(2);
-    expect(screen.getByRole("heading", { name: /Datalink/ })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /Craft summary/ })).toBeTruthy();
-    expect(screen.getByText("Dual-condition regression craft", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("EDITOR LINK", { exact: true })).toBeNull();
+    expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Resource inventory/ })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Craft resource inventory" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Dual-condition regression craft" })).toBeTruthy();
+    expect(screen.getByText("VAB · 31 parts · 10 stages · 3 seats", { exact: true })).toBeTruthy();
     expect(screen.getByText("Analysis current", { exact: true })).toBeTruthy();
     expect(screen.queryByText("KSP stages activate from the highest stage number down to S0.")).toBeNull();
     expect(screen.queryByText("Launch stage", { exact: true })).toBeNull();
@@ -310,16 +362,15 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByText("Liquid Fuel", { exact: true })).toBeTruthy();
     expect(screen.queryByText(/revision/i)).toBeNull();
     const editorWorkspace = document.querySelector(".editor-workspace");
+    const editorContent = editorWorkspace?.querySelector(".editor-workspace-content");
     const editorPrimary = editorWorkspace?.querySelector(".editor-workspace-primary");
     const editorSecondary = editorWorkspace?.querySelector(".editor-workspace-secondary");
-    expect(editorPrimary?.firstElementChild?.id).toBe("editorContext");
-    expect(editorPrimary?.children[1]?.classList.contains("editor-staging-slice")).toBe(true);
+    expect(editorWorkspace?.classList.contains("no-planning-companion")).toBe(true);
+    expect(editorWorkspace?.firstElementChild?.id).toBe("editorContext");
+    expect(editorContent?.firstElementChild).toBe(editorPrimary);
+    expect(editorPrimary?.firstElementChild?.classList.contains("editor-staging-slice")).toBe(true);
     expect(editorPrimary?.lastElementChild?.id).toBe("editorSummary");
     expect(editorSecondary?.querySelector("#editorSummary")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Collapse Craft analysis" }));
-    expect(document.querySelector("#editorContext")?.classList.contains("panel-collapsed")).toBe(true);
-    expect(screen.queryByLabelText("Reference body")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Expand Craft analysis" }));
     expect(screen.getByLabelText("Reference body")).toBeTruthy();
 
     const commandsBeforeEditorChange = firstSocket.sent.length;
@@ -367,9 +418,9 @@ describe("Dashboard lifecycle", () => {
     act(() => firstSocket.message(inactiveTelemetryFixture));
     expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close Notes preview" }));
-    expect(screen.getAllByText("MISSION CONTROL LINK", { exact: true })).toHaveLength(1);
+    expect(screen.queryByText("MISSION CONTROL LINK", { exact: true })).toBeNull();
     expect(document.querySelector(".inactive-mode .slice-status")).toBeNull();
-    expect(screen.getByRole("heading", { name: /Datalink/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Woobie's Mission Control" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Transfer windows" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Active vessels" })).toBeTruthy();
@@ -393,6 +444,41 @@ describe("Dashboard lifecycle", () => {
     });
     expect(screen.getByRole("button", { name: "Datalink" })).toBeTruthy();
     expect(screen.getAllByText("Odyssey", { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it("refreshes and toggles the browser datalink from its utility drawer", () => {
+    const firstSocket = openLiveConnection();
+    act(() => firstSocket.message(flightTelemetryFixture));
+    fireEvent.click(screen.getByRole("button", { name: "Datalink" }));
+
+    const drawer = screen.getByRole("dialog", { name: "Datalink controls" });
+    expect(drawer.textContent).toContain("LINKED");
+    expect(drawer.textContent).toContain("127.0.0.1:8091");
+    expect(drawer.textContent).toContain("FRAMES THIS SESSION");
+    expect(drawer.textContent).toContain("Browser telemetry socket linked.");
+
+    fireEvent.click(screen.getByRole("button", { name: /^REFRESH CONNECTION/ }));
+    expect(firstSocket.readyState).toBe(3);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(screen.getByText("Manual connection refresh requested.", { exact: true })).toBeTruthy();
+
+    const refreshedSocket = FakeWebSocket.instances[1];
+    act(() => {
+      refreshedSocket.open();
+      refreshedSocket.message(flightTelemetryFixture);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^TURN DATALINK OFF/ }));
+    expect(refreshedSocket.readyState).toBe(3);
+    expect(screen.getByText("DATALINK OFF", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^TURN DATALINK ON/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^TURN DATALINK ON/ }));
+    expect(FakeWebSocket.instances).toHaveLength(3);
+    const restartedSocket = FakeWebSocket.instances[2];
+    act(() => restartedSocket.open());
+    expect(screen.getByText("LINKED", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Manual datalink stop requested.", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Manual datalink start requested.", { exact: true })).toBeTruthy();
   });
 
   it("does not rerender a consumables subscriber for unrelated frames", () => {

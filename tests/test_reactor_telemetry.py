@@ -1,7 +1,11 @@
 import unittest
 from types import SimpleNamespace
 
-from telemetry_server import _apply_reactor_control_command, _gather_reactors
+from telemetry_server import (
+    _apply_reactor_control_command,
+    _gather_reactor_telemetry,
+    _gather_reactors,
+)
 
 
 class LegacyFissionService:
@@ -171,6 +175,33 @@ def reactor_command_connection(service, vessel_id="vessel-1"):
 
 
 class ReactorTelemetryTests(unittest.TestCase):
+    def test_reactor_source_reports_known_not_applicable_and_unknown(self):
+        available = FusionLifeService()
+        available.available = True
+        unavailable = SimpleNamespace(available=False)
+        failing = SimpleNamespace(
+            available=True,
+            reactor_count=lambda: (_ for _ in ()).throw(RuntimeError("RPC failed")),
+        )
+        incompatible = SimpleNamespace(available=True)
+
+        self.assertEqual(
+            _gather_reactor_telemetry(SimpleNamespace(system_heat=available))["elec.reactorsStatus"],
+            "known",
+        )
+        self.assertEqual(
+            _gather_reactor_telemetry(SimpleNamespace(system_heat=unavailable)),
+            {"elec.reactorsStatus": "not_applicable"},
+        )
+        self.assertEqual(
+            _gather_reactor_telemetry(SimpleNamespace(system_heat=failing)),
+            {"elec.reactorsStatus": "unknown"},
+        )
+        self.assertEqual(
+            _gather_reactor_telemetry(SimpleNamespace(system_heat=incompatible)),
+            {"elec.reactorsStatus": "unknown"},
+        )
+
     def test_legacy_service_defaults_to_fission_contract(self):
         reactor = _gather_reactors(LegacyFissionService())[0]
 

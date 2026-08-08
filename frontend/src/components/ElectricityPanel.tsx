@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   formatPercent,
   formatRateColumn,
@@ -81,6 +81,18 @@ function sourceDetail(source: ElectricitySourceViewModel) {
   return source.detail ?? `${source.count} installed`;
 }
 
+function SourceRate({ value }: { value: number | undefined }) {
+  const rendered = ecRate(value);
+  const suffix = " EC/s";
+  const amount = rendered.endsWith(suffix) ? rendered.slice(0, -suffix.length) : rendered;
+  return (
+    <strong className="ec-source-rate">
+      <span>{amount}</span>
+      <span>EC/s</span>
+    </strong>
+  );
+}
+
 function ChargeMeter({ model }: { model: ElectricityViewModel }) {
   const percent = isFiniteNumber(model.chargeFraction)
     ? Math.round(model.chargeFraction * 100)
@@ -147,13 +159,19 @@ function GenerationMeter({ model }: { model: ElectricityViewModel }) {
 
 function SourceLedger({
   generation,
+  hidden,
+  onOpenReactors,
+  reactorButtonRef,
   sources,
 }: {
   generation: number | undefined;
+  hidden: boolean;
+  onOpenReactors?: () => void;
+  reactorButtonRef?: RefObject<HTMLButtonElement | null>;
   sources: ElectricitySourceViewModel[];
 }) {
   return (
-    <div className="ec-source-ledger" aria-label="Electricity generation by source">
+    <div className="ec-source-ledger" aria-label="Electricity generation by source" hidden={hidden}>
       {sources.map((source) => {
         const idle = !isFiniteNumber(source.outputEcPerSec) || source.outputEcPerSec <= 0.05;
         const share = (
@@ -162,17 +180,33 @@ function SourceLedger({
           && isFiniteNumber(source.outputEcPerSec)
           && source.outputEcPerSec > 0
         ) ? formatPercent(source.outputEcPerSec / generation * 100) : "—";
-        return (
-          <div className={`ec-source-row ${idle ? "idle" : ""}`} key={source.kind}>
+        const content = <>
             <span className={`ec-source-chip ${source.kind}`} />
             <span className="ec-source-copy">
               <strong>{source.label}</strong>
               <small>{sourceDetail(source)}</small>
             </span>
             <span className="ec-source-output">
-              <strong>{ecRate(source.outputEcPerSec)}</strong>
+              <SourceRate value={source.outputEcPerSec} />
               <small>{share}</small>
             </span>
+          </>;
+        return source.kind === "reactor" && onOpenReactors ? (
+          <button
+            aria-label="Open reactor detail"
+            className={`ec-source-row ec-source-button ${idle ? "idle" : ""}`}
+            key={source.kind}
+            onClick={onOpenReactors}
+            ref={reactorButtonRef}
+            type="button"
+          >
+            {content}
+            <span aria-hidden="true" className="ec-source-drill">›</span>
+          </button>
+        ) : (
+          <div className={`ec-source-row ${idle ? "idle" : ""}`} key={source.kind}>
+            {content}
+            <span aria-hidden="true" className="ec-source-drill placeholder">›</span>
           </div>
         );
       })}
@@ -183,14 +217,20 @@ function SourceLedger({
 function ReactorDetail({
   commandEnabled,
   controlResult,
+  detailOpen,
   onSendCommand,
+  onClose,
+  closeButtonRef,
   reactors,
   vesselGuid,
   warning,
 }: {
   commandEnabled: boolean;
   controlResult?: ReactorControlResult;
+  detailOpen: boolean;
   onSendCommand?: (command: TelemetryCommand) => boolean;
+  onClose: () => void;
+  closeButtonRef: RefObject<HTMLButtonElement | null>;
   reactors: ReactorTelemetry[];
   vesselGuid?: string;
   warning: boolean;
@@ -257,9 +297,19 @@ function ReactorDetail({
     }
   };
   return (
-    <details className={`rx-details ${warning ? "warn" : ""}`}>
-      <summary><span>Reactor detail</span><span>{reactors.length}</span></summary>
-      <div className="rx-scroll"><div className="rx-list">{reactors.map((reactor, index) => {
+    <section aria-label="Reactor detail" className={`rx-detail-view ${warning ? "warn" : ""}`} hidden={!detailOpen}>
+      <button
+        aria-label="Back to power sources"
+        className="rx-detail-back"
+        onClick={onClose}
+        ref={closeButtonRef}
+        type="button"
+      >
+        <span aria-hidden="true">‹</span>
+        <span>Reactors</span>
+        <span>{reactors.length}</span>
+      </button>
+      <div aria-label="Reactor list" className="rx-scroll" role="region" tabIndex={0}><div className="rx-list">{reactors.map((reactor, index) => {
         const isFusion = reactor.family === "fusion";
         const hasIntegrity = reactor.hasIntegrity !== false;
         const tempWarn = (
@@ -356,7 +406,7 @@ function ReactorDetail({
           {localError ?? result?.message}
         </div>
       )}
-    </details>
+    </section>
   );
 }
 
@@ -372,6 +422,27 @@ export function ElectricityPanel({
   snapshot: TelemetrySnapshot;
 }) {
   const model = selectElectricity(snapshot);
+  const [reactorDetailOpen, setReactorDetailOpen] = useState(false);
+  const reactorButtonRef = useRef<HTMLButtonElement>(null);
+  const reactorBackRef = useRef<HTMLButtonElement>(null);
+  const reactorDetailWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (model.reactors.length === 0 && reactorDetailOpen) setReactorDetailOpen(false);
+  }, [model.reactors.length, reactorDetailOpen]);
+  useEffect(() => {
+    if (reactorDetailOpen) {
+      reactorBackRef.current?.focus();
+    } else if (reactorDetailWasOpenRef.current) {
+      reactorButtonRef.current?.focus();
+    }
+    reactorDetailWasOpenRef.current = reactorDetailOpen;
+  }, [reactorDetailOpen]);
+  const openReactorDetail = () => {
+    setReactorDetailOpen(true);
+  };
+  const closeReactorDetail = () => {
+    setReactorDetailOpen(false);
+  };
   const deficit = isFiniteNumber(model.netEcPerSec) && model.netEcPerSec < -0.05;
   const heroLabel = model.tier === 1
     ? "Stored charge"
@@ -385,9 +456,20 @@ export function ElectricityPanel({
         : "—"
     )
     : ecRate(model.generationEcPerSec);
+  const chargePercent = isFiniteNumber(model.chargeCurrent) && isFiniteNumber(model.chargeMaximum) && model.chargeMaximum > 0
+    ? Math.round(Math.max(0, Math.min(1, model.chargeCurrent / model.chargeMaximum)) * 100)
+    : undefined;
+  const railStatus = `${chargePercent === undefined ? "EC" : `${chargePercent}%`} · ${model.status.label}`;
 
   return (
-    <Panel hideable id="elec" title="Electricity">
+    <Panel
+      className={reactorDetailOpen ? "reactor-detail-open" : undefined}
+      collapsible
+      compact
+      id="elec"
+      tag={railStatus}
+      title="Electricity"
+    >
       <div className={`ec-overview-card ${deficit || model.tier === 1 ? "warn" : ""}`}>
         <div className="ec-hero-row">
           <div>
@@ -407,17 +489,30 @@ export function ElectricityPanel({
           <span className={model.etaKind === "empty" ? "danger" : ""}>{etaLabel(model)}</span>
         </div>
       </div>
-      {model.tier === 3 && (
-        <SourceLedger generation={model.generationEcPerSec} sources={model.sources} />
+      {(model.tier === 3 || model.reactors.length > 0) && (
+        <div
+          className={`ec-source-slot${reactorDetailOpen ? " detail-open" : ""}`}
+        >
+          <SourceLedger
+            generation={model.generationEcPerSec}
+            hidden={reactorDetailOpen}
+            onOpenReactors={model.reactors.length > 0 ? openReactorDetail : undefined}
+            reactorButtonRef={reactorButtonRef}
+            sources={model.sources}
+          />
+          <ReactorDetail
+            closeButtonRef={reactorBackRef}
+            commandEnabled={commandEnabled}
+            controlResult={controlResult}
+            detailOpen={reactorDetailOpen}
+            onClose={closeReactorDetail}
+            onSendCommand={onSendCommand}
+            reactors={model.reactors}
+            vesselGuid={snapshot["v.guid"]}
+            warning={model.status.tone === "danger"}
+          />
+        </div>
       )}
-      <ReactorDetail
-        commandEnabled={commandEnabled}
-        controlResult={controlResult}
-        onSendCommand={onSendCommand}
-        reactors={model.reactors}
-        vesselGuid={snapshot["v.guid"]}
-        warning={model.status.tone === "danger"}
-      />
     </Panel>
   );
 }

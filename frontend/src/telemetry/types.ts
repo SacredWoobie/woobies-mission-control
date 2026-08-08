@@ -125,6 +125,13 @@ export interface ReactorControlResult {
   message: string;
 }
 
+export interface TargetClearResult {
+  type: "target.clear.result";
+  requestId: string;
+  status: "accepted" | "error";
+  message: string;
+}
+
 export type ElectricitySourceKind =
   | "reactor"
   | "solar"
@@ -143,14 +150,6 @@ export interface ElectricitySourceTelemetry {
   detail?: string;
   runtimeSeconds?: number;
   limitingResource?: string;
-}
-
-export interface SolarForecastTelemetry {
-  phase: "sunlight" | "shadow";
-  transitionInSeconds?: number;
-  orbitSeconds?: number;
-  shadowSeconds?: number;
-  valid: boolean;
 }
 
 export interface ScienceExperimentTelemetry {
@@ -299,9 +298,20 @@ export interface OverviewAlarmTelemetry {
 }
 
 export interface OverviewContractTelemetry {
+  objectId?: string;
   title: string;
   type: string;
   deadline?: number | null;
+  synopsis?: string;
+  description?: string;
+  notes?: string;
+  parameters?: Array<{
+    title: string;
+    status: "complete" | "failed" | "incomplete";
+    optional?: boolean;
+    depth?: number;
+    notes?: string;
+  }>;
   fundsCompletion?: number;
   reputationCompletion?: number;
   scienceCompletion?: number;
@@ -365,6 +375,8 @@ export interface TelemetrySnapshot {
   "v.verticalSpeed"?: number;
   "v.surfaceSpeed"?: number;
   "v.geeForce"?: number;
+  "v.thrust"?: number;
+  "v.availableThrust"?: number;
   "v.orbitalVelocity"?: number;
   "v.situationString"?: string;
   "v.biome"?: string;
@@ -484,6 +496,7 @@ export interface TelemetrySnapshot {
   "comm.krpc.canCommunicate"?: boolean;
   "comm.krpc.signalStrength"?: number;
   "res.names"?: string[];
+  "res.status"?: "known" | "incomplete" | "unknown";
   "res.stageKnown"?: boolean;
   "res.stageResourceStage"?: number;
   "res.stageActivationStage"?: number;
@@ -508,11 +521,13 @@ export interface TelemetrySnapshot {
   "heat.netKw"?: number;
   "heat.loops"?: HeatLoopTelemetry[];
   "heat.backend"?: "system_heat" | "stock";
+  "heat.systemHeatStatus"?: "known" | "not_applicable" | "unknown";
   "heat.generatedW"?: number;
   "heat.removedW"?: number;
   "heat.netW"?: number;
   "heat.parts"?: StockHeatPartTelemetry[];
   "elec.reactors"?: ReactorTelemetry[];
+  "elec.reactorsStatus"?: "known" | "not_applicable" | "unknown";
   "elec.sources"?: ElectricitySourceTelemetry[];
   "elec.totalGenEcPerSec"?: number;
   "elec.otherEcPerSec"?: number;
@@ -523,7 +538,6 @@ export interface TelemetrySnapshot {
   "solar.count"?: number;
   "solar.outputEcPerSec"?: number;
   "solar.efficiency"?: number;
-  "solar.forecast"?: SolarForecastTelemetry;
   "rtg.count"?: number;
   "rtg.outputEcPerSec"?: number;
   "fuelCell.count"?: number;
@@ -546,6 +560,7 @@ export interface TelemetrySnapshot {
   "career.science"?: number;
   "tar.name"?: string;
   "tar.type"?: string;
+  "tar.objectId"?: string;
   "tar.distance"?: number;
   "tar.o.relativeVelocity"?: number;
   "tar.o.velocity"?: number;
@@ -647,6 +662,7 @@ export interface MissionPlanningPersistenceState {
 export type TelemetryCommand =
   | { type: "editor.conditions"; body?: string; altitude?: number; mach?: number }
   | { type: "heat.loop.control"; requestId: string; loopId: number; action: HeatLoopControlAction; expectedVesselGuid: string; expectedRadiatorPartIds: number[] }
+  | { type: "target.clear"; requestId: string; expectedVesselGuid: string; expectedTargetObjectId: string; expectedTargetName: string; expectedTargetType: "body" | "dockingport" | "vessel" }
   | { type: "science.alarm.create"; requestId: string; labId: string; provider: ScienceAlarmProviderPreference; leadSeconds: 1800 | 3600; kacAction: ScienceAlarmAction }
   | { type: "science.lab.transmit"; requestId: string; labId: string }
   | { type: "science.lab.research"; requestId: string; labId: string; enabled: boolean }

@@ -31,6 +31,28 @@ function numberField(snapshot: TelemetrySnapshot, key: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+export function selectThrottleFraction(snapshot: TelemetrySnapshot) {
+  const commanded = numberField(snapshot, "krpc.throttle");
+  if (commanded !== undefined && commanded > 0) {
+    return Math.max(0, Math.min(1, commanded));
+  }
+
+  const thrust = numberField(snapshot, "v.thrust");
+  const availableThrust = numberField(snapshot, "v.availableThrust");
+  if (
+    thrust !== undefined
+    && thrust > 0
+    && availableThrust !== undefined
+    && availableThrust > 0
+  ) {
+    return Math.max(0, Math.min(1, thrust / availableThrust));
+  }
+
+  const stagingFallback = numberField(snapshot, "stage.throttle");
+  const fallback = commanded ?? stagingFallback;
+  return fallback === undefined ? undefined : Math.max(0, Math.min(1, fallback));
+}
+
 function resourceAmount(
   snapshot: TelemetrySnapshot,
   currentKey: string,
@@ -47,6 +69,7 @@ function resourceAmount(
 }
 
 export function selectConsumables(snapshot: TelemetrySnapshot): ConsumableViewModel[] {
+  if (snapshot["res.status"] === "unknown") return [];
   const names = Array.isArray(snapshot["res.names"])
     ? snapshot["res.names"].filter((name) => name !== "ElectricCharge")
     : [];

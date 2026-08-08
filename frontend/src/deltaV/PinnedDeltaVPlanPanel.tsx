@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Panel } from "../components/Panel";
+import { useResonantOrbitState } from "../resonantOrbit/state";
 import {
   formatDistance,
   formatEccentricity,
@@ -21,6 +22,7 @@ import { useDeltaVDraft } from "./state";
 import { thermalProtectionStatus } from "./thermalProtection";
 
 const AUTO_COLLAPSE_ROUTE_THRESHOLD = 8;
+const EDITOR_COLLAPSE_ROUTE_THRESHOLD = 7;
 
 function timelineForLeg(plan: DeltaVPlan, leg: DeltaVLeg) {
   const timelines = Object.entries(plan.transferTimeline)
@@ -116,7 +118,8 @@ export function PinnedDeltaVPlanPanel({
   scene?: "flight" | "editor";
   snapshot?: TelemetrySnapshot | null;
 }) {
-  const { pinnedForTelemetry, rememberPinnedCraft, setPinnedStepComplete, unpinPlan } = useDeltaVDraft();
+  const { loadPlan, pinnedForTelemetry, rememberPinnedCraft, setPinnedStepComplete, unpinPlan } = useDeltaVDraft();
+  const { openDeltaVDrawer } = useResonantOrbitState();
   const liveSnapshot = useLiveTelemetrySelector((state) => state.snapshot);
   const connection = useLiveConnectionStatus();
   const snapshot = connection.status === "linked"
@@ -129,11 +132,11 @@ export function PinnedDeltaVPlanPanel({
     context: string;
   } | null>(null);
   const [routeExpanded, setRouteExpanded] = useState(false);
-  const [readinessExpanded, setReadinessExpanded] = useState(true);
+  const [readinessExpanded, setReadinessExpanded] = useState(scene !== "flight");
   const pinned = pinnedForTelemetry(snapshot);
   useEffect(() => rememberPinnedCraft(snapshot), [rememberPinnedCraft, snapshot]);
   useEffect(() => setRouteExpanded(false), [pinned?.id]);
-  useEffect(() => setReadinessExpanded(true), [pinned?.id]);
+  useEffect(() => setReadinessExpanded(scene !== "flight"), [pinned?.id, scene]);
   useEffect(() => {
     if (connection.status !== "linked") setManeuverPreview(null);
   }, [connection.status]);
@@ -217,10 +220,15 @@ export function PinnedDeltaVPlanPanel({
     && periapsisAltitude > 0;
   const routeIsLong = scene === "flight"
     && visibleLegs.length > AUTO_COLLAPSE_ROUTE_THRESHOLD;
+  const editorRouteIsLong = scene === "editor"
+    && visibleLegs.length > EDITOR_COLLAPSE_ROUTE_THRESHOLD;
   const hasDedicatedNextStep = showLaunchTarget || Boolean(nextTransferLeg);
-  const renderedRouteLegs = routeIsLong && !routeExpanded
-    ? hasDedicatedNextStep ? [] : visibleLegs.slice(0, 1)
-    : visibleLegs;
+  const renderedRouteLegs = editorRouteIsLong && !routeExpanded
+    ? [...visibleLegs.slice(0, 3), ...visibleLegs.slice(-2)]
+    : routeIsLong && !routeExpanded
+      ? hasDedicatedNextStep ? [] : visibleLegs.slice(0, 1)
+      : visibleLegs;
+  const hiddenEditorRouteSteps = editorRouteIsLong ? Math.max(0, visibleLegs.length - 5) : 0;
   const plannedAltitude = selectedSolution?.originParkingAltitude;
   const launchTargetAltitude = launchTransferSolution?.originParkingAltitude
     ?? (firstIncompleteLeg?.id === firstMissionAscentLeg?.id
@@ -320,36 +328,89 @@ export function PinnedDeltaVPlanPanel({
       expectedVesselGuid: vesselGuid,
     })) setManeuverSendError("The live dashboard did not accept node creation.");
   };
+  const comparisonAmount = comparison.difference === undefined
+    ? undefined
+    : Math.abs(comparison.difference);
+  const comparisonPercent = comparisonAmount === undefined || comparisonRequirement <= 0
+    ? undefined
+    : comparisonAmount / comparisonRequirement * 100;
+  const editorComparisonDetail = comparison.status === "unavailable"
+    ? "Staging data unavailable"
+    : comparison.status === "shortfall"
+      ? `${formatDeltaV(comparisonAmount ?? 0)} needed${comparisonPercent === undefined ? "" : ` · ${comparisonPercent.toFixed(1)}% short`}`
+      : `${formatDeltaV(comparisonAmount ?? 0)} reserve${comparisonPercent === undefined ? "" : ` · ${comparisonPercent.toFixed(1)}%`}`;
+  const savedStopBodies = [
+    ...pinned.draft.stops.map((stop) => stop.bodyName),
+    ...(!pinned.draft.editingStopId && pinned.draft.nextStop.bodyName ? [pinned.draft.nextStop.bodyName] : []),
+  ];
+  const routeStopBodies = savedStopBodies.length > 0 ? savedStopBodies : [plan.destination.name];
+  const routeVisitsAnotherBody = routeStopBodies.some((bodyName) => bodyName !== plan.origin.name);
+  const routeIdentity = plan.origin.name === plan.destination.name
+    ? routeVisitsAnotherBody
+      ? `${plan.origin.name} round trip${routeStopBodies.length > 1 ? ` · ${routeStopBodies.length} stops` : ""}`
+      : `${plan.origin.name} local mission`
+    : `${plan.origin.name} → ${plan.destination.name}${routeStopBodies.length > 1 ? ` · ${routeStopBodies.length} stops` : ""}`;
+  const routeIdentityTitle = [plan.origin.name, ...routeStopBodies].join(" → ");
+  const pinnedPlanId = pinned.id;
+
+  function editPinnedPlan() {
+    loadPlan(pinnedPlanId);
+    openDeltaVDrawer();
+  }
 
   return <Panel
-    headingActions={<button className="resonant-unpin" onClick={() => unpinPlan(snapshot)} type="button">Unpin</button>}
-    hideable
+    collapsible={scene === "flight"}
+    compact={scene === "flight"}
+    headingActions={scene === "editor" ? <>
+      <button className="resonant-edit-plan" onClick={editPinnedPlan} type="button">Edit plan</button>
+      <button className="resonant-unpin" onClick={() => unpinPlan(snapshot)} type="button">Unpin</button>
+    </> : <button className="resonant-unpin" onClick={() => unpinPlan(snapshot)} type="button">Unpin</button>}
     id={scene === "flight" ? "flightDeltaVPlan" : "editorDeltaVPlan"}
-    tag={scene === "flight" ? "MISSION" : "READ ONLY"}
+    tag={scene === "flight" ? comparison.status.toUpperCase() : undefined}
     title="Mission Plan"
   >
-    <div className="delta-v-pinned-identity">
+    <div className={`delta-v-pinned-identity ${scene}`}>
       <strong>{pinned.name}</strong>
-      <span>{plan.origin.name} {"\u2192"} {plan.destination.name}</span>
+      <span title={routeIdentityTitle}>{routeIdentity}</span>
     </div>
     {!pinned.craftBound && <>
       <div className="delta-v-pinned-scope legacy">LEGACY GLOBAL PIN</div>
       <div className="delta-v-pinned-scope-warning" role="alert">Craft identity is unavailable. Install or repair StageStats 0.2.7, then pin this plan to the intended craft.</div>
     </>}
-    <div aria-label="Mission delta-v overview" className={`delta-v-pinned-overview ${comparison.status}`}>
-      <div className="delta-v-pinned-facts">
-        <div><span>Total budget</span><strong>{formatDeltaV(plan.totalDeltaV)}</strong></div>
-        <div><span>Nominal route</span><strong>{formatDeltaV(plan.nominalDeltaV)}</strong></div>
-        <div><span>Margin</span><strong>+{formatDeltaV(plan.marginDeltaV)}</strong></div>
-        {scene === "flight" && <div><span>Remaining</span><strong>{formatDeltaV(remaining)}</strong></div>}
-        <div><span>Craft available</span><strong>{comparison.availableDeltaV === undefined ? "Unavailable" : formatDeltaV(comparison.availableDeltaV)}</strong></div>
-        <div><span>{comparison.difference !== undefined && comparison.difference < 0 ? "Shortfall" : "Reserve"}</span><strong>{comparison.difference === undefined ? "\u2014" : formatDeltaV(Math.abs(comparison.difference))}</strong></div>
+    {scene === "editor" ? (
+      <div aria-label="Mission delta-v overview" className="delta-v-editor-briefing">
+        <section className="delta-v-editor-budget">
+          <header><span>Mission budget</span><strong>{formatDeltaV(plan.totalDeltaV)}</strong></header>
+          <div className="delta-v-editor-budget-breakdown">
+            <div><span>Nominal route</span><strong>{formatDeltaV(plan.nominalDeltaV)}</strong></div>
+            <div><span>Planning margin</span><strong>+{formatDeltaV(plan.marginDeltaV)}</strong><small>{pinned.draft.marginPercent}%</small></div>
+          </div>
+        </section>
+        <section
+          className={`delta-v-editor-coverage ${comparison.status}`}
+          role={comparison.status === "shortfall" ? "alert" : "status"}
+        >
+          <header><span>Craft coverage · vacuum</span><strong>{comparison.status.toUpperCase()}</strong></header>
+          <div><strong>{comparison.availableDeltaV === undefined ? "Unavailable" : formatDeltaV(comparison.availableDeltaV)}</strong><span>Craft VAC Δv</span></div>
+          <footer>{editorComparisonDetail}</footer>
+        </section>
       </div>
-      <div className={`delta-v-pinned-comparison ${comparison.status}`} role={comparison.status === "shortfall" || comparison.status === "tight" ? "alert" : undefined}>
-        <header><span>VAC {"\u0394"}v</span><strong>{comparison.status.toUpperCase()}</strong></header>
-        <p>{comparisonMessage(comparison.status)} <span>Staging CURRENT may differ.</span></p>
+    ) : (
+      <div aria-label="Mission delta-v overview" className={`delta-v-pinned-overview ${comparison.status}`}>
+        <div className="delta-v-pinned-facts">
+          <div><span>Total budget</span><strong>{formatDeltaV(plan.totalDeltaV)}</strong></div>
+          <div><span>Nominal route</span><strong>{formatDeltaV(plan.nominalDeltaV)}</strong></div>
+          <div><span>Margin</span><strong>+{formatDeltaV(plan.marginDeltaV)}</strong></div>
+          <div><span>Remaining</span><strong>{formatDeltaV(remaining)}</strong></div>
+          <div><span>Craft available</span><strong>{comparison.availableDeltaV === undefined ? "Unavailable" : formatDeltaV(comparison.availableDeltaV)}</strong></div>
+          <div><span>{comparison.difference !== undefined && comparison.difference < 0 ? "Shortfall" : "Reserve"}</span><strong>{comparison.difference === undefined ? "\u2014" : formatDeltaV(Math.abs(comparison.difference))}</strong></div>
+        </div>
+        <div className={`delta-v-pinned-comparison ${comparison.status}`} role={comparison.status === "shortfall" || comparison.status === "tight" ? "alert" : undefined}>
+          <header><span>VAC {"\u0394"}v</span><strong>{comparison.status.toUpperCase()}</strong></header>
+          <p>{comparisonMessage(comparison.status)} <span>Staging CURRENT may differ.</span></p>
+        </div>
       </div>
-    </div>
+    )}
     {scene === "flight" && <div className="delta-v-pinned-progress">
       <span>Progress <strong>{completedLegIds.length} / {plan.legs.length} steps</strong></span>
       {lastCompletedLegId && <button onClick={() => setPinnedStepComplete(lastCompletedLegId, false, snapshot)} type="button">Undo last</button>}
@@ -420,12 +481,12 @@ export function PinnedDeltaVPlanPanel({
         {nodeError && <p className="delta-v-maneuver-error" role="alert">{nodeError}</p>}
         {readinessBlockers.length === 0 && readinessWarnings.length > 0 && <ul className="delta-v-readiness-issues warnings">{readinessWarnings.map((message) => <li key={message}>{message}</li>)}</ul>}
         {maneuverSendError && <p className="delta-v-maneuver-error" role="alert">{maneuverSendError}</p>}
-        <div className="delta-v-maneuver-actions">
-          {nodeState !== "ready" && nodeState !== "created" && nodeState !== "executed" && <button disabled={readinessBlockers.length > 0 || nodeState === "previewing"} onClick={previewManeuver} type="button">{nodeState === "previewing" ? "Checking\u2026" : nodeState === "failed" ? "Check again" : "Check maneuver"}</button>}
-          {nodeState === "ready" && <button disabled={readinessBlockers.length > 0} onClick={createManeuver} type="button">Create KSP node</button>}
-          {(nodeState === "created" || nodeState === "executed") && <button onClick={() => setPinnedStepComplete(nextTransferLeg.id, true, snapshot)} type="button">Mark transfer complete</button>}
-        </div>
       </div>}
+      <div className="delta-v-maneuver-actions">
+        {nodeState !== "ready" && nodeState !== "created" && nodeState !== "executed" && <button disabled={readinessBlockers.length > 0 || nodeState === "previewing"} onClick={previewManeuver} type="button">{nodeState === "previewing" ? "Checking\u2026" : nodeState === "failed" ? "Check again" : "Check maneuver"}</button>}
+        {nodeState === "ready" && <button disabled={readinessBlockers.length > 0} onClick={createManeuver} type="button">Create KSP node</button>}
+        {(nodeState === "created" || nodeState === "executed") && <button onClick={() => setPinnedStepComplete(nextTransferLeg.id, true, snapshot)} type="button">Mark transfer complete</button>}
+      </div>
     </div>}
     {routeIsLong && <div className="delta-v-pinned-route-toggle">
       <span>{visibleLegs.length} mission steps remaining</span>
@@ -438,24 +499,37 @@ export function PinnedDeltaVPlanPanel({
         {routeExpanded ? "Collapse mission steps" : `Show all ${visibleLegs.length} mission steps`}
       </button>
     </div>}
+    {scene === "editor" && <div className="delta-v-editor-route-heading">
+      <span>Mission route <b>{visibleLegs.length} {visibleLegs.length === 1 ? "step" : "steps"}</b></span>
+      <strong>{formatDeltaV(plan.nominalDeltaV)}</strong>
+      {editorRouteIsLong && routeExpanded && <button aria-expanded="true" onClick={() => setRouteExpanded(false)} type="button">Collapse route</button>}
+    </div>}
     {(!routeIsLong || routeExpanded || renderedRouteLegs.length > 0) && <div
       aria-label={scene === "flight" ? "Remaining mission plan steps" : "Mission plan steps"}
-      className={`delta-v-pinned-route ${scene}`}
+      className={`delta-v-pinned-route ${scene}${editorRouteIsLong && routeExpanded ? " expanded" : ""}`}
       id={scene === "flight" ? "flight-delta-v-mission-steps" : undefined}
       role="list"
     >
-      {renderedRouteLegs.map((leg) => {
+      {renderedRouteLegs.map((leg, renderedIndex) => {
         const originalIndex = plan.legs.findIndex((candidate) => candidate.id === leg.id);
         const burnUT = scene === "flight" ? burnTimeForLeg(plan, leg) : undefined;
-        return <div key={leg.id} role="listitem">
-          {scene === "flight" && <button aria-label={`Mark ${leg.label} complete`} className="delta-v-pinned-check" onClick={() => setPinnedStepComplete(leg.id, true, snapshot)} title="Mark step complete" type="button"><span aria-hidden="true">{"\u2713"}</span></button>}
-          <span className="delta-v-pinned-step-number">{String(originalIndex + 1).padStart(2, "0")}</span>
-          <div className="delta-v-pinned-step-copy">
-            <strong title={leg.label}>{leg.label}</strong>
-            {burnUT !== undefined && <small><span>{formatMissionUT(burnUT, kerbinTime)}</span>{typeof currentUT === "number" && <b>{relativeBurnTime(burnUT, currentUT, kerbinTime)}</b>}</small>}
+        return <Fragment key={leg.id}>
+          {scene === "editor" && editorRouteIsLong && !routeExpanded && renderedIndex === 3 && <button
+            aria-expanded="false"
+            className="delta-v-editor-route-omitted"
+            onClick={() => setRouteExpanded(true)}
+            type="button"
+          >{hiddenEditorRouteSteps} intermediate {hiddenEditorRouteSteps === 1 ? "step" : "steps"} <span>Expand route</span></button>}
+          <div role="listitem">
+            {scene === "flight" && <button aria-label={`Mark ${leg.label} complete`} className="delta-v-pinned-check" onClick={() => setPinnedStepComplete(leg.id, true, snapshot)} title="Mark step complete" type="button"><span aria-hidden="true">{"\u2713"}</span></button>}
+            <span className="delta-v-pinned-step-number">{String(originalIndex + 1).padStart(2, "0")}</span>
+            <div className="delta-v-pinned-step-copy">
+              <strong title={leg.label}>{leg.label}</strong>
+              {burnUT !== undefined && <small><span>{formatMissionUT(burnUT, kerbinTime)}</span>{typeof currentUT === "number" && <b>{relativeBurnTime(burnUT, currentUT, kerbinTime)}</b>}</small>}
+            </div>
+            <b className={scene === "editor" && leg.deltaV === 0 ? "assisted" : undefined} title={scene === "editor" && leg.deltaV === 0 ? "0 m/s planned" : undefined}>{scene === "editor" && leg.deltaV === 0 ? leg.atmosphericAssist ? "Assisted" : "No burn" : formatDeltaV(leg.deltaV)}</b>
           </div>
-          <b>{formatDeltaV(leg.deltaV)}</b>
-        </div>;
+        </Fragment>;
       })}
       {visibleLegs.length === 0 && <div className="delta-v-pinned-complete" role="status"><strong>Mission plan complete</strong><span>All planned steps have been checked off.</span></div>}
     </div>}

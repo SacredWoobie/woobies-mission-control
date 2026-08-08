@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isFiniteNumber } from "../formatting/numbers";
+import { STOCK_BODIES } from "../resonantOrbit/calculations";
 import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
-import { Panel } from "./Panel";
 
 interface EditorContextPanelProps {
   commandEnabled: boolean;
@@ -14,6 +15,21 @@ function finiteNonnegativeOrUndefined(value: string) {
   if (!value.trim()) return undefined;
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+function formatMass(value: unknown) {
+  if (!isFiniteNumber(value)) return "—";
+  return `${(value * 1_000).toLocaleString("en-US", { maximumFractionDigits: 1 })} kg`;
+}
+
+function formatFunds(value: unknown) {
+  return isFiniteNumber(value)
+    ? `√${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+    : "—";
+}
+
+function formatCount(value: unknown) {
+  return isFiniteNumber(value) ? Math.max(0, Math.round(value)).toLocaleString("en-US") : "—";
 }
 
 export function EditorContextPanel({
@@ -35,6 +51,14 @@ export function EditorContextPanel({
     const values = Array.isArray(reported) ? reported.filter((value): value is string => typeof value === "string") : [];
     return telemetryBody && !values.includes(telemetryBody) ? [telemetryBody, ...values] : values;
   }, [snapshot, telemetryBody]);
+  const vacuumAltitude = useMemo(() => {
+    const liveBody = Array.isArray(snapshot["catalog.bodies"])
+      ? snapshot["catalog.bodies"].find((candidate) => candidate.name === body)
+      : undefined;
+    const stockBody = STOCK_BODIES[body as keyof typeof STOCK_BODIES];
+    const atmosphereDepth = liveBody?.atmosphereDepth ?? stockBody?.atmosphereDepth;
+    return isFiniteNumber(atmosphereDepth) ? Math.max(0, Math.ceil(atmosphereDepth)) : undefined;
+  }, [body, snapshot]);
 
   const revision = typeof snapshot["editor.revision"] === "number"
     ? snapshot["editor.revision"]
@@ -60,6 +84,11 @@ export function EditorContextPanel({
   function markDirty() {
     setDirty(true);
     setSentAtRevision(null);
+  }
+
+  function setAltitudePreset(value: number) {
+    setAltitude(String(value));
+    markDirty();
   }
 
   const submit = useCallback((force = false) => {
@@ -106,7 +135,7 @@ export function EditorContextPanel({
 
   const statusClass = unavailable ? "bad" : calculating || sentAtRevision !== null ? "wait" : "ok";
   const statusText = !commandEnabled
-    ? "Fixture telemetry · connect live to send conditions"
+    ? "Fixture telemetry · controls require a live link"
     : unavailable
       ? "MechJeb core required on this craft"
       : calculating
@@ -114,20 +143,38 @@ export function EditorContextPanel({
         : sentAtRevision !== null
           ? "Recalculating…"
           : "Analysis current";
+  const craftName = String(snapshot["editor.craftName"] ?? "Untitled Space Craft");
+  const facility = String(snapshot["editor.facility"] ?? "EDITOR");
+  const partCount = formatCount(snapshot["editor.partCount"]);
+  const stageCount = formatCount(snapshot["editor.stageCount"]);
+  const seatCount = formatCount(snapshot["editor.crewCapacity"]);
+  const numericAltitude = finiteNonnegativeOrUndefined(altitude);
 
   return (
-    <Panel collapsible id="editorContext" title="Craft analysis" tag="VAB · SPH · MechJeb simulation">
-      <div className="editor-head">
-        <div>
-          <div className="label">Craft</div>
-          <div className="editor-craft">{String(snapshot["editor.craftName"] ?? "Untitled Space Craft")}</div>
+    <section aria-labelledby="editor-craft-name" className="editor-overview" id="editorContext">
+      <div className="editor-overview-summary">
+        <div className="editor-overview-craft">
+          <span className="label">Craft</span>
+          <h1 className="editor-craft" id="editor-craft-name">{craftName}</h1>
+          <span className="editor-craft-meta">{facility} · {partCount} parts · {stageCount} stages · {seatCount} seats</span>
         </div>
-        <div className="editor-facility">{String(snapshot["editor.facility"] ?? "EDITOR")}</div>
+        <div className="editor-overview-metric mass">
+          <span className="label">Wet mass</span>
+          <strong>{formatMass(snapshot["editor.wetMass"])}</strong>
+          <small>Dry {formatMass(snapshot["editor.dryMass"])} · resources {formatMass(snapshot["editor.resourceMass"])}</small>
+        </div>
+        <div className="editor-overview-metric cost">
+          <span className="label">Cost</span>
+          <strong>{formatFunds(snapshot["editor.totalCost"])}</strong>
+          <small>{formatFunds(snapshot["editor.resourceCost"])} in resources</small>
+        </div>
       </div>
-      <div className="editor-controls">
-        <label className="editor-control">
-          <span className="label">Reference body</span>
+      <div className="editor-sim-conditions">
+        <span className="editor-sim-title">Sim conditions</span>
+        <label className="editor-sim-control body">
+          <span>Body</span>
           <select
+            aria-label="Reference body"
             onChange={(event) => { setBody(event.target.value); markDirty(); }}
             onKeyDown={onKeyDown}
             value={body}
@@ -136,9 +183,10 @@ export function EditorContextPanel({
             {bodies.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </label>
-        <label className="editor-control">
-          <span className="label">Altitude ASL (m)</span>
+        <label className="editor-sim-control altitude">
+          <span>Alt ASL</span>
           <input
+            aria-label="Altitude ASL (m)"
             min={0}
             onChange={(event) => { setAltitude(event.target.value); markDirty(); }}
             onKeyDown={onKeyDown}
@@ -146,10 +194,12 @@ export function EditorContextPanel({
             type="number"
             value={altitude}
           />
+          <small>m</small>
         </label>
-        <label className="editor-control">
-          <span className="label">Mach</span>
+        <label className="editor-sim-control mach">
+          <span>Mach</span>
           <input
+            aria-label="Mach"
             min={0}
             onChange={(event) => { setMach(event.target.value); markDirty(); }}
             onKeyDown={onKeyDown}
@@ -158,10 +208,17 @@ export function EditorContextPanel({
             value={mach}
           />
         </label>
-        <button disabled={!commandEnabled || unavailable || !conditionsValid} onClick={() => submit(true)} type="button">Recalculate now</button>
+        <div aria-label="Altitude presets" className="editor-altitude-presets" role="group">
+          <button aria-pressed={numericAltitude === 0} onClick={() => setAltitudePreset(0)} type="button">Sea level</button>
+          <button aria-pressed={numericAltitude === 18_000} onClick={() => setAltitudePreset(18_000)} type="button">18 km</button>
+          <button aria-pressed={vacuumAltitude !== undefined && numericAltitude === vacuumAltitude} disabled={vacuumAltitude === undefined} onClick={() => vacuumAltitude !== undefined && setAltitudePreset(vacuumAltitude)} type="button">Vacuum</button>
+        </div>
+        <div className="editor-sim-feedback">
+          <span aria-live="polite" className={`editor-state ${statusClass}`}>{statusText}</span>
+          <span className="editor-recalculation-note">Changes recalculate automatically after a brief pause</span>
+        </div>
+        <button className="editor-recalculate" disabled={!commandEnabled || unavailable || !conditionsValid} onClick={() => submit(true)} type="button">Recalculate now</button>
       </div>
-      <div aria-live="polite" className={`editor-state ${statusClass}`}>{statusText}</div>
-      <p className="editor-recalculation-note">Condition changes recalculate automatically after a brief pause. Use Recalculate now to force an immediate refresh.</p>
-    </Panel>
+    </section>
   );
 }

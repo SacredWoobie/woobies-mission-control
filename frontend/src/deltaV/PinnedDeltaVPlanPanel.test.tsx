@@ -136,13 +136,56 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByLabelText("Mission plan steps").children).toHaveLength(5);
     expect(screen.getByText("Atmospheric entry", { exact: true })).toBeTruthy();
     expect(screen.getAllByText("6,095 m/s", { exact: true })).toHaveLength(1);
-    expect(screen.getByText("595 m/s", { exact: true })).toBeTruthy();
-    expect(screen.getByRole("alert").textContent).toContain("Craft does not cover this plan");
+    expect(screen.getByText("595 m/s needed · 9.8% short", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("SHORTFALL");
+    expect(screen.getByRole("alert").textContent).toContain("595 m/s needed");
+    expect(screen.getByRole("button", { name: "Edit plan" })).toBeTruthy();
+    expect(screen.queryByText("READ ONLY", { exact: true })).toBeNull();
+    expect(screen.getByText("No burn", { exact: true })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Mark .* complete/ })).toBeNull();
     expect(document.body.textContent).toContain("Kerbin \u2192 Duna");
+    expect(screen.getByText(/Mission route/).textContent).toContain("5 steps");
     expect(screen.getByLabelText("Mission delta-v overview").children).toHaveLength(2);
-    expect(document.body.textContent).toContain("VAC \u0394v");
+    expect(document.body.textContent).toContain("Craft VAC \u0394v");
     expect(document.body.textContent).not.toMatch(/[ÃÂâ]/);
+  });
+
+  it("summarizes long editor routes until the operator expands the scrollable rail", () => {
+    seedPinnedPlan(false);
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
+    library.plans[0].plan.legs = Array.from({ length: 9 }, (_, index) => ({
+      ...plan.legs[index % plan.legs.length],
+      id: `long-route-${index + 1}`,
+      label: `Mission step ${index + 1}`,
+    }));
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
+
+    renderPanel("editor");
+
+    expect(screen.getByLabelText("Mission plan steps").querySelectorAll('[role="listitem"]')).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: /4 intermediate steps/ }));
+    expect(screen.getByLabelText("Mission plan steps").querySelectorAll('[role="listitem"]')).toHaveLength(9);
+    expect(screen.getByLabelText("Mission plan steps").classList.contains("expanded")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse route" }));
+    expect(screen.getByLabelText("Mission plan steps").querySelectorAll('[role="listitem"]')).toHaveLength(5);
+  });
+
+  it("labels returning multi-stop plans as round trips instead of identical endpoints", () => {
+    seedPinnedPlan(false);
+    const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
+    library.plans[0].plan.destination = kerbin;
+    library.plans[0].draft.stops = [
+      { ...library.plans[0].draft.nextStop, id: "segment-1", bodyName: "Duna" },
+      { ...library.plans[0].draft.nextStop, id: "segment-2", bodyName: "Kerbin" },
+    ];
+    library.plans[0].draft.nextStop.bodyName = "";
+    localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
+
+    renderPanel("editor");
+
+    expect(screen.getByText("Kerbin round trip · 2 stops", { exact: true }).getAttribute("title")).toBe("Kerbin → Duna → Kerbin");
+    expect(screen.queryByText("Kerbin → Kerbin", { exact: true })).toBeNull();
   });
 
   it("shows flight burn dates and countdowns, then persists completed steps", async () => {
@@ -161,11 +204,13 @@ describe("pinned delta-v Mission Plan", () => {
     await waitFor(() => expect(screen.getByLabelText("Remaining mission plan steps").textContent).not.toContain("Launch to Kerbin orbit"));
     expect(screen.queryByText("LAUNCH TARGET", { exact: true })).toBeNull();
     expect(screen.getByText("TRANSFER READINESS", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Check maneuver" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Expand transfer readiness" }));
     expect(screen.getByText("Calculate and save this ideal transfer before checking the maneuver.", { exact: true })).toBeTruthy();
     expect(document.body.textContent).not.toContain("porkchop");
     expect(screen.getByText("1 / 5 steps", { exact: true })).toBeTruthy();
     expect(screen.getAllByText("2,185 m/s", { exact: true })).toHaveLength(1);
-    expect(screen.getByText("SURPLUS", { exact: true })).toBeTruthy();
+    expect(screen.getAllByText("SURPLUS", { exact: true })).toHaveLength(2);
     await waitFor(() => expect(JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null").assignments[0].completedLegIds).toEqual(["segment-1-ascent"]));
 
     const undo = screen.getByRole("button", { name: "Undo last" });
@@ -175,13 +220,22 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByText("Launch to Kerbin orbit", { exact: true })).toBeTruthy();
   });
 
-  it("collapses transfer readiness while keeping its live status visible", () => {
+  it("starts transfer readiness collapsed while keeping its status and action visible", () => {
     seedPinnedPlan();
     const library = JSON.parse(localStorage.getItem("wmc-delta-v-library-v1") ?? "null");
     library.assignments[0].completedLegIds = ["segment-1-ascent"];
     localStorage.setItem("wmc-delta-v-library-v1", JSON.stringify(library));
 
     renderPanel("flight");
+
+    const expand = screen.getByRole("button", { name: "Expand transfer readiness" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(expand.textContent).toBe("HOLD\u25c2");
+    expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Target orbit", { exact: true })).toBeNull();
+    expect(screen.getByRole("button", { name: "Check maneuver" })).toBeTruthy();
+
+    fireEvent.click(expand);
 
     const collapse = screen.getByRole("button", { name: "Collapse transfer readiness" });
     expect(collapse.getAttribute("aria-expanded")).toBe("true");
@@ -190,16 +244,8 @@ describe("pinned delta-v Mission Plan", () => {
     expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
 
     fireEvent.click(collapse);
-
-    const expand = screen.getByRole("button", { name: "Expand transfer readiness" });
-    expect(expand.getAttribute("aria-expanded")).toBe("false");
-    expect(expand.textContent).toBe("HOLD\u25c2");
-    expect(screen.getByText("HOLD", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Expand transfer readiness" }).getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("Target orbit", { exact: true })).toBeNull();
-
-    fireEvent.click(expand);
-    expect(screen.getByRole("button", { name: "Collapse transfer readiness" }).getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("Target orbit", { exact: true })).toBeTruthy();
   });
 
   it("describes a legacy Simple transfer as ideal when its maneuver vector is missing", () => {
@@ -225,17 +271,17 @@ describe("pinned delta-v Mission Plan", () => {
 
     renderPanel("flight");
 
+    fireEvent.click(screen.getByRole("button", { name: "Expand transfer readiness" }));
     expect(screen.getByText("Recalculate and update this ideal transfer to enable maneuver creation.", { exact: true })).toBeTruthy();
     expect(document.body.textContent).not.toContain("porkchop");
   });
 
-  it("restores the collapsed panel as Mission Plan with a distinct icon", () => {
+  it("migrates an old hidden Mission Plan preference back to in-place presentation", () => {
     localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["flightDeltaVPlan"]));
     render(<PanelVisibilityProvider><PanelRestoreRail available={new Set(["flightDeltaVPlan"])} /></PanelVisibilityProvider>);
 
-    const restore = screen.getByRole("button", { name: "Mission Plan" });
-    expect(restore.querySelector(".panel-rail-icon-flightDeltaVPlan")).toBeTruthy();
-    expect(restore.getAttribute("title")).toBe("Restore Mission Plan");
+    expect(screen.queryByRole("button", { name: "Mission Plan" })).toBeNull();
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).not.toContain("flightDeltaVPlan");
   });
 
   it("uses the complete live feed for staging when a narrow supplied snapshot is stale", () => {
@@ -319,6 +365,7 @@ describe("pinned delta-v Mission Plan", () => {
 
     const panel = renderPanel("flight");
 
+    fireEvent.click(screen.getByRole("button", { name: "Expand transfer readiness" }));
     expect(screen.getByText((_, element) => element?.textContent === "80.0\u2009km circular")).toBeTruthy();
     expect(
       screen.getByText(

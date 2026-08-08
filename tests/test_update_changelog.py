@@ -102,9 +102,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Launcher usability fixes", section)
-        self.assertIn("scrollable controls pane", section)
-        self.assertIn("outside `GameData`", section)
+        self.assertIn("Flight dashboard workspaces", section)
+        self.assertIn("MONITOR and PLAN workspaces", section)
+        self.assertIn("throttle readouts", section)
 
 
 if __name__ == "__main__":

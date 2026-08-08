@@ -15,6 +15,19 @@ const flightStages = editorStages.map((stage) => ({
   twrEnd: stage.twrVac > 0 ? stage.twrVac * 1.45 : 0,
 }));
 
+const denseEditorStages = [
+  { index: 0, ksp: 0, dvAtmo: 500, dvVac: 650, twr: 0.8, twrAtmo: 0.8, twrVac: 1.0, burn: 42 },
+  { index: 1, ksp: 1, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
+  { index: 2, ksp: 2, dvAtmo: 640, dvVac: 780, twr: 0.95, twrAtmo: 0.95, twrVac: 1.15, burn: 51 },
+  { index: 3, ksp: 3, dvAtmo: 820, dvVac: 980, twr: 1.08, twrAtmo: 1.08, twrVac: 1.32, burn: 58 },
+  { index: 4, ksp: 4, dvAtmo: 0, dvVac: 0, twr: 0, twrAtmo: 0, twrVac: 0, burn: 0 },
+  { index: 5, ksp: 5, dvAtmo: 1000, dvVac: 1200, twr: 1.25, twrAtmo: 1.25, twrVac: 1.55, burn: 75 },
+  { index: 6, ksp: 6, dvAtmo: 720, dvVac: 890, twr: 1.42, twrAtmo: 1.42, twrVac: 1.68, burn: 48 },
+  { index: 7, ksp: 7, dvAtmo: 240, dvVac: 300, twr: 1.58, twrAtmo: 1.58, twrVac: 1.88, burn: 20 },
+  { index: 8, ksp: 8, dvAtmo: 360, dvVac: 440, twr: 1.76, twrAtmo: 1.76, twrVac: 2.08, burn: 29 },
+  { index: 9, ksp: 9, dvAtmo: 180, dvVac: 230, twr: 2.1, twrAtmo: 2.1, twrVac: 2.45, burn: 12 },
+];
+
 const activeNote: NoteTelemetry = {
   name: "log_Odyssey",
   relativePath: "log_Odyssey.txt",
@@ -68,6 +81,8 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "v.altitude": 82_415.6,
   "v.verticalSpeed": 128.4,
   "v.surfaceSpeed": 2_215.3,
+  "v.thrust": 680_000,
+  "v.availableThrust": 1_000_000,
   "v.orbitalVelocity": 2_287.1,
   "v.geeForce": 1.08,
   "v.situationString": "Orbiting",
@@ -93,6 +108,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "comm.krpc.canCommunicate": true,
   "comm.krpc.signalStrength": 0.94,
   "res.names": ["LiquidFuel", "Oxidizer", "ElectricCharge", "ZeroCapacityModResource"],
+  "res.status": "known",
   "r.resource[LiquidFuel]": 90,
   "r.resourceMax[LiquidFuel]": 100,
   "r.resourceCurrent[LiquidFuel]": 45,
@@ -125,6 +141,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "stage.totalDvAtmo": 1850,
   "stage.totalDvVac": 1850,
   "heat.backend": "system_heat",
+  "heat.systemHeatStatus": "known",
   "heat.generatedKw": 284.2,
   "heat.removedKw": 301.6,
   "heat.netKw": -17.4,
@@ -147,9 +164,10 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
     { id: "2", tempK: 340, nominalTempK: 1200, genKw: 100, remKw: 100, netKw: 0 },
   ],
   "elec.reactors": [
-    { name: "MX-2C Hyperion Fission Reactor", on: true, status: "Online", ecPerSec: 36.4, ecMax: 40, coreTemp: 905, nominalTemp: 900, integrity: 98.7, fuel: "12y 184d", throttle: 91 },
-    { name: "MX-1B Hermes Fission Reactor", on: false, status: "Offline", ecPerSec: 0, ecMax: 18, coreTemp: 411, nominalTemp: 850, integrity: 100, fuel: "24y 12d", throttle: 0 },
+    { partId: 42011, name: "MX-2C Hyperion Fission Reactor", on: true, status: "Online", ecPerSec: 36.4, ecMax: 40, coreTemp: 905, nominalTemp: 900, integrity: 98.7, fuel: "12y 184d", throttle: 91 },
+    { partId: 42012, name: "MX-1B Hermes Fission Reactor", on: false, status: "Offline", ecPerSec: 0, ecMax: 18, coreTemp: 411, nominalTemp: 850, integrity: 100, fuel: "24y 12d", throttle: 0 },
   ],
+  "elec.reactorsStatus": "known",
   "elec.totalGenEcPerSec": 48.6,
   "elec.otherEcPerSec": 1.2,
   "elec.netEcPerSec": 6.2,
@@ -201,6 +219,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "career.science": 384.7,
   "tar.name": "Odyssey Station Docking Port",
   "tar.type": "dockingport",
+  "tar.objectId": "8080",
   "tar.distance": 184.6,
   "tar.o.relativeVelocity": 2.3,
   "tar.o.velocity": 2_291.4,
@@ -237,7 +256,7 @@ export const editorTelemetryFixture: TelemetrySnapshot = {
   "editor.summaryAvailable": true,
   "editor.partCount": 31,
   "editor.crewCapacity": 3,
-  "editor.stageCount": 3,
+  "editor.stageCount": 10,
   "editor.wetMass": 18.742,
   "editor.dryMass": 7.416,
   "editor.resourceMass": 11.326,
@@ -256,10 +275,13 @@ export const editorTelemetryFixture: TelemetrySnapshot = {
   "stage.available": true,
   "stage.complete": true,
   "stage.pending": false,
-  "stage.currentKsp": 2,
-  "stage.stages": editorStages,
-  "stage.totalDvAtmo": 1500,
-  "stage.totalDvVac": 1850,
+  "stage.count": 10,
+  "stage.currentKsp": 9,
+  "stage.unpoweredCount": 2,
+  "stage.stages": denseEditorStages,
+  "stage.totalDvAtmo": 4460,
+  "stage.totalDvVac": 5470,
+  "stage.totalBurnSeconds": 335,
   ...notesFixture,
 };
 
@@ -317,9 +339,37 @@ export const inactiveTelemetryFixture: TelemetrySnapshot = {
   "overview.reputation": 72.4,
   "overview.contractCounts": { active: 3, offered: 5, completed: 28, failed: 1 },
   "overview.contracts": [
-    { title: "Explore Duna", type: "Exploration", deadline: 13_200_000, fundsCompletion: 185_000, reputationCompletion: 22, scienceCompletion: 8 },
-    { title: "Position a satellite in polar orbit", type: "Satellite", deadline: 10_800_000, fundsCompletion: 92_500, reputationCompletion: 12 },
-    { title: "Gather temperature data from Minmus", type: "Science", deadline: 11_400_000, fundsCompletion: 68_000, reputationCompletion: 7, scienceCompletion: 14 },
+    {
+      objectId: "201", title: "Explore Duna", type: "Exploration", deadline: 13_200_000,
+      synopsis: "Carry the space program's exploration campaign to Duna and return useful flight data.",
+      description: "Reach the Duna system, establish a stable orbit, and transmit or recover scientific observations gathered there.",
+      notes: "Any active vessel may satisfy these objectives unless an objective says otherwise.",
+      parameters: [
+        { title: "Enter Duna's sphere of influence", status: "complete" },
+        { title: "Orbit Duna", status: "incomplete" },
+        { title: "Transmit or recover science from Duna", status: "incomplete" },
+      ],
+      fundsCompletion: 185_000, reputationCompletion: 22, scienceCompletion: 8,
+    },
+    {
+      objectId: "202", title: "Position a satellite in polar orbit", type: "Satellite", deadline: 10_800_000,
+      synopsis: "Place a new unmanned satellite into the requested polar orbit.",
+      parameters: [
+        { title: "Launch a new unmanned probe", status: "complete" },
+        { title: "Maintain the specified inclination and altitude", status: "incomplete" },
+        { title: "Keep the probe powered and controllable", status: "incomplete", optional: true },
+      ],
+      fundsCompletion: 92_500, reputationCompletion: 12,
+    },
+    {
+      objectId: "203", title: "Gather temperature data from Minmus", type: "Science", deadline: 11_400_000,
+      synopsis: "Collect temperature readings from the requested Minmus survey sites.",
+      parameters: [
+        { title: "Take a temperature scan in the Minmus Highlands", status: "complete" },
+        { title: "Take a temperature scan in the Greater Flats", status: "incomplete" },
+      ],
+      fundsCompletion: 68_000, reputationCompletion: 7, scienceCompletion: 14,
+    },
   ],
   "overview.vessels": [
     { objectId: "101", guid: "mock-odyssey-guid", name: "Odyssey", type: "Ship", situation: "Orbiting", body: "Kerbin", met: 134.2, crewCount: 3, crewNames: ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"], recoverable: false, mission: true, apoapsisAltitude: 122_480, periapsisAltitude: 118_920, inclination: 0.12, period: 2_080.4, eccentricity: 0.0008 },

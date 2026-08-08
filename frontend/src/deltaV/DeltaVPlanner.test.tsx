@@ -266,7 +266,9 @@ describe("delta-v planner drawer", () => {
     view.unmount();
     renderPlanner();
     expect(document.querySelector("#editorDeltaVPlan .delta-v-pinned-identity strong")?.textContent).toBe("Duna Survey");
-    fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    expect(screen.getByRole("dialog", { name: "Delta-v planner" })).toBeTruthy();
+    expect((screen.getByRole("textbox", { name: "Delta-v plan name" }) as HTMLInputElement).value).toBe("Duna Survey");
     expect((screen.getByRole("combobox", { name: "Next stop" }) as HTMLSelectElement).value).toBe("Kerbin");
     expect((screen.getByRole("spinbutton", { name: "Stay at Duna" }) as HTMLInputElement).value).toBe("4");
     expect(screen.queryByRole("spinbutton", { name: "Stay at Kerbin" })).toBeNull();

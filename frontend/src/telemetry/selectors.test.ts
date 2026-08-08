@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { selectConsumables, selectStages, selectStageSummary } from "./selectors";
+import {
+  selectConsumables,
+  selectStages,
+  selectStageSummary,
+  selectThrottleFraction,
+} from "./selectors";
 import type { TelemetrySnapshot } from "./types";
 
 describe("selectConsumables", () => {
@@ -19,6 +24,35 @@ describe("selectConsumables", () => {
       "ModB",
       "ModA",
     ]);
+  });
+});
+
+describe("selectThrottleFraction", () => {
+  it("uses commanded throttle when kRPC reports it", () => {
+    expect(selectThrottleFraction({
+      "context.mode": "flight",
+      "krpc.throttle": 0.42,
+      "v.thrust": 900,
+      "v.availableThrust": 1000,
+    })).toBe(0.42);
+  });
+
+  it("recovers the visible throttle from active thrust when control reports zero", () => {
+    expect(selectThrottleFraction({
+      "context.mode": "flight",
+      "krpc.throttle": 0,
+      "v.thrust": 550_716,
+      "v.availableThrust": 550_723,
+    })).toBeCloseTo(1, 4);
+  });
+
+  it("keeps a real zero when the vessel is not producing thrust", () => {
+    expect(selectThrottleFraction({
+      "context.mode": "flight",
+      "krpc.throttle": 0,
+      "v.thrust": 0,
+      "v.availableThrust": 550_723,
+    })).toBe(0);
   });
 });
 

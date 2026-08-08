@@ -156,7 +156,7 @@ describe("selectElectricity", () => {
     expect(model.etaSeconds).toBeCloseTo(1_828.57, 1);
   });
 
-  it("accepts normalized future source telemetry and reserves a solar forecast hook", () => {
+  it("accepts normalized source telemetry", () => {
     const model = selectElectricity({
       "context.mode": "flight",
       "elec.sources": [
@@ -174,20 +174,12 @@ describe("selectElectricity", () => {
       "elec.flowState": "valid",
       "r.resource[ElectricCharge]": 1_760,
       "r.resourceMax[ElectricCharge]": 2_000,
-      "solar.forecast": {
-        phase: "sunlight",
-        transitionInSeconds: 724,
-        orbitSeconds: 2_880,
-        shadowSeconds: 1_320,
-        valid: true,
-      },
     });
 
     expect(model.tier).toBe(2);
     expect(model.primarySource?.kind).toBe("fuel-cell");
     expect(model.status.label).toBe("RUNNING");
     expect(model.status.detail).toBe("limited by Liquid Fuel");
-    expect(model.solarForecast?.transitionInSeconds).toBe(724);
   });
 
   it("does not invent timing while flow telemetry is calibrating or saturated", () => {

@@ -35,6 +35,42 @@ describe("HeatPanel", () => {
     expect(screen.getByText("Reactor")).toBeTruthy();
   });
 
+  it("keeps only one System Heat loop expanded at a time", () => {
+    render(<HeatPanel snapshot={{
+      ...flightTelemetryFixture,
+      "heat.backend": "system_heat",
+      "heat.loops": [
+        ...flightTelemetryFixture["heat.loops"]!,
+      ].map((loop) => loop.id === "0"
+        ? {
+            ...loop,
+            producers: [{ name: "ISRU Converter", role: "producer", fluxKw: 74.2 }],
+            radiators: [{ name: "Graphene Radiator", role: "radiator", fluxKw: -201.6 }],
+          }
+        : loop.id === "2"
+          ? {
+              ...loop,
+              producers: [{ name: "Cryogenic Fuel Plant", role: "producer", fluxKw: 60 }],
+              radiators: [{ name: "Folding Radiator", role: "radiator", fluxKw: -100 }],
+            }
+          : loop),
+    }} />);
+
+    expect(screen.getByRole("button", { name: "Collapse Loop 1" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Loop 0" }));
+    expect(screen.getByRole("button", { name: "Expand Loop 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Collapse Loop 0" })).toBeTruthy();
+    expect(screen.getByText("ISRU Converter")).toBeTruthy();
+    expect(screen.queryByText("Reactor")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Loop 2" }));
+    expect(screen.getByRole("button", { name: "Expand Loop 0" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Collapse Loop 2" })).toBeTruthy();
+    expect(screen.getByText("Cryogenic Fuel Plant")).toBeTruthy();
+    expect(screen.queryByText("ISRU Converter")).toBeNull();
+  });
+
   it("uses the limiting stock temperature channel and omits the flux column", () => {
     render(<HeatPanel snapshot={{
       ...flightTelemetryFixture,

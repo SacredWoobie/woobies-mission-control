@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   formatDistance,
   formatDuration,
@@ -8,7 +8,7 @@ import {
   isFiniteNumber,
   VACUUM_PRESSURE_ATM,
 } from "../formatting/numbers";
-import { selectStages, selectStageSummary } from "../telemetry/selectors";
+import { selectStages, selectStageSummary, selectThrottleFraction } from "../telemetry/selectors";
 import type { StageViewModel, TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
 import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
@@ -16,6 +16,8 @@ import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
 interface StagingPanelProps {
   snapshot: TelemetrySnapshot;
 }
+
+const VISIBLE_POWERED_STAGE_ROWS = 4;
 
 function deltaVWithUnit(value: number | undefined) {
   const formatted = formatStageDeltaV(value);
@@ -64,7 +66,10 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const stale = editorMode && retained;
   const activeKsp = atmosphere.currentKsp ?? vacuum.currentKsp;
   const previousActiveKsp = useRef(activeKsp);
+  const editorStageTable = useRef<HTMLDivElement>(null);
   const [flashKsp, setFlashKsp] = useState<number>();
+  const [showAllPoweredStages, setShowAllPoweredStages] = useState(false);
+  const poweredRowsId = `powered-stage-rows-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   useEffect(() => {
     if (
@@ -80,7 +85,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const pressureAtm = snapshot["stage.staticPressureAtm"];
   const body = snapshot["stage.body"] || snapshot["v.body"] || "Current body";
   const altitude = snapshot["stage.altitude"] ?? snapshot["v.altitude"];
-  const throttle = snapshot["stage.throttle"] ?? snapshot["krpc.throttle"];
+  const throttle = selectThrottleFraction(snapshot);
   const situation = snapshot["stage.situation"] || snapshot["v.situationString"] || "";
   const unpoweredCount = isFiniteNumber(snapshot["stage.unpoweredCount"])
     ? Math.max(0, Math.round(snapshot["stage.unpoweredCount"]))
@@ -93,10 +98,58 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const throttlePercent = isFiniteNumber(throttle)
     ? Math.round(Math.max(0, Math.min(1, throttle)) * 100)
     : undefined;
+  const activeRowIndex = rows.findIndex((stage) => stage.ksp === activeKsp);
+  const groupedRowCount = rows.length > VISIBLE_POWERED_STAGE_ROWS + 1
+    && (activeRowIndex < 0 || activeRowIndex >= rows.length - VISIBLE_POWERED_STAGE_ROWS)
+    ? rows.length - VISIBLE_POWERED_STAGE_ROWS
+    : 0;
+  const groupedRows = groupedRowCount > 0 ? rows.slice(0, groupedRowCount) : [];
+  const groupedRange = groupedRows.length > 0
+    ? `S${groupedRows[0].ksp}–S${groupedRows[groupedRows.length - 1].ksp}`
+    : "";
+  const displayedRows = groupedRowCount > 0 && !showAllPoweredStages
+    ? rows.slice(groupedRowCount)
+    : rows;
+
+  useLayoutEffect(() => {
+    const table = editorStageTable.current;
+    if (!editorMode || stale || !table || activeKsp === undefined) return;
+    const activeRow = table.querySelector<HTMLElement>(`[data-stage-ksp="${activeKsp}"]`);
+    if (!activeRow) return;
+    const header = table.querySelector<HTMLElement>(".st-head");
+    const tableBounds = table.getBoundingClientRect();
+    const rowBounds = activeRow.getBoundingClientRect();
+    const visibleTop = tableBounds.top + (header?.getBoundingClientRect().height ?? 0);
+    if (rowBounds.bottom > tableBounds.bottom) {
+      table.scrollTop += Math.ceil(rowBounds.bottom - tableBounds.bottom) + 1;
+    } else if (rowBounds.top < visibleTop) {
+      table.scrollTop = Math.max(0, table.scrollTop - (visibleTop - rowBounds.top));
+    }
+  }, [activeKsp, editorMode, rows.length, stale]);
+
+  const renderFlightStageRow = (stage: StageViewModel) => {
+    const isCurrent = activeKsp === stage.ksp;
+    const danger = isCurrent
+      && isSurfaceSituation(situation)
+      && isFiniteNumber(stage.twrStart)
+      && stage.twrStart < 1;
+    return (
+      <div
+        className={`st-row${isCurrent ? " cur" : ""}${flashKsp === stage.ksp ? " newly-active" : ""}`}
+        key={stage.ksp}
+      >
+        <span className="sname">S{stage.ksp}</span>
+        <span className={dimCurrentDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
+        <span className={dimVacuumDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVVacuum)}</span>
+        <span className={`stage-twr${danger ? " danger" : ""}`}>{twrRange(stage)}</span>
+        <span>{compactDuration(stage.burnSeconds)}</span>
+      </div>
+    );
+  };
 
   return (
     <Panel
-      hideable={!editorMode}
+      compact={!editorMode}
       id="stage"
       title={editorMode ? "Editor staging analysis" : "Staging analysis"}
       tag={editorMode ? (
@@ -136,30 +189,46 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
             </p>
           ) : (
             <div
+              aria-label="Editor stage performance"
               aria-busy={pending}
               className={`stage-table editor${stale ? " editor-analysis-retained" : ""}`}
+              ref={editorStageTable}
+              role="table"
+              tabIndex={0}
             >
-              <div className="st-row st-head" aria-hidden="true">
-                <span>Stage</span>
-                <span>Δv Atmo</span>
-                <span>Δv Vac</span>
-                <span>TWR Atmo</span>
-                <span>TWR Vac</span>
-                <span>Burn</span>
+              <div className="st-row st-head" role="row">
+                <span role="columnheader">Stage</span>
+                <span role="columnheader">Δv Atmo</span>
+                <span role="columnheader">Δv Vac</span>
+                <span role="columnheader">TWR Atmo</span>
+                <span role="columnheader">TWR Vac</span>
+                <span role="columnheader">Burn</span>
               </div>
               {rows.map((stage) => {
                 const isCurrent = !stale && atmosphere.current?.ksp === stage.ksp;
                 return (
-                  <div className={`st-row ${isCurrent ? "cur" : ""}`} key={stage.ksp}>
-                    <span className="sname">{isCurrent ? "▶ " : ""}S{stage.ksp}</span>
-                    <span>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
-                    <span>{formatStageDeltaV(stage.deltaVVacuum)}</span>
-                    <span>{formatTwr(stage.twrAtmosphere)}</span>
-                    <span>{formatTwr(stage.twrVacuum)}</span>
-                    <span>{formatDuration(stage.burnSeconds)}</span>
+                  <div
+                    aria-current={isCurrent ? "step" : undefined}
+                    aria-label={isCurrent ? `Current stage S${stage.ksp}` : undefined}
+                    className={`st-row ${isCurrent ? "cur" : ""}`}
+                    data-stage-ksp={stage.ksp}
+                    key={stage.ksp}
+                    role="row"
+                  >
+                    <span className="sname" role="cell">{isCurrent ? "▶ " : ""}S{stage.ksp}</span>
+                    <span role="cell">{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
+                    <span role="cell">{formatStageDeltaV(stage.deltaVVacuum)}</span>
+                    <span role="cell">{formatTwr(stage.twrAtmosphere)}</span>
+                    <span role="cell">{formatTwr(stage.twrVacuum)}</span>
+                    <span role="cell">{formatDuration(stage.burnSeconds)}</span>
                   </div>
                 );
               })}
+            </div>
+          )}
+          {unpoweredCount > 0 && (
+            <div className="editor-stage-footer">
+              {unpoweredCount} non-propulsive {unpoweredCount === 1 ? "stage" : "stages"} omitted
             </div>
           )}
         </>
@@ -188,7 +257,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
           ) : rows.length === 1 ? (
             <div className="flight-stage-single">
               <div>
-                <span>TWR · {body}</span>
+                <span title={`Full-throttle TWR at live body gravity (${body})`}>TWR · LIVE</span>
                 <strong className={
                   isSurfaceSituation(situation)
                   && rows[0].ksp === activeKsp
@@ -208,33 +277,32 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
               </div>
             </div>
           ) : (
-            <div className="stage-table flight">
+            <div className={`stage-table flight${groupedRowCount > 0 ? " has-stage-group" : ""}${showAllPoweredStages ? " expanded" : ""}`}>
               <div className="st-row st-head" aria-hidden="true">
                 <span>ST</span>
-                <span className={dimCurrentDeltaV ? "dim" : ""}>Δv current</span>
-                <span className={dimVacuumDeltaV ? "dim" : ""}>Δv vac</span>
-                <span>TWR · {body}</span>
+                <span className={dimCurrentDeltaV ? "dim" : ""} title="Delta-v at live flight conditions">Δv LIVE</span>
+                <span className={dimVacuumDeltaV ? "dim" : ""} title="Delta-v in vacuum">Δv VAC</span>
+                <span title={`Full-throttle TWR at live body gravity (${body})`}>TWR · LIVE</span>
                 <span>Burn</span>
               </div>
-              {rows.map((stage) => {
-                const isCurrent = activeKsp === stage.ksp;
-                const danger = isCurrent
-                  && isSurfaceSituation(situation)
-                  && isFiniteNumber(stage.twrStart)
-                  && stage.twrStart < 1;
-                return (
-                  <div
-                    className={`st-row${isCurrent ? " cur" : ""}${flashKsp === stage.ksp ? " newly-active" : ""}`}
-                    key={stage.ksp}
-                  >
-                    <span className="sname">S{stage.ksp}</span>
-                    <span className={dimCurrentDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVAtmosphere)}</span>
-                    <span className={dimVacuumDeltaV ? "dim" : ""}>{formatStageDeltaV(stage.deltaVVacuum)}</span>
-                    <span className={`stage-twr${danger ? " danger" : ""}`}>{twrRange(stage)}</span>
-                    <span>{compactDuration(stage.burnSeconds)}</span>
-                  </div>
-                );
-              })}
+              {groupedRowCount > 0 && (
+                <div className="flight-stage-group">
+                  <span>
+                    <strong>{groupedRange}</strong>
+                    <small>{groupedRowCount} earlier powered stages</small>
+                  </span>
+                  <button
+                    aria-controls={poweredRowsId}
+                    aria-expanded={showAllPoweredStages}
+                    aria-label={`${showAllPoweredStages ? "Collapse" : "Expand"} ${groupedRowCount} earlier powered stages, ${groupedRange.replace("–", " through ")}`}
+                    onClick={() => setShowAllPoweredStages((expanded) => !expanded)}
+                    type="button"
+                  >{showAllPoweredStages ? "COLLAPSE" : "EXPAND"}</button>
+                </div>
+              )}
+              <div className="flight-stage-rows" id={poweredRowsId}>
+                {displayedRows.map(renderFlightStageRow)}
+              </div>
             </div>
           )}
 

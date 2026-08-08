@@ -1,8 +1,8 @@
-import type { SceneMode } from "../telemetry/types";
+import type { SceneMode, TelemetrySnapshot } from "../telemetry/types";
 import { ResonantOrbitDrawer } from "./ResonantOrbitDrawer";
 import { useResonantOrbitState } from "./state";
 
-export function ResonantOrbitTool({ mode, onOpen }: { mode: SceneMode; onOpen(): void }) {
+export function ResonantOrbitTool({ mode, onOpen, snapshot }: { mode: SceneMode; onOpen(): void; snapshot?: TelemetrySnapshot }) {
   const { drawerOpen, toggleDrawer } = useResonantOrbitState();
   function toggle() {
     if (!drawerOpen) onOpen();
@@ -22,7 +22,7 @@ export function ResonantOrbitTool({ mode, onOpen }: { mode: SceneMode; onOpen():
         <span aria-hidden="true" className="panel-rail-label">Resonant Orbit Planner</span>
         <span className="resonant-rail-icon" aria-hidden="true"><i /></span>
       </button>
-      <ResonantOrbitDrawer mode={mode} />
+      <ResonantOrbitDrawer mode={mode} snapshot={snapshot} />
     </>
   );
 }

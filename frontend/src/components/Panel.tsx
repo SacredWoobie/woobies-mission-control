@@ -2,7 +2,9 @@ import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { panelLabels, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
 
 interface PanelProps extends PropsWithChildren {
+  className?: string;
   collapsible?: boolean;
+  compact?: boolean;
   id?: string;
   headingActions?: ReactNode;
   hideable?: boolean;
@@ -10,14 +12,14 @@ interface PanelProps extends PropsWithChildren {
   tag?: ReactNode;
 }
 
-export function Panel({ children, collapsible = false, headingActions, hideable = false, id, tag, title }: PanelProps) {
+export function Panel({ children, className, collapsible = false, compact = false, headingActions, hideable = false, id, tag, title }: PanelProps) {
   const visibility = usePanelVisibility();
   const [collapsed, setCollapsed] = useState(false);
   const panelId = id && id in panelLabels ? id as DashboardPanelId : null;
   return (
-    <section className={`panel ${collapsed ? "panel-collapsed" : ""}`} id={id}>
+    <section className={`panel${compact ? " panel-compact" : ""}${collapsed ? " panel-collapsed" : ""}${className ? ` ${className}` : ""}`} id={id}>
       <h2>
-        <span>{title}</span>
+        <span className="panel-title">{title}</span>
         <span className="panel-heading-actions">
           {tag && <span className="tag">{tag}</span>}
           {headingActions}
@@ -29,7 +31,7 @@ export function Panel({ children, collapsible = false, headingActions, hideable 
               onClick={() => setCollapsed((current) => !current)}
               type="button"
             >
-              {collapsed ? "EXPAND" : "COLLAPSE"}
+              <span aria-hidden="true" className="panel-collapse-chevron" />
             </button>
           )}
           {hideable && panelId && (
@@ -45,7 +47,9 @@ export function Panel({ children, collapsible = false, headingActions, hideable 
           )}
         </span>
       </h2>
-      {!collapsed && <div className="body">{children}</div>}
+      {compact ? (
+        <div className="body" hidden={collapsed} inert={collapsed || undefined}>{children}</div>
+      ) : !collapsed && <div className="body">{children}</div>}
     </section>
   );
 }
