@@ -219,13 +219,13 @@ if ($builderReleaseSetPath) {
     }
 }
 
-$packageJson = Get-Content -LiteralPath (Join-Path $frontendRoot 'package.json') -Raw | ConvertFrom-Json
+$packageJson = Get-Content -LiteralPath (Join-Path $frontendRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($packageJson.version -ne $Version) {
     throw "frontend/package.json identifies $($packageJson.version), not v$Version."
 }
 
-$launcherText = Get-Content -LiteralPath (Join-Path $repoRoot 'ksp_dashboard_app.py') -Raw
-$changelog = Get-Content -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') -Raw
+$launcherText = Get-Content -LiteralPath (Join-Path $repoRoot 'ksp_dashboard_app.py') -Raw -Encoding UTF8
+$changelog = Get-Content -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') -Raw -Encoding UTF8
 if ($launcherText -notmatch [regex]::Escape("APP_VERSION = `"$Version`"")) {
     throw "ksp_dashboard_app.py does not identify v$Version."
 }
