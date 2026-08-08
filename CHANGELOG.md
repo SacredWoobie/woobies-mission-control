@@ -4,7 +4,15 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
-_No changes yet._
+- Reconciled the dashboard CSS foundation across both active production
+  stylesheets: repaired undefined custom-property references, promoted repeated
+  exact palette values into shared semantic roles, and added a dependency-free
+  CSS contract that prevents those roles from drifting back into raw literals.
+- Raised the minimum dashboard text size to 8 px and moved operational copy off
+  the low-contrast decorative slate role while preserving its use for borders,
+  strokes, fills, and other intentionally receding non-text detail.
+- Added GitHub continuous integration for the Python runtime suite and the
+  locked frontend CSS, unit, type/build, Chrome, and Edge checks.
 
 ## v0.5.0 - Flight dashboard workspaces
 

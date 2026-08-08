@@ -185,13 +185,20 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
 
 Production Python source lives at the repository root. React and TypeScript
 source lives under `frontend`; fixtures, Vite, and the mock server are
-development tools rather than end-user dependencies.
+development tools rather than end-user dependencies. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the complete local and CI checks and
+[`docs/DASHBOARD_UI_GUIDELINES.md`](docs/DASHBOARD_UI_GUIDELINES.md) for the
+tracked dashboard design contract.
 
 ```powershell
 .\scripts\dashboard-dev.ps1 start
 .\scripts\dashboard-dev.ps1 stop
+cd frontend
+pnpm install --frozen-lockfile
+pnpm check
+cd ..
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-Frontend.ps1 -InstallDependencies -StageRuntimeWeb
-python -m unittest discover -s tests -p "test_*.py"
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 
 For repeatable UI work without KSP, `tools\Mock Mission Control.bat` serves the

@@ -36,10 +36,12 @@ density.
 
 - Operational titles, roles, deadlines, values, and decision text must remain
   readable in the actual browser. Use 10-12 px as the normal compact range;
-  reserve 8-9 px text for truly secondary captions and metadata.
-- Use `--slate` or brighter text for supporting information a user must read.
-  `--slate-dim` is for information that can safely recede, not for squeezing
-  more apparent hierarchy out of required copy.
+  reserve 8-9 px text for truly secondary captions and metadata. Eight pixels
+  is the absolute floor for rendered dashboard text; do not evade it with a
+  shorthand declaration or a scene-specific stylesheet.
+- Use `--slate-muted-text` or a stronger semantic text token for supporting
+  information a user must read. `--slate-dim` is reserved for decorative
+  borders, strokes, fills, and other non-text detail that can safely recede.
 - Preserve the dashboard's semantic palette: cyan for active state and primary
   operational controls, amber for time-sensitive or emphasized values, green
   for available/success/recovery state, and red for warnings or destructive
@@ -48,6 +50,29 @@ density.
   countdowns should scan vertically rather than drift with content length.
 - Reformat numeric values through units and precision before truncating them.
   Do not ellipsize a number whose magnitude or unit affects a decision.
+
+### CSS foundation and reuse
+
+- `frontend/src/styles.css` owns the shared `:root` palette used by both active
+  production stylesheets. `resonantOrbit/resonantOrbit.css` consumes those
+  roles rather than defining a parallel palette.
+- Name shared colors for their job, not their hue or the component that first
+  needed them. Current reusable roles include primary/value/muted text,
+  control surfaces, instrument surfaces, accent borders, success borders, and
+  error text. Keep warning and destructive roles distinct even when their
+  values are visually related.
+- Promote a raw color only after checking every exact use across both active
+  stylesheets and confirming one honest semantic role. Preserve local literals
+  for gradients, alpha overlays, shadows, SVG/instrument geometry, and
+  data-visualization endpoints when a global role would be misleading.
+- Do not mechanically collapse near colors, replace all raw literals, or remove
+  `!important`. Each can encode state, cascade, opacity, or instrument geometry;
+  change it only with selector-level evidence and rendered review.
+- `pnpm test:css` is the executable contract. It rejects undefined custom
+  properties, direct reuse of migrated literals, undersized pixel text,
+  low-contrast `--slate-dim` text, and regressions in selected semantic-token
+  contrast pairs. Expand it incrementally when a new role is fully migrated;
+  do not turn current literal counts into a brittle pass/fail target.
 
 ### Layout and responsive behavior
 
@@ -192,7 +217,9 @@ Before calling dashboard UI work complete:
 1. Confirm the first glance answers the scene's primary user question and that
    every visual element communicates real information.
 2. Remove redundant copy and verify required secondary text remains readable in
-   Chrome rather than relying only on declared CSS sizes.
+   Chrome rather than relying only on declared CSS sizes. Run `pnpm test:css`
+   before rendered review so undefined tokens, migrated literals, the 8 px text
+   floor, and selected contrast contracts fail early.
 3. Exercise normal, dense, long-label, loading, empty, unavailable, offline,
    error, and missing-optional-field fixtures applicable to the change.
 4. Inspect `1920x889`, `1280x800`, and `1080x1920`; measure document and panel
