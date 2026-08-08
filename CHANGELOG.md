@@ -17,13 +17,6 @@ _No changes yet._
   silhouette, including its smaller centered reference dot.
 - Rebalanced Flight staging columns so `Δv LIVE`, `Δv VAC`, and `TWR · LIVE`
   headings leave less unused width in TWR and more room for delta-v values.
-- Expanded the deterministic Flight mock to eight powered stages out of ten
-  total and added non-retractable, deploying, and damaged radiator states for
-  staging- and Heat-panel density testing.
-- Added deterministic save and craft identity to the live Editor mock so
-  Resonant Orbit and Delta-V plans can be pinned safely during layout testing.
-- Populated the deterministic inactive mock with a completed nine-destination
-  transfer-window board for overview-scene density and layout review.
 - Consolidated inactive-scene identity and content-weighted program status into
   one header, expanded Active Vessels into a source-backed orbit, crew, and
   next-event briefing with three equal command actions, and added collapsible
@@ -45,8 +38,8 @@ _No changes yet._
   Transfer Windows, Active Vessels, Astronaut Roster, Upcoming Alarms, and
   Active Contracts remain consistently available; celestial-body disclosures
   and contract focus controls are unchanged.
-- Aligned the Resonant Orbit planner with the selected dashboard telemetry so
-  fixture and live Editor sessions use the same save context when pinning plans.
+- Aligned the Resonant Orbit planner with the selected dashboard save context so
+  pinned Editor plans remain associated with the active craft.
 - Redesigned the pinned Editor Resonant Orbit plan as a compact constellation
   and carrier-orbit card, with the saved plan name and key maneuver facts in the
   body plus an `EDIT PLAN` header action that restores that exact plan.
@@ -58,8 +51,6 @@ _No changes yet._
   into one full-width header, removed the redundant Editor Link strip, and
   refocused Craft Summary as a dedicated resource inventory. Altitude and Mach
   remain directly editable without native increment/decrement controls.
-- Reused that dense ten-stage mock craft in Editor so the same staged vehicle
-  can be inspected across Flight and VAB layout states.
 - Reclaimed the empty Editor planning column for a full-width craft-analysis
   row with side-by-side staging and craft summary, repaired shared collapse
   chevrons, and made dense staging explain omitted stages while revealing and
@@ -79,10 +70,6 @@ _No changes yet._
 - Reflowed Ascension's orbital-stat rail before narrow panels can truncate
   labels or telemetry values, while retaining the single-row proposal-target
   layouts.
-- Expanded the deterministic Flight mock with detailed component inventories
-  for all three System Heat loops, two fission reactors plus one fusion reactor,
-  and nuclear, cryogenic, ore, and depleted-fuel consumables for frontend stress
-  testing without a running KSP session.
 - Made System Heat loop details an accordion: opening one loop collapses the
   previously expanded loop, preserving the bounded Heat Management footprint
   while retaining automatic expansion for a newly critical loop.
@@ -97,14 +84,11 @@ _No changes yet._
   annunciator, dedicated SAS strip, width-safe prominent altitude, 2x2
   flight-speed grid, explanatory orbital-stat rail, and a centered
   telemetry-projected spherical navball with curved coordinates, a true horizon,
-  and heading-aware cardinals;
-  removed the lower sparklines without adding RCS, vessel controls, backend
-  telemetry, or bitmap assets.
+  and heading-aware cardinals.
 
 - Simplified Flight Consumables to the authoritative vessel-total inventory,
-  giving resource names and amount meters substantially more horizontal room;
-  current-stage telemetry remains available internally for future contextual
-  use, while incomplete or unavailable polls no longer present cached resource
+  giving resource names and amount meters substantially more horizontal room,
+  while incomplete or unavailable polls no longer present cached resource
   amounts as current.
 
 - Reduced the fixed caution surface to an actionable 2x2 HEAT, REACTOR, COMMS,

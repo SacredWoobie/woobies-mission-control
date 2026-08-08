@@ -365,6 +365,25 @@ class ReleaseContractTests(unittest.TestCase):
             publish_script,
         )
 
+    def test_release_notes_preserve_utf8_and_exclude_mock_only_history(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        release_section = changelog.split(
+            "## v0.5.0 - Flight dashboard workspaces", 1
+        )[1].split("\n## ", 1)[0]
+
+        self.assertIn(
+            "Get-Content -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') "
+            "-Raw -Encoding UTF8",
+            publish_script,
+        )
+        self.assertIn("`Δv LIVE`", release_section)
+        self.assertIn("`TWR · LIVE`", release_section)
+        self.assertNotIn("mock", release_section.casefold())
+        self.assertNotIn("fixture", release_section.casefold())
+
     def test_release_package_includes_runtime_and_license_materials(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
             encoding="utf-8"
