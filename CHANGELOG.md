@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.5.1 - Contract deadlines and UI foundations
+
 - Added authoritative live KSP deadlines to Active Contracts when the new
   read-only MissionOverview service API is available. Compact cards prioritize
   a low-noise time-remaining countdown, expanded briefings show the absolute

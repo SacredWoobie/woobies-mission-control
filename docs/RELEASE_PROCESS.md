@@ -31,7 +31,7 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-The current development manifest selects:
+The v0.5.1 release manifest selects:
 
 | Service | Release |
 | --- | --- |
@@ -76,14 +76,14 @@ Before the screenshot session, build an internal acceptance package without
 image assets:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.0 -GameDataPath $serviceGameData -SkipReleaseImages
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.1 -GameDataPath $serviceGameData -SkipReleaseImages
 ```
 
 The switch is rejected when `-CreateDraftRelease` is present. After all five
 screenshots are approved, run the final package command without the switch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.0 -GameDataPath $serviceGameData
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.1 -GameDataPath $serviceGameData
 ```
 
 The packager:
@@ -119,24 +119,25 @@ Before creating a GitHub draft:
 - verify Notes, KAC/stock alarms, stock/System Heat selection, reconnects,
   collapsed panels, planner persistence, transfer preview/confirmation, and
   launcher update/preflight behavior as applicable;
-- follow `docs/images/v0.5.0/README.md` for the screenshot set and
+- follow `docs/images/v0.5.1/README.md` for the screenshot set and
   its source briefs.
 
-Version 0.5.0 requires a fresh dashboard image set because Mission Control,
-Editor, and Flight have materially changed. Capture the development-fixture
-images only after the browser matrix passes against the final candidate; the
-development corner control must remain hidden in every release image.
+Version 0.5.1 refreshes the Mission Control overview and focused-contract images
+from accepted live telemetry. The unchanged Editor, Flight Monitor, and Flight
+Plan Workspace captures are reused from v0.5.0 and the v0.5.1 copies are encoded
+as true PNG files. The development corner control must remain hidden in every
+release image.
 
 ## 5. Create a private draft release
 
 After committing, pushing, and confirming that `main` matches `origin/main`:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.0 -GameDataPath $serviceGameData -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.1 -GameDataPath $serviceGameData -CreateDraftRelease
 ```
 
 This creates a draft GitHub Release and uploads the ZIP, checksum, GPL source
 archive, and five curated screenshots. The screenshot filenames use a `.zz-01`
-through `.zz-05` suffix so `Woobies-Mission-Control-v0.5.0.zip` remains the
+through `.zz-05` suffix so `Woobies-Mission-Control-v0.5.1.zip` remains the
 first release asset. Review the draft, its generated notes, asset ordering,
 source archive, and final screenshots before publishing it.
