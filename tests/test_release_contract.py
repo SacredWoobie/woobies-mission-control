@@ -212,15 +212,23 @@ class ReleaseContractTests(unittest.TestCase):
         v050_product, v050_services = read_manifest(
             ROOT / "tools" / "Release-Pack-v0.5.0.psd1"
         )
-        manifest_product, manifest_services = read_manifest(
-            ROOT / "tools" / "Release-Manifest.psd1"
-        )
 
         self.assertEqual(v044_product, "0.4.4")
         self.assertEqual(v050_product, "0.5.0")
-        self.assertEqual(manifest_product, "0.5.0")
         self.assertEqual(v050_services, v044_services)
-        self.assertEqual(manifest_services, v050_services)
+
+    def test_development_manifest_records_contract_deadline_service_source(self):
+        manifest = (
+            ROOT / "tools" / "Release-Manifest.psd1"
+        ).read_text(encoding="utf-8")
+
+        self.assertRegex(
+            manifest,
+            r'(?s)Folder = "WoobiesControlStats".*?'
+            r'Version = "0\.2\.7\.0".*?'
+            r'Sha256 = "712A058862C78691B2CB4351E6DD0E554E391C517C2531090DBB57009C605A14".*?'
+            r'SourceCommit = "56723004f10c422686a96775f98978302900a9b4"',
+        )
 
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(

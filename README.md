@@ -116,7 +116,7 @@ Historical release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
 | --- | --- | --- |
-| WoobiesControlStats | 0.2.6 | Roster, stored science, research-lab telemetry and controls, stock thermal data, KAC bridge recovery, and guarded vessel termination |
+| WoobiesControlStats | 0.2.7 | Roster, stored science, research-lab telemetry and controls, stock thermal data, authoritative contract deadlines, KAC bridge recovery, and guarded vessel termination |
 | KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
 | KRPC.SystemHeat | 0.2.9 | System Heat loops, components, electrical integration, reactor control, and guarded per-loop radiator control |
 | KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
