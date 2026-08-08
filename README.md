@@ -111,8 +111,9 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The current release includes four independently versioned kRPC extensions.
-Historical release packs remain pinned to their original service bytes:
+The Unreleased development manifest selects four independently versioned kRPC
+extensions. Published release packs, including v0.5.0 with
+WoobiesControlStats 0.2.6, remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
 | --- | --- | --- |
