@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run",
+    "test": "pnpm test:css && pnpm test:unit",
+    "test:css": "node ./scripts/check-css-contract.mjs",
+    "test:unit": "vitest run",
     "test:browser": "playwright test",
     "check": "pnpm test && pnpm build && pnpm test:browser",
     "preview": "vite preview"
