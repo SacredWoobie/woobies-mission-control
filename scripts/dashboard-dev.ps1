@@ -14,7 +14,7 @@ $PidFile = Join-Path $StateRoot "vite.pid"
 $StartTimeFile = Join-Path $StateRoot "vite.start-time"
 $OutputLog = Join-Path $StateRoot "vite.output.log"
 $ErrorLog = Join-Path $StateRoot "vite.error.log"
-$DashboardUrl = "http://127.0.0.1:5173/"
+$DashboardUrl = "http://127.0.0.1:5174/"
 
 function Test-DashboardReady {
     try {

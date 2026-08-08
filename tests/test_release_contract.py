@@ -254,6 +254,21 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('DASHBOARD_URL = "http://127.0.0.1:8090/"', launcher)
         self.assertIn('DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"', telemetry)
 
+    def test_managed_frontend_server_uses_the_configured_vite_port(self):
+        dev_script = (ROOT / "scripts" / "dashboard-dev.ps1").read_text(
+            encoding="utf-8"
+        )
+        vite_config = (ROOT / "frontend" / "vite.config.ts").read_text(
+            encoding="utf-8"
+        )
+        frontend_readme = (ROOT / "frontend" / "README.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('$DashboardUrl = "http://127.0.0.1:5174/"', dev_script)
+        self.assertIn("port: 5174", vite_config)
+        self.assertIn("http://127.0.0.1:5174/", frontend_readme)
+
     def test_component_specific_first_run_menu_is_packaged(self):
         menu = (ROOT / "Select Mission Control Setup.ps1").read_text(encoding="utf-8")
         batch = (ROOT / "Start KSP Dashboard.bat").read_text(encoding="utf-8")
