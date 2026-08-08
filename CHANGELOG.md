@@ -4,6 +4,9 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Added authoritative live KSP due dates and time remaining to Active Contracts
+  when the new read-only MissionOverview service API is available, while older
+  service installations continue to omit unavailable deadlines safely.
 - Reconciled the dashboard CSS foundation across both active production
   stylesheets: repaired undefined custom-property references, promoted repeated
   exact palette values into shared semantic roles, and added a dependency-free

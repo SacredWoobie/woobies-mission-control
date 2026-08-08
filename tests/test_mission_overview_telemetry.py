@@ -32,6 +32,22 @@ class MissionOverviewService:
     def roster_flight_counts(self): return [5, 11]
 
 
+class ContractDeadlineService:
+    available = True
+    contract_deadline_schema = 1
+
+    def __init__(self, deadline=None, error=None):
+        self.deadline = deadline
+        self.error = error
+        self.contracts = []
+
+    def contract_deadline(self, contract):
+        self.contracts.append(contract)
+        if self.error is not None:
+            raise self.error
+        return self.deadline
+
+
 class VesselManagementService:
     available = True
 
@@ -587,6 +603,66 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
             },
         ])
 
+    def test_contract_deadline_prefers_exact_custom_service_contract(self):
+        contract = SimpleNamespace(
+            title="Explore Duna",
+            type="ContractType.exploration",
+            parameters=[],
+        )
+        service = ContractDeadlineService(deadline=13_200_000.0)
+        manager = SimpleNamespace(
+            active_contracts=[contract], offered_contracts=[],
+            completed_contracts=[], failed_contracts=[],
+        )
+
+        row = telemetry_server._gather_overview_contracts(
+            SimpleNamespace(contract_manager=manager), service
+        )["overview.contracts"][0]
+
+        self.assertEqual(row["deadline"], 13_200_000.0)
+        self.assertEqual(service.contracts, [contract])
+
+    def test_contract_deadline_retains_old_service_property_fallback(self):
+        contract = SimpleNamespace(
+            title="Legacy relay contract",
+            type="ContractType.satellite",
+            date_deadline=10_800_000.0,
+            parameters=[],
+        )
+        manager = SimpleNamespace(
+            active_contracts=[contract], offered_contracts=[],
+            completed_contracts=[], failed_contracts=[],
+        )
+
+        row = telemetry_server._gather_overview_contracts(
+            SimpleNamespace(contract_manager=manager), MissionOverviewService()
+        )["overview.contracts"][0]
+
+        self.assertEqual(row["deadline"], 10_800_000.0)
+
+    def test_contract_deadline_omits_invalid_or_failed_service_values(self):
+        contract = SimpleNamespace(
+            title="Evergreen contract",
+            type="ContractType.configured",
+            parameters=[],
+        )
+        manager = SimpleNamespace(
+            active_contracts=[contract], offered_contracts=[],
+            completed_contracts=[], failed_contracts=[],
+        )
+        services = (
+            ContractDeadlineService(deadline=float("nan")),
+            ContractDeadlineService(deadline=0),
+            ContractDeadlineService(error=RuntimeError("stale contract")),
+        )
+
+        for service in services:
+            with self.subTest(service=service):
+                row = telemetry_server._gather_overview_contracts(
+                    SimpleNamespace(contract_manager=manager), service
+                )["overview.contracts"][0]
+                self.assertIsNone(row["deadline"])
+
     def test_contract_text_strips_markup_without_removing_numeric_comparisons(self):
         contract = SimpleNamespace(
             title="<b>Low flight</b>",
@@ -642,6 +718,41 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
 
         refreshed = telemetry_server._gather_overview_telemetry(conn, "GameScene.space_center", now=102.1)
         self.assertEqual(refreshed["overview.funds"], 300000)
+
+    def test_contract_poll_uses_and_caches_custom_service_deadline(self):
+        conn = fake_connection()
+        contract = SimpleNamespace(
+            title="Explore Duna",
+            type="ContractType.exploration",
+            parameters=[],
+        )
+        conn.space_center.contract_manager.active_contracts = [contract]
+        conn.mission_overview = ContractDeadlineService(deadline=13_200_000.0)
+
+        first = telemetry_server._gather_overview_telemetry(
+            conn, "GameScene.space_center", now=100
+        )
+        self.assertEqual(
+            first["overview.contracts"][0]["deadline"], 13_200_000.0
+        )
+        self.assertEqual(conn.mission_overview.contracts, [contract])
+
+        conn.mission_overview.deadline = 14_400_000.0
+        cached = telemetry_server._gather_overview_telemetry(
+            conn, "GameScene.space_center", now=101
+        )
+        self.assertEqual(
+            cached["overview.contracts"][0]["deadline"], 13_200_000.0
+        )
+        self.assertEqual(conn.mission_overview.contracts, [contract])
+
+        refreshed = telemetry_server._gather_overview_telemetry(
+            conn, "GameScene.space_center", now=110.1
+        )
+        self.assertEqual(
+            refreshed["overview.contracts"][0]["deadline"], 14_400_000.0
+        )
+        self.assertEqual(conn.mission_overview.contracts, [contract, contract])
 
 
 if __name__ == "__main__":
