@@ -110,8 +110,9 @@ export function collectPixelFontSizes(source) {
     const property = match[1].toLowerCase();
     const value = match[2];
     const sizeMatch = property === "font-size"
-      ? value.match(/^\s*(\d*\.?\d+)px\b/i)
-      : value.match(/(?:^|\s)(\d*\.?\d+)px(?:\s*\/|\s|$)/i);
+      ? value.match(/^\s*(\d*\.?\d+)px\b/i) ?? value.match(/^\s*clamp\(\s*(\d*\.?\d+)px\b/i)
+      : value.match(/(?:^|\s)(\d*\.?\d+)px(?:\s*\/|\s|$)/i)
+        ?? value.match(/(?:^|\s)clamp\(\s*(\d*\.?\d+)px\b/i);
     if (!sizeMatch) continue;
     sizes.push({ index: match.index, pixels: Number.parseFloat(sizeMatch[1]) });
   }
@@ -175,10 +176,15 @@ export function checkCssContract(sources) {
 
   const rootSource = sources.find((source) => source.file === "src/styles.css");
   const rootBlock = rootSource?.text.match(/:root\s*\{([\s\S]*?)\}/)?.[1] ?? "";
-  const rootColors = new Map(
+  const rootStart = rootSource?.text.indexOf(rootBlock) ?? -1;
+  const rootColorDefinitions = new Map(
     [...rootBlock.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-f]{3}|#[0-9a-f]{6})\s*;/gi)]
-      .map((match) => [match[1], expandHex(match[2])]),
+      .map((match) => [match[1], {
+        line: lineNumberAt(rootSource.text, rootStart + match.index),
+        literal: expandHex(match[2]),
+      }]),
   );
+  const rootColors = new Map([...rootColorDefinitions].map(([name, definition]) => [name, definition.literal]));
 
   for (const token of canonicalLiteralTokens) {
     const literal = rootColors.get(token);
@@ -190,7 +196,8 @@ export function checkCssContract(sources) {
       const masked = maskCommentsAndStrings(source.text);
       const lines = masked.split("\n");
       lines.forEach((line, index) => {
-        if (/^\s*--[a-z0-9-]+\s*:/i.test(line)) return;
+        const definition = rootColorDefinitions.get(token);
+        if (source.file === rootSource?.file && index + 1 === definition?.line) return;
         const literals = [...line.matchAll(/#[0-9a-f]{3}(?:[0-9a-f]{3})?\b/gi)].map((match) => expandHex(match[0]));
         if (literals.includes(literal)) {
           failures.push(`${source.file}:${index + 1} uses ${literal} directly; use var(${token}).`);
