@@ -81,6 +81,8 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "v.altitude": 82_415.6,
   "v.verticalSpeed": 128.4,
   "v.surfaceSpeed": 2_215.3,
+  "v.thrust": 680_000,
+  "v.availableThrust": 1_000_000,
   "v.orbitalVelocity": 2_287.1,
   "v.geeForce": 1.08,
   "v.situationString": "Orbiting",
@@ -337,9 +339,37 @@ export const inactiveTelemetryFixture: TelemetrySnapshot = {
   "overview.reputation": 72.4,
   "overview.contractCounts": { active: 3, offered: 5, completed: 28, failed: 1 },
   "overview.contracts": [
-    { title: "Explore Duna", type: "Exploration", deadline: 13_200_000, fundsCompletion: 185_000, reputationCompletion: 22, scienceCompletion: 8 },
-    { title: "Position a satellite in polar orbit", type: "Satellite", deadline: 10_800_000, fundsCompletion: 92_500, reputationCompletion: 12 },
-    { title: "Gather temperature data from Minmus", type: "Science", deadline: 11_400_000, fundsCompletion: 68_000, reputationCompletion: 7, scienceCompletion: 14 },
+    {
+      objectId: "201", title: "Explore Duna", type: "Exploration", deadline: 13_200_000,
+      synopsis: "Carry the space program's exploration campaign to Duna and return useful flight data.",
+      description: "Reach the Duna system, establish a stable orbit, and transmit or recover scientific observations gathered there.",
+      notes: "Any active vessel may satisfy these objectives unless an objective says otherwise.",
+      parameters: [
+        { title: "Enter Duna's sphere of influence", status: "complete" },
+        { title: "Orbit Duna", status: "incomplete" },
+        { title: "Transmit or recover science from Duna", status: "incomplete" },
+      ],
+      fundsCompletion: 185_000, reputationCompletion: 22, scienceCompletion: 8,
+    },
+    {
+      objectId: "202", title: "Position a satellite in polar orbit", type: "Satellite", deadline: 10_800_000,
+      synopsis: "Place a new unmanned satellite into the requested polar orbit.",
+      parameters: [
+        { title: "Launch a new unmanned probe", status: "complete" },
+        { title: "Maintain the specified inclination and altitude", status: "incomplete" },
+        { title: "Keep the probe powered and controllable", status: "incomplete", optional: true },
+      ],
+      fundsCompletion: 92_500, reputationCompletion: 12,
+    },
+    {
+      objectId: "203", title: "Gather temperature data from Minmus", type: "Science", deadline: 11_400_000,
+      synopsis: "Collect temperature readings from the requested Minmus survey sites.",
+      parameters: [
+        { title: "Take a temperature scan in the Minmus Highlands", status: "complete" },
+        { title: "Take a temperature scan in the Greater Flats", status: "incomplete" },
+      ],
+      fundsCompletion: 68_000, reputationCompletion: 7, scienceCompletion: 14,
+    },
   ],
   "overview.vessels": [
     { objectId: "101", guid: "mock-odyssey-guid", name: "Odyssey", type: "Ship", situation: "Orbiting", body: "Kerbin", met: 134.2, crewCount: 3, crewNames: ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"], recoverable: false, mission: true, apoapsisAltitude: 122_480, periapsisAltitude: 118_920, inclination: 0.12, period: 2_080.4, eccentricity: 0.0008 },

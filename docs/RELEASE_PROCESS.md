@@ -31,7 +31,7 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-For Mission Control v0.4.4, the selected set is:
+For Mission Control v0.5.0, the selected set remains:
 
 | Service | Release |
 | --- | --- |
@@ -61,18 +61,29 @@ runtime logs, and release output remain local and ignored.
 
 ## 3. Assemble the release without publishing
 
+Assemble only from the clean merged release-candidate commit. Do not use a
+dirty feature checkout as package provenance.
+
+If the canonical service-builder checkout is intentionally parked on an older
+release line, point the packager at a separately verified selected-service
+staging tree. `Verify-Release.ps1` must pass in that service checkout first:
+
+```powershell
+$serviceGameData = "C:\path\to\verified-service-builder\dist\GameData"
+```
+
 Before the screenshot session, build an internal acceptance package without
 image assets:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.4 -SkipReleaseImages
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.0 -GameDataPath $serviceGameData -SkipReleaseImages
 ```
 
 The switch is rejected when `-CreateDraftRelease` is present. After all five
 screenshots are approved, run the final package command without the switch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.4
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.0 -GameDataPath $serviceGameData
 ```
 
 The packager:
@@ -108,23 +119,24 @@ Before creating a GitHub draft:
 - verify Notes, KAC/stock alarms, stock/System Heat selection, reconnects,
   collapsed panels, planner persistence, transfer preview/confirmation, and
   launcher update/preflight behavior as applicable;
-- follow `docs/images/v0.4.4/README.md` for the approved screenshot set and
+- follow `docs/images/v0.5.0/README.md` for the screenshot set and
   its source briefs.
 
-Version 0.4.4 refreshes the launcher image to show the independently scrollable
-controls and Mission Log from the assembled package. It reuses the v0.4.2 Space
-Center overview and the three still-current v0.4.0 planning and editor images.
+Version 0.5.0 requires a fresh dashboard image set because Mission Control,
+Editor, and Flight have materially changed. Capture the development-fixture
+images only after the browser matrix passes against the final candidate; the
+development corner control must remain hidden in every release image.
 
 ## 5. Create a private draft release
 
 After committing, pushing, and confirming that `main` matches `origin/main`:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.4.4 -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.5.0 -GameDataPath $serviceGameData -CreateDraftRelease
 ```
 
 This creates a draft GitHub Release and uploads the ZIP, checksum, GPL source
 archive, and five curated screenshots. The screenshot filenames use a `.zz-01`
-through `.zz-05` suffix so `Woobies-Mission-Control-v0.4.4.zip` remains the
+through `.zz-05` suffix so `Woobies-Mission-Control-v0.5.0.zip` remains the
 first release asset. Review the draft, its generated notes, asset ordering,
 source archive, and final screenshots before publishing it.

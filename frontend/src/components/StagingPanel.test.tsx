@@ -32,6 +32,28 @@ describe("StagingPanel", () => {
     expect(container.querySelector("#stage > h2 .tag")).toBeNull();
   });
 
+  it("uses the live vessel throttle instead of the slower staging snapshot", () => {
+    render(<StagingPanel snapshot={{
+      ...flightTelemetryFixture,
+      "krpc.throttle": 0.42,
+      "stage.throttle": 0.9,
+    }} />);
+
+    expect(screen.getByText("throttle 42%", { exact: true })).toBeTruthy();
+  });
+
+  it("recovers the KSP throttle gauge from active thrust when control reports zero", () => {
+    render(<StagingPanel snapshot={{
+      ...flightTelemetryFixture,
+      "krpc.throttle": 0,
+      "v.thrust": 550_716,
+      "v.availableThrust": 550_723,
+      "stage.throttle": 0,
+    }} />);
+
+    expect(screen.getByText("throttle 100%", { exact: true })).toBeTruthy();
+  });
+
   it("groups distant powered stages and expands them inside a bounded row region", () => {
     const stages = [0, 2, 3, 5, 6, 8, 9].map((ksp, index) => ({
       index,

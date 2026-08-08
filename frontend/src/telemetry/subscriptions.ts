@@ -47,7 +47,7 @@ export function consumablesSnapshotsEqual(
     ...((left?.["res.names"] as string[] | undefined) ?? []),
     ...((right?.["res.names"] as string[] | undefined) ?? []),
   ].filter((name) => name !== "ElectricCharge"));
-  const keys = ["context.mode", "res.names", "res.stageKnown"];
+  const keys = ["context.mode", "res.status", "res.names", "res.stageKnown"];
   names.forEach((name) => keys.push(
     `r.resource[${name}]`,
     `r.resourceMax[${name}]`,
@@ -64,9 +64,22 @@ export function stagingSnapshotsEqual(
   return fieldsEqual(left, right, [
     "context.mode",
     "krpc.throttle",
+    "v.thrust",
+    "v.availableThrust",
+    "v.altitude",
+    "v.body",
+    "v.situationString",
     "stage.available",
     "stage.complete",
     "stage.pending",
+    "stage.count",
+    "stage.unpoweredCount",
+    "stage.totalBurnSeconds",
+    "stage.staticPressureAtm",
+    "stage.altitude",
+    "stage.body",
+    "stage.situation",
+    "stage.throttle",
     "editor.revision",
     "editor.analysisRevision",
     "editor.stable",
@@ -101,8 +114,17 @@ export function editorSnapshotsEqual(
     "editor.bodies",
     "editor.altitude",
     "editor.mach",
+    "editor.partCount",
+    "editor.stageCount",
+    "editor.crewCapacity",
+    "editor.wetMass",
+    "editor.dryMass",
+    "editor.resourceMass",
+    "editor.totalCost",
+    "editor.resourceCost",
     "editor.revision",
     "editor.stable",
+    "catalog.bodies",
     "stage.available",
     "stage.pending",
   ]);
@@ -163,7 +185,7 @@ export function clockSnapshotsEqual(left: TelemetrySnapshot | null, right: Telem
 }
 
 export function ascensionSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
-  return fieldsEqual(left, right, ["context.mode", "krpc.throttle", "krpc.sas", "krpc.sasMode", "n.heading", "n.pitch", "n.roll", "v.body", "v.situationString", "v.altitude", "v.verticalSpeed", "v.surfaceSpeed", "v.orbitalVelocity", "o.ApA", "o.PeA", "o.timeToAp", "o.timeToPe", "o.inclination", "o.eccentricity", "o.period", "mj.sasActive", "mj.sasMode", "tar.name", "tar.o.relativeVelocity"]);
+  return fieldsEqual(left, right, ["context.mode", "krpc.throttle", "v.thrust", "v.availableThrust", "krpc.sas", "krpc.sasMode", "n.heading", "n.pitch", "n.roll", "v.body", "v.situationString", "v.altitude", "v.verticalSpeed", "v.surfaceSpeed", "v.orbitalVelocity", "o.ApA", "o.PeA", "o.timeToAp", "o.timeToPe", "o.inclination", "o.eccentricity", "o.period", "mj.sasActive", "mj.sasMode", "tar.name", "tar.o.relativeVelocity"]);
 }
 
 export function heatSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
@@ -189,7 +211,6 @@ export function electricitySnapshotsEqual(left: TelemetrySnapshot | null, right:
     "solar.count",
     "solar.outputEcPerSec",
     "solar.efficiency",
-    "solar.forecast",
     "rtg.count",
     "rtg.outputEcPerSec",
     "fuelCell.count",

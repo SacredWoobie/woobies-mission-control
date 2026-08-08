@@ -143,7 +143,7 @@ describe("Dashboard lifecycle", () => {
 
   it("renders the complete flight dashboard with in-place Flight panel collapse", () => {
     const firstView = render(<App />);
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.4.4 · Development")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.5.0 · Development")).toBeTruthy();
     ["Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
       expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });
@@ -276,12 +276,26 @@ describe("Dashboard lifecycle", () => {
   it("renders unavailable and pending lifecycle states without stale values", () => {
     const unavailableResources = {
       ...flightTelemetryFixture,
+      "res.status": "unknown" as const,
       "res.stageKnown": false,
     };
     const resourceView = render(<ConsumablesPanel snapshot={unavailableResources} />);
     expect(resourceView.container.textContent).not.toContain("Current-stage column unavailable");
-    expect(resourceView.container.textContent).toContain("Vessel total");
+    expect(resourceView.container.textContent).toContain("Consumable telemetry unavailable.");
+    expect(resourceView.container.textContent).not.toContain("Liquid Fuel");
     resourceView.unmount();
+
+    const incompleteResources = {
+      ...flightTelemetryFixture,
+      "res.status": "incomplete" as const,
+      "r.resource[Oxidizer]": undefined,
+      "r.resourceMax[Oxidizer]": undefined,
+    };
+    const incompleteView = render(<ConsumablesPanel snapshot={incompleteResources} />);
+    expect(incompleteView.container.textContent).toContain("Consumable telemetry incomplete.");
+    expect(incompleteView.container.textContent).toContain("Liquid Fuel");
+    expect(incompleteView.container.textContent).not.toContain("Oxidizer");
+    incompleteView.unmount();
 
     render(<StagingPanel snapshot={{
       ...flightTelemetryFixture,

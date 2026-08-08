@@ -22,10 +22,6 @@ export default defineConfig({
       name: "edge",
       use: { ...devices["Desktop Edge"], channel: "msedge" },
     },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
   ],
   webServer: {
     command: "node ./node_modules/vite/bin/vite.js",

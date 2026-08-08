@@ -133,11 +133,11 @@ $zipPath = Join-Path $OutputDirectory "$packageName.zip"
 $checksumPath = Join-Path $OutputDirectory "$packageName.zip.sha256"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
-    @{ Source = 'docs/images/v0.4.2/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
-    @{ Source = 'docs/images/v0.4.0/resonant-orbit-planner.png'; Name = "$packageName.zz-02-resonant-orbit-planner.png" },
-    @{ Source = 'docs/images/v0.4.0/delta-v-planner.png'; Name = "$packageName.zz-03-delta-v-planner.png" },
-    @{ Source = 'docs/images/v0.4.0/editor-vab-mission-plan.png'; Name = "$packageName.zz-04-editor-vab-mission-plan.png" },
-    @{ Source = 'docs/images/v0.4.4/launcher-scroll.png'; Name = "$packageName.zz-05-launcher-scroll.png" }
+    @{ Source = 'docs/images/v0.5.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
+    @{ Source = 'docs/images/v0.5.0/active-contract-focus.png'; Name = "$packageName.zz-02-active-contract-focus.png" },
+    @{ Source = 'docs/images/v0.5.0/editor-craft-analysis.png'; Name = "$packageName.zz-03-editor-craft-analysis.png" },
+    @{ Source = 'docs/images/v0.5.0/flight-monitor.png'; Name = "$packageName.zz-04-flight-monitor.png" },
+    @{ Source = 'docs/images/v0.5.0/flight-plan-workspace.png'; Name = "$packageName.zz-05-flight-plan-workspace.png" }
 )
 $activeReleaseImages = @(
     if (-not $SkipReleaseImages) {

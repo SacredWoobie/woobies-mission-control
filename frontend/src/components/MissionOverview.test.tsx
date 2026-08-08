@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { inactiveTelemetryFixture } from "../telemetry/fixtures";
 import type { TelemetryCommand, TelemetrySnapshot } from "../telemetry/types";
@@ -39,7 +39,9 @@ describe("MissionOverview", () => {
     expect(within(craftTypes).queryByRole("button", { name: "Space Object craft type filter" })).toBeNull();
     expect(screen.getByRole("button", { name: "Debris craft type filter" }).getAttribute("aria-pressed")).toBe("false");
     const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
-    expect(within(fleet).queryByText("Jebediah Kerman", { exact: true })).toBeNull();
+    const vesselIndex = within(fleet).getByLabelText("Filtered vessels");
+    expect(within(vesselIndex).queryByText("Jebediah Kerman", { exact: true })).toBeNull();
+    expect(within(within(fleet).getByRole("region", { name: "Crew manifest" })).getByText("Jebediah Kerman", { exact: true })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("SOI"), { target: { value: "Mun" } });
     expect(within(fleet).getAllByText("Mun Surveyor", { exact: true }).length).toBeGreaterThan(0);
@@ -53,7 +55,7 @@ describe("MissionOverview", () => {
     fireEvent.click(relayFilter);
     expect(within(fleet).queryByText("Mun Surveyor", { exact: true })).toBeNull();
     expect(within(fleet).queryByText("Duna Relay 1", { exact: true })).toBeNull();
-    expect(within(fleet).getByText("Odyssey", { exact: true })).toBeTruthy();
+    expect(within(fleet).getAllByText("Odyssey", { exact: true }).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Enable all craft types" }));
     expect(within(fleet).getAllByText("Mun Surveyor", { exact: true }).length).toBeGreaterThan(0);
 
@@ -94,6 +96,9 @@ describe("MissionOverview", () => {
     expect(within(alarms).queryByText("Raw", { exact: true })).toBeNull();
     expect(within(alarms).getByText("Maneuver", { exact: true }).classList.contains("overview-alarm-type")).toBe(true);
     expect(within(alarms).getByText("SOI Change", { exact: true }).classList.contains("overview-alarm-type")).toBe(true);
+    const alarmColumns = [...within(alarms).getByText("Odyssey maneuver", { exact: true }).closest("article")!.children];
+    expect(alarmColumns[1]?.classList.contains("overview-alarm-badges")).toBe(true);
+    expect(alarmColumns[2]?.classList.contains("overview-alarm-time")).toBe(true);
     expect(within(alarms).getByRole("group", { name: "Alarm source" })).toBeTruthy();
     fireEvent.click(within(alarms).getByRole("button", { name: "Show KAC alarms" }));
     expect(within(alarms).getByText("Mun Surveyor SOI change", { exact: true })).toBeTruthy();
@@ -141,16 +146,179 @@ describe("MissionOverview", () => {
     expect(document.querySelector(".overview-data-grid")).toBeTruthy();
   });
 
+  it("combines scene identity and program status in one overview header", () => {
+    renderOverview();
+
+    const header = document.querySelector<HTMLElement>(".mission-overview-header")!;
+    expect(within(header).getByRole("heading", { name: "Woobie's Mission Control" })).toBeTruthy();
+    expect(within(header).getByText("Tracking Station · Career", { exact: true })).toBeTruthy();
+    expect(within(header).getByRole("region", { name: "Program status" })).toBeTruthy();
+    expect(header.querySelector(".overview-metric-science")).toBeTruthy();
+    expect(header.querySelector(".overview-metric-reputation")).toBeTruthy();
+    expect(header.querySelector(".overview-metric-contracts")).toBeTruthy();
+    expect(document.querySelector(".mission-overview-banner")).toBeNull();
+  });
+
+  it("opens the fleet on the vessel with the nearest scheduled event", () => {
+    renderOverview();
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    const detail = fleet.querySelector<HTMLElement>(".overview-vessel-detail")!;
+
+    expect(within(fleet).getByRole("button", { name: "Select Odyssey" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(detail).getByText("Next event", { exact: true })).toBeTruthy();
+    expect(within(detail).getByText("Maneuver", { exact: true })).toBeTruthy();
+    expect(within(detail).queryByText("Odyssey maneuver", { exact: true })).toBeNull();
+    expect(detail.querySelector(".overview-vessel-next-event-mark")).toBeNull();
+    expect(within(detail).queryByText("Orbit profile", { exact: true })).toBeNull();
+    const crew = within(detail).getByRole("region", { name: "Crew manifest" });
+    expect(within(crew).getByText("Jebediah Kerman", { exact: true })).toBeTruthy();
+    expect(within(crew).getByText("Pilot", { exact: true })).toBeTruthy();
+    expect(within(crew).getByText("Bill Kerman", { exact: true })).toBeTruthy();
+    expect(within(crew).getByText("Engineer", { exact: true })).toBeTruthy();
+    expect(within(crew).getByText("Bob Kerman", { exact: true })).toBeTruthy();
+    expect(within(crew).getByText("Scientist", { exact: true })).toBeTruthy();
+    expect(within(detail).getByText("Crew · 3", { exact: true })).toBeTruthy();
+    expect(within(crew).queryByText(/aboard/i)).toBeNull();
+    expect(crew.querySelector(".overview-vessel-crew-member span")).toBeNull();
+    expect(within(detail).getByRole("button", { name: "Edit Odyssey" }).textContent).toBe("EDIT IDENTITY");
+    expect(detail.querySelector(".overview-vessel-actions")?.querySelectorAll("button")).toHaveLength(3);
+  });
+
   it("shows useful contract completion rewards instead of internal contract types", () => {
     renderOverview();
     const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
 
     expect(within(contracts).queryByText("Exploration", { exact: true })).toBeNull();
     expect(within(contracts).queryByText("Satellite", { exact: true })).toBeNull();
-    expect(within(contracts).getAllByRole("generic", { name: "Completion rewards" })).toHaveLength(3);
+    expect(within(contracts).getAllByText(/Due Y2 · D/)).toHaveLength(3);
+    fireEvent.click(within(contracts).getByRole("button", { name: "Expand contract Explore Duna" }));
+    expect(within(contracts).getAllByRole("generic", { name: "Completion rewards" })).toHaveLength(1);
     expect(within(contracts).getByText("+185,000", { exact: true })).toBeTruthy();
     expect(within(contracts).getByText("+22", { exact: true })).toBeTruthy();
     expect(within(contracts).getByText("+8", { exact: true })).toBeTruthy();
+  });
+
+  it("keeps one contract briefing expanded at a time", async () => {
+    renderOverview();
+    const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
+    const explore = within(contracts).getByRole("button", { name: "Expand contract Explore Duna" });
+
+    expect(explore.getAttribute("aria-expanded")).toBe("false");
+    expect(explore.hasAttribute("aria-controls")).toBe(false);
+    explore.focus();
+    fireEvent.click(explore);
+    const focusedExplore = within(contracts).getByRole("button", { name: "Collapse contract Explore Duna" });
+    const exploreDetailsId = focusedExplore.getAttribute("aria-controls");
+    expect(exploreDetailsId).toBeTruthy();
+    expect(document.getElementById(exploreDetailsId!)).toBeTruthy();
+    expect(document.querySelector(".overview-data-grid")?.classList.contains("contracts-focused")).toBe(true);
+    expect(screen.queryByRole("heading", { name: "Astronaut roster" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Upcoming alarms" })).toBeNull();
+    expect(within(contracts).getByText("Orbit Duna", { exact: true })).toBeTruthy();
+    expect(within(contracts).getByText("Exploration", { exact: true })).toBeTruthy();
+
+    const exploreScroll = contracts.querySelector<HTMLElement>(".overview-contract-focus-scroll")!;
+    exploreScroll.scrollTop = 120;
+    fireEvent.click(within(contracts).getByText("More briefing", { exact: true }));
+    expect(contracts.querySelector(".overview-contract-more")?.hasAttribute("open")).toBe(true);
+    const satellite = within(contracts).getByRole("button", { name: "Expand contract Position a satellite in polar orbit" });
+    satellite.focus();
+    fireEvent.click(satellite);
+    expect(within(contracts).queryByText("Orbit Duna", { exact: true })).toBeNull();
+    expect(within(contracts).getByText("Maintain the specified inclination and altitude", { exact: true })).toBeTruthy();
+    const satelliteScroll = contracts.querySelector<HTMLElement>(".overview-contract-focus-scroll")!;
+    expect(satelliteScroll).not.toBe(exploreScroll);
+    expect(satelliteScroll.scrollTop).toBe(0);
+    expect(within(contracts).getByRole("button", { name: "Expand contract Explore Duna" }).getAttribute("aria-expanded")).toBe("false");
+    expect(within(contracts).getByRole("button", { name: "Expand contract Explore Duna" }).hasAttribute("aria-controls")).toBe(false);
+    expect(within(contracts).getByRole("button", { name: "Collapse contract Position a satellite in polar orbit" }).getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(within(contracts).getByRole("button", { name: "Return to contract list" }));
+    await waitFor(() => expect(document.activeElement).toBe(within(contracts).getByRole("button", { name: "Expand contract Position a satellite in polar orbit" })));
+    expect(document.querySelector(".overview-data-grid")?.classList.contains("contracts-focused")).toBe(false);
+    expect(screen.getByRole("heading", { name: "Astronaut roster" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Upcoming alarms" })).toBeTruthy();
+  });
+
+  it("moves deeply nested contract conditions behind technical details", () => {
+    renderOverview({
+      ...inactiveTelemetryFixture,
+      "overview.contracts": [{
+        title: "Point a dish out from Kerbin",
+        type: "Configuredcontract",
+        synopsis: "Point a dish at one of our moons!",
+        parameters: [
+          { title: "Vessel: Any", status: "incomplete", depth: 0 },
+          { title: "Connected to KSC", status: "complete", depth: 1 },
+          { title: "Antenna", status: "incomplete", depth: 2 },
+          { title: "Target: The Mun", status: "incomplete", depth: 3 },
+        ],
+      }],
+    });
+    const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
+
+    fireEvent.click(within(contracts).getByRole("button", { name: "Expand contract Point a dish out from Kerbin" }));
+    expect(contracts.querySelectorAll(".overview-contract-primary-parameters li")).toHaveLength(2);
+    expect(contracts.querySelectorAll(".overview-contract-technical-parameters li")).toHaveLength(2);
+    expect(within(contracts).getByText("Technical details", { exact: false })).toBeTruthy();
+    expect(within(contracts).getByText("Mission contract", { exact: true })).toBeTruthy();
+  });
+
+  it("closes contract focus on an outside pointer without closing for inside interaction", async () => {
+    renderOverview();
+    const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
+
+    const explore = within(contracts).getByRole("button", { name: "Expand contract Explore Duna" });
+    explore.focus();
+    fireEvent.click(explore);
+    fireEvent.pointerDown(contracts);
+    expect(document.querySelector(".overview-data-grid")?.classList.contains("contracts-focused")).toBe(true);
+
+    fireEvent.pointerDown(document.querySelector(".mission-overview-header")!);
+    expect(document.querySelector(".overview-data-grid")?.classList.contains("contracts-focused")).toBe(false);
+    await waitFor(() => expect(document.activeElement).toBe(within(contracts).getByRole("button", { name: "Expand contract Explore Duna" })));
+    expect(screen.getByRole("heading", { name: "Astronaut roster" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Upcoming alarms" })).toBeTruthy();
+  });
+
+  it("closes contract focus with Escape and restores the selected trigger", async () => {
+    renderOverview();
+    const contracts = screen.getByRole("heading", { name: "Active contracts" }).closest("section")!;
+    const explore = within(contracts).getByRole("button", { name: "Expand contract Explore Duna" });
+    explore.focus();
+    fireEvent.click(explore);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(document.querySelector(".overview-data-grid")?.classList.contains("contracts-focused")).toBe(false);
+    await waitFor(() => expect(document.activeElement).toBe(within(contracts).getByRole("button", { name: "Expand contract Explore Duna" })));
+    expect(screen.getByRole("heading", { name: "Astronaut roster" })).toBeTruthy();
+  });
+
+  it("preserves contract focus across telemetry reorder and clears it when contracts disappear", () => {
+    const view = renderOverview();
+    const explore = screen.getByRole("button", { name: "Expand contract Explore Duna" });
+    fireEvent.click(explore);
+
+    const reordered = [...(inactiveTelemetryFixture["overview.contracts"] ?? [])].reverse();
+    view.rerender(<PanelVisibilityProvider><MissionOverview snapshot={{
+      ...inactiveTelemetryFixture,
+      "overview.contracts": reordered,
+    }} /></PanelVisibilityProvider>);
+    expect(screen.getByText("Orbit Duna", { exact: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Collapse contract Explore Duna" })).toBeTruthy();
+
+    view.rerender(<PanelVisibilityProvider><MissionOverview snapshot={{
+      ...inactiveTelemetryFixture,
+      "overview.capabilities": {
+        ...(inactiveTelemetryFixture["overview.capabilities"]!),
+        contracts: false,
+      },
+      "overview.contracts": [],
+    }} /></PanelVisibilityProvider>);
+    expect(document.querySelector(".overview-data-grid")?.classList.contains("contracts-focused")).toBe(false);
+    expect(screen.getByRole("heading", { name: "Astronaut roster" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Upcoming alarms" })).toBeTruthy();
   });
 
   it("collapses true zero-state alarm and contract bodies", () => {
@@ -226,6 +394,52 @@ describe("MissionOverview", () => {
     fireEvent.change(within(fleet).getByLabelText("SOI"), { target: { value: "Kerbin" } });
     expect(within(fleet).queryByRole("button", { name: "Select Duna Relay 1" })).toBeNull();
     expect(fleet.querySelector(".overview-vessel-detail")?.textContent).not.toContain("Duna Relay 1");
+  });
+
+  it("collapses and expands each celestial-body vessel group", () => {
+    renderOverview();
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    const collapseDuna = within(fleet).getByRole("button", { name: "Collapse Duna vessels" });
+
+    expect(collapseDuna.getAttribute("aria-expanded")).toBe("true");
+    expect(within(fleet).getByRole("button", { name: "Select Duna Pathfinder" })).toBeTruthy();
+    fireEvent.click(collapseDuna);
+
+    const expandDuna = within(fleet).getByRole("button", { name: "Expand Duna vessels" });
+    expect(expandDuna.getAttribute("aria-expanded")).toBe("false");
+    expect(within(fleet).queryByRole("button", { name: "Select Duna Pathfinder" })).toBeNull();
+    fireEvent.click(expandDuna);
+    expect(within(fleet).getByRole("button", { name: "Select Duna Pathfinder" })).toBeTruthy();
+  });
+
+  it("orders planets by orbital radius and places moons after their parent", () => {
+    const body = (name: string, parent: string, semiMajorAxis: number) => ({
+      name, parent, semiMajorAxis, gravitationalParameter: 1, radius: 1,
+      rotationPeriod: 1, atmosphereDepth: 0, sphereOfInfluence: 2,
+    });
+    const vessel = (name: string, bodyName: string) => ({
+      name, body: bodyName, type: "Probe", situation: "Orbiting", met: 0,
+      crewCount: 0, crewNames: [], recoverable: false, mission: true,
+    });
+    renderOverview({
+      ...inactiveTelemetryFixture,
+      "catalog.bodies": [
+        body("Outer", "Sun", 20_000),
+        body("Outer Moon", "Outer", 2_000),
+        body("Inner", "Sun", 10_000),
+      ],
+      "overview.vessels": [
+        vessel("Outer craft", "Outer"),
+        vessel("Moon craft", "Outer Moon"),
+        vessel("Inner craft", "Inner"),
+      ],
+    });
+    const fleet = screen.getByRole("heading", { name: "Active vessels" }).closest("section")!;
+    expect(within(fleet).getAllByRole("button", { name: /^Collapse .* vessels$/ }).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Collapse Inner vessels",
+      "Collapse Outer vessels",
+      "Collapse Outer Moon vessels",
+    ]);
   });
 
   it("sends an identity-guarded vessel switch and shows a rejected result", () => {
@@ -317,7 +531,7 @@ describe("MissionOverview", () => {
     const detail = fleet.querySelector(".overview-vessel-detail")!;
     const nameInput = within(dialog).getByRole("textbox", { name: "Vessel name" });
     expect(detail.contains(dialog)).toBe(true);
-    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(true);
+    expect(document.querySelector(".mission-overview-header")?.hasAttribute("inert")).toBe(true);
     expect(nameInput.getAttribute("value")).toBe("Duna Relay 1");
     expect(document.activeElement).toBe(nameInput);
     expect(within(dialog).getByRole("button", { name: "Relay" }).getAttribute("aria-pressed")).toBe("true");
@@ -325,7 +539,7 @@ describe("MissionOverview", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(editButton);
-    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(false);
+    expect(document.querySelector(".mission-overview-header")?.hasAttribute("inert")).toBe(false);
 
     fireEvent.click(editButton);
     dialog = screen.getByRole("dialog", { name: "Edit Duna Relay 1" });
@@ -361,7 +575,7 @@ describe("MissionOverview", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(within(fleet).getByRole("status").textContent).toContain("Duna Relay Prime as Probe");
-    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(false);
+    expect(document.querySelector(".mission-overview-header")?.hasAttribute("inert")).toBe(false);
   });
 
   it("recovers the edit modal when KSP does not answer", () => {
@@ -430,7 +644,7 @@ describe("MissionOverview", () => {
     let dialog = screen.getByRole("dialog", { name: "Terminate Odyssey?" });
     const detail = fleet.querySelector(".overview-vessel-detail")!;
     expect(detail.contains(dialog)).toBe(true);
-    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(true);
+    expect(document.querySelector(".mission-overview-header")?.hasAttribute("inert")).toBe(true);
     expect(within(dialog).getByText("The following Kerbals will be killed:", { exact: true })).toBeTruthy();
     for (const name of ["Jebediah Kerman", "Bill Kerman", "Bob Kerman"]) {
       expect(within(dialog).getByText(name, { exact: true })).toBeTruthy();
@@ -471,7 +685,7 @@ describe("MissionOverview", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(within(fleet).getByRole("status").textContent).toContain("Terminated Odyssey");
-    expect(document.querySelector(".overview-metrics")?.hasAttribute("inert")).toBe(false);
+    expect(document.querySelector(".mission-overview-header")?.hasAttribute("inert")).toBe(false);
   });
 
   it("offers stock recovery in green and confirms the returning crew", () => {
@@ -560,6 +774,7 @@ describe("MissionOverview", () => {
         <MissionOverview commandEnabled onSendCommand={onSendCommand} snapshot={inactiveTelemetryFixture} />
       </PanelVisibilityProvider>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Select Duna Pathfinder" }));
     const button = screen.getByRole("button", { name: "Terminate Duna Pathfinder" });
     expect(button.hasAttribute("disabled")).toBe(false);
     fireEvent.click(button);
@@ -669,7 +884,7 @@ describe("MissionOverview", () => {
     expect(within(facts).queryByText("Period", { exact: true })).toBeNull();
   });
 
-  it("shows a status-grouped flat Kerbonaut table with assignments", () => {
+  it("shows a status-summary Kerbonaut table with clear columns and assignments", () => {
     renderOverview();
     const roster = screen.getByRole("heading", { name: "Astronaut roster" }).closest("section")!;
     const table = within(roster).getByRole("table", { name: "Filtered Kerbonauts" });
@@ -677,7 +892,9 @@ describe("MissionOverview", () => {
     const valentinaRow = within(table).getByText("Valentina Kerman", { exact: true }).closest("tr")!;
 
     expect(within(table).getByText("Assignment", { exact: true })).toBeTruthy();
-    expect(within(table).getByRole("columnheader", { name: "Flights" }).textContent).toBe("FLTS");
+    expect(within(table).getByRole("columnheader", { name: "Role" })).toBeTruthy();
+    expect(within(table).getByRole("columnheader", { name: "Level" })).toBeTruthy();
+    expect(within(table).getByRole("columnheader", { name: "Flights" }).textContent).toBe("Flights");
     expect(jebRow.textContent).toContain("Odyssey");
     expect(jebRow.textContent).toContain("Pilot");
     expect(jebRow.textContent).toContain("8");
@@ -686,42 +903,35 @@ describe("MissionOverview", () => {
     expect(within(valentinaRow).getByLabelText("Fallen Kerbonaut")).toBeTruthy();
     expect(within(roster).queryByText("Experience", { exact: true })).toBeNull();
     expect(within(roster).queryByRole("button", { name: "Select Valentina Kerman" })).toBeNull();
-    expect(within(table).getByText("Assigned", { exact: true })).toBeTruthy();
-    expect(within(table).getByText("Available", { exact: true })).toBeTruthy();
-    expect(within(table).getByText("Dead", { exact: true })).toBeTruthy();
+    const summary = within(roster).getByLabelText("Roster status summary");
+    expect(summary.closest(".overview-section-head")).toBeTruthy();
+    expect(within(summary).getByText("Assigned", { exact: true })).toBeTruthy();
+    expect(within(summary).getByText("Available", { exact: true })).toBeTruthy();
+    expect(within(summary).getByText("Memorial", { exact: true })).toBeTruthy();
+    expect(within(summary).getByText("Assigned", { exact: true }).parentElement?.textContent).toBe("Assigned3");
+    expect(within(summary).getByText("Available", { exact: true }).parentElement?.textContent).toBe("Available9");
+    expect(within(summary).getByText("Memorial", { exact: true }).parentElement?.textContent).toBe("Memorial1");
 
     fireEvent.click(within(roster).getByRole("button", { name: "Roster filters" }));
     fireEvent.change(within(roster).getByLabelText("Job"), { target: { value: "Engineer" } });
     expect(within(roster).queryByText("Valentina Kerman", { exact: true })).toBeNull();
+    expect(within(summary).getByText("Assigned", { exact: true }).parentElement?.textContent).toBe("Assigned3");
+    expect(within(summary).getByText("Available", { exact: true }).parentElement?.textContent).toBe("Available9");
+    expect(within(summary).getByText("Memorial", { exact: true }).parentElement?.textContent).toBe("Memorial1");
   });
 
-  it("collapses and restores the four optional overview panels with instrument icons", () => {
+  it("keeps the main overview sections present without panel collapse controls", () => {
+    localStorage.setItem("wmc-hidden-panels-v1", JSON.stringify(["overviewTransfers", "overviewFleet", "overviewRoster", "overviewAlarms"]));
     const view = renderOverview();
     expect(screen.getByRole("heading", { name: "Woobie's Mission Control" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide Active vessels panel" }));
-    expect(screen.queryByRole("heading", { name: "Active vessels" })).toBeNull();
-    const fleetRestore = screen.getByRole("button", { name: "Active vessels" });
-    expect(fleetRestore.querySelector(".panel-rail-icon-overviewFleet")).toBeTruthy();
-    expect(view.container.querySelector(".overview-data-grid")?.className).toContain("without-fleet");
-    fireEvent.click(fleetRestore);
-    expect(screen.getByRole("heading", { name: "Active vessels" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide Transfer windows panel" }));
-    expect(screen.queryByRole("heading", { name: "Transfer windows" })).toBeNull();
-    expect(localStorage.getItem("wmc-hidden-panels-v1")).toContain("overviewTransfers");
-    const transferRestore = screen.getByRole("button", { name: "Transfer windows" });
-    expect(transferRestore.querySelector(".panel-rail-icon-overviewTransfers")).toBeTruthy();
-    fireEvent.click(transferRestore);
     expect(screen.getByRole("heading", { name: "Transfer windows" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide Astronaut roster panel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Hide Upcoming alarms panel" }));
-    expect(screen.queryByRole("heading", { name: "Astronaut roster" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Upcoming alarms" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Astronaut roster" }).querySelector(".panel-rail-icon-overviewRoster")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Upcoming alarms" }).querySelector(".panel-rail-icon-overviewAlarms")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Active vessels" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Astronaut roster" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Upcoming alarms" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Active contracts" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Woobie's Mission Control" })).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem("wmc-hidden-panels-v1") ?? "[]")).toEqual([]);
+    expect(screen.queryByRole("button", { name: /^Hide (Transfer windows|Active vessels|Astronaut roster|Upcoming alarms) panel$/ })).toBeNull();
+    expect(view.container.querySelector(".panel-restore-rail")).toBeNull();
+    expect(screen.getByRole("button", { name: "Collapse Kerbin vessels" })).toBeTruthy();
   });
 });

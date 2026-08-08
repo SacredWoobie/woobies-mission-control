@@ -183,6 +183,7 @@ class ReactorTelemetryTests(unittest.TestCase):
             available=True,
             reactor_count=lambda: (_ for _ in ()).throw(RuntimeError("RPC failed")),
         )
+        incompatible = SimpleNamespace(available=True)
 
         self.assertEqual(
             _gather_reactor_telemetry(SimpleNamespace(system_heat=available))["elec.reactorsStatus"],
@@ -194,6 +195,10 @@ class ReactorTelemetryTests(unittest.TestCase):
         )
         self.assertEqual(
             _gather_reactor_telemetry(SimpleNamespace(system_heat=failing)),
+            {"elec.reactorsStatus": "unknown"},
+        )
+        self.assertEqual(
+            _gather_reactor_telemetry(SimpleNamespace(system_heat=incompatible)),
             {"elec.reactorsStatus": "unknown"},
         )
 

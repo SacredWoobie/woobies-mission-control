@@ -36,6 +36,8 @@ describe("resonant orbit tool scene availability", () => {
     render(<ResonantOrbitProvider><ResonantOrbitTool mode="inactive" onOpen={vi.fn()} /></ResonantOrbitProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Resonant orbit planner" }));
     expect(screen.getByRole("dialog", { name: "Resonant orbit planner" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Altitude input units" })).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "Display units" })).toBeNull();
     expect(screen.getAllByRole("button", { name: "Close resonant orbit planner" })).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Eric Meyer’s original calculator" }).getAttribute("href"))
       .toBe("https://meyerweb.com/eric/ksp/resonant-orbits/");

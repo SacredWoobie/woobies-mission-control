@@ -81,6 +81,24 @@ class HeatTelemetryTests(unittest.TestCase):
         self.assertEqual(result["heat.backend"], "stock")
         self.assertEqual(result["heat.systemHeatStatus"], "unknown")
 
+    def test_marks_loaded_system_heat_unknown_when_expected_api_is_missing(self):
+        stock = SimpleNamespace(
+            available=True,
+            part_names=lambda: [], part_temperatures=lambda: [],
+            part_max_temperatures=lambda: [], part_skin_temperatures=lambda: [],
+            part_max_skin_temperatures=lambda: [], part_utilizations=lambda: [],
+            part_net_watts=lambda: [], generated_watts=0.0,
+            removed_watts=0.0, net_watts=0.0,
+        )
+
+        result = telemetry_server._gather_heat(SimpleNamespace(
+            system_heat=SimpleNamespace(available=True),
+            stock_thermal=stock,
+        ))
+
+        self.assertEqual(result["heat.backend"], "stock")
+        self.assertEqual(result["heat.systemHeatStatus"], "unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -524,10 +524,31 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         self.assertEqual(conn.vessel_management.termination_calls, [])
 
     def test_contract_rows_include_finite_completion_rewards(self):
+        child = SimpleNamespace(
+            title="Transmit the data",
+            completed=False,
+            failed=False,
+            optional=True,
+            notes="Use any antenna.",
+            children=[],
+        )
+        parameter = SimpleNamespace(
+            title="<b>Collect science</b>",
+            completed=True,
+            failed=False,
+            optional=False,
+            notes="",
+            children=[child],
+        )
         contract = SimpleNamespace(
+            _object_id=77,
             title="Point a dish out from Kerbin",
             type="ContractType.configured",
             date_deadline=None,
+            synopsis="Build a relay network.",
+            description="<color=#ffcc00>Keep Kerbin connected.</color>",
+            notes="Read the fine print.",
+            parameters=[parameter],
             funds_completion=42_500,
             reputation_completion=8.5,
             science_completion=3,
@@ -544,8 +565,53 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
         )["overview.contracts"][0]
 
         self.assertEqual(row["fundsCompletion"], 42_500)
+        self.assertEqual(row["objectId"], "77")
         self.assertEqual(row["reputationCompletion"], 8.5)
         self.assertEqual(row["scienceCompletion"], 3)
+        self.assertEqual(row["synopsis"], "Build a relay network.")
+        self.assertEqual(row["description"], "Keep Kerbin connected.")
+        self.assertEqual(row["notes"], "Read the fine print.")
+        self.assertEqual(row["parameters"], [
+            {
+                "title": "Collect science",
+                "status": "complete",
+                "depth": 0,
+                "optional": False,
+            },
+            {
+                "title": "Transmit the data",
+                "status": "incomplete",
+                "depth": 1,
+                "optional": True,
+                "notes": "Use any antenna.",
+            },
+        ])
+
+    def test_contract_text_strips_markup_without_removing_numeric_comparisons(self):
+        contract = SimpleNamespace(
+            title="<b>Low flight</b>",
+            type="ContractType.configured",
+            date_deadline=None,
+            synopsis="Maintain altitude < 1000 m and speed > 0 m/s.",
+            description="<color=#ffcc00>Stay below the ceiling.</color>",
+            notes="",
+            parameters=[],
+        )
+        row = telemetry_server._gather_overview_contracts(SimpleNamespace(
+            contract_manager=SimpleNamespace(
+                active_contracts=[contract],
+                offered_contracts=[],
+                completed_contracts=[],
+                failed_contracts=[],
+            )
+        ))["overview.contracts"][0]
+
+        self.assertEqual(row["title"], "Low flight")
+        self.assertEqual(
+            row["synopsis"],
+            "Maintain altitude < 1000 m and speed > 0 m/s.",
+        )
+        self.assertEqual(row["description"], "Stay below the ceiling.")
 
     def test_merges_alarm_sources_by_time_without_querying_remaining(self):
         conn = fake_connection()

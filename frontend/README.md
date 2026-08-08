@@ -4,6 +4,12 @@ This directory contains the production React/TypeScript dashboard and its
 development-only fixtures. Vite is a build and local-development tool; release
 users receive only the compiled files under `Dashboard/web`.
 
+Dashboard changes follow the tracked
+[Dashboard UI/UX guidelines](../docs/DASHBOARD_UI_GUIDELINES.md). Those rules
+are the default for information hierarchy, responsive composition, typography,
+scrolling, disclosure, accessibility, and telemetry-backed state. Record any
+deliberate exception and its acceptance evidence in the active workstream.
+
 ## Development server
 
 From the repository root:
@@ -33,7 +39,10 @@ Open `http://127.0.0.1:5173/`.
 
 Development starts in deterministic fixture mode. The left-side developer
 drawer switches among Flight, Editor, and inactive Mission Control scenes or
-connects to live KSP telemetry at `ws://127.0.0.1:8090`.
+connects to live KSP telemetry at `ws://127.0.0.1:8090`. On a mouse-equipped
+browser its collapsed `DEV` tab stays hidden until the pointer reaches the
+upper-left corner or keyboard focus reaches the tab. Touch and coarse-pointer
+devices keep the tab visible.
 
 For an end-to-end feed without KSP:
 
@@ -70,3 +79,26 @@ developer drawer, and use relative assets so the Python telemetry process can
 serve them from `http://127.0.0.1:8090/`.
 
 Generated `node_modules`, `dist`, `.dev`, and coverage directories are ignored.
+
+## UI review matrix
+
+Use deterministic fixtures to exercise the complete visual state before live
+KSP acceptance. Every dashboard UI change should cover the affected entries in
+this matrix:
+
+| Review | Required evidence |
+| --- | --- |
+| Wide landscape | Inspect at `1920x889`; record document and bounded-panel overflow. |
+| Short landscape | Inspect at `1280x800`; keep controls and operational copy readable and document any intentional vertical fallback. |
+| Portrait | Inspect at `1080x1920`; confirm scene order, reflow, and no horizontal overflow. |
+| Content stress | Exercise dense rows, long labels, empty/loading/error states, offline services, and missing optional fields. |
+| Interaction | Verify keyboard navigation, focus restoration, Escape and click-away behavior, disclosure state, and accessible names. |
+| Data authority | State whether evidence came from fixtures or live KSP; fixtures never count as live acceptance. |
+
+Measure the rendered browser rather than inferring fit from CSS alone. Run
+focused component tests during iteration, then the full frontend suite, strict
+TypeScript build, and relevant browser cases before the feature is called
+ready. The maintained automated browser matrix is Chrome and Edge. Firefox is
+not a release gate because the local Playwright Firefox runtime repeatedly
+fails before page creation; record any separate Firefox acceptance as optional
+manual evidence rather than blocking the dashboard build.

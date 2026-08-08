@@ -78,14 +78,15 @@ foreach ($forbidden in @(
     "React flight dashboard POC",
     "Crew reports nominal systems.",
     "Dual-condition regression craft",
-    "React proof of concept",
-    "React dashboard · v0.4.4 WIP",
-    "React dashboard · v0.4.3 WIP",
-    "React dashboard · v0.4.2 WIP"
+    "React proof of concept"
 )) {
     if ($bundleText.Contains($forbidden)) {
         throw "Production dashboard contains development-only text: $forbidden"
     }
+}
+
+if ($bundleText -match 'React dashboard[^\r\n]{0,32}v\d+\.\d+\.\d+[^\r\n]{0,32}WIP') {
+    throw "Production dashboard contains a versioned development label."
 }
 
 $indexText = Get-Content -LiteralPath $indexPath -Raw

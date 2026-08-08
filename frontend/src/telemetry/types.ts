@@ -152,14 +152,6 @@ export interface ElectricitySourceTelemetry {
   limitingResource?: string;
 }
 
-export interface SolarForecastTelemetry {
-  phase: "sunlight" | "shadow";
-  transitionInSeconds?: number;
-  orbitSeconds?: number;
-  shadowSeconds?: number;
-  valid: boolean;
-}
-
 export interface ScienceExperimentTelemetry {
   title: string;
   value?: number;
@@ -306,9 +298,20 @@ export interface OverviewAlarmTelemetry {
 }
 
 export interface OverviewContractTelemetry {
+  objectId?: string;
   title: string;
   type: string;
   deadline?: number | null;
+  synopsis?: string;
+  description?: string;
+  notes?: string;
+  parameters?: Array<{
+    title: string;
+    status: "complete" | "failed" | "incomplete";
+    optional?: boolean;
+    depth?: number;
+    notes?: string;
+  }>;
   fundsCompletion?: number;
   reputationCompletion?: number;
   scienceCompletion?: number;
@@ -372,6 +375,8 @@ export interface TelemetrySnapshot {
   "v.verticalSpeed"?: number;
   "v.surfaceSpeed"?: number;
   "v.geeForce"?: number;
+  "v.thrust"?: number;
+  "v.availableThrust"?: number;
   "v.orbitalVelocity"?: number;
   "v.situationString"?: string;
   "v.biome"?: string;
@@ -533,7 +538,6 @@ export interface TelemetrySnapshot {
   "solar.count"?: number;
   "solar.outputEcPerSec"?: number;
   "solar.efficiency"?: number;
-  "solar.forecast"?: SolarForecastTelemetry;
   "rtg.count"?: number;
   "rtg.outputEcPerSec"?: number;
   "fuelCell.count"?: number;

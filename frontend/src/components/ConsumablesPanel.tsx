@@ -21,11 +21,11 @@ function ResourceMeter({
   return (
     <div
       aria-label={fraction === undefined ? "Amount unavailable" : `${percent}% remaining`}
-      aria-valuemax={100}
-      aria-valuemin={0}
+      aria-valuemax={fraction === undefined ? undefined : 100}
+      aria-valuemin={fraction === undefined ? undefined : 0}
       aria-valuenow={fraction === undefined ? undefined : percent}
       className="meter"
-      role="meter"
+      role={fraction === undefined ? "img" : "meter"}
     >
       <div className="track">
         <span className={`fill ${severity}`} style={{ width: `${percent}%` }} />
@@ -40,6 +40,7 @@ function ResourceMeter({
 
 export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
   const resources = selectConsumables(snapshot);
+  const status = snapshot["res.status"];
 
   return (
     <Panel compact id="cons" title="Consumables">
@@ -47,17 +48,24 @@ export function ConsumablesPanel({ snapshot }: ConsumablesPanelProps) {
         <span>Resource</span>
         <span>Vessel total</span>
       </div>
-      {resources.length === 0 ? (
+      {status === "unknown" ? (
+        <p className="empty-state">Consumable telemetry unavailable.</p>
+      ) : resources.length === 0 ? (
         <p className="empty-state">No consumable resources reported.</p>
       ) : (
-        resources.map((resource) => (
-          <div className="res-row" key={resource.name}>
-            <span className="res-name" title={humanizeResourceName(resource.name)}>
-              {humanizeResourceName(resource.name)}
-            </span>
-            <ResourceMeter {...resource.vessel} />
-          </div>
-        ))
+        <>
+          {status === "incomplete" && (
+            <p className="empty-state">Consumable telemetry incomplete.</p>
+          )}
+          {resources.map((resource) => (
+            <div className="res-row" key={resource.name}>
+              <span className="res-name" title={humanizeResourceName(resource.name)}>
+                {humanizeResourceName(resource.name)}
+              </span>
+              <ResourceMeter {...resource.vessel} />
+            </div>
+          ))}
+        </>
       )}
     </Panel>
   );

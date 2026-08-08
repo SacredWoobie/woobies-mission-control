@@ -8,7 +8,7 @@ import {
   isFiniteNumber,
   VACUUM_PRESSURE_ATM,
 } from "../formatting/numbers";
-import { selectStages, selectStageSummary } from "../telemetry/selectors";
+import { selectStages, selectStageSummary, selectThrottleFraction } from "../telemetry/selectors";
 import type { StageViewModel, TelemetrySnapshot } from "../telemetry/types";
 import { Panel } from "./Panel";
 import { useEditorAnalysisStatus } from "./useEditorAnalysisStatus";
@@ -85,7 +85,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
   const pressureAtm = snapshot["stage.staticPressureAtm"];
   const body = snapshot["stage.body"] || snapshot["v.body"] || "Current body";
   const altitude = snapshot["stage.altitude"] ?? snapshot["v.altitude"];
-  const throttle = snapshot["stage.throttle"] ?? snapshot["krpc.throttle"];
+  const throttle = selectThrottleFraction(snapshot);
   const situation = snapshot["stage.situation"] || snapshot["v.situationString"] || "";
   const unpoweredCount = isFiniteNumber(snapshot["stage.unpoweredCount"])
     ? Math.max(0, Math.round(snapshot["stage.unpoweredCount"]))

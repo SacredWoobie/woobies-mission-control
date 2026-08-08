@@ -22,21 +22,24 @@ function EditorSummaryContent({ names, snapshot }: { names: string[]; snapshot: 
             const capacity = isFiniteNumber(maximum) ? maximum : undefined;
             const percent = capacity && capacity > 0 && current !== undefined
               ? Math.max(0, Math.min(100, Math.round(current / capacity * 100)))
-              : 0;
-            const severity = resourceSeverity(percent);
+              : undefined;
+            const severity = percent === undefined ? undefined : resourceSeverity(percent);
             const formatted = formatResourcePair(current, capacity);
             return (
               <div className="editor-resource-row" key={name}>
                 <span title={name}>{humanizeResourceName(name)}</span>
                 <div
-                  aria-label={`${percent}% full`}
-                  aria-valuemax={100}
-                  aria-valuemin={0}
+                  aria-label={percent === undefined ? "Amount unavailable" : `${percent}% full`}
+                  aria-valuemax={percent === undefined ? undefined : 100}
+                  aria-valuemin={percent === undefined ? undefined : 0}
                   aria-valuenow={percent}
                   className="editor-resource-meter"
-                  role="meter"
+                  role={percent === undefined ? "img" : "meter"}
                 >
-                  <span className={`fill ${severity}`} style={{ width: `${percent}%` }} />
+                  <span
+                    className={`fill${severity ? ` ${severity}` : ""}`}
+                    style={{ width: `${percent ?? 0}%` }}
+                  />
                 </div>
                 <span className="editor-resource-amount">
                   {formatted.value}

@@ -21,10 +21,6 @@ export const panelLabels = {
   sci: "Science",
   stage: "Staging",
   target: "Target",
-  overviewTransfers: "Transfer windows",
-  overviewFleet: "Active vessels",
-  overviewRoster: "Astronaut roster",
-  overviewAlarms: "Upcoming alarms",
   flightNote: "Pinned note",
   flightOrbitPlan: "Resonant orbit plan",
   flightDeltaVPlan: "Mission Plan",
@@ -41,10 +37,6 @@ const panelRailDescriptions: Record<keyof typeof panelLabels, string> = {
   sci: "Science",
   stage: "Staging Analysis",
   target: "Target",
-  overviewTransfers: "Transfer Windows",
-  overviewFleet: "Active Vessels",
-  overviewRoster: "Astronaut Roster",
-  overviewAlarms: "Upcoming Alarms",
   flightNote: "Pinned Note",
   flightOrbitPlan: "Resonant Orbit Plan",
   flightDeltaVPlan: "Mission Plan",
@@ -68,10 +60,6 @@ const panelOrder: DashboardPanelId[] = [
   "sci",
   "stage",
   "target",
-  "overviewTransfers",
-  "overviewFleet",
-  "overviewRoster",
-  "overviewAlarms",
   "flightNote",
   "flightOrbitPlan",
   "flightDeltaVPlan",
@@ -110,7 +98,11 @@ function initialHiddenPanels() {
       ? saved.filter((id): id is DashboardPanelId => id in panelLabels)
       : [];
     const migrated = valid.filter((id) => id !== "conn" && !flightInPlacePanelIds.has(id));
-    if (migrated.length !== valid.length) localStorage.setItem(storageKey, JSON.stringify(migrated));
+    if (
+      !Array.isArray(saved)
+      || saved.length !== migrated.length
+      || migrated.some((id, index) => id !== saved[index])
+    ) localStorage.setItem(storageKey, JSON.stringify(migrated));
     return new Set<DashboardPanelId>(migrated);
   } catch {
     return new Set<DashboardPanelId>();

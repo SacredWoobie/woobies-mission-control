@@ -21,6 +21,7 @@ import json
 import math
 import mimetypes
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -75,6 +76,8 @@ OVERVIEW_MAX_VESSELS = 500
 OVERVIEW_MAX_VESSEL_NAME_LENGTH = 80
 OVERVIEW_MAX_VESSEL_CREW = 256
 OVERVIEW_MAX_KERBAL_NAME_LENGTH = 128
+OVERVIEW_MAX_CONTRACT_TEXT_LENGTH = 4000
+OVERVIEW_MAX_CONTRACT_PARAMETERS = 64
 OVERVIEW_TRACKED_VESSEL_TYPES = frozenset({
     "Debris", "Probe", "Rover", "Lander", "Ship", "Station", "Base",
     "Plane", "Relay",
@@ -2838,16 +2841,21 @@ def _gather_heat(conn):
     """Prefer real System Heat loops, then fall back to stock vessel heat."""
     system_heat_status = "not_applicable"
     try:
-        system_heat_available = bool(conn.system_heat.available)
-        if system_heat_available:
-            result = _gather_system_heat(conn)
-            if result:
-                result["heat.systemHeatStatus"] = "known"
-                return result
+        system_heat = conn.system_heat
     except AttributeError:
-        system_heat_status = "not_applicable"
+        system_heat = None
     except Exception:
+        system_heat = None
         system_heat_status = "unknown"
+    if system_heat is not None:
+        try:
+            if bool(system_heat.available):
+                result = _gather_system_heat(conn)
+                if result:
+                    result["heat.systemHeatStatus"] = "known"
+                    return result
+        except Exception:
+            system_heat_status = "unknown"
     try:
         result = _gather_stock_heat(conn)
         if result:
@@ -2887,6 +2895,63 @@ def _overview_list(obj, name):
         return list(value or [])
     except Exception:
         return []
+
+
+def _overview_contract_text(obj, name, limit=OVERVIEW_MAX_CONTRACT_TEXT_LENGTH):
+    """Return bounded plain text from KSP's contract briefing fields."""
+    value = _overview_value(obj, name)
+    if value is None:
+        return ""
+    try:
+        text = str(value).strip()
+    except Exception:
+        return ""
+    if not text:
+        return ""
+    # KSP contract text can include Unity rich-text tags. The dashboard renders
+    # a compact plain-text briefing, so do not expose the markup as content.
+    text = re.sub(r"</?[A-Za-z][A-Za-z0-9-]*(?:=[^<>]*)?\s*>", "", text)
+    text = "".join(
+        character if character in "\n\t" or ord(character) >= 32 else " "
+        for character in text
+    ).strip()
+    return text[:limit]
+
+
+def _overview_contract_parameters(contract):
+    """Flatten a bounded contract-parameter tree for an accessible summary."""
+    rows = []
+
+    def append(parameters, depth):
+        if depth > 8:
+            return
+        for parameter in parameters:
+            if len(rows) >= OVERVIEW_MAX_CONTRACT_PARAMETERS:
+                return
+            title = _overview_contract_text(parameter, "title", 512)
+            if title:
+                completed = _overview_value(parameter, "completed") is True
+                failed = _overview_value(parameter, "failed") is True
+                row = {
+                    "title": title,
+                    "status": (
+                        "complete" if completed else
+                        "failed" if failed else
+                        "incomplete"
+                    ),
+                    "depth": depth,
+                }
+                optional = _overview_value(parameter, "optional")
+                if isinstance(optional, bool):
+                    row["optional"] = optional
+                notes = _overview_contract_text(parameter, "notes", 1000)
+                if notes:
+                    row["notes"] = notes
+                rows.append(row)
+            append(_overview_list(parameter, "children"), depth + 1)
+
+    append(_overview_list(contract, "parameters"), 0)
+    return rows
 
 
 def _overview_crew_names(vessel):
@@ -3661,11 +3726,39 @@ def _gather_overview_contracts(sc):
     }
     active_rows = []
     for contract in groups["active"]:
+        deadline = _overview_finite_float(
+            _overview_value(contract, "date_deadline")
+        )
+        if deadline is None:
+            deadline = _overview_finite_float(
+                _overview_value(contract, "deadline")
+            )
         row = {
-            "title": _overview_value(contract, "title", "Untitled contract"),
+            "title": (
+                _overview_contract_text(contract, "title", 512) or
+                "Untitled contract"
+            ),
             "type": _overview_label(_overview_value(contract, "type"), "Contract"),
-            "deadline": _overview_value(contract, "date_deadline"),
+            "deadline": deadline,
         }
+        contract_object_id = _overview_value(contract, "_object_id")
+        if (
+            isinstance(contract_object_id, int)
+            and not isinstance(contract_object_id, bool)
+            and contract_object_id > 0
+        ):
+            row["objectId"] = str(contract_object_id)
+        for source, target in (
+            ("synopsis", "synopsis"),
+            ("description", "description"),
+            ("notes", "notes"),
+        ):
+            text = _overview_contract_text(contract, source)
+            if text:
+                row[target] = text
+        parameters = _overview_contract_parameters(contract)
+        if parameters:
+            row["parameters"] = parameters
         for source, target in (
             ("funds_completion", "fundsCompletion"),
             ("reputation_completion", "reputationCompletion"),
@@ -4113,16 +4206,34 @@ def _gather_reactor_telemetry(conn):
     """Return reactors plus an explicit completeness state for alarm rules."""
     try:
         service = conn.system_heat
+    except AttributeError:
+        return {"elec.reactorsStatus": "not_applicable"}
+    except Exception:
+        return {"elec.reactorsStatus": "unknown"}
+    try:
         if not service.available:
             return {"elec.reactorsStatus": "not_applicable"}
         return {
             "elec.reactors": _gather_reactors(service),
             "elec.reactorsStatus": "known",
         }
-    except AttributeError:
-        return {"elec.reactorsStatus": "not_applicable"}
     except Exception:
         return {"elec.reactorsStatus": "unknown"}
+
+
+def _gather_throttle_state(vessel):
+    """Return commanded throttle plus limiter-adjusted vessel thrust."""
+    out = {}
+    try:
+        out["krpc.throttle"] = vessel.control.throttle
+    except Exception:
+        pass
+    try:
+        out["v.thrust"] = vessel.thrust
+        out["v.availableThrust"] = vessel.available_thrust
+    except Exception:
+        pass
+    return out
 
 
 def gather_telemetry(conn):
@@ -4220,11 +4331,8 @@ def gather_telemetry(conn):
     except Exception:
         pass
 
-    # ---- throttle ----
-    try:
-        d["krpc.throttle"] = vessel.control.throttle
-    except Exception:
-        pass
+    # ---- throttle + active-engine thrust ----
+    d.update(_gather_throttle_state(vessel))
 
     # ---- navball + flight + orbit (every tick; all cheap) ----
     try:
@@ -4330,13 +4438,9 @@ def gather_telemetry(conn):
     if now - _res_last_poll >= RES_POLL_SECONDS:
         _res_last_poll = now
         try:
-            r = _gather_resources(vessel, current_stage=cs)
-            if r.get("res.status") == "known":
-                _res_cache = r
-            else:
-                _res_cache = {**_res_cache, **r}
+            _res_cache = _gather_resources(vessel, current_stage=cs)
         except Exception:
-            _res_cache = {**_res_cache, "res.status": "unknown"}
+            _res_cache = {"res.status": "unknown"}
     d.update(_res_cache)
 
     # ---- target + docking ----

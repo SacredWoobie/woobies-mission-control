@@ -4,6 +4,13 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+_No changes yet._
+
+## v0.5.0 - Flight dashboard workspaces
+
+- Corrected both Flight throttle readouts for mod-controlled engines when kRPC's
+  vessel control reports zero despite active thrust; limiter-adjusted current
+  versus available thrust now provides a source-backed fallback.
 - Clipped every projected navball world layer to the spherical boundary so the
   moving sky, horizon, grid, and cardinal labels cannot bleed beyond the globe.
 - Reshaped the navball aircraft marker to match KSP's connected wing-and-chevron
@@ -17,6 +24,27 @@ All notable public changes will be recorded here.
   Resonant Orbit and Delta-V plans can be pinned safely during layout testing.
 - Populated the deterministic inactive mock with a completed nine-destination
   transfer-window board for overview-scene density and layout review.
+- Consolidated inactive-scene identity and content-weighted program status into
+  one header, expanded Active Vessels into a source-backed orbit, crew, and
+  next-event briefing with three equal command actions, and added collapsible
+  celestial-body groups ordered outward from the system primary with each moon
+  immediately after its parent. The astronaut roster now keeps roster-wide
+  status totals in the header while its count and readable table remain
+  filterable.
+- Repositioned the separate Upcoming Alarms and Active Contracts panels below
+  the astronaut roster on wide inactive screens, bounded alarm overflow with an
+  internal scroll, and added a contract focus mode that promotes a selected
+  briefing into the full right column with a persistent contract rail, readable
+  synopsis and objectives, collapsible flavor copy and technical conditions,
+  due dates, rewards, and notes when KSP exposes those fields. `BACK`, Escape,
+  and outside-click return paths restore the compact dashboard and selected
+  contract focus;
+  alarm countdowns now anchor the right edge after their source/type tags, and
+  contract due dates use a larger high-contrast treatment.
+- Removed panel hide and restore controls from the main inactive overview so
+  Transfer Windows, Active Vessels, Astronaut Roster, Upcoming Alarms, and
+  Active Contracts remain consistently available; celestial-body disclosures
+  and contract focus controls are unchanged.
 - Aligned the Resonant Orbit planner with the selected dashboard telemetry so
   fixture and live Editor sessions use the same save context when pinning plans.
 - Redesigned the pinned Editor Resonant Orbit plan as a compact constellation
@@ -75,7 +103,9 @@ All notable public changes will be recorded here.
 
 - Simplified Flight Consumables to the authoritative vessel-total inventory,
   giving resource names and amount meters substantially more horizontal room;
-  current-stage telemetry remains available internally for future contextual use.
+  current-stage telemetry remains available internally for future contextual
+  use, while incomplete or unavailable polls no longer present cached resource
+  amounts as current.
 
 - Reduced the fixed caution surface to an actionable 2x2 HEAT, REACTOR, COMMS,
   and POWER grid; dashboard-feed interruptions remain diagnostic history without

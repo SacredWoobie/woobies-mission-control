@@ -65,6 +65,29 @@ describe("Ascension orbital formatting", () => {
 });
 
 describe("Ascension information hierarchy", () => {
+  it("renders the live vessel throttle as a percentage and meter fill", () => {
+    const view = render(<AscensionPanel snapshot={{
+      ...flightTelemetryFixture,
+      "krpc.throttle": 0.42,
+    }} />);
+
+    expect(view.container.querySelector(".thr-pct")?.textContent).toBe("42%");
+    expect(view.container.querySelector(".thr-track")?.getAttribute("aria-valuenow")).toBe("42");
+    expect((view.container.querySelector(".thr-fill") as HTMLElement | null)?.style.height).toBe("42%");
+  });
+
+  it("recovers the KSP throttle gauge from active thrust when control reports zero", () => {
+    const view = render(<AscensionPanel snapshot={{
+      ...flightTelemetryFixture,
+      "krpc.throttle": 0,
+      "v.thrust": 550_716,
+      "v.availableThrust": 550_723,
+    }} />);
+
+    expect(view.container.querySelector(".thr-pct")?.textContent).toBe("100%");
+    expect(view.container.querySelector(".thr-track")?.getAttribute("aria-valuenow")).toBe("100");
+  });
+
   it("separates attitude and flight-state readouts and adds target speed only when present", () => {
     const targetSnapshot: TelemetrySnapshot = {
       ...flightTelemetryFixture,

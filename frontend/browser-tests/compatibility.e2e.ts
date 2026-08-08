@@ -1,10 +1,30 @@
 import { expect, test } from "@playwright/test";
 
+test("developer controls stay out of screenshots until the corner is engaged", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.mouse.move(640, 400);
+
+  const tab = page.getByRole("button", { name: "DEV", exact: true });
+  await expect(tab).toHaveCSS("opacity", "0");
+
+  await page.mouse.move(4, 4);
+  await expect(tab).toHaveCSS("opacity", "1");
+  await page.mouse.move(640, 400);
+  await expect(tab).toHaveCSS("opacity", "0");
+
+  await tab.focus();
+  await expect(tab).toHaveCSS("opacity", "1");
+  await tab.click();
+  await expect(page.getByRole("complementary", { name: "Dashboard developer controls" })).toBeVisible();
+  await expect(tab).toHaveCSS("opacity", "1");
+});
+
 test("both mission planners remain usable at a normal desktop viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
 
-  await expect(page.getByText("React dashboard · v0.4.4", { exact: false })).toBeVisible();
+  await expect(page.getByText("React dashboard · v0.5.0", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Resonant orbit planner" }).click();
   const resonantDrawer = page.getByRole("dialog", { name: "Resonant orbit planner" });
   await expect(resonantDrawer).toBeVisible();
@@ -619,6 +639,65 @@ test("Mission Control gives transfer-window cards the full panel body", async ({
     scrollWidth: element.scrollWidth,
   }));
   expect(narrowHeader.scrollWidth).toBeLessThanOrEqual(narrowHeader.clientWidth + 1);
+});
+
+test("Mission Control contract focus preserves keyboard, scroll, and responsive boundaries", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await page.getByTitle("Dashboard developer controls").click();
+  await page.getByLabel("Telemetry fixture").getByRole("button", { name: "inactive" }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const contracts = page.locator(".overview-contracts");
+  const explore = contracts.getByRole("button", { name: "Expand contract Explore Duna" });
+  await explore.click();
+  const focusedExplore = contracts.getByRole("button", { name: "Collapse contract Explore Duna" });
+  const detailsId = await focusedExplore.getAttribute("aria-controls");
+  expect(detailsId).toBeTruthy();
+  await expect(page.locator(`#${detailsId}`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Astronaut roster" })).toHaveCount(0);
+
+  const reader = contracts.locator(".overview-contract-focus-scroll");
+  await contracts.getByText("More briefing", { exact: true }).click();
+  await reader.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  expect(await reader.evaluate((element) => getComputedStyle(element).overflowY)).toBe("auto");
+  await contracts.getByRole("button", { name: "Expand contract Position a satellite in polar orbit" }).click();
+  expect(await contracts.locator(".overview-contract-focus-scroll").evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(contracts.locator("details[open]")).toHaveCount(0);
+
+  await page.keyboard.press("Escape");
+  const returnedSatellite = contracts.getByRole("button", { name: "Expand contract Position a satellite in polar orbit" });
+  await expect(returnedSatellite).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Astronaut roster" })).toBeVisible();
+  await returnedSatellite.click();
+  await page.locator(".mission-overview-header h1").click();
+  await expect(returnedSatellite).toBeFocused();
+
+  const desktopOverflow = await page.evaluate(() => ({
+    alarmOverflow: getComputedStyle(document.querySelector<HTMLElement>(".overview-alarms .overview-card-list")!).overflowY,
+    clientHeight: document.documentElement.clientHeight,
+    clientWidth: document.documentElement.clientWidth,
+    scrollHeight: document.documentElement.scrollHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(desktopOverflow.alarmOverflow).toBe("auto");
+  expect(desktopOverflow.scrollHeight).toBeLessThanOrEqual(desktopOverflow.clientHeight);
+  expect(desktopOverflow.scrollWidth).toBeLessThanOrEqual(desktopOverflow.clientWidth);
+
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 1080, height: 1920 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const overflow = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      panelOverflow: Array.from(document.querySelectorAll<HTMLElement>(".overview-section"))
+        .some((panel) => panel.scrollWidth > panel.clientWidth + 1),
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(overflow.panelOverflow).toBe(false);
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+  }
 });
 
 test("Flight staging presents both conditions without a mode toggle", async ({ page }) => {

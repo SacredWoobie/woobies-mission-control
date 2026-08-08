@@ -13,6 +13,7 @@ import {
   formatTelemetryNumber,
   isFiniteNumber,
 } from "../formatting/numbers";
+import { selectThrottleFraction } from "../telemetry/selectors";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { buildNavballGeometry } from "./navballGeometry";
@@ -177,7 +178,8 @@ function trajectoryDisplay(snapshot: TelemetrySnapshot) {
 export function AscensionPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const { system } = useTimeSystem();
   const kerbinTime = isKerbinTime(system);
-  const throttle = isFiniteNumber(snapshot["krpc.throttle"]) ? Math.round(snapshot["krpc.throttle"] * 100) : 0;
+  const throttleFraction = selectThrottleFraction(snapshot);
+  const throttle = isFiniteNumber(throttleFraction) ? Math.round(throttleFraction * 100) : 0;
   const heading = snapshot["n.heading"];
   const pitch = snapshot["n.pitch"];
   const roll = snapshot["n.roll"];

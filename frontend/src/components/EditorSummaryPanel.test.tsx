@@ -33,6 +33,26 @@ describe("EditorSummaryPanel", () => {
     expect(screen.getByRole("meter", { name: "40% full" }).querySelector(".fill.mid")).toBeTruthy();
   });
 
+  it.each([
+    ["missing amount", undefined, 100],
+    ["missing capacity", 25, undefined],
+    ["zero capacity", 0, 0],
+  ])("does not announce %s as a valid zero", (_label, amount, capacity) => {
+    render(<EditorSummaryPanel snapshot={{
+      ...editorTelemetryFixture,
+      "editor.res.names": ["ElectricCharge"],
+      "editor.res[ElectricCharge]": amount,
+      "editor.resMax[ElectricCharge]": capacity,
+    }} />);
+
+    const meter = screen.getByRole("img", { name: "Amount unavailable" });
+    expect(meter.hasAttribute("aria-valuenow")).toBe(false);
+    expect(meter.hasAttribute("aria-valuemin")).toBe(false);
+    expect(meter.hasAttribute("aria-valuemax")).toBe(false);
+    expect(meter.querySelector<HTMLElement>(".fill")?.style.width).toBe("0%");
+    expect(meter.querySelector(".fill.low, .fill.mid, .fill.healthy")).toBeNull();
+  });
+
   it("distinguishes a recalculation from an outdated StageStats service", () => {
     const view = render(<EditorSummaryPanel snapshot={{
       ...editorTelemetryFixture,
