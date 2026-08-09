@@ -78,12 +78,13 @@ class FlightMockTelemetryTests(unittest.TestCase):
         parts = self.flight["damage.parts"]
 
         self.assertEqual(self.flight["damage.status"], "known")
-        self.assertEqual(self.flight["damage.damagedCount"], 3)
+        self.assertEqual(self.flight["damage.source"], "vessel_damage")
+        self.assertEqual(self.flight["damage.damagedCount"], 36)
         self.assertEqual(
             {(part["kind"], part["count"]) for part in parts},
-            {("radiator", 2), ("solar_panel", 1)},
+            {("antenna", 24), ("radiator", 12)},
         )
-        self.assertEqual(self.flight["damage.unsupportedKinds"], ["antenna"])
+        self.assertEqual(self.flight["damage.unsupportedKinds"], [])
 
     def test_consumables_include_nuclear_cryo_and_ore_stress_data(self):
         expected = {"EnrichedUranium", "LqdDeuterium", "Ore", "DepletedFuel"}

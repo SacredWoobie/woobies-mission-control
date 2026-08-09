@@ -95,12 +95,15 @@ export type DamagePartKind =
   | "antenna"
   | "landing_leg"
   | "wheel"
-  | "reaction_wheel";
+  | "reaction_wheel"
+  | "other";
 
 export interface DamagePartTelemetry {
   kind: DamagePartKind;
   name: string;
   tag?: string;
+  module?: string;
+  detector?: string;
   count: number;
 }
 
@@ -542,12 +545,16 @@ export interface TelemetrySnapshot {
   "heat.netW"?: number;
   "heat.parts"?: StockHeatPartTelemetry[];
   "damage.status"?: "known" | "incomplete" | "unknown";
+  "damage.source"?: "vessel_damage" | "stock_krpc";
   "damage.parts"?: DamagePartTelemetry[];
   "damage.checkedKinds"?: DamagePartKind[];
   "damage.incompleteKinds"?: string[];
   "damage.unsupportedKinds"?: DamagePartKind[];
   "damage.checkedCount"?: number;
+  "damage.checkedModuleCount"?: number;
+  "damage.readErrorCount"?: number;
   "damage.damagedCount"?: number;
+  "damage.detectors"?: string[];
   "elec.reactors"?: ReactorTelemetry[];
   "elec.reactorsStatus"?: "known" | "not_applicable" | "unknown";
   "elec.sources"?: ElectricitySourceTelemetry[];

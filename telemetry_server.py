@@ -4484,6 +4484,7 @@ def gather_telemetry(conn):
         try:
             _damage_cache = gather_part_damage(
                 vessel,
+                connection=conn,
                 remote_tech_active=d.get("rt.available") is True,
             )
         except Exception:

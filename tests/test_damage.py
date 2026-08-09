@@ -104,6 +104,110 @@ class DamageTelemetryTests(unittest.TestCase):
         self.assertEqual(result["damage.status"], "unknown")
         self.assertEqual(result["damage.parts"], [])
 
+    def test_vessel_damage_service_covers_grouped_modded_deployables(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=36,
+            checked_module_count=36,
+            status="known",
+            read_error_count=0,
+            damaged_count=3,
+            part_ids=lambda: [101, 102, 201],
+            part_names=lambda: [
+                "nfex-antenna-reflector-huge-1",
+                "nfex-antenna-reflector-huge-1",
+                "radiator-universal-1",
+            ],
+            part_titles=lambda: [
+                "RFL-100 Giant Dish Reflector",
+                "RFL-100 Giant Dish Reflector",
+                "XR-175 High Temperature Heat Radiator",
+            ],
+            part_tags=lambda: ["", "", ""],
+            module_names=lambda: [
+                "ModuleDeployableReflector",
+                "ModuleDeployableReflector",
+                "ModuleDeployableRadiator",
+            ],
+            kinds=lambda: ["antenna", "antenna", "radiator"],
+            detectors=lambda: [
+                "ModuleDeployablePart.deployState",
+                "ModuleDeployablePart.deployState",
+                "ModuleDeployablePart.deployState",
+            ],
+            supported_detectors=lambda: [
+                "ModuleDeployablePart.deployState",
+                "ModuleWheelDamage.isDamaged",
+            ],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(),
+            connection=SimpleNamespace(vessel_damage=service),
+            remote_tech_active=True,
+        )
+
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.source"], "vessel_damage")
+        self.assertEqual(result["damage.checkedCount"], 36)
+        self.assertEqual(result["damage.checkedModuleCount"], 36)
+        self.assertEqual(result["damage.damagedCount"], 3)
+        self.assertEqual(result["damage.unsupportedKinds"], [])
+        self.assertEqual(
+            {(row["kind"], row["name"], row["module"], row["count"])
+             for row in result["damage.parts"]},
+            {
+                ("antenna", "RFL-100 Giant Dish Reflector",
+                 "ModuleDeployableReflector", 2),
+                ("radiator", "XR-175 High Temperature Heat Radiator",
+                 "ModuleDeployableRadiator", 1),
+            },
+        )
+
+    def test_malformed_service_payload_fails_closed_without_stock_fallback(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=1,
+            checked_module_count=1,
+            status="known",
+            read_error_count=0,
+            damaged_count=1,
+            part_ids=lambda: [],
+            part_names=lambda: [],
+            part_titles=lambda: [],
+            part_tags=lambda: [],
+            module_names=lambda: [],
+            kinds=lambda: [],
+            detectors=lambda: [],
+            supported_detectors=lambda: [],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(parts=FakeParts(
+                radiators=[component("Radiator", state="broken")]
+            )),
+            connection=SimpleNamespace(vessel_damage=service),
+        )
+
+        self.assertEqual(result["damage.status"], "incomplete")
+        self.assertEqual(result["damage.source"], "vessel_damage")
+        self.assertEqual(result["damage.parts"], [])
+
+    def test_missing_service_keeps_stock_fallback(self):
+        class ConnectionWithoutDamage:
+            @property
+            def vessel_damage(self):
+                raise AttributeError("service is not installed")
+
+        result = gather_part_damage(
+            SimpleNamespace(parts=FakeParts(
+                radiators=[component("Radiator", state="broken")]
+            )),
+            connection=ConnectionWithoutDamage(),
+        )
+
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.source"], "stock_krpc")
+        self.assertEqual(result["damage.damagedCount"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

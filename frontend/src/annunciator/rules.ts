@@ -310,10 +310,11 @@ const DAMAGE_KIND_LABELS: Record<DamagePartTelemetry["kind"], string> = {
   landing_leg: "landing leg",
   wheel: "wheel",
   reaction_wheel: "reaction wheel",
+  other: "part",
 };
 
 function damageIdentity(part: DamagePartTelemetry) {
-  return [part.kind, part.name, part.tag ?? ""]
+  return [part.kind, part.name, part.tag ?? "", part.module ?? ""]
     .map((value) => encodeURIComponent(value.trim().toLocaleLowerCase()))
     .join(":");
 }
@@ -335,6 +336,8 @@ function damageEvaluation(snapshot: TelemetrySnapshot): RuleEvaluation {
         || typeof part.name !== "string"
         || !part.name.trim()
         || (part.tag !== undefined && typeof part.tag !== "string")
+        || (part.module !== undefined && typeof part.module !== "string")
+        || (part.detector !== undefined && typeof part.detector !== "string")
         || !Number.isSafeInteger(part.count)
         || part.count <= 0
       ) return unknown(`unidentified-${index}`);

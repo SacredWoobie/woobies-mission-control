@@ -219,6 +219,7 @@ describe("Flight annunciator rule catalog", () => {
       "damage.parts": [
         { kind: "radiator", name: "Large Folding Radiator", tag: "Port loop", count: 2 },
         { kind: "solar_panel", name: "OX-4L", count: 1 },
+        { kind: "other", name: "Modded Reliability Unit", module: "ReliabilityModule", count: 1 },
       ],
     })).toMatchObject({
       kind: "known",
@@ -226,6 +227,7 @@ describe("Flight annunciator rule catalog", () => {
       observations: [
         { state: "active", tier: "warning", message: "2 damaged radiators: Large Folding Radiator (Port loop)." },
         { state: "active", tier: "warning", message: "1 damaged solar panel: OX-4L." },
+        { state: "active", tier: "warning", message: "1 damaged part: Modded Reliability Unit." },
       ],
     });
   });
