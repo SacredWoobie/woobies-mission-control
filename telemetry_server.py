@@ -186,7 +186,7 @@ NOTES_FAVORITES_PATH = _default_notes_favorites_path()
 _stage_partition_cache = None
 
 # kRPC builds differ in whether vessel.control.current_stage is available. Probe
-# the stock property once and retain the result. StageStats 0.2.7 exposes KSP's
+# the stock property once and retain the result. StageStats 0.2.8 exposes KSP's
 # direct vessel.currentStage value as a compatibility fallback.
 #   None  = not probed yet
 #   True  = present, use it

@@ -42,9 +42,9 @@
             Version = "0.8.10.0"
             Sha256 = "67CFC7B3ED7E347F223AACCED5A827A5691DA2CA230B955DBD68FD63DB03A30D"
             License = "GPL-3.0-only"
-            SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"
+            SourceCommit = "951cdac773a458e076a8153be209f73ff4db22e5"
             SourceArchive = "KRPC.WoobiesMechJeb-0.8.10-source.zip"
-            SourceArchiveSha256 = "1E2ACB8B1AB1F3A963BA29C0792195C24FA04F585F78C633E0605B45132D34BB"
+            SourceArchiveSha256 = "0FECF86DA3F014A7D4D5E5091A80FE1A173C11CA01ED240DD67DFE63165637BD"
             RequiredPackageFiles = @("LICENSE", "NOTICE.md")
         }
     )
