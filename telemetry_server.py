@@ -186,7 +186,7 @@ NOTES_FAVORITES_PATH = _default_notes_favorites_path()
 _stage_partition_cache = None
 
 # kRPC builds differ in whether vessel.control.current_stage is available. Probe
-# the stock property once and retain the result. StageStats 0.2.7 exposes KSP's
+# the stock property once and retain the result. StageStats 0.2.8 exposes KSP's
 # direct vessel.currentStage value as a compatibility fallback.
 #   None  = not probed yet
 #   True  = present, use it
@@ -2167,7 +2167,7 @@ def _apply_telemetry_command(conn, command):
         return
 
     try:
-        scene = conn.krpc.current_game_scene
+        scene = conn.krpc.game_scene
         if scene not in (
             conn.krpc.GameScene.editor_vab,
             conn.krpc.GameScene.editor_sph,
@@ -3044,7 +3044,7 @@ def _apply_target_clear_command(conn, command):
     expected_target_name = expected_target_name.strip()
 
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+        if conn.krpc.game_scene != conn.krpc.GameScene.flight:
             return reject("Targets can be cleared only in flight.")
 
         current_identity = _mission_planning.current_craft_identity(conn, "flight")
@@ -3145,7 +3145,7 @@ def _apply_heat_loop_control_command(conn, command):
         return reject("Valid expected radiator identities are required.")
 
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+        if conn.krpc.game_scene != conn.krpc.GameScene.flight:
             return reject("Heat-loop controls are available only in flight.")
 
         current_identity = _mission_planning.current_craft_identity(
@@ -3245,7 +3245,7 @@ def _apply_overview_vessel_switch_command(conn, command):
         return reject("The selected vessel identity is invalid.")
 
     try:
-        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        scene_name = _overview_label(conn.krpc.game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
             return reject(
                 "Vessels can only be switched from the Space Center "
@@ -3366,7 +3366,7 @@ def _apply_overview_vessel_edit_command(conn, command):
         return reject("Change the vessel name or type before saving.")
 
     try:
-        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        scene_name = _overview_label(conn.krpc.game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
             return reject(
                 "Vessels can only be edited from the Space Center "
@@ -3514,7 +3514,7 @@ def _apply_overview_vessel_lifecycle_command(conn, command):
         return reject("The selected vessel crew list is unavailable.")
 
     try:
-        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        scene_name = _overview_label(conn.krpc.game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
             return reject(
                 "Vessels can only be recovered or terminated from the "
@@ -4084,7 +4084,7 @@ def _apply_reactor_control_command(conn, command):
         return reject("A valid expected vessel ID is required.")
 
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+        if conn.krpc.game_scene != conn.krpc.GameScene.flight:
             return reject("Reactor controls are available only in flight.")
 
         current_identity = _mission_planning.current_craft_identity(conn, "flight")
@@ -4273,7 +4273,7 @@ def gather_telemetry(conn):
     # The game scene is the authoritative signal. A vessel handle may remain
     # available briefly during editor and scene transitions.
     try:
-        scene = conn.krpc.current_game_scene
+        scene = conn.krpc.game_scene
         if scene == conn.krpc.GameScene.editor_vab:
             mode = "editor_vab"
         elif scene == conn.krpc.GameScene.editor_sph:

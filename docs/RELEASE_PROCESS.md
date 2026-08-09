@@ -31,16 +31,20 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-The v0.5.1 release manifest selects:
+The Unreleased development manifest selects:
 
 | Service | Release |
 | --- | --- |
-| WoobiesControlStats | 0.2.7 |
-| KRPC.StageStats | 0.2.7 |
-| KRPC.SystemHeat | 0.2.9 |
-| KRPC.WoobiesMechJeb | 0.8.6 |
+| WoobiesControlStats | 0.2.8 |
+| KRPC.StageStats | 0.2.8 |
+| KRPC.SystemHeat | 0.2.10 |
+| KRPC.WoobiesMechJeb | 0.8.10 |
 
-The matching contract is also recorded in `tools/Release-Manifest.psd1`.
+This is not the published v0.5.1 service set; that remains documented in
+`README.md` and frozen in `tools/Release-Pack-v0.5.1.psd1`. The matching
+development contract is recorded in `tools/Release-Manifest.psd1`, and the
+publisher refuses to package it until a product release version is deliberately
+selected and aligned.
 Versioned names are retained in the builder archives; the assembled KSP
 `GameData` folders use each service's canonical DLL filename as required by
 KSP and kRPC.

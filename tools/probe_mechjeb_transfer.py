@@ -20,7 +20,7 @@ TERMINAL_STATES = {"completed", "cancelled", "failed"}
 
 
 def _scene_name(conn):
-    value = str(conn.krpc.current_game_scene)
+    value = str(conn.krpc.game_scene)
     return value.rsplit(".", 1)[-1].lower()
 
 

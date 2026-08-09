@@ -96,6 +96,13 @@ $frontendDist = Join-Path $frontendRoot 'dist'
 Assert-RequiredFile $manifestPath
 Assert-RequiredFile $frontendBuildScript
 $manifest = Import-PowerShellDataFile -LiteralPath $manifestPath
+if ($manifest.ContainsKey('ReleaseState') -and
+    $manifest.ReleaseState -eq 'Unreleased') {
+    throw (
+        'Release-Manifest.psd1 is an Unreleased development selection. ' +
+        'Choose and align the product release version before packaging.'
+    )
+}
 if ($manifest.ProductVersion -ne $Version) {
     throw "Release-Manifest.psd1 targets $($manifest.ProductVersion), not requested v$Version."
 }

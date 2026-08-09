@@ -141,7 +141,7 @@ class ResourceTelemetryTests(unittest.TestCase):
         game_scene = SimpleNamespace(flight="flight")
         conn = SimpleNamespace(
             krpc=SimpleNamespace(
-                current_game_scene="flight",
+                game_scene="flight",
                 GameScene=game_scene,
             ),
             space_center=SimpleNamespace(

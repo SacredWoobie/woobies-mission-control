@@ -1,36 +1,55 @@
 @{
+    # Development selection for CHANGELOG.md's Unreleased section. The source
+    # still identifies as the public 0.5.1 baseline until a release version is
+    # deliberately selected; Release-Pack-v0.5.1.psd1 remains the immutable
+    # authority for the published v0.5.1 service set.
+    ReleaseState = "Unreleased"
     ProductVersion = "0.5.1"
+    Krpc = @{
+        Version = "0.6.0"
+        PackageSha256 = "6B4399A8DB57C41DD15323FCD79DC3AA440999AEFED808729A5C850BAC1A17C8"
+        PackageUrl = "https://github.com/krpc/krpc/releases/download/v0.6.0/krpc-0.6.0.zip"
+        CoreAssemblies = @{
+            "KRPC.dll" = "5AA1D0CDC8EECDE0A3EFBF16DEE8BFA575F4ACD94E8960619F642861F7AFD2E4"
+            "KRPC.Core.dll" = "0C7E447FC801C41D38169E82E39CB06C04DF9973A4D6AFA9D4C12E76AB313AD8"
+            "KRPC.SpaceCenter.dll" = "EF3855F132477D3DD7C3A8FB8AAE1FBBE8CCA54F23BEC5C333C04A91665BD8A4"
+            "Google.Protobuf.dll" = "2210E190ECFA7B27F48B6601FDAD544E8ADB0A9BDCB70D775C8BBDD5E48B5CEE"
+        }
+    }
     Services = @(
         @{
             Folder = "WoobiesControlStats"
             File = "WoobiesControlStats.dll"
-            Version = "0.2.7.0"
-            Sha256 = "712A058862C78691B2CB4351E6DD0E554E391C517C2531090DBB57009C605A14"
+            Version = "0.2.8.0"
+            Sha256 = "07C45B3F717B9F5A60F87B8F499E0ACB0D244FB7229C3AEFAE5716DB44F642C6"
             License = "MIT"
-            SourceCommit = "56723004f10c422686a96775f98978302900a9b4"
+            SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"
         }
         @{
             Folder = "KRPC.StageStats"
             File = "KRPC.StageStats.dll"
-            Version = "0.2.7.0"
-            Sha256 = "18AE2F6D14B63476E37F2EC052119E49C421043FDB1A63F0C9BBED05D5A265EC"
+            Version = "0.2.8.0"
+            Sha256 = "20DA352A76AB030EBF8B4BD11DB386387CBDCF8567CE54A0F12A5CE2AB512B07"
             License = "MIT"
+            SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"
         }
         @{
             Folder = "KRPC.SystemHeat"
             File = "KRPC.SystemHeat.dll"
-            Version = "0.2.9.0"
-            Sha256 = "D253044319E44FAFC19F8DB59415339BE8E42BFE9643E44A19332092239C22C4"
+            Version = "0.2.10.0"
+            Sha256 = "4077982BC2F2E6A49383E639695D4A81F1D33D0DE8C7D96E978B581BEED17D28"
             License = "MIT"
+            SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"
         }
         @{
             Folder = "KRPC.WoobiesMechJeb"
             File = "KRPC.WoobiesMechJeb.dll"
-            Version = "0.8.6.0"
-            Sha256 = "0B6EF8FDF2567F6BDD80C639C06C3707B02C6B6BDEDEF65A8DE9EEED3FF94C3A"
+            Version = "0.8.10.0"
+            Sha256 = "67CFC7B3ED7E347F223AACCED5A827A5691DA2CA230B955DBD68FD63DB03A30D"
             License = "GPL-3.0-only"
-            SourceArchive = "KRPC.WoobiesMechJeb-0.8.6-source.zip"
-            SourceArchiveSha256 = "E65E11040E9AA55F961CC1EA42F67E406CEC759FB6A9F5F69B16150DE5B871F5"
+            SourceCommit = "951cdac773a458e076a8153be209f73ff4db22e5"
+            SourceArchive = "KRPC.WoobiesMechJeb-0.8.10-source.zip"
+            SourceArchiveSha256 = "0FECF86DA3F014A7D4D5E5091A80FE1A173C11CA01ED240DD67DFE63165637BD"
             RequiredPackageFiles = @("LICENSE", "NOTICE.md")
         }
     )

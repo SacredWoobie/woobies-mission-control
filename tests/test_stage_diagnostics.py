@@ -107,7 +107,7 @@ class FakeVessel:
 class FakeConnection:
     def __init__(self, service):
         self.stage_stats = service
-        self.krpc = types.SimpleNamespace(current_game_scene="flight")
+        self.krpc = types.SimpleNamespace(game_scene="flight")
         self.space_center = types.SimpleNamespace(active_vessel=FakeVessel())
 
 

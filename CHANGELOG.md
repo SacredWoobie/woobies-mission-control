@@ -4,6 +4,13 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Updated the dashboard feed and panel bridge runtime contract to kRPC 0.6.0
+  with its required protobuf 7.35.1 Python runtime, coherent server-core
+  preflight checks, and rebuilt custom-service compatibility versions.
+- Migrated scene reads to kRPC 0.6's supported `game_scene` property while
+  preserving the dashboard telemetry schema, ports, and control-safety
+  boundaries.
+
 ## v0.5.1 - Contract deadlines and UI foundations
 
 - Added authoritative live KSP deadlines to Active Contracts when the new

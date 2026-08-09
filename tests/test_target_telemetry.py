@@ -94,7 +94,7 @@ class TargetTelemetryTests(unittest.TestCase):
         krpc = _Object()
         krpc.GameScene = _Object()
         krpc.GameScene.flight = "flight"
-        krpc.current_game_scene = "flight"
+        krpc.game_scene = "flight"
         connection = _Object()
         connection.krpc = krpc
         connection.space_center = space_center
@@ -134,7 +134,7 @@ class TargetTelemetryTests(unittest.TestCase):
         krpc = _Object()
         krpc.GameScene = _Object()
         krpc.GameScene.flight = "flight"
-        krpc.current_game_scene = "flight"
+        krpc.game_scene = "flight"
         connection = _Object()
         connection.krpc = krpc
         connection.space_center = space_center

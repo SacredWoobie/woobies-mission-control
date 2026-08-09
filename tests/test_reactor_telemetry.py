@@ -157,7 +157,7 @@ def reactor_command_connection(service, vessel_id="vessel-1"):
     game_scene = SimpleNamespace(flight="flight")
     return SimpleNamespace(
         krpc=SimpleNamespace(
-            current_game_scene="flight",
+            game_scene="flight",
             GameScene=game_scene,
         ),
         space_center=SimpleNamespace(

@@ -23,7 +23,7 @@ def _safe(call, default=None):
 
 
 def _scene_name(conn):
-    scene = _safe(lambda: conn.krpc.current_game_scene)
+    scene = _safe(lambda: conn.krpc.game_scene)
     return str(scene) if scene is not None else None
 
 
