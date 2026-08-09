@@ -206,7 +206,17 @@ class KrpcPrerequisiteTests(unittest.TestCase):
     def install_krpc(self, root, settings=None):
         folder = root / "GameData" / "kRPC"
         folder.mkdir(parents=True, exist_ok=True)
-        (folder / "KRPC.dll").write_bytes(b"krpc")
+        for filename in (
+            "KRPC.dll",
+            "KRPC.Core.dll",
+            "KRPC.SpaceCenter.dll",
+            "Google.Protobuf.dll",
+        ):
+            (folder / filename).write_bytes(filename.encode("ascii"))
+        (folder / "kRPC.version").write_text(
+            json.dumps({"VERSION": {"MAJOR": 0, "MINOR": 6, "PATCH": 0}}),
+            encoding="utf-8",
+        )
         if settings is not None:
             plugin_data = folder / "PluginData"
             plugin_data.mkdir()
@@ -215,13 +225,22 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             )
         return folder
 
+    @staticmethod
+    def runtime_version_reader(path):
+        return {
+            "KRPC.dll": "0.6.0.0",
+            "KRPC.Core.dll": "0.6.0.0",
+            "KRPC.SpaceCenter.dll": "0.6.0.0",
+            "Google.Protobuf.dll": "3.10.1.0",
+        }.get(Path(path).name)
+
     def test_inventory_reports_tested_untested_and_missing_mods(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_root(directory)
             krpc = self.install_krpc(root)
             (krpc / "kRPC.version").write_text(
                 json.dumps(
-                    {"VERSION": {"MAJOR": 0, "MINOR": 5, "PATCH": 4}}
+                    {"VERSION": {"MAJOR": 0, "MINOR": 6, "PATCH": 0}}
                 ),
                 encoding="utf-8",
             )
@@ -232,9 +251,12 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             )
 
             def version_reader(path):
-                if Path(path).name == "KRPC.WoobiesMechJeb.dll":
-                    return "0.8.0.0"
-                return None
+                return {
+                    "KRPC.Core.dll": "0.6.0.0",
+                    "KRPC.SpaceCenter.dll": "0.6.0.0",
+                    "Google.Protobuf.dll": "3.10.1.0",
+                    "KRPC.WoobiesMechJeb.dll": "0.8.0.0",
+                }.get(Path(path).name)
 
             inventory = {
                 item["key"]: item
@@ -388,6 +410,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 "feed",
                 port_open=lambda _address, _port: False,
                 dashboard_port_available=lambda _port: False,
+                version_reader=self.runtime_version_reader,
             )
             self.assertEqual(len(preflight["errors"]), 1)
             message = preflight["errors"][0]
@@ -404,6 +427,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 "feed",
                 port_open=lambda _address, _port: False,
                 dashboard_port_available=lambda _port: True,
+                version_reader=self.runtime_version_reader,
             )
             self.assertEqual(preflight["errors"], [])
             self.assertTrue(
@@ -417,6 +441,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             common = {
                 "port_open": lambda _address, _port: True,
                 "dashboard_port_available": lambda _port: False,
+                "version_reader": self.runtime_version_reader,
             }
             feed = app.component_preflight(root, "feed", **common)
             panel = app.component_preflight(root, "panel", **common)
@@ -433,7 +458,32 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 dashboard_port_available=lambda _port: True,
             )
             self.assertTrue(
-                any("kRPC is missing" in error for error in preflight["errors"])
+                any("kRPC 0.6.0 runtime" in error for error in preflight["errors"])
+            )
+
+    def test_mixed_krpc_runtime_blocks_start(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_root(directory)
+            self.install_krpc(root, krpc_settings())
+
+            def mixed_version_reader(path):
+                versions = {
+                    "KRPC.dll": "0.6.0.0",
+                    "KRPC.Core.dll": "0.5.4.0",
+                    "KRPC.SpaceCenter.dll": "0.6.0.0",
+                    "Google.Protobuf.dll": "3.10.1.0",
+                }
+                return versions.get(Path(path).name)
+
+            preflight = app.component_preflight(
+                root,
+                "feed",
+                port_open=lambda _address, _port: True,
+                dashboard_port_available=lambda _port: True,
+                version_reader=mixed_version_reader,
+            )
+            self.assertTrue(
+                any("kRPC core API (untested)" in error for error in preflight["errors"])
             )
 
     def test_connection_refused_message_explains_both_port_pairs(self):
@@ -444,7 +494,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
 
     def test_live_probe_reports_registered_services_and_closes(self):
         class Status:
-            version = "0.5.4"
+            version = "0.6.0"
 
         class KrpcService:
             @staticmethod
@@ -464,7 +514,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
         result = app.probe_krpc_connection(
             lambda **_kwargs: connection
         )
-        self.assertEqual(result["server_version"], "0.5.4")
+        self.assertEqual(result["server_version"], "0.6.0")
         self.assertTrue(result["services"]["space_center"])
         self.assertTrue(result["services"]["stage_stats"])
         self.assertFalse(result["services"]["mech_jeb"])

@@ -35,10 +35,10 @@ The v0.5.1 release manifest selects:
 
 | Service | Release |
 | --- | --- |
-| WoobiesControlStats | 0.2.7 |
-| KRPC.StageStats | 0.2.7 |
-| KRPC.SystemHeat | 0.2.9 |
-| KRPC.WoobiesMechJeb | 0.8.6 |
+| WoobiesControlStats | 0.2.8 |
+| KRPC.StageStats | 0.2.8 |
+| KRPC.SystemHeat | 0.2.10 |
+| KRPC.WoobiesMechJeb | 0.8.10 |
 
 The matching contract is also recorded in `tools/Release-Manifest.psd1`.
 Versioned names are retained in the builder archives; the assembled KSP

@@ -218,30 +218,30 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(v050_product, "0.5.0")
         self.assertEqual(v050_services, v044_services)
 
-    def test_v051_release_pack_selects_contract_deadline_service(self):
+    def test_v051_release_pack_remains_immutable(self):
         v051_product, v051_services = read_manifest(
             ROOT / "tools" / "Release-Pack-v0.5.1.psd1"
         )
-        manifest_product, manifest_services = read_manifest(
-            ROOT / "tools" / "Release-Manifest.psd1"
-        )
 
         self.assertEqual(v051_product, "0.5.1")
-        self.assertEqual(manifest_product, "0.5.1")
-        self.assertEqual(v051_services, manifest_services)
         self.assertEqual(v051_services["WoobiesControlStats"], "0.2.7.0")
 
-    def test_development_manifest_records_contract_deadline_service_source(self):
+    def test_development_manifest_records_krpc_060_service_cohort(self):
         manifest = (
             ROOT / "tools" / "Release-Manifest.psd1"
         ).read_text(encoding="utf-8")
 
+        self.assertIn('Version = "0.6.0"', manifest)
+        self.assertIn(
+            'PackageSha256 = "6B4399A8DB57C41DD15323FCD79DC3AA440999AEFED808729A5C850BAC1A17C8"',
+            manifest,
+        )
         self.assertRegex(
             manifest,
             r'(?s)Folder = "WoobiesControlStats".*?'
-            r'Version = "0\.2\.7\.0".*?'
-            r'Sha256 = "712A058862C78691B2CB4351E6DD0E554E391C517C2531090DBB57009C605A14".*?'
-            r'SourceCommit = "56723004f10c422686a96775f98978302900a9b4"',
+            r'Version = "0\.2\.8\.0".*?'
+            r'Sha256 = "07C45B3F717B9F5A60F87B8F499E0ACB0D244FB7229C3AEFAE5716DB44F642C6".*?'
+            r'SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"',
         )
 
     def test_product_versions_and_service_selection_are_aligned(self):
@@ -328,6 +328,31 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("DownArrow", menu)
         self.assertIn("requirements-dashboard.txt", batch)
         self.assertIn("requirements-panel.txt", batch)
+
+    def test_krpc_060_python_runtime_is_pinned_for_both_components(self):
+        dashboard = (ROOT / "requirements-dashboard.txt").read_text(
+            encoding="utf-8"
+        )
+        panel = (ROOT / "requirements-panel.txt").read_text(encoding="utf-8")
+        batch = (ROOT / "Start KSP Dashboard.bat").read_text(encoding="utf-8")
+
+        for requirements in (dashboard, panel):
+            self.assertIn("krpc==0.6.0", requirements)
+            self.assertIn("protobuf==7.35.1", requirements)
+            self.assertNotIn("krpc==0.5.4", requirements)
+        self.assertIn("'krpc':'0.6.0'", batch)
+        self.assertIn("'protobuf':'7.35.1'", batch)
+
+    def test_runtime_uses_supported_krpc_060_scene_property(self):
+        runtime_files = (
+            "telemetry_server.py",
+            "panel_bridge.py",
+            "tools/probe_stage_stats.py",
+            "tools/probe_mechjeb_transfer.py",
+        )
+        for relative_path in runtime_files:
+            source = (ROOT / relative_path).read_text(encoding="utf-8")
+            self.assertNotIn("current_game_scene", source, relative_path)
 
     def test_quickstart_keeps_the_release_outside_ksp_gamedata(self):
         quickstart = (ROOT / "QUICKSTART.txt").read_text(encoding="utf-8")

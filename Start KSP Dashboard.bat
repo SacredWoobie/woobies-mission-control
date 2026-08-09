@@ -192,12 +192,12 @@ exit /b %errorlevel%
 
 :dashboard_ready
 if not exist "%VENV_PYTHON%" exit /b 1
-"%VENV_PYTHON%" -c "import importlib.metadata as m, krpc, websockets; expected={'krpc':'0.5.4','websockets':'16.0'}; raise SystemExit(0 if all(m.version(name) == version for name, version in expected.items()) else 1)" >nul 2>&1
+"%VENV_PYTHON%" -c "import importlib.metadata as m, krpc, google.protobuf, websockets; expected={'krpc':'0.6.0','protobuf':'7.35.1','websockets':'16.0'}; raise SystemExit(0 if all(m.version(name) == version for name, version in expected.items()) else 1)" >nul 2>&1
 exit /b %errorlevel%
 
 :panel_ready
 if not exist "%VENV_PYTHON%" exit /b 1
-"%VENV_PYTHON%" -c "import importlib.metadata as m, krpc, serial; expected={'krpc':'0.5.4','pyserial':'3.5'}; raise SystemExit(0 if all(m.version(name) == version for name, version in expected.items()) else 1)" >nul 2>&1
+"%VENV_PYTHON%" -c "import importlib.metadata as m, krpc, google.protobuf, serial; expected={'krpc':'0.6.0','protobuf':'7.35.1','pyserial':'3.5'}; raise SystemExit(0 if all(m.version(name) == version for name, version in expected.items()) else 1)" >nul 2>&1
 exit /b %errorlevel%
 
 :find_python
