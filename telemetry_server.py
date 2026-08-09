@@ -4490,28 +4490,33 @@ def gather_telemetry(conn):
         _damage_last_poll = now
         try:
             loss_fields = None
+            packed_damage = False
             try:
                 damage_service = conn.vessel_damage
-                loss_revision = damage_service.loss_revision
-                if (
-                    isinstance(loss_revision, int)
-                    and not isinstance(loss_revision, bool)
-                    and loss_revision >= 0
-                ):
+                try:
+                    damage_service.packed_snapshot
+                    packed_damage = True
+                except AttributeError:
+                    loss_revision = damage_service.loss_revision
                     if (
-                        _damage_loss_cache is None
-                        or loss_revision != _damage_loss_revision
+                        isinstance(loss_revision, int)
+                        and not isinstance(loss_revision, bool)
+                        and loss_revision >= 0
                     ):
-                        candidate = read_loss_fields(damage_service)
-                        if candidate[0] != "incomplete":
-                            _damage_loss_cache = candidate
-                            _damage_loss_revision = loss_revision
-                        loss_fields = candidate
-                    else:
-                        loss_fields = _damage_loss_cache
+                        if (
+                            _damage_loss_cache is None
+                            or loss_revision != _damage_loss_revision
+                        ):
+                            candidate = read_loss_fields(damage_service)
+                            if candidate[0] != "incomplete":
+                                _damage_loss_cache = candidate
+                                _damage_loss_revision = loss_revision
+                            loss_fields = candidate
+                        else:
+                            loss_fields = _damage_loss_cache
             except AttributeError:
                 pass
-            if loss_fields is None:
+            if packed_damage or loss_fields is None:
                 _damage_cache = gather_part_damage(
                     vessel,
                     connection=conn,

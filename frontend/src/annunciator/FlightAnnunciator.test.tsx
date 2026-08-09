@@ -227,7 +227,7 @@ describe("Flight annunciator surface", () => {
   it.each([
     ["loading", "Recorded loss history is loading from the KSP save."],
     ["incomplete", "Recorded loss history is incomplete."],
-    ["unavailable", "Recorded loss history requires WoobiesControlStats 0.2.13 or newer."],
+    ["unavailable", "Recorded loss history requires WoobiesControlStats 0.2.11 or newer."],
   ] as const)("explains %s loss-history coverage", async (status, message) => {
     const user = userEvent.setup();
     render(<Harness damageLossEvents={[]} damageLossStatus={status} initialState={damageActiveState()} />);

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from collections import defaultdict
 import math
+from types import SimpleNamespace
 
 
 MAX_DAMAGE_NAME_LENGTH = 120
@@ -27,6 +30,8 @@ _FLAG_COLLECTIONS = (
     ("reaction_wheel", "reaction_wheels"),
 )
 _LOSS_FIELDS_UNSET = object()
+_MAX_PACKED_SNAPSHOT_BYTES = 2 * 1024 * 1024
+_MAX_PACKED_SNAPSHOT_ROWS = 5000
 
 
 def _text(value, fallback, limit):
@@ -102,8 +107,132 @@ def _unknown_service_result():
     }
 
 
+def _decode_packed_text(value):
+    if not isinstance(value, str) or len(value) > _MAX_PACKED_SNAPSHOT_BYTES:
+        raise ValueError("invalid packed text")
+    try:
+        raw = base64.b64decode(value, validate=True)
+        return raw.decode("utf-8", errors="strict")
+    except (binascii.Error, UnicodeDecodeError, ValueError) as error:
+        raise ValueError("invalid packed text") from error
+
+
+def _packed_snapshot_service(payload):
+    """Decode WoobiesControlStats' bounded one-call damage snapshot."""
+    if not isinstance(payload, str):
+        return None
+    try:
+        if len(payload.encode("utf-8")) > _MAX_PACKED_SNAPSHOT_BYTES:
+            return None
+        lines = payload.splitlines()
+        if not lines or len(lines) > _MAX_PACKED_SNAPSHOT_ROWS:
+            return None
+        header = lines[0].split("\t")
+        if len(header) != 12 or header[:2] != ["WCS_DAMAGE_SNAPSHOT", "1"]:
+            return None
+        available_flag = header[2]
+        status = header[3]
+        read_error_count = int(header[4])
+        checked_part_count = int(header[5])
+        checked_module_count = int(header[6])
+        damaged_count = int(header[7])
+        loss_status = header[8]
+        loss_revision = int(header[9])
+        loss_event_count = int(header[10])
+        detector_count = int(header[11])
+        counts = (
+            read_error_count, checked_part_count, checked_module_count,
+            damaged_count, loss_revision, loss_event_count, detector_count,
+        )
+        if (
+            available_flag not in ("0", "1")
+            or status not in ("known", "incomplete")
+            or loss_status not in ("known", "loading")
+            or any(value < 0 for value in counts)
+            or damaged_count + loss_event_count + detector_count != len(lines) - 1
+        ):
+            return None
+
+        damage_columns = {
+            "part_ids": [], "part_names": [], "part_titles": [],
+            "part_tags": [], "module_names": [], "kinds": [],
+            "detectors": [], "conditions": [], "event_ids": [],
+        }
+        loss_columns = {
+            "loss_event_ids": [], "loss_part_ids": [],
+            "loss_part_names": [], "loss_part_titles": [],
+            "loss_part_tags": [], "loss_module_names": [],
+            "loss_kinds": [], "loss_states": [],
+            "loss_occurrence_uts": [], "loss_occurrence_mets": [],
+            "loss_cleared_uts": [], "loss_clear_reasons": [],
+            "loss_causes": [],
+        }
+        supported_detectors = []
+        for line in lines[1:]:
+            fields = line.split("\t")
+            if fields[0] == "D" and len(fields) == 10:
+                damage_columns["part_ids"].append(int(fields[1]))
+                decoded = [_decode_packed_text(value) for value in fields[2:]]
+                for key, value in zip((
+                    "part_names", "part_titles", "part_tags", "module_names",
+                    "kinds", "detectors", "conditions", "event_ids",
+                ), decoded):
+                    damage_columns[key].append(value)
+            elif fields[0] == "L" and len(fields) == 14:
+                loss_columns["loss_event_ids"].append(
+                    _decode_packed_text(fields[1])
+                )
+                loss_columns["loss_part_ids"].append(int(fields[2]))
+                decoded = [_decode_packed_text(value) for value in fields[3:8]]
+                for key, value in zip((
+                    "loss_part_names", "loss_part_titles", "loss_part_tags",
+                    "loss_module_names", "loss_kinds",
+                ), decoded):
+                    loss_columns[key].append(value)
+                loss_columns["loss_states"].append(
+                    _decode_packed_text(fields[8])
+                )
+                loss_columns["loss_occurrence_uts"].append(float(fields[9]))
+                loss_columns["loss_occurrence_mets"].append(float(fields[10]))
+                loss_columns["loss_cleared_uts"].append(float(fields[11]))
+                loss_columns["loss_clear_reasons"].append(
+                    _decode_packed_text(fields[12])
+                )
+                loss_columns["loss_causes"].append(
+                    _decode_packed_text(fields[13])
+                )
+            elif fields[0] == "S" and len(fields) == 2:
+                supported_detectors.append(_decode_packed_text(fields[1]))
+            else:
+                return None
+        if (
+            len(damage_columns["part_ids"]) != damaged_count
+            or len(loss_columns["loss_event_ids"]) != loss_event_count
+            or len(supported_detectors) != detector_count
+        ):
+            return None
+
+        service = SimpleNamespace(
+            available=available_flag == "1",
+            status=status,
+            read_error_count=read_error_count,
+            checked_part_count=checked_part_count,
+            checked_module_count=checked_module_count,
+            damaged_count=damaged_count,
+            loss_status=loss_status,
+            loss_revision=loss_revision,
+            loss_event_count=loss_event_count,
+        )
+        for name, values in {**damage_columns, **loss_columns}.items():
+            setattr(service, name, lambda values=values: list(values))
+        service.supported_detectors = lambda: list(supported_detectors)
+        return service
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 def _loss_fields(service):
-    """Read the optional 0.2.13 loss ledger without weakening 0.2.10."""
+    """Read the optional aligned loss ledger without weakening 0.2.10."""
     try:
         loss_status = service.loss_status
     except AttributeError:
@@ -206,6 +335,25 @@ def _gather_service_damage(connection, *, loss_fields=_LOSS_FIELDS_UNSET):
         return None
     except Exception:
         return _unknown_service_result()
+
+    try:
+        packed_snapshot = service.packed_snapshot
+    except AttributeError:
+        pass
+    except Exception:
+        return _unknown_service_result()
+    else:
+        try:
+            packed_service = _packed_snapshot_service(packed_snapshot())
+        except Exception:
+            return _unknown_service_result()
+        if packed_service is None:
+            return {
+                **_unknown_service_result(),
+                "damage.status": "incomplete",
+            }
+        service = packed_service
+        loss_fields = _LOSS_FIELDS_UNSET
 
     try:
         if service.available is not True:
