@@ -249,9 +249,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertRegex(
             manifest,
             r'(?s)Folder = "WoobiesControlStats".*?'
-            r'Version = "0\.2\.10\.0".*?'
-            r'Sha256 = "D8F1C43819CBDA1AE3FD6BB5678D1EF8BED2BCFEDDB6CC3A20A074A04EFBB945".*?'
-            r'SourceCommit = "9b976daecba8b7d540cf7b4ad0927ab364736190"',
+            r'Version = "0\.2\.14\.0".*?'
+            r'Sha256 = "54A62762F0FF8630111B52ADDB9B56A5B40186E70998FCE0D87F5BAEA29C0BC6".*?'
+            r'SourceCommit = "1f90c972087ae16b1c6bd05848b8ecd45102913f"',
         )
 
     def test_unreleased_manifest_cannot_be_packaged_as_v051(self):

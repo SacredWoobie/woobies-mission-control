@@ -1,3 +1,4 @@
+import base64
 import unittest
 from types import SimpleNamespace
 
@@ -15,6 +16,14 @@ def component(title, *, state="extended", broken=False, tag=""):
         broken=broken,
         part=SimpleNamespace(title=title, name=title.lower(), tag=tag),
     )
+
+
+def packed(value):
+    return base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+
+
+def packed_snapshot(*lines):
+    return "\n".join("\t".join(str(value) for value in line) for line in lines)
 
 
 class FakeParts:
@@ -207,6 +216,206 @@ class DamageTelemetryTests(unittest.TestCase):
         self.assertEqual(result["damage.status"], "known")
         self.assertEqual(result["damage.source"], "stock_krpc")
         self.assertEqual(result["damage.damagedCount"], 1)
+        self.assertEqual(result["damage.lossStatus"], "unavailable")
+
+    def test_0211_service_reports_mixed_current_damage_and_loss_history(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=12,
+            checked_module_count=8,
+            status="known",
+            read_error_count=0,
+            damaged_count=2,
+            part_ids=lambda: [101, 202],
+            part_names=lambda: ["radiator", "nfex-antenna-feeder-relay-1"],
+            part_titles=lambda: ["Radiator", "F-RA Relay Antenna Feed"],
+            part_tags=lambda: ["", "Relay 2"],
+            module_names=lambda: ["ModuleDeployableRadiator", "ModuleRTAntenna"],
+            kinds=lambda: ["radiator", "antenna"],
+            detectors=lambda: ["ModuleDeployablePart.deployState", "joint_break"],
+            conditions=lambda: ["damaged", "lost"],
+            event_ids=lambda: ["", "loss-202"],
+            supported_detectors=lambda: ["ModuleDeployablePart.deployState"],
+            loss_status="known",
+            loss_event_count=2,
+            loss_event_ids=lambda: ["loss-202", "loss-77"],
+            loss_part_ids=lambda: [202, 77],
+            loss_part_names=lambda: ["nfex-antenna-feeder-relay-1", "winglet"],
+            loss_part_titles=lambda: ["F-RA Relay Antenna Feed", "Booster Fin"],
+            loss_part_tags=lambda: ["Relay 2", ""],
+            loss_module_names=lambda: ["ModuleRTAntenna", "ModuleLiftingSurface"],
+            loss_kinds=lambda: ["antenna", "wing"],
+            loss_states=lambda: ["active", "cleared"],
+            loss_occurrence_uts=lambda: [1000.0, 900.0],
+            loss_occurrence_mets=lambda: [120.0, 20.0],
+            loss_cleared_uts=lambda: [-1.0, 950.0],
+            loss_clear_reasons=lambda: ["", "intentional_separation"],
+            loss_causes=lambda: ["joint_break", "destroyed"],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(), connection=SimpleNamespace(vessel_damage=service)
+        )
+
+        self.assertEqual(result["damage.lossStatus"], "known")
+        self.assertEqual(len(result["damage.lossEvents"]), 2)
+        lost = next(row for row in result["damage.parts"]
+                    if row["condition"] == "lost")
+        self.assertEqual(lost["eventId"], "loss-202")
+        self.assertEqual(lost["partId"], 202)
+        self.assertEqual(lost["count"], 1)
+        cleared = next(row for row in result["damage.lossEvents"]
+                       if row["state"] == "cleared")
+        self.assertEqual(cleared["clearReason"], "intentional_separation")
+        self.assertEqual(cleared["clearedUt"], 950.0)
+
+    def test_revision_cached_loss_history_skips_aligned_history_calls(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=0,
+            checked_module_count=0,
+            status="known",
+            read_error_count=0,
+            damaged_count=0,
+            part_ids=lambda: [],
+            part_names=lambda: [],
+            part_titles=lambda: [],
+            part_tags=lambda: [],
+            module_names=lambda: [],
+            kinds=lambda: [],
+            detectors=lambda: [],
+            conditions=lambda: [],
+            event_ids=lambda: [],
+            supported_detectors=lambda: [],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(),
+            connection=SimpleNamespace(vessel_damage=service),
+            loss_fields=("known", []),
+        )
+
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.lossStatus"], "known")
+        self.assertEqual(result["damage.lossEvents"], [])
+
+    def test_0214_packed_snapshot_uses_one_call_for_current_and_history(self):
+        payload = packed_snapshot(
+            (
+                "WCS_DAMAGE_SNAPSHOT", 1, 1, "known", 0, 12, 8,
+                2, "known", 7, 2, 1,
+            ),
+            (
+                "D", 101, packed("radiator"), packed("Radiator"), packed(""),
+                packed("ModuleDeployableRadiator"), packed("radiator"),
+                packed("ModuleDeployablePart.deployState"), packed("damaged"),
+                packed(""),
+            ),
+            (
+                "D", 202, packed("relay-feed"), packed("F-RA Relay Feed"),
+                packed("Relay 2"), packed("ModuleRTAntenna"), packed("antenna"),
+                packed("joint_break"), packed("lost"), packed("loss-202"),
+            ),
+            (
+                "L", packed("loss-202"), 202, packed("relay-feed"),
+                packed("F-RA Relay Feed"), packed("Relay 2"),
+                packed("ModuleRTAntenna"), packed("antenna"), packed("active"),
+                1000.0, 120.0, -1.0, packed(""), packed("joint_break"),
+            ),
+            (
+                "L", packed("loss-77"), 77, packed("winglet"),
+                packed("Booster Fin"), packed(""), packed("ModuleLiftingSurface"),
+                packed("wing"), packed("cleared"), 900.0, 20.0, 950.0,
+                packed("intentional_separation"), packed("destroyed"),
+            ),
+            ("S", packed("ModuleDeployablePart.deployState")),
+        )
+
+        class PackedOnlyService:
+            def __init__(self):
+                self.calls = 0
+
+            def packed_snapshot(self):
+                self.calls += 1
+                return payload
+
+            def __getattr__(self, name):
+                raise AssertionError(f"aligned API should not be read: {name}")
+
+        service = PackedOnlyService()
+        result = gather_part_damage(
+            SimpleNamespace(), connection=SimpleNamespace(vessel_damage=service)
+        )
+
+        self.assertEqual(service.calls, 1)
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.damagedCount"], 2)
+        self.assertEqual(result["damage.lossStatus"], "known")
+        self.assertEqual(len(result["damage.lossEvents"]), 2)
+        lost = next(row for row in result["damage.parts"]
+                    if row["condition"] == "lost")
+        self.assertEqual(lost["eventId"], "loss-202")
+        cleared = next(row for row in result["damage.lossEvents"]
+                       if row["state"] == "cleared")
+        self.assertEqual(cleared["clearReason"], "intentional_separation")
+        self.assertEqual(
+            result["damage.detectors"],
+            ["ModuleDeployablePart.deployState"],
+        )
+
+    def test_0214_malformed_packed_snapshot_fails_closed(self):
+        service = SimpleNamespace(
+            packed_snapshot=lambda: "WCS_DAMAGE_SNAPSHOT\t1\tbroken"
+        )
+        result = gather_part_damage(
+            SimpleNamespace(parts=FakeParts(
+                radiators=[component("Radiator", state="broken")]
+            )),
+            connection=SimpleNamespace(vessel_damage=service),
+        )
+
+        self.assertEqual(result["damage.status"], "incomplete")
+        self.assertEqual(result["damage.source"], "vessel_damage")
+        self.assertEqual(result["damage.parts"], [])
+
+    def test_0211_misaligned_loss_history_is_incomplete_not_empty_known(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=0,
+            checked_module_count=0,
+            status="known",
+            read_error_count=0,
+            damaged_count=0,
+            part_ids=lambda: [],
+            part_names=lambda: [],
+            part_titles=lambda: [],
+            part_tags=lambda: [],
+            module_names=lambda: [],
+            kinds=lambda: [],
+            detectors=lambda: [],
+            conditions=lambda: [],
+            event_ids=lambda: [],
+            supported_detectors=lambda: [],
+            loss_status="known",
+            loss_event_count=1,
+            loss_event_ids=lambda: ["loss"],
+            loss_part_ids=lambda: [],
+            loss_part_names=lambda: ["part"],
+            loss_part_titles=lambda: ["Part"],
+            loss_part_tags=lambda: [""],
+            loss_module_names=lambda: ["Module"],
+            loss_kinds=lambda: ["other"],
+            loss_states=lambda: ["active"],
+            loss_occurrence_uts=lambda: [1.0],
+            loss_occurrence_mets=lambda: [1.0],
+            loss_cleared_uts=lambda: [-1.0],
+            loss_clear_reasons=lambda: [""],
+            loss_causes=lambda: ["topology_change"],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(), connection=SimpleNamespace(vessel_damage=service)
+        )
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.lossStatus"], "incomplete")
+        self.assertEqual(result["damage.lossEvents"], [])
 
 
 if __name__ == "__main__":

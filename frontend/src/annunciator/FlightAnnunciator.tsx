@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { isFiniteNumber } from "../formatting/numbers";
 import { formatMissionDuration } from "../telemetry/formatters";
+import type { DamageLossEventTelemetry } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { useDialogFocus } from "../deltaV/useDialogFocus";
 import type { AnnunciatorEpisode, AnnunciatorSummary } from "./engine";
@@ -17,16 +19,20 @@ function indicatorState(summary: AnnunciatorSummary, subsystem: FixedIndicator):
   return summary.active.some((episode) => episode.subsystem === subsystem) ? "acknowledged" : "clear";
 }
 
-function indicatorLabel(summary: AnnunciatorSummary, subsystem: FixedIndicator, state: IndicatorState) {
-  if (state === "clear") return `${subsystem} clear`;
+function indicatorLabel(summary: AnnunciatorSummary, subsystem: FixedIndicator, state: IndicatorState, hasHistory = false) {
+  if (state === "clear") {
+    return subsystem === "DAMAGE" && hasHistory
+      ? "DAMAGE clear. Show recorded part-loss history."
+      : `${subsystem} clear`;
+  }
   const relevant = (state === "new" ? [...summary.active, ...summary.cleared] : summary.active).filter((episode) => (
     episode.subsystem === subsystem && (state !== "new" || !episode.seen)
   ));
   const level = relevant.some((episode) => episode.tier === "warning") ? "warning" : "caution";
   if (subsystem === "DAMAGE") {
     return state === "new"
-      ? `DAMAGE new ${level}. Acknowledge and show damaged parts.`
-      : `DAMAGE ${level} acknowledged. Show damaged parts.`;
+      ? `DAMAGE new ${level}. Acknowledge and show affected craft parts.`
+      : `DAMAGE ${level} acknowledged. Show affected craft parts.`;
   }
   return state === "new"
     ? `${subsystem} new ${level}. Acknowledge.`
@@ -63,6 +69,45 @@ function EpisodeRow({ episode }: { episode: AnnunciatorEpisode }) {
   );
 }
 
+function validLossEvent(value: DamageLossEventTelemetry) {
+  return value
+    && typeof value.eventId === "string"
+    && value.eventId.trim().length > 0
+    && Number.isSafeInteger(value.partId)
+    && value.partId > 0
+    && typeof value.name === "string"
+    && value.name.trim().length > 0
+    && typeof value.kind === "string"
+    && typeof value.cause === "string"
+    && (value.state === "active" || value.state === "cleared")
+    && isFiniteNumber(value.occurrenceUt)
+    && isFiniteNumber(value.occurrenceMet)
+    && (value.state !== "cleared" || isFiniteNumber(value.clearedUt));
+}
+
+function LossEventRow({ event }: { event: DamageLossEventTelemetry }) {
+  const { system } = useTimeSystem();
+  const kerbin = isKerbinTime(system);
+  const occurred = event.occurrenceMet >= 0
+    ? `MET ${formatMissionDuration(event.occurrenceMet, kerbin)}`
+    : `UT ${event.occurrenceUt.toFixed(1)}`;
+  const status = event.state === "cleared"
+    ? event.clearReason === "intentional_separation"
+      ? "Cleared · branch intentionally separated"
+      : `Cleared · ${event.clearReason || "reason unavailable"}`
+    : "Active loss";
+  return (
+    <li className={`annunciator-loss ${event.state}`}>
+      <div className="annunciator-episode-head">
+        <strong>{event.name}</strong>
+        <span>{event.state}</span>
+      </div>
+      <p>{status}{event.tag?.trim() ? ` · ${event.tag.trim()}` : ""}</p>
+      <small>{occurred} · part {event.partId} · {event.kind.replaceAll("_", " ")}</small>
+    </li>
+  );
+}
+
 function AnnunciatorHistory({
   controller,
   filter,
@@ -80,6 +125,7 @@ function AnnunciatorHistory({
     ? controller.summary.cleared.filter((episode) => episode.subsystem === filter)
     : controller.summary.cleared;
   const title = filter === "DAMAGE" ? "Damage report" : "Master caution history";
+  const recordedLosses = controller.damageLossEvents.filter(validLossEvent);
   return createPortal(
     <div className="annunciator-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
@@ -105,6 +151,20 @@ function AnnunciatorHistory({
               ? <ol>{cleared.map((episode) => <EpisodeRow episode={episode} key={episode.id} />)}</ol>
               : <p className="annunciator-empty">No cleared episodes recorded.</p>}
           </section>
+          {filter === "DAMAGE" && <section aria-labelledby="annunciator-loss-title">
+            <h3 id="annunciator-loss-title">Recorded part loss <span>{recordedLosses.length}</span></h3>
+            {controller.damageLossStatus === "known"
+              ? recordedLosses.length > 0
+                ? <ol>{recordedLosses.map((event) => <LossEventRow event={event} key={event.eventId} />)}</ol>
+                : <p className="annunciator-empty">No part-loss events recorded for this vessel.</p>
+              : <p className="annunciator-empty">
+                {controller.damageLossStatus === "loading"
+                  ? "Recorded loss history is loading from the KSP save."
+                  : controller.damageLossStatus === "incomplete"
+                    ? "Recorded loss history is incomplete."
+                    : "Recorded loss history requires WoobiesControlStats 0.2.11 or newer."}
+              </p>}
+          </section>}
         </div>
       </aside>
     </div>,
@@ -141,9 +201,10 @@ export function FlightAnnunciator({ controller }: { controller: FlightAnnunciato
       <div aria-label="Flight alert indicators" className="annunciator-indicators" role="group">
         {FIXED_INDICATORS.map((subsystem) => {
           const state = indicatorState(controller.summary, subsystem);
-          const opensDamage = subsystem === "DAMAGE" && state !== "clear";
+          const hasDamageHistory = subsystem === "DAMAGE" && controller.damageLossEvents.length > 0;
+          const opensDamage = subsystem === "DAMAGE" && (state !== "clear" || hasDamageHistory);
           return <button
-            aria-label={indicatorLabel(controller.summary, subsystem, state)}
+            aria-label={indicatorLabel(controller.summary, subsystem, state, hasDamageHistory)}
             className={`annunciator-indicator ${state}`}
             disabled={state !== "new" && !opensDamage}
             key={subsystem}

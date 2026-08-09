@@ -396,10 +396,11 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
   await expect(indicators.getByRole("button", { name: "HEAT warning acknowledged and still active" })).toHaveClass(/acknowledged/);
 
-  await indicators.getByRole("button", { name: "DAMAGE new warning. Acknowledge and show damaged parts." }).click();
+  await indicators.getByRole("button", { name: "DAMAGE new warning. Acknowledge and show affected craft parts." }).click();
   const damage = page.getByRole("dialog", { name: "Damage report" });
   await expect(damage).toBeVisible();
   await expect(damage.getByRole("heading", { name: "Active 2" })).toBeVisible();
+  await expect(damage.getByRole("heading", { name: "Recorded part loss 1" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(damage).toBeHidden();
   await expect(lamp).toHaveAttribute("aria-label", /Master caution clear/);

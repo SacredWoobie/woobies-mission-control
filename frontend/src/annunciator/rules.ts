@@ -310,10 +310,20 @@ const DAMAGE_KIND_LABELS: Record<DamagePartTelemetry["kind"], string> = {
   landing_leg: "landing leg",
   wheel: "wheel",
   reaction_wheel: "reaction wheel",
+  engine: "engine",
+  tank: "tank",
+  wing: "wing",
+  sas: "SAS unit",
+  rcs: "RCS part",
+  command: "command part",
+  structural: "structural part",
   other: "part",
 };
 
 function damageIdentity(part: DamagePartTelemetry) {
+  if (part.condition === "lost" && part.eventId?.trim()) {
+    return `loss:${encodeURIComponent(part.eventId.trim())}`;
+  }
   return [part.kind, part.name, part.tag ?? "", part.module ?? ""]
     .map((value) => encodeURIComponent(value.trim().toLocaleLowerCase()))
     .join(":");
@@ -321,32 +331,47 @@ function damageIdentity(part: DamagePartTelemetry) {
 
 function damageEvaluation(snapshot: TelemetrySnapshot): RuleEvaluation {
   const status = snapshot["damage.status"];
-  if (status === "unknown" || status === "incomplete") return { kind: "source-unknown" };
-  if (status !== "known") return { kind: "source-unknown" };
+  const lossStatus = snapshot["damage.lossStatus"];
+  const attachedKnown = status === "known";
+  const lossKnown = lossStatus === "known";
+  const lossUnavailable = lossStatus === "unavailable" || lossStatus === undefined;
+  if (!attachedKnown && !lossKnown) return { kind: "source-unknown" };
   const parts = snapshot["damage.parts"];
   if (!Array.isArray(parts)) return { kind: "source-unknown" };
+  const observations = parts.map((part, index) => {
+    if (!part || typeof part !== "object") return unknown(`unidentified-${index}`);
+    const condition = part.condition ?? "damaged";
+    if ((condition === "damaged" && !attachedKnown) || (condition === "lost" && !lossKnown)) {
+      return unknown(`unavailable-${index}`);
+    }
+    const label = DAMAGE_KIND_LABELS[part.kind];
+    if (
+      !label
+      || (condition !== "damaged" && condition !== "lost")
+      || typeof part.name !== "string"
+      || !part.name.trim()
+      || (part.tag !== undefined && typeof part.tag !== "string")
+      || (part.module !== undefined && typeof part.module !== "string")
+      || (part.detector !== undefined && typeof part.detector !== "string")
+      || (part.partId !== undefined && !Number.isSafeInteger(part.partId))
+      || (part.eventId !== undefined && typeof part.eventId !== "string")
+      || (condition === "lost" && !part.eventId?.trim())
+      || !Number.isSafeInteger(part.count)
+      || part.count <= 0
+    ) return unknown(`unidentified-${index}`);
+    const count = part.count;
+    const identity = damageIdentity(part);
+    const named = part.tag?.trim() ? `${part.name} (${part.tag.trim()})` : part.name;
+    const family = count === 1 ? label : `${label}s`;
+    const verb = condition === "lost" ? "lost" : "damaged";
+    return active(identity, "warning", `${count} ${verb} ${family}: ${named}.`);
+  });
+  if (!attachedKnown) observations.push(unknown("attached-scan"));
+  if (!lossKnown && !lossUnavailable) observations.push(unknown("loss-ledger"));
   return {
     kind: "known",
-    complete: true,
-    observations: parts.map((part, index) => {
-      if (!part || typeof part !== "object") return unknown(`unidentified-${index}`);
-      const label = DAMAGE_KIND_LABELS[part.kind];
-      if (
-        !label
-        || typeof part.name !== "string"
-        || !part.name.trim()
-        || (part.tag !== undefined && typeof part.tag !== "string")
-        || (part.module !== undefined && typeof part.module !== "string")
-        || (part.detector !== undefined && typeof part.detector !== "string")
-        || !Number.isSafeInteger(part.count)
-        || part.count <= 0
-      ) return unknown(`unidentified-${index}`);
-      const count = part.count;
-      const identity = damageIdentity(part);
-      const named = part.tag?.trim() ? `${part.name} (${part.tag.trim()})` : part.name;
-      const family = count === 1 ? label : `${label}s`;
-      return active(identity, "warning", `${count} damaged ${family}: ${named}.`);
-    }),
+    complete: attachedKnown && (lossKnown || lossUnavailable),
+    observations,
   };
 }
 

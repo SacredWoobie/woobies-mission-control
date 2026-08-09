@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import type { TelemetrySnapshot } from "../telemetry/types";
+import type { DamageLossEventTelemetry, TelemetrySnapshot } from "../telemetry/types";
 import {
   acknowledgeAnnunciator,
   acknowledgeAnnunciatorSubsystem,
@@ -77,14 +77,37 @@ function damageActiveState() {
   });
 }
 
-function Harness({ initialState }: { initialState: AnnunciatorState }) {
+const persistedLossEvents: DamageLossEventTelemetry[] = [{
+  eventId: "lost-fin-1",
+  partId: 77,
+  name: "Booster Fin",
+  kind: "wing",
+  state: "cleared",
+  occurrenceUt: 500,
+  occurrenceMet: 42,
+  clearedUt: 510,
+  clearReason: "intentional_separation",
+  cause: "joint_break",
+}];
+
+function Harness({
+  initialState,
+  damageLossEvents = persistedLossEvents,
+  damageLossStatus = "known",
+}: {
+  initialState: AnnunciatorState;
+  damageLossEvents?: DamageLossEventTelemetry[];
+  damageLossStatus?: "known" | "unavailable" | "incomplete" | "loading";
+}) {
   const [state, setState] = useState(initialState);
   const controller = useMemo(() => ({
     state,
     summary: summarizeAnnunciator(state),
+    damageLossStatus,
+    damageLossEvents,
     acknowledge: () => setState((current) => acknowledgeAnnunciator(current)),
     acknowledgeSubsystem: (subsystem: string) => setState((current) => acknowledgeAnnunciatorSubsystem(current, subsystem)),
-  }), [state]);
+  }), [damageLossEvents, damageLossStatus, state]);
   return <FlightAnnunciator controller={controller} />;
 }
 
@@ -133,16 +156,19 @@ describe("Flight annunciator surface", () => {
   it("acknowledges DAMAGE and opens a focused damaged-parts report", async () => {
     const user = userEvent.setup();
     render(<Harness initialState={damageActiveState()} />);
-    const damage = screen.getByRole("button", { name: "DAMAGE new warning. Acknowledge and show damaged parts." });
+    const damage = screen.getByRole("button", { name: "DAMAGE new warning. Acknowledge and show affected craft parts." });
 
     await user.click(damage);
     expect(screen.getByRole("dialog", { name: "Damage report" })).toBeTruthy();
     expect(screen.getByText("2 damaged radiators: Large Folding Radiator.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Recorded part loss 1" })).toBeTruthy();
+    expect(screen.getByText("Booster Fin")).toBeTruthy();
+    expect(screen.getByText(/branch intentionally separated/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Close damage report" })).toBeTruthy();
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("button", { name: "DAMAGE warning acknowledged. Show damaged parts." })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "DAMAGE warning acknowledged. Show affected craft parts." })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Master caution clear/i })).toBeTruthy();
     expect(document.activeElement).toBe(damage);
   });
@@ -174,6 +200,65 @@ describe("Flight annunciator surface", () => {
     await user.click(screen.getByRole("button", { name: /Master caution clear/i }));
     expect(screen.getByRole("heading", { name: "Cleared 1" })).toBeTruthy();
     expect(screen.getByText(/duration/)).toBeTruthy();
+  });
+
+  it("keeps recorded loss history discoverable after DAMAGE clears", async () => {
+    const user = userEvent.setup();
+    render(<Harness initialState={activeState()} />);
+    const damage = screen.getByRole("button", {
+      name: "DAMAGE clear. Show recorded part-loss history.",
+    });
+    expect(damage.hasAttribute("disabled")).toBe(false);
+    await user.click(damage);
+    expect(screen.getByRole("dialog", { name: "Damage report" })).toBeTruthy();
+    expect(screen.getByText("Booster Fin")).toBeTruthy();
+  });
+
+  it("opens the focused DAMAGE report from the keyboard", async () => {
+    const user = userEvent.setup();
+    render(<Harness initialState={damageActiveState()} />);
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement?.textContent).toBe("DAMAGE");
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("dialog", { name: "Damage report" })).toBeTruthy();
+  });
+
+  it.each([
+    ["loading", "Recorded loss history is loading from the KSP save."],
+    ["incomplete", "Recorded loss history is incomplete."],
+    ["unavailable", "Recorded loss history requires WoobiesControlStats 0.2.11 or newer."],
+  ] as const)("explains %s loss-history coverage", async (status, message) => {
+    const user = userEvent.setup();
+    render(<Harness damageLossEvents={[]} damageLossStatus={status} initialState={damageActiveState()} />);
+    await user.click(screen.getByRole("button", { name: /DAMAGE new warning/ }));
+    expect(screen.getByText(message)).toBeTruthy();
+  });
+
+  it("renders known empty and mixed active/cleared persisted loss history", async () => {
+    const user = userEvent.setup();
+    const activeLoss: DamageLossEventTelemetry = {
+      ...persistedLossEvents[0],
+      eventId: "active-antenna",
+      partId: 88,
+      name: "F-RA Relay Antenna Feed",
+      kind: "antenna",
+      state: "active",
+      clearedUt: undefined,
+      clearReason: undefined,
+    };
+    const { unmount } = render(
+      <Harness damageLossEvents={[]} initialState={damageActiveState()} />,
+    );
+    await user.click(screen.getByRole("button", { name: /DAMAGE new warning/ }));
+    expect(screen.getByText("No part-loss events recorded for this vessel.")).toBeTruthy();
+    unmount();
+
+    render(<Harness damageLossEvents={[activeLoss, ...persistedLossEvents]} initialState={damageActiveState()} />);
+    await user.click(screen.getByRole("button", { name: /DAMAGE new warning/ }));
+    expect(screen.getByRole("heading", { name: "Recorded part loss 2" })).toBeTruthy();
+    expect(screen.getByText("Active loss")).toBeTruthy();
+    expect(screen.getByText(/branch intentionally separated/i)).toBeTruthy();
   });
 
 });

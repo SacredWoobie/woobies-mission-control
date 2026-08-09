@@ -4,6 +4,14 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Added save-persistent unexpected part-loss detection for stock and modded
+  craft hardware. Normal staging, undocking, clamp release, EVA construction,
+  and fairing jettison remain quiet; losses stay actionable until their branch
+  is deliberately discarded, then remain visible in the focused DAMAGE history.
+  The recorder reacts to vessel events and uses a low-frequency part-ID safety
+  poll, avoiding full metadata and module scans during steady-state frames.
+  A packed snapshot transfers current damage and persisted loss history in one
+  kRPC call, while older services retain the aligned-array fallback.
 - Added authoritative broken-part monitoring for stock and modded deployable
   equipment, wheels, reaction wheels, and conservative mod failure signals.
   Damage raises Master Warning through a new `DAMAGE` annunciator and opens a
