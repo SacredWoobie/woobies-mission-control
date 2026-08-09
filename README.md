@@ -1,16 +1,18 @@
 # Woobie's Mission Control
 
-Current release: **v0.5.0**
+Current public release: **v0.5.0**
+
+Next release candidate: **v0.5.1**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.5.0 introduces persistent Flight Monitor and Plan workspaces, a
-telemetry-projected navball, a software Master Caution surface, denser staging
-and craft analysis, and expanded Mission Control contract, fleet, roster, and
-alarm briefings.
+Version 0.5.1 adds authoritative live contract deadlines, prioritizes a
+low-noise countdown in compact contract rows, and moves the absolute KSP due
+date into expanded briefings. It also reconciles the dashboard CSS foundation
+and adds automated CSS, Python, unit, build, Chrome, and Edge quality gates.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -20,8 +22,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.5.0/space-center-overview.png">
-    <img src="docs/images/v0.5.0/space-center-overview.png" width="900" alt="Mission Control overview with program status, transfer windows, solar-hierarchy fleet groups, Kerbonaut roster, alarms, and active contracts">
+  <a href="docs/images/v0.5.1/space-center-overview.png">
+    <img src="docs/images/v0.5.1/space-center-overview.png" width="900" alt="Live Mission Control overview with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and an active-contract countdown">
   </a>
 </p>
 
@@ -63,8 +65,8 @@ custom allowances, and craft assignment.
 ### VAB and SPH
 
 <p align="center">
-  <a href="docs/images/v0.5.0/editor-craft-analysis.png">
-    <img src="docs/images/v0.5.0/editor-craft-analysis.png" width="900" alt="VAB craft analysis with consolidated craft totals, dense staging, resource inventory, and planning tools">
+  <a href="docs/images/v0.5.1/editor-craft-analysis.png">
+    <img src="docs/images/v0.5.1/editor-craft-analysis.png" width="900" alt="VAB craft analysis with consolidated craft totals, dense staging, resource inventory, and planning tools">
   </a>
 </p>
 
@@ -77,8 +79,8 @@ briefings beside the vehicle, with exact-plan editing when assumptions change.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.5.0/flight-monitor.png">
-    <img src="docs/images/v0.5.0/flight-monitor.png" width="900" alt="Flight Monitor workspace with persistent vessel state, projected navball, Master Caution, electricity, heat, science, and target panels">
+  <a href="docs/images/v0.5.1/flight-monitor.png">
+    <img src="docs/images/v0.5.1/flight-monitor.png" width="900" alt="Flight Monitor workspace with persistent vessel state, projected navball, Master Caution, electricity, heat, science, and target panels">
   </a>
 </p>
 
@@ -111,7 +113,7 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The Unreleased development manifest selects four independently versioned kRPC
+The v0.5.1 release candidate selects four independently versioned kRPC
 extensions. Published release packs, including v0.5.0 with
 WoobiesControlStats 0.2.6, remain pinned to their original service bytes:
 

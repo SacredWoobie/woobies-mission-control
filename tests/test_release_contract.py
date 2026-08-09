@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import re
+import struct
 import unittest
 from pathlib import Path
 
@@ -217,6 +218,19 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(v050_product, "0.5.0")
         self.assertEqual(v050_services, v044_services)
 
+    def test_v051_release_pack_selects_contract_deadline_service(self):
+        v051_product, v051_services = read_manifest(
+            ROOT / "tools" / "Release-Pack-v0.5.1.psd1"
+        )
+        manifest_product, manifest_services = read_manifest(
+            ROOT / "tools" / "Release-Manifest.psd1"
+        )
+
+        self.assertEqual(v051_product, "0.5.1")
+        self.assertEqual(manifest_product, "0.5.1")
+        self.assertEqual(v051_services, manifest_services)
+        self.assertEqual(v051_services["WoobiesControlStats"], "0.2.7.0")
+
     def test_development_manifest_records_contract_deadline_service_source(self):
         manifest = (
             ROOT / "tools" / "Release-Manifest.psd1"
@@ -244,6 +258,16 @@ class ReleaseContractTests(unittest.TestCase):
 
         self.assertEqual(product, launcher.APP_VERSION)
         self.assertEqual(package["version"], launcher.APP_VERSION)
+        self.assertIn(
+            f'PRODUCT_VERSION = "{launcher.APP_VERSION}"',
+            (ROOT / "frontend" / "src" / "buildIdentity.ts").read_text(
+                encoding="utf-8"
+            ),
+        )
+        self.assertIn(
+            f"VERSION {launcher.APP_VERSION}",
+            (ROOT / "QUICKSTART.txt").read_text(encoding="utf-8"),
+        )
         self.assertEqual(
             {name: version.rsplit(".0", 1)[0] for name, version in services.items()},
             launcher.SERVICE_TESTED_VERSIONS,
@@ -308,7 +332,7 @@ class ReleaseContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         screenshot_brief = (
-            ROOT / "docs" / "images" / "v0.5.0" / "README.md"
+            ROOT / "docs" / "images" / "v0.5.1" / "README.md"
         ).read_text(encoding="utf-8")
         required = re.findall(
             r"\| \d \| (?:not ready|ready|captured|approved) "
@@ -317,7 +341,12 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertEqual(len(required), 5)
         for name in required:
-            self.assertIn(f"docs/images/v0.5.0/{name}", publish_script)
+            self.assertIn(f"docs/images/v0.5.1/{name}", publish_script)
+            image = (
+                ROOT / "docs" / "images" / "v0.5.1" / name
+            ).read_bytes()
+            self.assertTrue(image.startswith(b"\x89PNG\r\n\x1a\n"), name)
+            self.assertEqual(struct.unpack(">II", image[16:24]), (1920, 889))
         self.assertFalse(any(" " in name or "&" in name for name in required))
 
     def test_release_assets_sort_zip_before_curated_images(self):
@@ -338,13 +367,13 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-05-flight-plan-workspace.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.5.0.zip"
+        zip_name = "Woobies-Mission-Control-v0.5.1.zip"
         checksum_name = f"{zip_name}.sha256"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.5.0.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.5.1.{name}" for name in image_names
         ]
         source_archive_name = (
-            "Woobies-Mission-Control-v0.5.0.zz-00-"
+            "Woobies-Mission-Control-v0.5.1.zz-00-"
             "KRPC.WoobiesMechJeb-0.8.6-source.zip"
         )
         self.assertEqual(
@@ -373,7 +402,7 @@ class ReleaseContractTests(unittest.TestCase):
             publish_script,
         )
 
-    def test_release_notes_preserve_utf8_and_exclude_mock_only_history(self):
+    def test_v050_release_notes_preserve_utf8_and_exclude_mock_only_history(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
             encoding="utf-8"
         )
@@ -389,6 +418,18 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertIn("`Δv LIVE`", release_section)
         self.assertIn("`TWR · LIVE`", release_section)
+        self.assertNotIn("mock", release_section.casefold())
+        self.assertNotIn("fixture", release_section.casefold())
+
+    def test_v051_release_notes_cover_deadlines_and_quality_gates(self):
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        release_section = changelog.split(
+            "## v0.5.1 - Contract deadlines and UI foundations", 1
+        )[1].split("\n## ", 1)[0]
+
+        self.assertIn("authoritative live KSP deadlines", release_section)
+        self.assertIn("dashboard CSS foundation", release_section)
+        self.assertIn("GitHub continuous integration", release_section)
         self.assertNotIn("mock", release_section.casefold())
         self.assertNotIn("fixture", release_section.casefold())
 
