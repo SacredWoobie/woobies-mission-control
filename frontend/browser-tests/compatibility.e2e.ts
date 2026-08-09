@@ -362,9 +362,13 @@ test("the wide Flight context and control plate fit long mission times in one co
     const statusBounds = status.getBoundingClientRect();
     const plateBounds = plate.getBoundingClientRect();
     const comms = status.querySelector<HTMLElement>(".cs-cell")!;
+    const delayLabel = comms.querySelector<HTMLElement>(".cs-delay .label")!;
+    const delayValue = comms.querySelector<HTMLElement>(".cs-delay .cs-val")!;
     return {
       cellCount: cells.length,
       commsText: comms.textContent,
+      delayLabelFontSize: Number.parseFloat(getComputedStyle(delayLabel).fontSize),
+      delayValueFontSize: Number.parseFloat(getComputedStyle(delayValue).fontSize),
       height: statusBounds.height,
       maxTopDifference: Math.max(...tops) - Math.min(...tops),
       clientWidth: status.clientWidth,
@@ -384,6 +388,8 @@ test("the wide Flight context and control plate fit long mission times in one co
   expect(layout.cellCount).toBe(4);
   expect(layout.commsText).toContain("CONNECTED");
   expect(layout.commsText).toContain("Signal delay");
+  expect(layout.delayLabelFontSize).toBeGreaterThanOrEqual(9);
+  expect(layout.delayValueFontSize).toBeGreaterThanOrEqual(11);
   expect(layout.height).toBeLessThan(100);
   expect(layout.maxTopDifference).toBeLessThanOrEqual(1);
   expect(layout.clientWidth).toBeLessThan(1600);
