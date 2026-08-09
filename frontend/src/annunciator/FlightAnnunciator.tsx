@@ -6,9 +6,10 @@ import { useDialogFocus } from "../deltaV/useDialogFocus";
 import type { AnnunciatorEpisode, AnnunciatorSummary } from "./engine";
 import type { FlightAnnunciatorController } from "./useFlightAnnunciator";
 
-const FIXED_INDICATORS = ["HEAT", "REACTOR", "COMMS", "POWER"] as const;
+const FIXED_INDICATORS = ["HEAT", "REACTOR", "COMMS", "POWER", "DAMAGE"] as const;
 type FixedIndicator = typeof FIXED_INDICATORS[number];
 type IndicatorState = "clear" | "new" | "acknowledged";
+type HistoryView = "all" | FixedIndicator;
 
 function indicatorState(summary: AnnunciatorSummary, subsystem: FixedIndicator): IndicatorState {
   const matching = [...summary.active, ...summary.cleared].filter((episode) => episode.subsystem === subsystem);
@@ -22,6 +23,11 @@ function indicatorLabel(summary: AnnunciatorSummary, subsystem: FixedIndicator, 
     episode.subsystem === subsystem && (state !== "new" || !episode.seen)
   ));
   const level = relevant.some((episode) => episode.tier === "warning") ? "warning" : "caution";
+  if (subsystem === "DAMAGE") {
+    return state === "new"
+      ? `DAMAGE new ${level}. Acknowledge and show damaged parts.`
+      : `DAMAGE ${level} acknowledged. Show damaged parts.`;
+  }
   return state === "new"
     ? `${subsystem} new ${level}. Acknowledge.`
     : `${subsystem} ${level} acknowledged and still active`;
@@ -59,13 +65,21 @@ function EpisodeRow({ episode }: { episode: AnnunciatorEpisode }) {
 
 function AnnunciatorHistory({
   controller,
+  filter,
   onClose,
 }: {
   controller: FlightAnnunciatorController;
+  filter?: FixedIndicator;
   onClose(): void;
 }) {
   const dialogRef = useDialogFocus<HTMLElement>(true, onClose);
-  const { active, cleared } = controller.summary;
+  const active = filter
+    ? controller.summary.active.filter((episode) => episode.subsystem === filter)
+    : controller.summary.active;
+  const cleared = filter
+    ? controller.summary.cleared.filter((episode) => episode.subsystem === filter)
+    : controller.summary.cleared;
+  const title = filter === "DAMAGE" ? "Damage report" : "Master caution history";
   return createPortal(
     <div className="annunciator-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
@@ -73,10 +87,10 @@ function AnnunciatorHistory({
       <aside aria-labelledby="annunciator-history-title" aria-modal="true" className="annunciator-history" ref={dialogRef} role="dialog" tabIndex={-1}>
         <header>
           <div>
-            <span className="label">Flight safety record</span>
-            <h2 id="annunciator-history-title">Master caution history</h2>
+            <span className="label">{filter === "DAMAGE" ? "Craft condition" : "Flight safety record"}</span>
+            <h2 id="annunciator-history-title">{title}</h2>
           </div>
-          <button aria-label="Close master caution history" onClick={onClose} type="button">×</button>
+          <button aria-label={`Close ${title.toLocaleLowerCase()}`} onClick={onClose} type="button">×</button>
         </header>
         <div className="annunciator-history-body">
           <section aria-labelledby="annunciator-active-title">
@@ -99,7 +113,8 @@ function AnnunciatorHistory({
 }
 
 export function FlightAnnunciator({ controller }: { controller: FlightAnnunciatorController }) {
-  const [open, setOpen] = useState(false);
+  const [historyView, setHistoryView] = useState<HistoryView | null>(null);
+  const open = historyView !== null;
   const { lamp, tier } = controller.summary;
   const label = useMemo(() => {
     if (lamp === "dark") return "Master caution clear. Open history.";
@@ -116,7 +131,7 @@ export function FlightAnnunciator({ controller }: { controller: FlightAnnunciato
         className={`annunciator-lamp ${lamp} ${tier ?? "clear"}`}
         onClick={() => {
           if (!open) controller.acknowledge();
-          setOpen((current) => !current);
+          setHistoryView((current) => current === "all" ? null : "all");
         }}
         type="button"
       >
@@ -126,17 +141,25 @@ export function FlightAnnunciator({ controller }: { controller: FlightAnnunciato
       <div aria-label="Flight alert indicators" className="annunciator-indicators" role="group">
         {FIXED_INDICATORS.map((subsystem) => {
           const state = indicatorState(controller.summary, subsystem);
+          const opensDamage = subsystem === "DAMAGE" && state !== "clear";
           return <button
             aria-label={indicatorLabel(controller.summary, subsystem, state)}
             className={`annunciator-indicator ${state}`}
-            disabled={state !== "new"}
+            disabled={state !== "new" && !opensDamage}
             key={subsystem}
-            onClick={() => controller.acknowledgeSubsystem(subsystem)}
+            onClick={() => {
+              if (state === "new") controller.acknowledgeSubsystem(subsystem);
+              if (opensDamage) setHistoryView("DAMAGE");
+            }}
             type="button"
           >{subsystem}</button>;
         })}
       </div>
-      {open && <AnnunciatorHistory controller={controller} onClose={() => setOpen(false)} />}
+      {historyView && <AnnunciatorHistory
+        controller={controller}
+        filter={historyView === "all" ? undefined : historyView}
+        onClose={() => setHistoryView(null)}
+      />}
     </div>
   );
 }

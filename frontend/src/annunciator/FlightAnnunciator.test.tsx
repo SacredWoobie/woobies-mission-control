@@ -41,6 +41,17 @@ const powerRule: AnnunciatorRule = {
     observations: [{ instanceId: "vessel-electric-charge", message: "Electric charge is low.", state: "active" }],
   }),
 };
+const damageRule: AnnunciatorRule = {
+  ...warningRule,
+  ruleId: "test-damage",
+  sourceId: "damage",
+  subsystem: "DAMAGE",
+  evaluate: () => ({
+    kind: "known",
+    complete: true,
+    observations: [{ instanceId: "radiator:large-folding", message: "2 damaged radiators: Large Folding Radiator.", state: "active" }],
+  }),
+};
 
 function activeState() {
   return evaluateAnnunciatorSnapshot(createAnnunciatorState(), [warningRule], snapshot, {
@@ -52,6 +63,14 @@ function activeState() {
 
 function multipleActiveState() {
   return evaluateAnnunciatorSnapshot(createAnnunciatorState(), [warningRule, powerRule], snapshot, {
+    missionTime: 123,
+    nowMs: 1_000,
+    vesselIdentity: "vessel-a",
+  });
+}
+
+function damageActiveState() {
+  return evaluateAnnunciatorSnapshot(createAnnunciatorState(), [damageRule], snapshot, {
     missionTime: 123,
     nowMs: 1_000,
     vesselIdentity: "vessel-a",
@@ -91,12 +110,12 @@ describe("Flight annunciator surface", () => {
     expect(document.activeElement).toBe(lamp);
   });
 
-  it("keeps four fixed indicators in a two-row order and acknowledges only the selected subsystem", async () => {
+  it("keeps five fixed indicators in compact order and acknowledges only the selected subsystem", async () => {
     const user = userEvent.setup();
     render(<Harness initialState={multipleActiveState()} />);
     const group = screen.getByRole("group", { name: "Flight alert indicators" });
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "HEAT", "REACTOR", "COMMS", "POWER",
+      "HEAT", "REACTOR", "COMMS", "POWER", "DAMAGE",
     ]);
     expect(within(group).getByRole("button", { name: "REACTOR clear" }).hasAttribute("disabled")).toBe(true);
     expect(within(group).getByRole("button", { name: "COMMS clear" }).className).toContain("clear");
@@ -109,6 +128,23 @@ describe("Flight annunciator surface", () => {
     await user.click(within(group).getByRole("button", { name: "POWER new caution. Acknowledge." }));
     expect(screen.getByRole("button", { name: /Master caution clear/i })).toBeTruthy();
     expect(within(group).getByRole("button", { name: "POWER caution acknowledged and still active" }).className).toContain("acknowledged");
+  });
+
+  it("acknowledges DAMAGE and opens a focused damaged-parts report", async () => {
+    const user = userEvent.setup();
+    render(<Harness initialState={damageActiveState()} />);
+    const damage = screen.getByRole("button", { name: "DAMAGE new warning. Acknowledge and show damaged parts." });
+
+    await user.click(damage);
+    expect(screen.getByRole("dialog", { name: "Damage report" })).toBeTruthy();
+    expect(screen.getByText("2 damaged radiators: Large Folding Radiator.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close damage report" })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "DAMAGE warning acknowledged. Show damaged parts." })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Master caution clear/i })).toBeTruthy();
+    expect(document.activeElement).toBe(damage);
   });
 
   it("keeps the dark lamp operable for cleared history", async () => {

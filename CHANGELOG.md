@@ -4,6 +4,12 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Added authoritative broken-part monitoring for stock and modded deployable
+  equipment, wheels, reaction wheels, and conservative mod failure signals.
+  Damage raises Master Warning through a new `DAMAGE` annunciator and opens a
+  focused report identifying the affected part groups. The new VesselDamage
+  service performs a cached in-game PartModule scan, while older service sets
+  retain the narrower stock kRPC fallback.
 - Updated the dashboard feed and panel bridge runtime contract to kRPC 0.6.0
   with its required protobuf 7.35.1 Python runtime, coherent server-core
   preflight checks, and rebuilt custom-service compatibility versions.

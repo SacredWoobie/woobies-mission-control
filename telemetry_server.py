@@ -38,6 +38,7 @@ from electricity import (
     latest_generation_total,
     solar_summary,
 )
+from damage import gather_part_damage
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
@@ -59,6 +60,7 @@ DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"
 SCI_POLL_SECONDS = 5      # science walk is many RPCs
 HEAT_POLL_SECONDS = 1     # heat via the custom kRPC service is cheap
 ELEC_POLL_SECONDS = 1     # per-reactor + solar + RTG
+DAMAGE_POLL_SECONDS = 1   # complete stock breakable-part collections
 RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
@@ -112,6 +114,10 @@ _heat_cache = {}
 _heat_last_poll = 0.0
 _elec_cache = {}
 _elec_last_poll = 0.0
+_damage_cache = {}
+_damage_last_poll = 0.0
+_damage_cache_key = None
+_damage_last_ut = None
 _res_cache = {}
 _res_last_poll = 0.0
 _tgt_cache = {}
@@ -4268,6 +4274,7 @@ def gather_telemetry(conn):
     global _stage_cache, _stage_current_authority
     global _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
+    global _damage_cache, _damage_last_poll, _damage_cache_key, _damage_last_ut
     d = {}
 
     # The game scene is the authoritative signal. A vessel handle may remain
@@ -4293,6 +4300,10 @@ def gather_telemetry(conn):
                 _stage_current_authority = {}
                 _stage_last_poll = 0.0
                 _stage_last_ut = None
+                _damage_cache = {"damage.status": "unknown"}
+                _damage_last_poll = 0.0
+                _damage_cache_key = None
+                _damage_last_ut = None
             _telemetry_mode = mode
             _stage_trace_last_published = None
             _editor_bodies_cache = []
@@ -4453,6 +4464,32 @@ def gather_telemetry(conn):
         d["comm.krpc.signalStrength"] = c.signal_strength
     except Exception:
         pass  # no antenna / no CommNet
+
+    # ---- Authoritative broken craft parts ---------------------------------
+    # Bind the cache to the active vessel and UT lifecycle so a vessel switch
+    # or revert can never publish the previous craft's damage for one poll.
+    damage_key = str(d.get("v.guid") or d.get("v.name") or "").strip()
+    damage_reverted = (
+        _damage_last_ut is not None
+        and universal_time is not None
+        and universal_time < _damage_last_ut
+    )
+    if damage_key != _damage_cache_key or damage_reverted:
+        _damage_cache = {"damage.status": "unknown"}
+        _damage_last_poll = 0.0
+        _damage_cache_key = damage_key
+    _damage_last_ut = universal_time
+    if now - _damage_last_poll >= DAMAGE_POLL_SECONDS:
+        _damage_last_poll = now
+        try:
+            _damage_cache = gather_part_damage(
+                vessel,
+                connection=conn,
+                remote_tech_active=d.get("rt.available") is True,
+            )
+        except Exception:
+            _damage_cache = {"damage.status": "unknown"}
+    d.update(_damage_cache)
 
     # ---- stock SAS + MechJeb SmartASS mode ----
     # Smart A.S.S. and stock SAS are mutually exclusive in normal operation,

@@ -119,7 +119,7 @@ SERVICE_DLLS = (
     ("KRPC.WoobiesMechJeb", "Mission planning / MechJeb bridge"),
 )
 SERVICE_TESTED_VERSIONS = {
-    "WoobiesControlStats": "0.2.8",
+    "WoobiesControlStats": "0.2.10",
     "KRPC.StageStats": "0.2.8",
     "KRPC.SystemHeat": "0.2.10",
     "KRPC.WoobiesMechJeb": "0.8.10",
@@ -169,6 +169,7 @@ KRPC_SERVICE_ATTRIBUTES = (
     ("system_heat", "SystemHeat"),
     ("vessel_science", "VesselScience"),
     ("stock_thermal", "StockThermal"),
+    ("vessel_damage", "VesselDamage"),
 )
 SYSTEM_HEAT_MOD_PATH = Path("SystemHeat") / "Plugin" / "SystemHeat.dll"
 KSP_PREREQUISITES = (
@@ -1300,6 +1301,7 @@ def expected_krpc_services(prerequisites, services):
             ("mission_overview", "MissionOverview"),
             ("vessel_science", "VesselScience"),
             ("stock_thermal", "StockThermal"),
+            ("vessel_damage", "VesselDamage"),
         ),
         "KRPC.StageStats": (("stage_stats", "StageStats"),),
         "KRPC.SystemHeat": (("system_heat", "SystemHeat"),),
