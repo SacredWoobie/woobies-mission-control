@@ -102,7 +102,7 @@ def _unknown_service_result():
 
 
 def _loss_fields(service):
-    """Read the optional 0.2.11 loss ledger without weakening 0.2.10."""
+    """Read the optional 0.2.12 loss ledger without weakening 0.2.10."""
     try:
         loss_status = service.loss_status
     except AttributeError:
