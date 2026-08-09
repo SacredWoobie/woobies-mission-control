@@ -231,4 +231,31 @@ describe("Flight annunciator rule catalog", () => {
       ],
     });
   });
+
+  it("raises stable immediate loss warnings even when attached-part scanning is incomplete", () => {
+    expect(evaluate(PART_DAMAGE_RULE, {
+      "damage.status": "incomplete",
+      "damage.lossStatus": "known",
+      "damage.parts": [{
+        kind: "antenna",
+        name: "F-RA Relay Antenna Feed",
+        condition: "lost",
+        count: 1,
+        partId: 202,
+        eventId: "persisted-loss-202",
+      }],
+    })).toMatchObject({
+      kind: "known",
+      complete: false,
+      observations: [
+        {
+          instanceId: "loss:persisted-loss-202",
+          state: "active",
+          tier: "warning",
+          message: "1 lost antenna: F-RA Relay Antenna Feed.",
+        },
+        { instanceId: "attached-scan", state: "unknown" },
+      ],
+    });
+  });
 });

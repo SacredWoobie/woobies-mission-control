@@ -1205,6 +1205,12 @@ button { font: inherit; }
 .annunciator-episode-head span { color: var(--slate); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
 .annunciator-episode p { margin: 6px 0; color: #d6dee8; font-size: 10px; line-height: 1.45; }
 .annunciator-episode small { color: var(--slate-muted-text); font-size: 8px; letter-spacing: .04em; }
+.annunciator-loss { padding: 9px 11px; border: 1px solid #61322e; border-left: 3px solid var(--warn); border-radius: 3px; background: #18100f; }
+.annunciator-loss.cleared { border-color: var(--rule); border-left-color: var(--slate); background: #0d141c; }
+.annunciator-loss .annunciator-episode-head strong { color: var(--warn); font-size: 11px; letter-spacing: .04em; }
+.annunciator-loss.cleared .annunciator-episode-head strong { color: #d6dee8; }
+.annunciator-loss p { margin: 6px 0; color: #d6dee8; font-size: 10px; line-height: 1.45; }
+.annunciator-loss small { color: var(--slate-muted-text); font-size: 8px; letter-spacing: .04em; }
 .annunciator-empty { margin: 0; padding: 14px; border: 1px dashed var(--rule); color: var(--slate-muted-text); background: #070c12; text-align: center; }
 
 /* Flight information rails collapse in place; compact chrome is pointer-aware. */

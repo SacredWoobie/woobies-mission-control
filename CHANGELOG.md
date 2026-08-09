@@ -4,6 +4,10 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Added save-persistent unexpected part-loss detection for stock and modded
+  craft hardware. Normal staging, undocking, clamp release, EVA construction,
+  and fairing jettison remain quiet; losses stay actionable until their branch
+  is deliberately discarded, then remain visible in the focused DAMAGE history.
 - Added authoritative broken-part monitoring for stock and modded deployable
   equipment, wheels, reaction wheels, and conservative mod failure signals.
   Damage raises Master Warning through a new `DAMAGE` annunciator and opens a

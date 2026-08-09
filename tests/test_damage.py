@@ -207,6 +207,98 @@ class DamageTelemetryTests(unittest.TestCase):
         self.assertEqual(result["damage.status"], "known")
         self.assertEqual(result["damage.source"], "stock_krpc")
         self.assertEqual(result["damage.damagedCount"], 1)
+        self.assertEqual(result["damage.lossStatus"], "unavailable")
+
+    def test_0211_service_reports_mixed_current_damage_and_loss_history(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=12,
+            checked_module_count=8,
+            status="known",
+            read_error_count=0,
+            damaged_count=2,
+            part_ids=lambda: [101, 202],
+            part_names=lambda: ["radiator", "nfex-antenna-feeder-relay-1"],
+            part_titles=lambda: ["Radiator", "F-RA Relay Antenna Feed"],
+            part_tags=lambda: ["", "Relay 2"],
+            module_names=lambda: ["ModuleDeployableRadiator", "ModuleRTAntenna"],
+            kinds=lambda: ["radiator", "antenna"],
+            detectors=lambda: ["ModuleDeployablePart.deployState", "joint_break"],
+            conditions=lambda: ["damaged", "lost"],
+            event_ids=lambda: ["", "loss-202"],
+            supported_detectors=lambda: ["ModuleDeployablePart.deployState"],
+            loss_status="known",
+            loss_event_count=2,
+            loss_event_ids=lambda: ["loss-202", "loss-77"],
+            loss_part_ids=lambda: [202, 77],
+            loss_part_names=lambda: ["nfex-antenna-feeder-relay-1", "winglet"],
+            loss_part_titles=lambda: ["F-RA Relay Antenna Feed", "Booster Fin"],
+            loss_part_tags=lambda: ["Relay 2", ""],
+            loss_module_names=lambda: ["ModuleRTAntenna", "ModuleLiftingSurface"],
+            loss_kinds=lambda: ["antenna", "wing"],
+            loss_states=lambda: ["active", "cleared"],
+            loss_occurrence_uts=lambda: [1000.0, 900.0],
+            loss_occurrence_mets=lambda: [120.0, 20.0],
+            loss_cleared_uts=lambda: [-1.0, 950.0],
+            loss_clear_reasons=lambda: ["", "intentional_separation"],
+            loss_causes=lambda: ["joint_break", "destroyed"],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(), connection=SimpleNamespace(vessel_damage=service)
+        )
+
+        self.assertEqual(result["damage.lossStatus"], "known")
+        self.assertEqual(len(result["damage.lossEvents"]), 2)
+        lost = next(row for row in result["damage.parts"]
+                    if row["condition"] == "lost")
+        self.assertEqual(lost["eventId"], "loss-202")
+        self.assertEqual(lost["partId"], 202)
+        self.assertEqual(lost["count"], 1)
+        cleared = next(row for row in result["damage.lossEvents"]
+                       if row["state"] == "cleared")
+        self.assertEqual(cleared["clearReason"], "intentional_separation")
+        self.assertEqual(cleared["clearedUt"], 950.0)
+
+    def test_0211_misaligned_loss_history_is_incomplete_not_empty_known(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=0,
+            checked_module_count=0,
+            status="known",
+            read_error_count=0,
+            damaged_count=0,
+            part_ids=lambda: [],
+            part_names=lambda: [],
+            part_titles=lambda: [],
+            part_tags=lambda: [],
+            module_names=lambda: [],
+            kinds=lambda: [],
+            detectors=lambda: [],
+            conditions=lambda: [],
+            event_ids=lambda: [],
+            supported_detectors=lambda: [],
+            loss_status="known",
+            loss_event_count=1,
+            loss_event_ids=lambda: ["loss"],
+            loss_part_ids=lambda: [],
+            loss_part_names=lambda: ["part"],
+            loss_part_titles=lambda: ["Part"],
+            loss_part_tags=lambda: [""],
+            loss_module_names=lambda: ["Module"],
+            loss_kinds=lambda: ["other"],
+            loss_states=lambda: ["active"],
+            loss_occurrence_uts=lambda: [1.0],
+            loss_occurrence_mets=lambda: [1.0],
+            loss_cleared_uts=lambda: [-1.0],
+            loss_clear_reasons=lambda: [""],
+            loss_causes=lambda: ["topology_change"],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(), connection=SimpleNamespace(vessel_damage=service)
+        )
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.lossStatus"], "incomplete")
+        self.assertEqual(result["damage.lossEvents"], [])
 
 
 if __name__ == "__main__":

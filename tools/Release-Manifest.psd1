@@ -20,10 +20,10 @@
         @{
             Folder = "WoobiesControlStats"
             File = "WoobiesControlStats.dll"
-            Version = "0.2.10.0"
-            Sha256 = "D8F1C43819CBDA1AE3FD6BB5678D1EF8BED2BCFEDDB6CC3A20A074A04EFBB945"
+            Version = "0.2.11.0"
+            Sha256 = "3E82E0D39C723AD9CF18C33A3237EE123CDBE996B8FED4ADF37541743B6FBA17"
             License = "MIT"
-            SourceCommit = "9b976daecba8b7d540cf7b4ad0927ab364736190"
+            SourceCommit = "4b8dedfbfe7c3f0b07941e2f410fc2369983fd18"
         }
         @{
             Folder = "KRPC.StageStats"

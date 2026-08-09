@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionStatus } from "../telemetry/client";
 import { isFiniteNumber } from "../formatting/numbers";
-import type { TelemetrySnapshot } from "../telemetry/types";
+import type { DamageLossEventTelemetry, TelemetrySnapshot } from "../telemetry/types";
 import {
   acknowledgeAnnunciator,
   acknowledgeAnnunciatorSubsystem,
@@ -17,6 +17,8 @@ import { ACTIVE_FLIGHT_ANNUNCIATOR_RULES } from "./rules";
 export interface FlightAnnunciatorController {
   state: AnnunciatorState;
   summary: AnnunciatorSummary;
+  damageLossStatus?: "known" | "unavailable" | "incomplete" | "loading";
+  damageLossEvents: DamageLossEventTelemetry[];
   acknowledge(): void;
   acknowledgeSubsystem(subsystem: string): void;
 }
@@ -104,6 +106,10 @@ export function useFlightAnnunciator({
   return {
     state,
     summary: useMemo(() => summarizeAnnunciator(state), [state]),
+    damageLossStatus: snapshot?.["damage.lossStatus"],
+    damageLossEvents: Array.isArray(snapshot?.["damage.lossEvents"])
+      ? snapshot["damage.lossEvents"]
+      : [],
     acknowledge,
     acknowledgeSubsystem,
   };
