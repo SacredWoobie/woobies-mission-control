@@ -273,6 +273,19 @@ class ReleaseContractTests(unittest.TestCase):
             launcher.SERVICE_TESTED_VERSIONS,
         )
 
+    def test_readme_identifies_the_current_public_release(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "Current public release: **[v0.5.1]"
+            "(https://github.com/SacredWoobie/woobies-mission-control/"
+            "releases/tag/v0.5.1)**",
+            readme,
+        )
+        self.assertIn("The v0.5.1 public release selects", readme)
+        self.assertNotIn("Next release candidate", readme)
+        self.assertNotIn("v0.5.1 release candidate", readme)
+
     def test_only_react_loopback_runtime_is_supported(self):
         self.assertFalse((ROOT / "ksp_mission_dashboard.html").exists())
         self.assertFalse((ROOT / "Start React POC.bat").exists())

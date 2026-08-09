@@ -1,8 +1,6 @@
 # Woobie's Mission Control
 
-Current public release: **v0.5.0**
-
-Next release candidate: **v0.5.1**
+Current public release: **[v0.5.1](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.5.1)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
@@ -113,8 +111,8 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The v0.5.1 release candidate selects four independently versioned kRPC
-extensions. Published release packs, including v0.5.0 with
+The v0.5.1 public release selects four independently versioned kRPC extensions.
+Earlier release packs, including v0.5.0 with
 WoobiesControlStats 0.2.6, remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
