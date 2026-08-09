@@ -1,4 +1,9 @@
 @{
+    # Development selection for CHANGELOG.md's Unreleased section. The source
+    # still identifies as the public 0.5.1 baseline until a release version is
+    # deliberately selected; Release-Pack-v0.5.1.psd1 remains the immutable
+    # authority for the published v0.5.1 service set.
+    ReleaseState = "Unreleased"
     ProductVersion = "0.5.1"
     Krpc = @{
         Version = "0.6.0"

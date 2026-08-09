@@ -177,6 +177,7 @@ KSP_PREREQUISITES = (
         "title": "kRPC",
         "relative_path": Path("kRPC") / "KRPC.dll",
         "tested_version": "0.6.0",
+        "expected_sha256": "5aa1d0cdc8eecde0a3efbf16dee8bfa575f4acd94e8960619f642861f7afd2e4",
         "required": True,
     },
     {
@@ -184,6 +185,7 @@ KSP_PREREQUISITES = (
         "title": "kRPC core API",
         "relative_path": Path("kRPC") / "KRPC.Core.dll",
         "tested_version": "0.6.0.0",
+        "expected_sha256": "0c7e447fc801c41d38169e82e39cb06c04df9973a4d6afa9d4c12e76ab313ad8",
         "required": True,
     },
     {
@@ -191,6 +193,7 @@ KSP_PREREQUISITES = (
         "title": "kRPC SpaceCenter service",
         "relative_path": Path("kRPC") / "KRPC.SpaceCenter.dll",
         "tested_version": "0.6.0.0",
+        "expected_sha256": "ef3855f132477d3dd7c3a8fb8aae1fbbe8cca54f23bec5c333c04a91665bd8a4",
         "required": True,
     },
     {
@@ -198,6 +201,7 @@ KSP_PREREQUISITES = (
         "title": "kRPC server protobuf runtime",
         "relative_path": Path("kRPC") / "Google.Protobuf.dll",
         "tested_version": "3.10.1.0",
+        "expected_sha256": "2210e190ecfa7b27f48b6601fdad544e8adb0a9bdcb70d775c8bbdd5e48b5cee",
         "required": True,
     },
     {
@@ -879,7 +883,11 @@ def dll_layout_inventory(ksp_root_value):
     }
 
 
-def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_version):
+def prerequisite_inventory(
+    ksp_root_value,
+    version_reader=read_windows_file_version,
+    hash_reader=sha256_file,
+):
     """Describe installed kRPC and MechJeb prerequisites without loading DLLs."""
     if isinstance(ksp_root_value, os.PathLike):
         ksp_root_value = os.fspath(ksp_root_value)
@@ -892,6 +900,7 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
             else None
         )
         installed_version = None
+        installed_sha256 = None
         if root is None:
             status = "unconfigured"
         elif target is None or not target.is_file():
@@ -908,7 +917,15 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
             elif versions_equivalent(
                 installed_version, definition["tested_version"]
             ):
-                status = "current"
+                expected_sha256 = definition.get("expected_sha256")
+                if expected_sha256 is not None:
+                    installed_sha256 = hash_reader(target).lower()
+                status = (
+                    "checksum_mismatch"
+                    if expected_sha256 is not None
+                    and installed_sha256 != expected_sha256.lower()
+                    else "current"
+                )
             else:
                 status = "untested"
         inventory.append(
@@ -916,6 +933,7 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
                 **definition,
                 "target": target,
                 "installed_version": installed_version,
+                "installed_sha256": installed_sha256,
                 "status": status,
             }
         )
@@ -1397,6 +1415,16 @@ def prerequisite_recommendations(inventory, configuration):
                     f"Use CKAN to reinstall {package} {tested} so its version "
                     "metadata and DLLs come from one known package."
                 )
+        elif status == "checksum_mismatch":
+            observed = (
+                f"Installed version {installed}, but its SHA-256 is not the "
+                "official tested file"
+            )
+            fix = (
+                "Close KSP and reinstall the complete official kRPC 0.6.0 "
+                "server package. Do not keep or mix same-version DLLs from "
+                "another package."
+            )
         else:
             observed = f"Installed version {installed}"
             direction = compare_versions(installed, tested)
@@ -1896,6 +1924,7 @@ def component_preflight(
     port_open=tcp_port_open,
     dashboard_port_available=local_tcp_port_available,
     version_reader=read_windows_file_version,
+    hash_reader=sha256_file,
 ):
     """Return actionable errors and warnings before a kRPC component starts."""
     if isinstance(ksp_root_value, os.PathLike):
@@ -1905,7 +1934,7 @@ def component_preflight(
     warnings = []
     ksp_installation = ksp_installation_inventory(ksp_root_value)
     dll_layout = dll_layout_inventory(ksp_root_value)
-    inventory = prerequisite_inventory(ksp_root_value, version_reader)
+    inventory = prerequisite_inventory(ksp_root_value, version_reader, hash_reader)
     configuration = krpc_configuration_inventory(ksp_root_value)
 
     if root is None:
@@ -2951,6 +2980,8 @@ class App:
                 text, color = f"{item['tested_version']} tested", THEME["green"]
             elif status == "untested":
                 text, color = f"{version} - untested", THEME["amber"]
+            elif status == "checksum_mismatch":
+                text, color = f"{version} - unexpected file", THEME["warn"]
             else:
                 text, color = "Installed - version unknown", THEME["amber"]
             self.prerequisite_status_labels[item["key"]].config(

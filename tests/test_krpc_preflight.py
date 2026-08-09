@@ -234,6 +234,15 @@ class KrpcPrerequisiteTests(unittest.TestCase):
             "Google.Protobuf.dll": "3.10.1.0",
         }.get(Path(path).name)
 
+    @staticmethod
+    def runtime_hash_reader(path):
+        definition = next(
+            item
+            for item in app.KSP_PREREQUISITES
+            if item["relative_path"].name == Path(path).name
+        )
+        return definition["expected_sha256"]
+
     def test_inventory_reports_tested_untested_and_missing_mods(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_root(directory)
@@ -260,7 +269,9 @@ class KrpcPrerequisiteTests(unittest.TestCase):
 
             inventory = {
                 item["key"]: item
-                for item in app.prerequisite_inventory(root, version_reader)
+                for item in app.prerequisite_inventory(
+                    root, version_reader, self.runtime_hash_reader
+                )
             }
             self.assertEqual(inventory["krpc"]["status"], "current")
             self.assertEqual(inventory["krpc_mechjeb"]["status"], "untested")
@@ -411,6 +422,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 port_open=lambda _address, _port: False,
                 dashboard_port_available=lambda _port: False,
                 version_reader=self.runtime_version_reader,
+                hash_reader=self.runtime_hash_reader,
             )
             self.assertEqual(len(preflight["errors"]), 1)
             message = preflight["errors"][0]
@@ -428,6 +440,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 port_open=lambda _address, _port: False,
                 dashboard_port_available=lambda _port: True,
                 version_reader=self.runtime_version_reader,
+                hash_reader=self.runtime_hash_reader,
             )
             self.assertEqual(preflight["errors"], [])
             self.assertTrue(
@@ -442,6 +455,7 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 "port_open": lambda _address, _port: True,
                 "dashboard_port_available": lambda _port: False,
                 "version_reader": self.runtime_version_reader,
+                "hash_reader": self.runtime_hash_reader,
             }
             feed = app.component_preflight(root, "feed", **common)
             panel = app.component_preflight(root, "panel", **common)
@@ -481,9 +495,35 @@ class KrpcPrerequisiteTests(unittest.TestCase):
                 port_open=lambda _address, _port: True,
                 dashboard_port_available=lambda _port: True,
                 version_reader=mixed_version_reader,
+                hash_reader=self.runtime_hash_reader,
             )
             self.assertTrue(
                 any("kRPC core API (untested)" in error for error in preflight["errors"])
+            )
+
+    def test_same_version_tampered_krpc_runtime_blocks_start(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_root(directory)
+            self.install_krpc(root, krpc_settings())
+
+            def tampered_hash_reader(path):
+                if Path(path).name == "KRPC.Core.dll":
+                    return "0" * 64
+                return self.runtime_hash_reader(path)
+
+            preflight = app.component_preflight(
+                root,
+                "feed",
+                port_open=lambda _address, _port: True,
+                dashboard_port_available=lambda _port: True,
+                version_reader=self.runtime_version_reader,
+                hash_reader=tampered_hash_reader,
+            )
+            self.assertTrue(
+                any(
+                    "kRPC core API (checksum_mismatch)" in error
+                    for error in preflight["errors"]
+                )
             )
 
     def test_connection_refused_message_explains_both_port_pairs(self):

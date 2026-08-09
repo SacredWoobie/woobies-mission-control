@@ -230,12 +230,22 @@ class ReleaseContractTests(unittest.TestCase):
         manifest = (
             ROOT / "tools" / "Release-Manifest.psd1"
         ).read_text(encoding="utf-8")
+        spec = importlib.util.spec_from_file_location(
+            "krpc_release_launcher", ROOT / "ksp_dashboard_app.py"
+        )
+        launcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(launcher)
 
+        self.assertIn('ReleaseState = "Unreleased"', manifest)
         self.assertIn('Version = "0.6.0"', manifest)
         self.assertIn(
             'PackageSha256 = "6B4399A8DB57C41DD15323FCD79DC3AA440999AEFED808729A5C850BAC1A17C8"',
             manifest,
         )
+        for definition in launcher.KSP_PREREQUISITES:
+            expected_sha256 = definition.get("expected_sha256")
+            if expected_sha256 is not None:
+                self.assertIn(expected_sha256.upper(), manifest)
         self.assertRegex(
             manifest,
             r'(?s)Folder = "WoobiesControlStats".*?'
@@ -243,6 +253,18 @@ class ReleaseContractTests(unittest.TestCase):
             r'Sha256 = "07C45B3F717B9F5A60F87B8F499E0ACB0D244FB7229C3AEFAE5716DB44F642C6".*?'
             r'SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"',
         )
+
+    def test_unreleased_manifest_cannot_be_packaged_as_v051(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        release_process = (ROOT / "docs" / "RELEASE_PROCESS.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("$manifest.ReleaseState -eq 'Unreleased'", publish_script)
+        self.assertIn("Choose and align the product release version", publish_script)
+        self.assertIn("not the published v0.5.1 service set", release_process)
 
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
