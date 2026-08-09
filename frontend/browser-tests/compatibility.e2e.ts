@@ -344,7 +344,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(portrait.documentScrollHeight).toBeLessThanOrEqual(portrait.documentClientHeight);
 });
 
-test("the wide Flight context and annunciator fit long mission times in one compact row", async ({ page }) => {
+test("the wide Flight context and control plate fit long mission times in one compact header", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
 
@@ -353,27 +353,46 @@ test("the wide Flight context and annunciator fit long mission times in one comp
     element.textContent = "T+ 999999d 05:59:59";
   });
 
-  const layout = await page.locator(".status-strip").evaluate((element) => {
-    const cells = Array.from(element.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell, .flight-annunciator"));
+  const layout = await page.locator(".flight-workspace-shell").evaluate((element) => {
+    const status = element.querySelector<HTMLElement>(".status-strip")!;
+    const plate = element.querySelector<HTMLElement>(".flight-control-plate")!;
+    const cells = Array.from(status.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell"));
     const tops = cells.map((cell) => cell.getBoundingClientRect().top);
-    const elapsed = element.querySelector<HTMLElement>(".met-cell .big")!;
+    const elapsed = status.querySelector<HTMLElement>(".met-cell .big")!;
+    const statusBounds = status.getBoundingClientRect();
+    const plateBounds = plate.getBoundingClientRect();
+    const comms = status.querySelector<HTMLElement>(".cs-cell")!;
     return {
-      height: element.getBoundingClientRect().height,
+      cellCount: cells.length,
+      commsText: comms.textContent,
+      height: statusBounds.height,
       maxTopDifference: Math.max(...tops) - Math.min(...tops),
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth,
+      clientWidth: status.clientWidth,
+      scrollWidth: status.scrollWidth,
       elapsedClientWidth: elapsed.clientWidth,
       elapsedScrollWidth: elapsed.scrollWidth,
       elapsedWhiteSpace: getComputedStyle(elapsed).whiteSpace,
+      plateBottom: plateBounds.bottom,
+      plateLeft: plateBounds.left,
+      plateTop: plateBounds.top,
+      statusBottom: statusBounds.bottom,
+      statusRight: statusBounds.right,
+      statusTop: statusBounds.top,
     };
   });
 
+  expect(layout.cellCount).toBe(4);
+  expect(layout.commsText).toContain("CONNECTED");
+  expect(layout.commsText).toContain("Signal delay");
   expect(layout.height).toBeLessThan(100);
   expect(layout.maxTopDifference).toBeLessThanOrEqual(1);
   expect(layout.clientWidth).toBeLessThan(1600);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
   expect(layout.elapsedWhiteSpace).toBe("nowrap");
   expect(layout.elapsedScrollWidth).toBeLessThanOrEqual(layout.elapsedClientWidth + 1);
+  expect(layout.plateLeft - layout.statusRight).toBeGreaterThanOrEqual(10);
+  expect(layout.plateTop).toBeGreaterThanOrEqual(layout.statusTop);
+  expect(layout.plateBottom).toBeLessThanOrEqual(layout.statusBottom);
 });
 
 test("the Flight annunciator uses fixed acknowledgement-state indicators", async ({ page }) => {
@@ -381,10 +400,19 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await page.goto("/");
 
   const lamp = page.locator(".annunciator-lamp");
+  const plate = page.getByRole("group", { name: "Flight caution and workspace controls" });
+  await expect(plate).toBeVisible();
   await expect(lamp).toBeVisible();
   await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
   const indicators = page.getByRole("group", { name: "Flight alert indicators" });
   await expect(indicators.getByRole("button")).toHaveCount(5);
+  await expect(indicators.locator(":scope > *")).toHaveCount(6);
+  const reserved = indicators.locator(".annunciator-reserved-space");
+  await expect(reserved).toHaveAttribute("aria-hidden", "true");
+  await expect(reserved).toHaveText("");
+  expect((await reserved.boundingBox())?.width).toBeGreaterThan(0);
+  await expect(plate.getByRole("tablist", { name: "Flight workspace" }).getByRole("tab")).toHaveCount(2);
+  await expect(plate.getByText("Lamp Test", { exact: true })).toHaveCount(0);
   const heat = indicators.getByRole("button", { name: "HEAT new warning. Acknowledge." });
   await expect(heat).toHaveClass(/new/);
   expect(await lamp.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
@@ -413,6 +441,35 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await page.keyboard.press("Escape");
   await expect(history).toBeHidden();
   await expect(lamp).toBeFocused();
+});
+
+test("the Flight control plate reflows all five indicators and its reserved slot on compact screens", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const layout = await page.locator(".flight-control-plate").evaluate((plate) => {
+    const indicators = Array.from(plate.querySelectorAll<HTMLElement>(".annunciator-indicator"));
+    const reserved = plate.querySelector<HTMLElement>(".annunciator-reserved-space")!;
+    const allSlots = [...indicators, reserved];
+    return {
+      columns: new Set(allSlots.map((slot) => Math.round(slot.getBoundingClientRect().left))).size,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      indicatorCount: indicators.length,
+      reservedText: reserved.textContent,
+      rows: new Set(allSlots.map((slot) => Math.round(slot.getBoundingClientRect().top))).size,
+      slotWidths: allSlots.map((slot) => slot.getBoundingClientRect().width),
+      workspaceLabelDisplay: getComputedStyle(plate.querySelector<HTMLElement>(".flight-workspace-label")!).display,
+    };
+  });
+
+  expect(layout.indicatorCount).toBe(5);
+  expect(layout.columns).toBe(3);
+  expect(layout.rows).toBe(2);
+  expect(layout.reservedText).toBe("");
+  expect(Math.max(...layout.slotWidths) - Math.min(...layout.slotWidths)).toBeLessThanOrEqual(1);
+  expect(layout.workspaceLabelDisplay).toBe("none");
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
 });
 
 test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", async ({ page }) => {

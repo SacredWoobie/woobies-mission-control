@@ -159,8 +159,18 @@ density.
 - Lane assignment and responsive arrangement preserve panel DOM identity,
   component state, focus, and internal scroll. Inactive views suspend panel
   telemetry work and resume from the current snapshot.
-- The fixed Master Caution surface reports vessel-wide actionable conditions.
-  Feed diagnostics remain in history without masquerading as a vessel warning.
+- The fixed Master Caution surface and MONITOR / PLAN controls share one
+  responsive instrument plate. It uses inset selector rails, lensed lamps,
+  restrained active-state glow, and a circular rebalance control so the group
+  reads as durable dashboard hardware rather than unrelated buttons.
+- The annunciator bank contains the five actionable HEAT, REACTOR, COMMS,
+  POWER, and DAMAGE positions plus one visually empty reserved grid position.
+  The reserved position has no label or interactive semantics, and mock-only
+  controls such as Lamp Test do not ship. Feed diagnostics remain in history
+  without masquerading as a vessel warning.
+- The Flight context strip has four logical cells: vessel, universal time,
+  mission elapsed time, and Comms. RemoteTech signal delay nests inside Comms
+  instead of consuming a separate cell.
 - Long staging inventories group distant powered stages before introducing
   internal scrolling, while keeping the current and nearest stages visible.
   Electricity, Heat, and Science details remain bounded and use one-at-a-time

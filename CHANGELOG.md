@@ -77,6 +77,10 @@ All notable public changes will be recorded here.
   focused report identifying the affected part groups. The new VesselDamage
   service performs a cached in-game PartModule scan, while older service sets
   retain the narrower stock kRPC fallback.
+- Integrated Flight's Master Warning, five actionable annunciators, MONITOR / PLAN
+  selector, and workspace rebalance control into one responsive instrument plate.
+  RemoteTech signal delay now stays inside the four-cell context strip's Comms
+  cell, and a deliberately empty sixth annunciator position reserves future growth.
 - Updated the dashboard feed and panel bridge runtime contract to kRPC 0.6.0
   with its required protobuf 7.35.1 Python runtime, coherent server-core
   preflight checks, and rebuilt custom-service compatibility versions.

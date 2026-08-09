@@ -215,6 +215,7 @@ export function FlightAnnunciator({ controller }: { controller: FlightAnnunciato
             type="button"
           >{subsystem}</button>;
         })}
+        <span aria-hidden="true" className="annunciator-reserved-space" />
       </div>
       {historyView && <AnnunciatorHistory
         controller={controller}

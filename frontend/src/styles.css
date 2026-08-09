@@ -930,11 +930,11 @@ button { font: inherit; }
   container-name: flight-shell;
   container-type: inline-size;
   grid-template-columns: minmax(0,1fr);
-  grid-template-areas: "status" "fixed" "selector" "tabbed";
+  grid-template-areas: "status" "fixed" "controls" "tabbed";
   gap: 12px;
   min-width: 0;
 }
-.flight-workspace-shell[data-fixed-empty="true"] { grid-template-areas: "status" "selector" "tabbed"; }
+.flight-workspace-shell[data-fixed-empty="true"] { grid-template-areas: "status" "controls" "tabbed"; }
 .flight-workspace-shell > .status-strip { grid-area: status; min-width: 0; margin: 0 0 0 8px; }
 .flight-fixed-region {
   grid-area: fixed;
@@ -957,27 +957,62 @@ button { font: inherit; }
   padding: 8px;
   background: color-mix(in srgb,var(--panel) 20%,transparent);
 }
-.flight-workspace-selector {
+.flight-control-plate {
   z-index: 2;
-  grid-area: selector;
-  display: inline-flex;
-  width: max-content;
-  max-width: 100%;
-  min-height: 38px;
-  padding: 3px;
-  justify-self: end;
+  grid-area: controls;
+  display: flex;
+  width: calc(100% - 16px);
+  min-width: 0;
+  min-height: 60px;
+  margin: 0 8px;
+  padding: 5px 7px;
+  align-items: stretch;
+  justify-content: space-between;
   align-self: center;
-  gap: 3px;
-  border: 1px solid var(--accent-border);
+  gap: 14px;
+  border: 1px solid var(--rule);
+  border-top-color: #26364a;
   border-radius: 4px;
-  background: #0b141e;
+  background: linear-gradient(180deg,#141c26 0%,#0a1017 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), inset 0 -1px 0 rgba(0,0,0,.55), 0 2px 7px rgba(0,0,0,.5);
 }
-.flight-workspace-selector button {
-  min-width: 82px;
-  min-height: 30px;
-  padding: 5px 12px;
-  border: 1px solid transparent;
+.flight-workspace-controls { display: flex; min-width: 0; align-items: center; gap: 8px; flex: 0 0 auto; }
+.flight-control-divider { width: 2px; align-self: stretch; margin: 2px 0; border-left: 1px solid rgba(0,0,0,.7); border-right: 1px solid rgba(255,255,255,.05); }
+.flight-workspace-label { color: var(--slate-muted-text); font-size: 8px; font-weight: 700; letter-spacing: .2em; text-shadow: 0 1px 0 rgba(0,0,0,.9); text-transform: uppercase; white-space: nowrap; }
+.flight-workspace-selector {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  padding: 2px;
+  gap: 3px;
+  border: 1px solid #1b2532;
   border-radius: 3px;
+  background: #060a0f;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.85);
+}
+.flight-workspace-selection-indicator {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 96px;
+  height: calc(100% - 4px);
+  border: 1px solid var(--accent-border-hover);
+  border-radius: 2px;
+  background: linear-gradient(180deg,#173248 0%,#0f2534 100%);
+  box-shadow: 0 0 10px rgba(78,201,224,.2), inset 0 1px 0 rgba(78,201,224,.22);
+  transition: transform .3s cubic-bezier(.34,1.45,.44,1);
+  transform: translateX(0);
+}
+.flight-workspace-selector[data-active-view="plan"] .flight-workspace-selection-indicator { transform: translateX(99px); }
+.flight-workspace-selector button {
+  position: relative;
+  z-index: 1;
+  width: 96px;
+  min-width: 96px;
+  min-height: 30px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 2px;
   color: var(--slate-muted-text);
   background: transparent;
   cursor: pointer;
@@ -985,10 +1020,12 @@ button { font: inherit; }
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .12em;
+  text-shadow: 0 1px 0 rgba(0,0,0,.8);
 }
-.flight-workspace-selector button[aria-selected="true"] { border-color: var(--accent-border-hover); color: var(--cyan); background: #142535; }
-.flight-workspace-selector button:hover { color: var(--cyan); background: #101f2c; }
-.flight-workspace-selector .flight-workspace-rebalance { min-width: 34px; width: 34px; padding-inline: 0; color: var(--amber); font-size: 17px; }
+.flight-workspace-selector button[aria-selected="true"] { color: var(--cyan); text-shadow: 0 0 9px rgba(78,201,224,.4); }
+.flight-workspace-selector button:hover { color: var(--cyan); }
+.flight-workspace-rebalance { display: grid; width: 30px; height: 30px; min-width: 30px; padding: 0; place-items: center; border: 1px solid #2f4152; border-radius: 50%; color: var(--amber); background: radial-gradient(circle at 50% 28%,#1c2632 0%,#0c1219 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.6); cursor: pointer; font: 15px var(--mono); }
+.flight-workspace-rebalance:hover { border-color: var(--amber-accent); background: radial-gradient(circle at 50% 28%,#263443 0%,#111923 100%); }
 .flight-workspace-view { position: relative; width: 100%; min-width: 0; }
 .flight-workspace-view[hidden] { display: none; }
 .flight-workspace-view > [data-flight-panel-host] { left: 0; top: 0; }
@@ -1004,20 +1041,39 @@ button { font: inherit; }
 }
 .flight-workspace-shell[data-arrangement="side-by-side"] {
   grid-template-columns: var(--flight-fixed-region-width) var(--flight-tabbed-region-width);
-  grid-template-areas: "status status" "fixed tabbed";
-}
-.flight-workspace-shell[data-arrangement="side-by-side"] > .flight-workspace-selector {
-  grid-area: status;
-  margin-right: 4px;
+  grid-template-areas: "status status" "controls controls" "fixed tabbed";
 }
 .flight-workspace-shell[data-arrangement="side-by-side"] > .status-strip { padding-right: 254px; }
 .flight-workspace-shell[data-arrangement="side-by-side"][data-fixed-empty="true"] {
   grid-template-columns: minmax(0,1fr);
-  grid-template-areas: "status" "tabbed";
+  grid-template-areas: "status" "controls" "tabbed";
+}
+@media (min-width: 1862px) {
+  .flight-workspace-shell[data-arrangement="side-by-side"] { grid-template-areas: "status status" "fixed tabbed"; }
+  .flight-workspace-shell[data-arrangement="side-by-side"] > .flight-control-plate {
+    grid-area: status;
+    width: max-content;
+    max-width: calc(100% - 16px);
+    margin: 0 4px 0 0;
+    justify-self: end;
+  }
+  .flight-workspace-shell[data-arrangement="side-by-side"] .annunciator-indicators { grid-template-columns: repeat(3,86px); }
+  .flight-workspace-shell[data-arrangement="side-by-side"][data-fixed-empty="true"] { grid-template-areas: "status" "tabbed"; }
 }
 
-/* At the portrait target the selector has already moved out of the context
-   strip, leaving enough width for the five context cells to form one compact
+@container flight-shell (max-width: 980px) {
+  .flight-control-plate { display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; }
+  .flight-annunciator { display: grid; width: 100%; grid-template-columns: 94px minmax(0,1fr); }
+  .flight-control-plate .annunciator-indicators { grid-template-columns: repeat(3,minmax(0,86px)); justify-content: start; }
+  .flight-workspace-controls { padding-top: 5px; justify-content: flex-end; border-top: 1px solid rgba(38,54,74,.58); }
+}
+
+@container flight-shell (max-width: 520px) {
+  .flight-workspace-label, .flight-control-divider { display: none; }
+}
+
+/* At the portrait target the control plate has moved out of the context
+   strip, leaving enough width for the four context cells to form one compact
    row. Panel chrome and Ascension then reuse the proven installed-monitor
    density without changing the workspace structure. */
 @container flight-shell (min-width: 900px) {
@@ -1042,12 +1098,9 @@ button { font: inherit; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock > .body { padding: 0; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .flight-context-grid {
     display: grid;
-    grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(115px,.9fr) minmax(250px,1.45fr);
+    grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(180px,1.2fr);
     gap: 1px;
     background: var(--rule);
-  }
-  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .flight-context-grid.remote-tech {
-    grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(115px,.9fr) minmax(105px,.8fr) minmax(250px,1.45fr);
   }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .clock-grid,
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .comms-strip { display: contents; }
@@ -1064,8 +1117,7 @@ button { font: inherit; }
   }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .flight-context-identity,
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clockcell,
-  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .cs-cell,
-  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .flight-annunciator {
+  .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .cs-cell {
     min-width: 0;
     padding: 5px 8px;
     border: 0;
@@ -1166,24 +1218,31 @@ button { font: inherit; }
 .calendar-toggle { padding: 0; border: 0; color: var(--slate-muted-text); background: transparent; cursor: pointer; font: inherit; letter-spacing: inherit; }
 .calendar-toggle:hover { color: var(--cyan); }
 .comms-strip { display: grid; grid-template-columns: minmax(0,1fr); gap: 1px; border-top: 1px solid var(--rule); background: var(--rule); }
-.comms-strip.remote-tech { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .cs-cell { display: flex; min-width: 0; padding: 8px 12px; background: var(--panel); flex-direction: column; gap: 4px; }
 .cs-status { display: flex; align-items: center; gap: 7px; font-size: 15px; letter-spacing: .04em; }
 .cs-val { overflow: hidden; color: var(--cyan); font-size: 16px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.cs-delay { display: flex; min-width: 0; margin-top: 1px; align-items: baseline; gap: 7px; }
+.cs-delay .label { flex: 0 0 auto; color: var(--slate-muted-text); font-size: 8px; letter-spacing: .09em; }
+.cs-delay .cs-val { min-width: 0; font-size: 10px; }
 .label-muted { color: var(--slate-muted-text); }
-.flight-annunciator { position: relative; display: grid; min-width: 0; padding: 5px 8px; align-items: center; grid-template-columns: 94px minmax(0,1fr); gap: 8px; border-top: 1px solid var(--rule); background: var(--panel); }
-.annunciator-lamp { display: flex; width: 94px; height: 48px; min-width: 94px; padding: 5px 6px; align-items: center; justify-content: center; border: 1px solid #3a4148; border-radius: 3px; color: #65707a; background: linear-gradient(180deg,#171b1e,#0c1013); cursor: pointer; font-family: var(--mono); line-height: 1; flex-direction: column; gap: 4px; }
+.flight-annunciator { position: relative; display: flex; min-width: 0; align-items: center; gap: 8px; }
+.annunciator-lamp { position: relative; display: flex; width: 94px; height: 48px; min-width: 94px; padding: 5px 6px; overflow: hidden; align-items: center; justify-content: center; border: 1px solid #39414a; border-radius: 4px; color: #65707a; background: radial-gradient(120% 90% at 50% 6%,rgba(255,255,255,.09) 0%,rgba(255,255,255,.015) 24%,#10151a 58%,#080b0f 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -2px 4px rgba(0,0,0,.7), 0 1px 2px rgba(0,0,0,.6); cursor: pointer; font-family: var(--mono); line-height: 1; flex-direction: column; gap: 4px; }
+.annunciator-lamp::before, .annunciator-indicator::before { position: absolute; top: 1px; left: 3px; right: 3px; height: 7px; border-radius: 3px 3px 8px 8px; background: linear-gradient(180deg,rgba(255,255,255,.13) 0%,rgba(255,255,255,0) 100%); content: ""; pointer-events: none; }
+.annunciator-lamp::before { top: 2px; left: 4px; right: 4px; height: 14px; }
+.annunciator-lamp span, .annunciator-lamp strong { position: relative; z-index: 1; }
 .annunciator-lamp span { font-size: 8px; letter-spacing: .16em; }
 .annunciator-lamp strong { font-size: 11px; letter-spacing: .08em; }
-.annunciator-lamp.caution:not(.dark) { border-color: #9c6b15; color: #1b1304; background: linear-gradient(180deg,#ffd75a,#d18b13); box-shadow: 0 0 10px rgba(251,191,36,.55), inset 0 0 7px rgba(255,248,194,.45); }
-.annunciator-lamp.warning:not(.dark) { border-color: #b74738; color: #200503; background: linear-gradient(180deg,#ff826f,#d84132); box-shadow: 0 0 11px rgba(255,107,91,.62), inset 0 0 7px rgba(255,220,211,.42); }
+.annunciator-lamp.caution:not(.dark) { border-color: #9c6b15; color: #1b1304; background: linear-gradient(180deg,#ffd75a 0%,#e5a220 62%,#d18b13 100%); box-shadow: 0 0 7px rgba(251,191,36,.3), inset 0 0 5px rgba(255,248,194,.28), inset 0 -2px 4px rgba(140,90,10,.4), 0 1px 2px rgba(0,0,0,.6); }
+.annunciator-lamp.warning:not(.dark) { border-color: #b74738; color: #200503; background: linear-gradient(180deg,#ff826f 0%,#e35a48 62%,#d84132 100%); box-shadow: 0 0 7px rgba(255,107,91,.32), inset 0 0 5px rgba(255,220,211,.24), inset 0 -2px 4px rgba(150,45,32,.4), 0 1px 2px rgba(0,0,0,.6); }
+.annunciator-lamp:not(.dark)::before { height: 8px; background: linear-gradient(180deg,rgba(255,255,255,.3) 0%,rgba(255,255,255,0) 100%); }
 .annunciator-lamp:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-.annunciator-indicators { display: grid; min-width: 0; align-content: center; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; }
-.annunciator-indicator { min-width: 0; min-height: 22px; padding: 3px 4px; overflow: hidden; border: 1px solid #303944; border-radius: 2px; color: var(--slate-muted-text); background: #0b1117; cursor: default; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; text-overflow: ellipsis; white-space: nowrap; }
-.annunciator-indicator:last-child { grid-column: 1 / -1; }
+.annunciator-indicators { display: grid; min-width: 0; align-content: center; grid-template-columns: repeat(6,86px); gap: 4px; }
+.annunciator-indicator { position: relative; min-width: 0; min-height: 22px; padding: 3px 5px; overflow: hidden; border: 1px solid #39414a; border-radius: 3px; color: #65707a; background: radial-gradient(120% 90% at 50% 6%,rgba(255,255,255,.09) 0%,rgba(255,255,255,.015) 24%,#10151a 58%,#080b0f 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -2px 4px rgba(0,0,0,.7), 0 1px 2px rgba(0,0,0,.6); cursor: default; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; text-overflow: ellipsis; white-space: nowrap; }
+.annunciator-reserved-space { display: block; min-width: 0; min-height: 22px; }
 .annunciator-indicator:disabled { opacity: 1; }
-.annunciator-indicator.new { border-color: #b74738; color: #240705; background: linear-gradient(180deg,#ff826f,#d84132); box-shadow: 0 0 8px rgba(255,107,91,.54), inset 0 0 5px rgba(255,220,211,.35); cursor: pointer; }
-.annunciator-indicator.acknowledged { border-color: #8d651a; color: #211503; background: linear-gradient(180deg,#ffd75a,#c98716); box-shadow: 0 0 6px rgba(251,191,36,.32), inset 0 0 4px rgba(255,248,194,.28); }
+.annunciator-indicator.new { border-color: #b74738; color: #240705; background: linear-gradient(180deg,#ff826f 0%,#e2584a 64%,#d84132 100%); box-shadow: 0 0 4px rgba(255,107,91,.26), inset 0 0 3px rgba(255,220,211,.2), 0 1px 2px rgba(0,0,0,.6); cursor: pointer; }
+.annunciator-indicator.acknowledged { border-color: #8d651a; color: #211503; background: linear-gradient(180deg,#ffd75a 0%,#dc9a1c 64%,#c98716 100%); box-shadow: 0 0 4px rgba(251,191,36,.22), inset 0 0 3px rgba(255,248,194,.22), 0 1px 2px rgba(0,0,0,.6); }
+.annunciator-indicator:is(.new,.acknowledged)::before { height: 4px; background: linear-gradient(180deg,rgba(255,255,255,.26) 0%,rgba(255,255,255,0) 100%); }
 .annunciator-indicator.acknowledged:not(:disabled) { cursor: pointer; }
 .annunciator-indicator.new:hover, .annunciator-indicator.new:focus-visible, .annunciator-indicator.acknowledged:not(:disabled):hover, .annunciator-indicator.acknowledged:not(:disabled):focus-visible { filter: brightness(1.12); outline: 2px solid var(--cyan); outline-offset: 1px; }
 .annunciator-backdrop { position: fixed; z-index: 1200; inset: 0; display: grid; padding: max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); place-items: center; background: rgba(2,6,9,.82); }
@@ -1860,7 +1919,7 @@ button { font: inherit; }
   }
   .inactive-mode .overview-section-head .overview-header-button { min-height: 36px; padding: 4px 7px; font-size: 11px; }
   .status-strip {
-    --flight-status-grid-width: 1364px;
+    --flight-status-grid-width: 1064px;
     position: relative;
     display: block;
     width: calc(var(--flight-status-grid-width) + 2px);
@@ -1872,7 +1931,6 @@ button { font: inherit; }
     background: var(--rule);
   }
   .flight-workspace-shell[data-arrangement="side-by-side"] > .status-strip { padding-right: 0; }
-  .status-strip:has(.flight-context-grid.remote-tech) { --flight-status-grid-width: 1540px; }
   .status-strip > .panel { border: 0; border-radius: 0; }
   .status-strip #clock {
     display: block;
@@ -1889,14 +1947,13 @@ button { font: inherit; }
     display: grid;
     width: var(--flight-status-grid-width);
     max-width: none;
-    grid-template-columns: 240px 340px 280px 200px 300px;
+    grid-template-columns: 240px 340px 280px 200px;
     gap: 1px;
     background: var(--rule);
   }
-  .status-strip #clock .flight-context-grid.remote-tech { grid-template-columns: 240px 340px 280px 200px 175px 300px; }
   .status-strip #clock .clock-grid, .status-strip #clock .comms-strip { display: contents; }
   .status-strip #clock > h2 { display: none; }
-  .status-strip .flight-context-identity, .status-strip .clockcell, .status-strip .cs-cell, .status-strip .flight-annunciator { min-width: 0; padding: 4px 10px; border: 0; background: var(--panel); justify-content: flex-start; }
+  .status-strip .flight-context-identity, .status-strip .clockcell, .status-strip .cs-cell { min-width: 0; padding: 4px 10px; border: 0; background: var(--panel); justify-content: flex-start; }
   .status-strip .clockcell { display: flex; flex-direction: column; }
   .status-strip .calendar-toggle { min-width: 0; min-height: 22px; padding-inline: 3px; }
   .status-strip .clockcell .big { font-size: 20px; }
@@ -2287,6 +2344,12 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .inactive-mode .overview-vessel-group-toggle { min-height: 32px; padding-block: 3px; }
 }
 
+@media (pointer: coarse) {
+  .flight-workspace-selector button { min-height: 44px; }
+  .flight-workspace-rebalance { width: 44px; height: 44px; min-width: 44px; }
+  .annunciator-indicator, .annunciator-reserved-space { min-height: 36px; }
+}
+
 @container (max-width: 460px) {
   .tgt-grid, .rx-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .clock-grid, .comms-strip, .comms-strip.remote-tech { grid-template-columns: minmax(0,1fr); }
@@ -2294,6 +2357,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 
 @media (prefers-reduced-motion: reduce) {
   .stage-table.flight .st-row.newly-active > span { animation: none; }
+  .flight-workspace-selection-indicator { transition: none; }
 }
 
 @container (max-width: 520px) {

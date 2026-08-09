@@ -53,8 +53,9 @@ function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
   return (
     <FlightDashboard
       ascension={<AscensionPanel snapshot={snapshot} />}
+      annunciator={<FlightAnnunciator controller={annunciator} />}
       availablePanels={available}
-      clock={<ClockPanel annunciator={<FlightAnnunciator controller={annunciator} />} snapshot={snapshot} />}
+      clock={<ClockPanel snapshot={snapshot} />}
       consumables={<ConsumablesPanel snapshot={snapshot} />}
       electricity={<ElectricityPanel snapshot={snapshot} />}
       heat={<HeatPanel snapshot={snapshot} />}

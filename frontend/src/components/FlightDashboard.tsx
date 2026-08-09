@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { FlightPanelHost } from "../flight/FlightPanelHost";
 import { FlightWorkspaceView, type FlightWorkspacePanel } from "../flight/FlightWorkspaceView";
 import {
@@ -10,10 +10,12 @@ import {
   type FlightLayoutPanelId,
   type FlightWorkspaceView as FlightWorkspaceViewName,
 } from "../flight/layout";
+import { FlightControlPlate } from "./FlightControlPlate";
 import { PanelRestoreRail, usePanelVisibility, type DashboardPanelId } from "./PanelVisibility";
 
 interface FlightDashboardProps {
   ascension: ReactNode;
+  annunciator: ReactNode;
   availablePanels: ReadonlySet<DashboardPanelId>;
   clock: ReactNode;
   consumables: ReactNode;
@@ -35,6 +37,7 @@ type WorkspaceStyle = CSSProperties & {
 
 export function FlightDashboard({
   ascension,
+  annunciator,
   availablePanels,
   clock,
   consumables,
@@ -106,17 +109,6 @@ export function FlightDashboard({
     if (owner === "monitor" || owner === "plan") setActiveView(owner);
   }, [lastRestore]);
 
-  const selectAdjacentView = (event: KeyboardEvent<HTMLButtonElement>, view: FlightWorkspaceViewName) => {
-    let next: FlightWorkspaceViewName | undefined;
-    if (event.key === "ArrowLeft" || event.key === "ArrowRight") next = view === "monitor" ? "plan" : "monitor";
-    if (event.key === "Home") next = "monitor";
-    if (event.key === "End") next = "plan";
-    if (!next) return;
-    event.preventDefault();
-    setActiveView(next);
-    document.getElementById(`flight-workspace-tab-${next}`)?.focus();
-  };
-
   const renderFixedPanel = (id: typeof flightFixedPanelIds[number]) => {
     const content = panelCandidates.get(id);
     if (!content) return null;
@@ -140,35 +132,15 @@ export function FlightDashboard({
         style={style}
       >
         <div className="status-strip">{clock}</div>
-        <div aria-label="Flight workspace" className="flight-workspace-selector" role="tablist">
-          {(["monitor", "plan"] as const).map((view) => (
-            <button
-              aria-controls={`flight-workspace-panel-${view}`}
-              aria-selected={activeView === view}
-              id={`flight-workspace-tab-${view}`}
-              key={view}
-              onKeyDown={(event) => selectAdjacentView(event, view)}
-              onClick={() => setActiveView(view)}
-              role="tab"
-              tabIndex={activeView === view ? 0 : -1}
-              type="button"
-            >
-              {view.toUpperCase()}
-            </button>
-          ))}
-          <button
-            aria-label={`Rebalance ${activeView.toUpperCase()} workspace`}
-            className="flight-workspace-rebalance"
-            onClick={() => setRebalanceSequence((current) => ({
+        <FlightControlPlate
+          activeView={activeView}
+          annunciator={annunciator}
+          onRebalance={() => setRebalanceSequence((current) => ({
               ...current,
               [activeView]: current[activeView] + 1,
             }))}
-            title={`Rebalance ${activeView.toUpperCase()} panels`}
-            type="button"
-          >
-            ↻
-          </button>
-        </div>
+          onSelectView={setActiveView}
+        />
         <section
           aria-label="Persistent vessel state"
           className="flight-fixed-region"

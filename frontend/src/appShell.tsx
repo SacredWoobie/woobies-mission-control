@@ -228,7 +228,7 @@ function useLiveFlightSnapshot(equality: (left: TelemetrySnapshot | null, right:
 }
 
 function LiveAscensionPanel() { const snapshot = useLiveFlightSnapshot(ascensionSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <AscensionPanel snapshot={snapshot} /> : null; }
-function LiveClockPanel({ annunciator }: { annunciator: FlightAnnunciatorController }) { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel annunciator={<FlightAnnunciator controller={annunciator} />} snapshot={snapshot} /> : null; }
+function LiveClockPanel() { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel snapshot={snapshot} /> : null; }
 function LiveConsumablesPanel() { const snapshot = useLiveFlightSnapshot(consumablesSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ConsumablesPanel snapshot={snapshot} /> : null; }
 function LiveElectricityPanel() {
   const liveState = useLiveTelemetrySelector(
@@ -308,8 +308,9 @@ function LiveFlightDashboard({ annunciator }: { annunciator: FlightAnnunciatorCo
   return (
     <FlightDashboard
       ascension={<LiveAscensionPanel />}
+      annunciator={<FlightAnnunciator controller={annunciator} />}
       availablePanels={available}
-      clock={<LiveClockPanel annunciator={annunciator} />}
+      clock={<LiveClockPanel />}
       consumables={<LiveConsumablesPanel />}
       electricity={<LiveElectricityPanel />}
       heat={<LiveHeatPanel />}

@@ -60,7 +60,8 @@ describe("ClockPanel communications", () => {
     expect(screen.getByText("Signal delay", { exact: true })).toBeTruthy();
     expect(screen.getByText("83 ms", { exact: true })).toBeTruthy();
     expect(container.querySelector(".flight-context-grid")?.classList.contains("remote-tech")).toBe(true);
-    expect(container.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell")).toHaveLength(5);
+    expect(container.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell")).toHaveLength(4);
+    expect(screen.getByText("Signal delay", { exact: true }).closest(".cs-cell")?.textContent).toContain("CONNECTED");
   });
 
   it("keeps the delay cell when an active RemoteTech link is disconnected", () => {
