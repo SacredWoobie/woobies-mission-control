@@ -38,7 +38,7 @@ from electricity import (
     latest_generation_total,
     solar_summary,
 )
-from damage import gather_part_damage
+from damage import gather_part_damage, read_loss_fields
 from heat import enrich_system_heat_result
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
@@ -118,6 +118,8 @@ _damage_cache = {}
 _damage_last_poll = 0.0
 _damage_cache_key = None
 _damage_last_ut = None
+_damage_loss_cache = None
+_damage_loss_revision = None
 _res_cache = {}
 _res_last_poll = 0.0
 _tgt_cache = {}
@@ -4275,6 +4277,7 @@ def gather_telemetry(conn):
     global _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
     global _damage_cache, _damage_last_poll, _damage_cache_key, _damage_last_ut
+    global _damage_loss_cache, _damage_loss_revision
     d = {}
 
     # The game scene is the authoritative signal. A vessel handle may remain
@@ -4304,6 +4307,8 @@ def gather_telemetry(conn):
                 _damage_last_poll = 0.0
                 _damage_cache_key = None
                 _damage_last_ut = None
+                _damage_loss_cache = None
+                _damage_loss_revision = None
             _telemetry_mode = mode
             _stage_trace_last_published = None
             _editor_bodies_cache = []
@@ -4478,15 +4483,47 @@ def gather_telemetry(conn):
         _damage_cache = {"damage.status": "unknown"}
         _damage_last_poll = 0.0
         _damage_cache_key = damage_key
+        _damage_loss_cache = None
+        _damage_loss_revision = None
     _damage_last_ut = universal_time
     if now - _damage_last_poll >= DAMAGE_POLL_SECONDS:
         _damage_last_poll = now
         try:
-            _damage_cache = gather_part_damage(
-                vessel,
-                connection=conn,
-                remote_tech_active=d.get("rt.available") is True,
-            )
+            loss_fields = None
+            try:
+                damage_service = conn.vessel_damage
+                loss_revision = damage_service.loss_revision
+                if (
+                    isinstance(loss_revision, int)
+                    and not isinstance(loss_revision, bool)
+                    and loss_revision >= 0
+                ):
+                    if (
+                        _damage_loss_cache is None
+                        or loss_revision != _damage_loss_revision
+                    ):
+                        candidate = read_loss_fields(damage_service)
+                        if candidate[0] != "incomplete":
+                            _damage_loss_cache = candidate
+                            _damage_loss_revision = loss_revision
+                        loss_fields = candidate
+                    else:
+                        loss_fields = _damage_loss_cache
+            except AttributeError:
+                pass
+            if loss_fields is None:
+                _damage_cache = gather_part_damage(
+                    vessel,
+                    connection=conn,
+                    remote_tech_active=d.get("rt.available") is True,
+                )
+            else:
+                _damage_cache = gather_part_damage(
+                    vessel,
+                    connection=conn,
+                    remote_tech_active=d.get("rt.available") is True,
+                    loss_fields=loss_fields,
+                )
         except Exception:
             _damage_cache = {"damage.status": "unknown"}
     d.update(_damage_cache)

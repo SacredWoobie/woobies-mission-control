@@ -162,7 +162,7 @@ function AnnunciatorHistory({
                   ? "Recorded loss history is loading from the KSP save."
                   : controller.damageLossStatus === "incomplete"
                     ? "Recorded loss history is incomplete."
-                    : "Recorded loss history requires WoobiesControlStats 0.2.12 or newer."}
+                    : "Recorded loss history requires WoobiesControlStats 0.2.13 or newer."}
               </p>}
           </section>}
         </div>

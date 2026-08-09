@@ -26,6 +26,7 @@ _STATE_COLLECTIONS = (
 _FLAG_COLLECTIONS = (
     ("reaction_wheel", "reaction_wheels"),
 )
+_LOSS_FIELDS_UNSET = object()
 
 
 def _text(value, fallback, limit):
@@ -102,7 +103,7 @@ def _unknown_service_result():
 
 
 def _loss_fields(service):
-    """Read the optional 0.2.12 loss ledger without weakening 0.2.10."""
+    """Read the optional 0.2.13 loss ledger without weakening 0.2.10."""
     try:
         loss_status = service.loss_status
     except AttributeError:
@@ -191,7 +192,12 @@ def _loss_fields(service):
     return "known", events
 
 
-def _gather_service_damage(connection):
+def read_loss_fields(service):
+    """Read and validate the aligned loss history for a service snapshot."""
+    return _loss_fields(service)
+
+
+def _gather_service_damage(connection, *, loss_fields=_LOSS_FIELDS_UNSET):
     if connection is None:
         return None
     try:
@@ -325,7 +331,10 @@ def _gather_service_damage(connection):
         ), count
         in sorted(groups.items())
     ]
-    loss_status, loss_events = _loss_fields(service)
+    if loss_fields is _LOSS_FIELDS_UNSET:
+        loss_status, loss_events = _loss_fields(service)
+    else:
+        loss_status, loss_events = loss_fields
     if has_loss_columns and loss_status == "unavailable":
         loss_status = "incomplete"
     return {
@@ -352,7 +361,13 @@ def _gather_service_damage(connection):
     }
 
 
-def gather_part_damage(vessel, *, connection=None, remote_tech_active=False):
+def gather_part_damage(
+    vessel,
+    *,
+    connection=None,
+    remote_tech_active=False,
+    loss_fields=_LOSS_FIELDS_UNSET,
+):
     """Return an additive telemetry bundle for currently broken craft parts.
 
     Prefer the batched in-game VesselDamage service. Older service sets fall
@@ -361,7 +376,10 @@ def gather_part_damage(vessel, *, connection=None, remote_tech_active=False):
     instead of inferred from localized PAW strings.
     """
 
-    service_result = _gather_service_damage(connection)
+    service_result = _gather_service_damage(
+        connection,
+        loss_fields=loss_fields,
+    )
     if service_result is not None:
         return service_result
 

@@ -10,6 +10,8 @@ All notable public changes will be recorded here.
   is deliberately discarded, then remain visible in the focused DAMAGE history.
   The recorder reacts to vessel events and uses a low-frequency part-ID safety
   poll, avoiding full metadata and module scans during steady-state frames.
+  The dashboard revision-gates the persisted loss history so its aligned API
+  arrays are transferred only when that history changes.
 - Added authoritative broken-part monitoring for stock and modded deployable
   equipment, wheels, reaction wheels, and conservative mod failure signals.
   Damage raises Master Warning through a new `DAMAGE` annunciator and opens a

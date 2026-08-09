@@ -259,6 +259,35 @@ class DamageTelemetryTests(unittest.TestCase):
         self.assertEqual(cleared["clearReason"], "intentional_separation")
         self.assertEqual(cleared["clearedUt"], 950.0)
 
+    def test_revision_cached_loss_history_skips_aligned_history_calls(self):
+        service = SimpleNamespace(
+            available=True,
+            checked_part_count=0,
+            checked_module_count=0,
+            status="known",
+            read_error_count=0,
+            damaged_count=0,
+            part_ids=lambda: [],
+            part_names=lambda: [],
+            part_titles=lambda: [],
+            part_tags=lambda: [],
+            module_names=lambda: [],
+            kinds=lambda: [],
+            detectors=lambda: [],
+            conditions=lambda: [],
+            event_ids=lambda: [],
+            supported_detectors=lambda: [],
+        )
+        result = gather_part_damage(
+            SimpleNamespace(),
+            connection=SimpleNamespace(vessel_damage=service),
+            loss_fields=("known", []),
+        )
+
+        self.assertEqual(result["damage.status"], "known")
+        self.assertEqual(result["damage.lossStatus"], "known")
+        self.assertEqual(result["damage.lossEvents"], [])
+
     def test_0211_misaligned_loss_history_is_incomplete_not_empty_known(self):
         service = SimpleNamespace(
             available=True,
