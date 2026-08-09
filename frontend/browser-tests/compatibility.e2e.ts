@@ -384,7 +384,7 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await expect(lamp).toBeVisible();
   await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
   const indicators = page.getByRole("group", { name: "Flight alert indicators" });
-  await expect(indicators.getByRole("button")).toHaveCount(4);
+  await expect(indicators.getByRole("button")).toHaveCount(5);
   const heat = indicators.getByRole("button", { name: "HEAT new warning. Acknowledge." });
   await expect(heat).toHaveClass(/new/);
   expect(await lamp.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
@@ -393,14 +393,22 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   expect(masterRect?.height).toBeGreaterThanOrEqual(48);
 
   await heat.click();
-  await expect(lamp).toHaveAttribute("aria-label", /Master caution clear/);
+  await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
   await expect(indicators.getByRole("button", { name: "HEAT warning acknowledged and still active" })).toHaveClass(/acknowledged/);
+
+  await indicators.getByRole("button", { name: "DAMAGE new warning. Acknowledge and show damaged parts." }).click();
+  const damage = page.getByRole("dialog", { name: "Damage report" });
+  await expect(damage).toBeVisible();
+  await expect(damage.getByRole("heading", { name: "Active 2" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(damage).toBeHidden();
+  await expect(lamp).toHaveAttribute("aria-label", /Master caution clear/);
 
   await lamp.click();
 
   const history = page.getByRole("dialog", { name: "Master caution history" });
   await expect(history).toBeVisible();
-  await expect(history.getByRole("heading", { name: "Active 1" })).toBeVisible();
+  await expect(history.getByRole("heading", { name: "Active 3" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(history).toBeHidden();
   await expect(lamp).toBeFocused();

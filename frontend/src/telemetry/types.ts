@@ -89,6 +89,21 @@ export interface StockHeatPartTelemetry {
   netW?: number;
 }
 
+export type DamagePartKind =
+  | "solar_panel"
+  | "radiator"
+  | "antenna"
+  | "landing_leg"
+  | "wheel"
+  | "reaction_wheel";
+
+export interface DamagePartTelemetry {
+  kind: DamagePartKind;
+  name: string;
+  tag?: string;
+  count: number;
+}
+
 export type ReactorControlAction = "start" | "stop" | "start_charging" | "stop_charging";
 export type ReactorChargeState = "off" | "charging" | "ready" | "running";
 
@@ -526,6 +541,13 @@ export interface TelemetrySnapshot {
   "heat.removedW"?: number;
   "heat.netW"?: number;
   "heat.parts"?: StockHeatPartTelemetry[];
+  "damage.status"?: "known" | "incomplete" | "unknown";
+  "damage.parts"?: DamagePartTelemetry[];
+  "damage.checkedKinds"?: DamagePartKind[];
+  "damage.incompleteKinds"?: string[];
+  "damage.unsupportedKinds"?: DamagePartKind[];
+  "damage.checkedCount"?: number;
+  "damage.damagedCount"?: number;
   "elec.reactors"?: ReactorTelemetry[];
   "elec.reactorsStatus"?: "known" | "not_applicable" | "unknown";
   "elec.sources"?: ElectricitySourceTelemetry[];

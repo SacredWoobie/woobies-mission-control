@@ -200,6 +200,22 @@ SCENES = {
                 ],
             },
         ],
+        "damage.status": "known",
+        "damage.parts": [
+            {"kind": "radiator", "name": "Large Folding Radiator",
+             "tag": "Port loop", "count": 2},
+            {"kind": "solar_panel",
+             "name": "OX-4L 1x6 Photovoltaic Panels", "tag": "",
+             "count": 1},
+        ],
+        "damage.checkedKinds": [
+            "solar_panel", "radiator", "landing_leg", "wheel",
+            "reaction_wheel",
+        ],
+        "damage.incompleteKinds": [],
+        "damage.unsupportedKinds": ["antenna"],
+        "damage.checkedCount": 18,
+        "damage.damagedCount": 3,
         "elec.reactors": [
             {"index": 0, "partId": 42011,
              "name": "MX-2C Hyperion Fission Reactor", "family": "fission",

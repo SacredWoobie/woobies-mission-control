@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Added authoritative broken-part monitoring for supported solar panels,
+  radiators, stock antennas, landing legs, wheels, and reaction wheels. Damage
+  raises Master Warning through a new `DAMAGE` annunciator and opens a focused
+  report identifying the affected part groups. RemoteTech antennas remain
+  unclassified because their current kRPC API has no damage-state property.
 - Updated the dashboard feed and panel bridge runtime contract to kRPC 0.6.0
   with its required protobuf 7.35.1 Python runtime, coherent server-core
   preflight checks, and rebuilt custom-service compatibility versions.
