@@ -181,6 +181,7 @@ $sourceFiles = @(
     @{ Source = 'mission_planning.py'; Destination = 'Dashboard/mission_planning.py' },
     @{ Source = 'planner_persistence.py'; Destination = 'Dashboard/planner_persistence.py' },
     @{ Source = 'resource_snapshot.py'; Destination = 'Dashboard/resource_snapshot.py' },
+    @{ Source = 'stage_snapshot.py'; Destination = 'Dashboard/stage_snapshot.py' },
     @{ Source = 'staging.py'; Destination = 'Dashboard/staging.py' },
     @{ Source = 'telemetry_runtime.py'; Destination = 'Dashboard/telemetry_runtime.py' },
     @{ Source = 'requirements-dashboard.txt'; Destination = 'Dashboard/requirements-dashboard.txt' },

@@ -99,6 +99,28 @@ class FakeAtomicEditorStageStats:
         raise AssertionError("atomic editor path must not make per-row RPCs")
 
 
+class FakeAtomicFlightStageStats:
+    def __init__(self, payload, error=None):
+        self.payload = payload
+        self.error = error
+        self.snapshot_calls = 0
+        self.available_reads = 0
+
+    def flight_stage_snapshot(self):
+        self.snapshot_calls += 1
+        if self.error is not None:
+            raise self.error
+        return self.payload
+
+    @property
+    def available(self):
+        self.available_reads += 1
+        return True
+
+    def stage_count(self):
+        raise AssertionError("atomic Flight path must not make per-row RPCs")
+
+
 class FakeVessel:
     name = "Diagnostic Craft"
     id = "vessel-guid"
@@ -112,6 +134,33 @@ class FakeConnection:
 
 
 class StageDiagnosticsTests(unittest.TestCase):
+    def test_atomic_flight_snapshot_is_exactly_one_service_rpc(self):
+        payload = [
+            1, 6, 7, 1, 2, 2,
+            0, 101.0, 202.0, 0.8, 0.9, 1.1, 20.0,
+            1, 303.0, 404.0, 1.8, 1.9, 2.1, 30.0,
+        ]
+        service = FakeAtomicFlightStageStats(payload)
+        result = telemetry_server._gather_stages(FakeConnection(service))
+
+        self.assertEqual(service.snapshot_calls, 1)
+        self.assertEqual(service.available_reads, 0)
+        self.assertTrue(result["stage.complete"])
+        self.assertEqual(result["stage.flightSnapshotSchema"], 1)
+        self.assertEqual(result["stage.totalDvAtmo"], 404.0)
+        self.assertEqual(result["stage.totalBurnSeconds"], 50.0)
+
+    def test_invalid_atomic_flight_snapshot_uses_legacy_same_poll(self):
+        service = FakeStageStats(count=2, current=1)
+        service.flight_stage_snapshot = lambda: [1, 6, 7, 1, 2, 2]
+
+        with mock.patch.object(telemetry_server, "STAGE_SETTLE_SECONDS", 0):
+            result = telemetry_server._gather_stages(FakeConnection(service))
+
+        self.assertTrue(result["stage.complete"])
+        self.assertNotIn("stage.flightSnapshotSchema", result)
+        self.assertEqual(len(result["stage.stages"]), 2)
+
     def test_atomic_editor_snapshot_replaces_all_per_row_rpcs(self):
         service = FakeAtomicEditorStageStats(editor_snapshot_payload())
         conn = FakeConnection(service)

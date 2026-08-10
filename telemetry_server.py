@@ -45,6 +45,7 @@ from mission_planning import (
     MissionPlanningController,
 )
 from resource_snapshot import decode_resource_snapshot
+from stage_snapshot import decode_flight_stage_snapshot
 from staging import enrich_stage_result, flight_conditions
 from telemetry_runtime import create_telemetry_runtime
 
@@ -67,7 +68,7 @@ RES_IDLE_POLL_SECONDS = 2.0  # Retain useful drain/refill updates while idle.
 RESOURCE_TOPOLOGY_REFRESH_SECONDS = 5.0
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
-STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
+STAGE_SETTLE_SECONDS = 0.12  # legacy row fallback waits for MechJeb's async sim
 EDITOR_SUMMARY_RETRY_SECONDS = 1
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
@@ -1424,8 +1425,9 @@ def _gather_target(conn, vessel):
 #                     = index + (current_ksp - (count - 1))
 #
 # atmo (current-pressure) and vac are both emitted per row; the dashboard picks.
-# The custom service pumps MechJeb's async sim on every read. Prime it, allow
-# MechJeb's 100 ms flight refresh window to complete, then take one snapshot.
+# StageStats 0.2.10+ returns the complete Flight table in one RPC and opens a
+# short server-side demand lease so MechJeb's async job finishes for the next
+# poll. Older services retain the prime/settle/per-field compatibility path.
 # ---------------------------------------------------------------------------
 _EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS = {1: 11, 2: 12}
 _EDITOR_STAGE_SNAPSHOT_ROW_WIDTH = 7
@@ -1580,6 +1582,40 @@ def _gather_stages(
         _stage_trace("service_missing", source=source,
                      error=type(exc).__name__, message=str(exc))
         return {}  # service DLL not installed this session
+
+    if source == "flight":
+        try:
+            result = decode_flight_stage_snapshot(
+                ss.flight_stage_snapshot()
+            )
+            result = enrich_stage_result(None, result)
+            context = (
+                flight_context
+                if isinstance(flight_context, dict)
+                else {}
+            )
+            result.update(flight_conditions(conn, **context))
+            _stage_trace(
+                "atomic_flight_sample",
+                source=source,
+                count=result.get("stage.count"),
+                currentKsp=result.get("stage.currentKsp"),
+                complete=True,
+            )
+            return result
+        except AttributeError:
+            # StageStats 0.2.8 and older retain the existing per-field path.
+            pass
+        except Exception as exc:
+            # A new but incomplete or malformed response gets the same-poll
+            # compatibility path. The first request after a vessel/scene change
+            # may legitimately be priming MechJeb's asynchronous simulation.
+            _stage_trace(
+                "atomic_flight_sample_error",
+                source=source,
+                error=type(exc).__name__,
+                message=str(exc),
+            )
 
     try:
         if not ss.available:

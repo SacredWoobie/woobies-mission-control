@@ -504,6 +504,7 @@ class ReleaseContractTests(unittest.TestCase):
             "mission_planning.py",
             "planner_persistence.py",
             "resource_snapshot.py",
+            "stage_snapshot.py",
             "staging.py",
             "telemetry_runtime.py",
         ):

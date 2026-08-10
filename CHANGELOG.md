@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced Flight staging telemetry to one bounded MechJeb-backed StageStats
+  snapshot per poll when the new service is installed. Older services and
+  invalid or not-yet-complete snapshots retain the existing same-poll fallback;
+  the Flight service now keeps MechJeb's asynchronous simulation warm only for
+  a short period after telemetry demand instead of on every disconnected frame.
 - Reduced Flight resource telemetry to one bounded packed custom-service call
   per poll when WoobiesControlStats 0.2.15 is installed. Older services,
   malformed or stale snapshots, and transient failures retain the existing

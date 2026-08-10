@@ -28,10 +28,10 @@
         @{
             Folder = "KRPC.StageStats"
             File = "KRPC.StageStats.dll"
-            Version = "0.2.8.0"
-            Sha256 = "20DA352A76AB030EBF8B4BD11DB386387CBDCF8567CE54A0F12A5CE2AB512B07"
+            Version = "0.2.10.0"
+            Sha256 = "3DC9EC805D620DA953A6879A721A7B4D2C97B7ACA21FFB2CF25991CAF0E6DDC2"
             License = "MIT"
-            SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"
+            SourceCommit = "4a49d7d0e703b3e03e1916f14d070adb022a2b15"
         }
         @{
             Folder = "KRPC.SystemHeat"
