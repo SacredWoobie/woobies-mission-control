@@ -4,6 +4,9 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced recurring stock-kRPC Flight reads by sharing each cycle's control,
+  orbit, body, and flight proxies plus already-collected body, altitude, and
+  throttle values with staging, current-stage, and SAS telemetry.
 - Reduced kRPC workload from Flight resource telemetry. Resource names,
   capacities, current-stage ownership, and container topology are reused across
   hot amount polls with bounded safety refresh and automatic full-scan

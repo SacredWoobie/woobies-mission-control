@@ -1109,12 +1109,18 @@ def _current_stage_resource_values(vessel, current_stage):
     return None, None, {}
 
 
-def _current_stage(vessel, stage_snapshot=None):
+def _current_stage(vessel, stage_snapshot=None, control=None):
     """Return the active KSP stage from stock kRPC or StageStats."""
     global _HAS_CURRENT_STAGE, _STAGE_STATS_CURRENT_STAGE_REPORTED
     if _HAS_CURRENT_STAGE is not False:
         try:
-            stage = int(vessel.control.current_stage)
+            selected_control = control if control is not None else vessel.control
+            try:
+                stage = int(selected_control.current_stage)
+            except Exception:
+                if control is None:
+                    raise
+                stage = int(vessel.control.current_stage)
             if _HAS_CURRENT_STAGE is None:
                 print("[telemetry] current-stage resources use stock kRPC.")
             _HAS_CURRENT_STAGE = True
@@ -1538,6 +1544,7 @@ def _gather_stages(
     editor_rebuild_verified=False,
     prefer_atomic_editor_snapshot=False,
     atomic_editor_completion_proven=False,
+    flight_context=None,
 ):
     try:
         ss = conn.stage_stats
@@ -1700,7 +1707,8 @@ def _gather_stages(
 
     enrich_stage_result(ss, out)
     if source == "flight":
-        out.update(flight_conditions(conn))
+        context = flight_context if isinstance(flight_context, dict) else {}
+        out.update(flight_conditions(conn, **context))
     return out
 
 
@@ -2987,14 +2995,20 @@ def _gather_science(conn, vessel):
 # ---------------------------------------------------------------------------
 # Telemetry gathering
 # ---------------------------------------------------------------------------
-def _gather_sas(conn, vessel):
+def _gather_sas(conn, vessel, control=None):
     """Return stock SAS and Smart A.S.S. state without coupling either source."""
     result = {}
     try:
-        control = vessel.control
-        result["krpc.sas"] = bool(control.sas)
+        selected_control = control if control is not None else vessel.control
         try:
-            result["krpc.sasMode"] = str(control.sas_mode)
+            result["krpc.sas"] = bool(selected_control.sas)
+        except Exception:
+            if control is None:
+                raise
+            selected_control = vessel.control
+            result["krpc.sas"] = bool(selected_control.sas)
+        try:
+            result["krpc.sasMode"] = str(selected_control.sas_mode)
         except Exception:
             pass
     except Exception:
@@ -4482,11 +4496,17 @@ def _gather_reactor_telemetry(conn):
         return {"elec.reactorsStatus": "unknown"}
 
 
-def _gather_throttle_state(vessel):
+def _gather_throttle_state(vessel, control=None):
     """Return commanded throttle plus limiter-adjusted vessel thrust."""
     out = {}
     try:
-        out["krpc.throttle"] = vessel.control.throttle
+        selected_control = control if control is not None else vessel.control
+        try:
+            out["krpc.throttle"] = selected_control.throttle
+        except Exception:
+            if control is None:
+                raise
+            out["krpc.throttle"] = vessel.control.throttle
     except Exception:
         pass
     try:
@@ -4495,6 +4515,38 @@ def _gather_throttle_state(vessel):
     except Exception:
         pass
     return out
+
+
+def _stage_flight_context(vessel, control, body, flight, telemetry):
+    """Share core Flight reads with the slower StageStats enrichment poll."""
+    known = {}
+    try:
+        body_name = telemetry["v.body"]
+        if body_name is not None:
+            known["stage.body"] = str(body_name)
+    except (KeyError, TypeError, ValueError):
+        pass
+    for source, target, digits in (
+        ("v.altitude", "stage.altitude", 1),
+        ("krpc.throttle", "stage.throttle", 4),
+    ):
+        try:
+            value = telemetry[source]
+            if (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+            ):
+                known[target] = round(float(value), digits)
+        except (KeyError, TypeError, ValueError):
+            pass
+    return {
+        "vessel": vessel,
+        "control": control,
+        "body": body,
+        "flight": flight,
+        "known": known,
+    }
 
 
 def gather_telemetry(conn):
@@ -4583,6 +4635,12 @@ def gather_telemetry(conn):
     d["flight.active"] = True
     d["editor.active"] = False
     now = time.time()
+    control = None
+    try:
+        control = vessel.control
+    except Exception:
+        # Individual consumers retain their original retry/fallback behavior.
+        pass
 
     # ---- clocks (every tick) ----
     universal_time = None
@@ -4606,14 +4664,16 @@ def gather_telemetry(conn):
         pass
 
     # ---- throttle + active-engine thrust ----
-    d.update(_gather_throttle_state(vessel))
+    d.update(_gather_throttle_state(vessel, control=control))
 
     # ---- navball + flight + orbit (every tick; all cheap) ----
+    body = None
+    fbody = None
     try:
-        body = vessel.orbit.body
+        orbit = vessel.orbit
+        body = orbit.body
         srf = vessel.flight(vessel.surface_reference_frame)   # navball attitude
         fbody = vessel.flight(body.reference_frame)           # surface-relative motion
-        orbit = vessel.orbit
 
         d["n.heading"] = srf.heading
         d["n.pitch"] = srf.pitch
@@ -4663,7 +4723,12 @@ def gather_telemetry(conn):
         _stage_last_poll = now
         result = {}
         try:
-            result = _gather_stages(conn)
+            result = _gather_stages(
+                conn,
+                flight_context=_stage_flight_context(
+                    vessel, control, body, fbody, d
+                ),
+            )
             if result:
                 previous_stage_cache = _stage_summary(_stage_cache)
                 _stage_cache = result
@@ -4682,7 +4747,9 @@ def gather_telemetry(conn):
     _trace_stage_publish(d, "flight")
 
     # ---- current stage index ----
-    cs = _current_stage(vessel, _stage_current_authority)
+    cs = _current_stage(
+        vessel, _stage_current_authority, control=control
+    )
     if cs is not None:
         d["krpc.currentStage"] = cs
 
@@ -4772,7 +4839,7 @@ def gather_telemetry(conn):
     # but stock SAS can pulse on briefly before MechJeb turns it back off. Send
     # both sources so the dashboard can keep Smart A.S.S. authoritative during
     # that handoff instead of flashing a stock mode.
-    d.update(_gather_sas(conn, vessel))
+    d.update(_gather_sas(conn, vessel, control=control))
 
     # ---- resources ----
     resource_context = (
