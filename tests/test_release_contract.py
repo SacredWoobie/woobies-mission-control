@@ -249,9 +249,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertRegex(
             manifest,
             r'(?s)Folder = "WoobiesControlStats".*?'
-            r'Version = "0\.2\.14\.0".*?'
-            r'Sha256 = "54A62762F0FF8630111B52ADDB9B56A5B40186E70998FCE0D87F5BAEA29C0BC6".*?'
-            r'SourceCommit = "1f90c972087ae16b1c6bd05848b8ecd45102913f"',
+            r'Version = "0\.2\.15\.0".*?'
+            r'Sha256 = "03666D858473142882E58F04022077EC1AE92E06CC767D54686692889F912B32".*?'
+            r'SourceCommit = "cb4740840e10c95efe1e02d7b9ab4a0a62447544"',
         )
 
     def test_unreleased_manifest_cannot_be_packaged_as_v051(self):
@@ -498,10 +498,12 @@ class ReleaseContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         for module in (
+            "damage.py",
             "electricity.py",
             "heat.py",
             "mission_planning.py",
             "planner_persistence.py",
+            "resource_snapshot.py",
             "staging.py",
             "telemetry_runtime.py",
         ):

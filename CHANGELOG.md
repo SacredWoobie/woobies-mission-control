@@ -4,6 +4,10 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced Flight resource telemetry to one bounded packed custom-service call
+  per poll when WoobiesControlStats 0.2.15 is installed. Older services,
+  malformed or stale snapshots, and transient failures retain the existing
+  optimized stock-kRPC collector as an immediate same-poll fallback.
 - Reduced recurring stock-kRPC Flight reads by sharing each cycle's control,
   orbit, body, and flight proxies plus already-collected body, altitude, and
   throttle values with staging, current-stage, and SAS telemetry.

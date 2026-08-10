@@ -44,6 +44,7 @@ from mission_planning import (
     MAX_ACTION_ID_LENGTH,
     MissionPlanningController,
 )
+from resource_snapshot import decode_resource_snapshot
 from staging import enrich_stage_result, flight_conditions
 from telemetry_runtime import create_telemetry_runtime
 
@@ -1228,6 +1229,33 @@ def _gather_resources(
     except Exception:
         _clear_resource_topology_cache()
         return _gather_resources_full_scan(vessel, current_stage=stage)
+
+
+def _gather_resources_preferred(
+        conn, vessel, current_stage=_CURRENT_STAGE_UNSET,
+        resource_identity=None, now=None):
+    """Prefer one custom-service call, retaining stock fallback in this poll."""
+    stage = (
+        _current_stage(vessel)
+        if current_stage is _CURRENT_STAGE_UNSET
+        else current_stage
+    )
+    try:
+        packed = conn.vessel_resources.packed_snapshot(
+            stage if stage is not None else -1
+        )
+        return decode_resource_snapshot(
+            packed,
+            expected_vessel_id=resource_identity,
+            expected_stage=stage,
+        )
+    except Exception:
+        return _gather_resources(
+            vessel,
+            current_stage=stage,
+            resource_identity=resource_identity,
+            now=now,
+        )
 
 
 def _resource_poll_interval(telemetry):
@@ -4854,7 +4882,8 @@ def gather_telemetry(conn):
     if now - _res_last_poll >= _resource_poll_interval(d):
         _res_last_poll = now
         try:
-            _res_cache = _gather_resources(
+            _res_cache = _gather_resources_preferred(
+                conn,
                 vessel,
                 current_stage=cs,
                 resource_identity=damage_key,
