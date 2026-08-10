@@ -4983,7 +4983,7 @@ def gather_telemetry(conn):
     packed_heat_electricity = None
     if heat_due or elec_due:
         packed_heat_electricity = _gather_heat_electricity_preferred(
-            conn, d["v.guid"]
+            conn, d.get("v.guid")
         )
 
     if heat_due:

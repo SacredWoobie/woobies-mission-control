@@ -73,6 +73,12 @@ class HeatElectricitySnapshotTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertFalse(hasattr(service, "available"))
 
+    def test_accepts_service_authoritative_identity_when_stock_guid_absent(self):
+        result = decode_heat_electricity_snapshot(snapshot())
+
+        self.assertEqual(result["schema"], 1)
+        self.assertEqual(result["heat"]["heat.backend"], "system_heat")
+
     def test_absent_failing_or_malformed_service_signals_same_poll_fallback(self):
         cases = [
             SimpleNamespace(),

@@ -159,7 +159,6 @@ class SharedFlightSnapshotTests(unittest.TestCase):
 
         class Vessel:
             name = "Shared Snapshot"
-            id = "shared-guid"
             met = 12.0
             thrust = 100.0
             available_thrust = 200.0
@@ -203,25 +202,32 @@ class SharedFlightSnapshotTests(unittest.TestCase):
             _stage_last_ut=100.0,
             _damage_cache={"damage.status": "known"},
             _damage_last_poll=100.0,
-            _damage_cache_key="shared-guid",
+            _damage_cache_key="Shared Snapshot",
             _damage_last_ut=100.0,
             _res_cache={"res.status": "known"},
             _res_last_poll=100.0,
-            _res_cache_key=("shared-guid", 3),
+            _res_cache_key=("Shared Snapshot", 3),
             _tgt_cache={},
             _tgt_last_poll=100.0,
             _sci_cache={},
             _sci_last_poll=100.0,
             _heat_cache={},
-            _heat_last_poll=100.0,
+            _heat_last_poll=0.0,
             _elec_cache={},
-            _elec_last_poll=100.0,
+            _elec_last_poll=0.0,
             _HAS_CURRENT_STAGE=True,
         ), mock.patch.object(
             telemetry_server.time, "time", return_value=100.0
         ), mock.patch.object(
             telemetry_server, "_gather_stages", return_value=stage_result
         ) as gather_stages, mock.patch.object(
+            telemetry_server,
+            "_gather_heat_electricity_preferred",
+            return_value={
+                "heat": {"heat.backend": "system_heat"},
+                "electricity": {"elec.reactorsStatus": "known"},
+            },
+        ) as gather_heat_electricity, mock.patch.object(
             telemetry_server,
             "_attach_notes_telemetry",
             side_effect=lambda payload, *_args: payload,
@@ -235,6 +241,7 @@ class SharedFlightSnapshotTests(unittest.TestCase):
         self.assertEqual(counts, {"control": 1, "orbit": 1, "flight": 2})
         self.assertEqual(result["krpc.currentStage"], 3)
         self.assertEqual(result["krpc.sasMode"], "SASMode.prograde")
+        gather_heat_electricity.assert_called_once_with(conn, None)
         context = gather_stages.call_args.kwargs["flight_context"]
         self.assertIs(context["control"], control)
         self.assertIs(context["body"], body)

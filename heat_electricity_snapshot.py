@@ -80,8 +80,15 @@ def _guid(value, label):
         raise ValueError(f"invalid {label}") from exc
 
 
-def decode_heat_electricity_snapshot(payload, *, expected_vessel_id):
-    """Decode one complete identity-matched payload or raise ``ValueError``."""
+def decode_heat_electricity_snapshot(payload, *, expected_vessel_id=None):
+    """Decode one complete, optionally identity-matched packed payload.
+
+    Stock kRPC 0.6.0 doesn't expose KSP's vessel GUID on its ``Vessel`` proxy.
+    When the caller cannot supply one, the service remains the context
+    authority: it keys its demand cache by ``Vessel.id`` and rejects an active
+    vessel change during capture. The GUID stamped into every payload is still
+    required to be valid.
+    """
     if not isinstance(payload, str) or not payload:
         raise ValueError("snapshot payload is not text")
     if len(payload) > MAX_PAYLOAD_CHARS or "\r" in payload:
@@ -96,7 +103,10 @@ def decode_heat_electricity_snapshot(payload, *, expected_vessel_id):
         raise ValueError("unsupported snapshot schema")
 
     vessel_id = _guid(header[2], "snapshot vessel ID")
-    if vessel_id != _guid(expected_vessel_id, "expected vessel ID"):
+    if (
+        expected_vessel_id is not None
+        and vessel_id != _guid(expected_vessel_id, "expected vessel ID")
+    ):
         raise ValueError("snapshot vessel identity is stale")
     heat_available = _boolean(header[3], "heat availability")
     loop_count = _integer(header[4], "loop count", maximum=MAX_LOOPS)
