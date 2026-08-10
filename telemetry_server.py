@@ -61,7 +61,9 @@ SCI_POLL_SECONDS = 5      # science walk is many RPCs
 HEAT_POLL_SECONDS = 1     # heat via the custom kRPC service is cheap
 ELEC_POLL_SECONDS = 1     # per-reactor + solar + RTG
 DAMAGE_POLL_SECONDS = 1   # complete stock breakable-part collections
-RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
+RES_POLL_SECONDS = 0.5    # Fast path while the vessel is producing thrust.
+RES_IDLE_POLL_SECONDS = 2.0  # Retain useful drain/refill updates while idle.
+RESOURCE_TOPOLOGY_REFRESH_SECONDS = 5.0
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
@@ -122,6 +124,8 @@ _damage_loss_cache = None
 _damage_loss_revision = None
 _res_cache = {}
 _res_last_poll = 0.0
+_res_cache_key = None
+_resource_topology_cache = None
 _tgt_cache = {}
 _tgt_last_poll = 0.0
 _stage_cache = {}
@@ -576,6 +580,188 @@ def _resource_values_for_parts(parts):
     return values
 
 
+def _resource_capacities(resources, include_zero=False):
+    """Read the cold names/capacities for one kRPC resource container."""
+    capacities = {}
+    for name in resources.names:
+        if not _is_consumable_resource(name):
+            continue
+        maximum = resources.max(name)
+        if include_zero or maximum > 0:
+            capacities[name] = maximum
+    return capacities
+
+
+def _clear_resource_topology_cache(clear_partition=True):
+    """Discard vessel/stage resource topology and its part assignment."""
+    global _resource_topology_cache, _stage_partition_cache
+    _resource_topology_cache = None
+    if clear_partition:
+        _stage_partition_cache = None
+
+
+def _resource_part_signature(vessel):
+    """Return stable kRPC part object IDs with one bounded part-list read."""
+    parts = list(vessel.parts.all)
+    return tuple(
+        getattr(part, "_object_id", id(part))
+        for part in parts
+    )
+
+
+def _same_resource_vessel(cached, vessel, identity):
+    """Compare a cache context without requiring remote proxies to be hashable."""
+    if identity:
+        return cached.get("identity") == identity
+    try:
+        return cached.get("vessel") == vessel
+    except Exception:
+        return cached.get("vessel") is vessel
+
+
+def _build_stage_resource_topology(vessel, current_stage):
+    """Resolve the current stage once and retain only cold topology data."""
+    for decouple_stage in range(current_stage - 1, -2, -1):
+        resources = vessel.resources_in_decouple_stage(
+            stage=decouple_stage,
+            cumulative=False,
+        )
+        capacities = _resource_capacities(resources)
+        if not capacities:
+            continue
+
+        activation_stage, parts = _stage_partition_parts(
+            vessel, decouple_stage, current_stage
+        )
+        if parts is None:
+            return {
+                "resource_stage": decouple_stage,
+                "activation_stage": None,
+                "capacities": capacities,
+                "sources": [(resources, tuple(capacities))],
+            }
+
+        aggregate_capacities = {}
+        sources = []
+        for part in parts:
+            part_resources = part.resources
+            part_capacities = _resource_capacities(part_resources)
+            if not part_capacities:
+                continue
+            sources.append((part_resources, tuple(part_capacities)))
+            for name, maximum in part_capacities.items():
+                aggregate_capacities[name] = (
+                    aggregate_capacities.get(name, 0.0) + maximum
+                )
+        return {
+            "resource_stage": decouple_stage,
+            "activation_stage": activation_stage,
+            "capacities": aggregate_capacities,
+            "sources": sources,
+        }
+    return None
+
+
+def _build_resource_topology(
+        vessel, current_stage, identity, now, part_signature):
+    """Build a bounded cold snapshot for repeated hot amount reads."""
+    vessel_resources = vessel.resources
+    vessel_capacities = _resource_capacities(
+        vessel_resources,
+        include_zero=True,
+    )
+    stage = None
+    if current_stage is not None:
+        stage = _build_stage_resource_topology(vessel, current_stage)
+    return {
+        "vessel": vessel,
+        "identity": identity,
+        "current_stage": current_stage,
+        "built_at": now,
+        "part_signature": part_signature,
+        "vessel_capacities": vessel_capacities,
+        "vessel_sources": [
+            (vessel_resources, tuple(vessel_capacities))
+        ],
+        "stage": stage,
+    }
+
+
+def _current_resource_topology(vessel, current_stage, identity, now):
+    """Return a matching fresh topology, rebuilding on every context epoch."""
+    global _resource_topology_cache
+    cached = _resource_topology_cache
+    same_context = False
+    if cached is not None:
+        try:
+            same_context = (
+                _same_resource_vessel(cached, vessel, identity)
+                and cached.get("current_stage") == current_stage
+            )
+            if same_context and (
+                now - cached["built_at"] < RESOURCE_TOPOLOGY_REFRESH_SECONDS
+            ):
+                return cached
+        except Exception:
+            same_context = False
+
+    # One part-list read detects docking, undocking, destruction, and mod-driven
+    # topology changes without repeating per-part metadata calls. Preserve the
+    # existing partition only for an expired but otherwise unchanged context.
+    part_signature = _resource_part_signature(vessel)
+    keep_partition = (
+        same_context
+        and cached.get("part_signature") == part_signature
+    )
+    _clear_resource_topology_cache(clear_partition=not keep_partition)
+    topology = _build_resource_topology(
+        vessel,
+        current_stage,
+        identity,
+        now,
+        part_signature,
+    )
+    _resource_topology_cache = topology
+    return topology
+
+
+def _resource_amounts(sources, capacities):
+    """Aggregate hot amounts using cached container handles and resource names."""
+    amounts = {name: 0.0 for name in capacities}
+    for resources, names in sources:
+        for name in names:
+            amounts[name] += resources.amount(name)
+    return amounts
+
+
+def _render_resource_topology(topology):
+    """Project cached cold data plus live amounts into the public schema."""
+    capacities = topology["vessel_capacities"]
+    amounts = _resource_amounts(topology["vessel_sources"], capacities)
+    out = {
+        "res.status": "known",
+        "res.names": list(capacities),
+        "res.stageKnown": topology["current_stage"] is not None,
+    }
+    for name, maximum in capacities.items():
+        out[f"r.resource[{name}]"] = amounts[name]
+        out[f"r.resourceMax[{name}]"] = maximum
+
+    stage = topology.get("stage")
+    if stage is not None:
+        out["res.stageResourceStage"] = stage["resource_stage"]
+        if stage["activation_stage"] is not None:
+            out["res.stageActivationStage"] = stage["activation_stage"]
+        stage_amounts = _resource_amounts(
+            stage["sources"],
+            stage["capacities"],
+        )
+        for name, maximum in stage["capacities"].items():
+            out[f"r.resourceCurrent[{name}]"] = stage_amounts[name]
+            out[f"r.resourceCurrentMax[{name}]"] = maximum
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Notes mod compatibility (zer0Kerbal/Notes)
 # ---------------------------------------------------------------------------
@@ -971,8 +1157,8 @@ def _current_stage_authority(stage_result):
 # ---------------------------------------------------------------------------
 # Resources (vessel total + current stage)
 # ---------------------------------------------------------------------------
-def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
-    """Return vessel and current-stage resources for dashboard rendering."""
+def _gather_resources_full_scan(vessel, current_stage=_CURRENT_STAGE_UNSET):
+    """Original compatibility path for a complete uncached resource scan."""
     out = {"res.status": "known"}
     try:
         res = vessel.resources
@@ -1008,6 +1194,45 @@ def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
             out[f"r.resourceCurrentMax[{name}]"] = maximum
 
     return out
+
+
+def _gather_resources(
+        vessel, current_stage=_CURRENT_STAGE_UNSET,
+        resource_identity=None, now=None):
+    """Return resources using cached cold topology and live hot amounts.
+
+    Any topology-build or cached-proxy failure clears the optimization and
+    returns through the original complete scan in the same poll.
+    """
+    if now is None:
+        now = time.time()
+    stage = (
+        _current_stage(vessel)
+        if current_stage is _CURRENT_STAGE_UNSET
+        else current_stage
+    )
+    try:
+        topology = _current_resource_topology(
+            vessel,
+            stage,
+            resource_identity,
+            now,
+        )
+        return _render_resource_topology(topology)
+    except Exception:
+        _clear_resource_topology_cache()
+        return _gather_resources_full_scan(vessel, current_stage=stage)
+
+
+def _resource_poll_interval(telemetry):
+    """Keep full burn responsiveness without repeating idle topology work."""
+    for key in ("krpc.throttle", "v.thrust"):
+        try:
+            if float(telemetry.get(key, 0.0)) > 0.001:
+                return RES_POLL_SECONDS
+        except (TypeError, ValueError):
+            pass
+    return RES_IDLE_POLL_SECONDS
 
 
 # ---------------------------------------------------------------------------
@@ -4278,6 +4503,7 @@ def gather_telemetry(conn):
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
     global _damage_cache, _damage_last_poll, _damage_cache_key, _damage_last_ut
     global _damage_loss_cache, _damage_loss_revision
+    global _res_cache, _res_last_poll, _res_cache_key
     d = {}
 
     # The game scene is the authoritative signal. A vessel handle may remain
@@ -4309,6 +4535,10 @@ def gather_telemetry(conn):
                 _damage_last_ut = None
                 _damage_loss_cache = None
                 _damage_loss_revision = None
+                _res_cache = {}
+                _res_last_poll = 0.0
+                _res_cache_key = None
+                _clear_resource_topology_cache()
             _telemetry_mode = mode
             _stage_trace_last_published = None
             _editor_bodies_cache = []
@@ -4423,6 +4653,10 @@ def gather_telemetry(conn):
             _stage_cache = {}
             _stage_current_authority = {}
             _stage_last_poll = 0.0
+            _res_cache = {}
+            _res_last_poll = 0.0
+            _res_cache_key = None
+            _clear_resource_topology_cache()
         _stage_last_ut = universal_time
 
     if now - _stage_last_poll >= STAGE_POLL_SECONDS:
@@ -4541,11 +4775,24 @@ def gather_telemetry(conn):
     d.update(_gather_sas(conn, vessel))
 
     # ---- resources ----
-    global _res_cache, _res_last_poll
-    if now - _res_last_poll >= RES_POLL_SECONDS:
+    resource_context = (
+        damage_key or getattr(vessel, "_object_id", id(vessel)),
+        cs,
+    )
+    if damage_reverted or resource_context != _res_cache_key:
+        _res_cache = {}
+        _res_last_poll = 0.0
+        _res_cache_key = resource_context
+        _clear_resource_topology_cache()
+    if now - _res_last_poll >= _resource_poll_interval(d):
         _res_last_poll = now
         try:
-            _res_cache = _gather_resources(vessel, current_stage=cs)
+            _res_cache = _gather_resources(
+                vessel,
+                current_stage=cs,
+                resource_identity=damage_key,
+                now=now,
+            )
         except Exception:
             _res_cache = {"res.status": "unknown"}
     d.update(_res_cache)

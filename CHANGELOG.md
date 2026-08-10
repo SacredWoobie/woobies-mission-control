@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced kRPC workload from Flight resource telemetry. Resource names,
+  capacities, current-stage ownership, and container topology are reused across
+  hot amount polls with bounded safety refresh and automatic full-scan
+  fallback; idle/coasting craft use a slower cadence while commanded or
+  measured thrust retains the existing fast cadence.
 - Added save-persistent unexpected part-loss detection for stock and modded
   craft hardware. Normal staging, undocking, clamp release, EVA construction,
   and fairing jettison remain quiet; losses stay actionable until their branch
