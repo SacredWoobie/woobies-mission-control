@@ -253,6 +253,13 @@ class ReleaseContractTests(unittest.TestCase):
             r'Sha256 = "03666D858473142882E58F04022077EC1AE92E06CC767D54686692889F912B32".*?'
             r'SourceCommit = "cb4740840e10c95efe1e02d7b9ab4a0a62447544"',
         )
+        self.assertRegex(
+            manifest,
+            r'(?s)Folder = "KRPC\.SystemHeat".*?'
+            r'Version = "0\.2\.11\.0".*?'
+            r'Sha256 = "6205C91B64A1B39B7F64BA418AC2CE26CDBC2A68637C2E0C8EA5AB69A6CF8202".*?'
+            r'SourceCommit = "5b15ecd83b95150c7a91006e2c49813a7ea9d6a1"',
+        )
 
     def test_unreleased_manifest_cannot_be_packaged_as_v051(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
@@ -501,6 +508,7 @@ class ReleaseContractTests(unittest.TestCase):
             "damage.py",
             "electricity.py",
             "heat.py",
+            "heat_electricity_snapshot.py",
             "mission_planning.py",
             "planner_persistence.py",
             "resource_snapshot.py",

@@ -40,6 +40,7 @@ from electricity import (
 )
 from damage import gather_part_damage, read_loss_fields
 from heat import enrich_system_heat_result
+from heat_electricity_snapshot import decode_heat_electricity_snapshot
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
     MissionPlanningController,
@@ -3117,6 +3118,17 @@ def _gather_system_heat(conn):
     return enrich_system_heat_result(sh, result)
 
 
+def _gather_heat_electricity_preferred(conn, vessel_id):
+    """Use one strict SystemHeat 0.2.11 call, or signal same-poll fallback."""
+    try:
+        return decode_heat_electricity_snapshot(
+            conn.system_heat.telemetry_snapshot(),
+            expected_vessel_id=vessel_id,
+        )
+    except Exception:
+        return None
+
+
 def _gather_stock_heat(conn):
     """Return stock part thermal telemetry in watts, hottest parts first."""
     stock = conn.stock_thermal
@@ -4965,86 +4977,107 @@ def gather_telemetry(conn):
     # ---- Heat management: System Heat loops, with stock thermal fallback ----
     # System Heat retains its native kW display. Stock part flux is explicitly
     # reported in W so the two backends never silently change scale.
-    global _heat_cache, _heat_last_poll
-    if now - _heat_last_poll >= HEAT_POLL_SECONDS:
+    global _heat_cache, _heat_last_poll, _elec_cache, _elec_last_poll
+    heat_due = now - _heat_last_poll >= HEAT_POLL_SECONDS
+    elec_due = now - _elec_last_poll >= ELEC_POLL_SECONDS
+    packed_heat_electricity = None
+    if heat_due or elec_due:
+        packed_heat_electricity = _gather_heat_electricity_preferred(
+            conn, d["v.guid"]
+        )
+
+    if heat_due:
         _heat_last_poll = now
-        _heat_cache = _gather_heat(conn) or {}
+        packed_heat = (
+            packed_heat_electricity.get("heat")
+            if packed_heat_electricity is not None
+            else None
+        )
+        _heat_cache = packed_heat or _gather_heat(conn) or {}
     d.update(_heat_cache)
 
     # ---- Electricity by source: reactors (custom service) + RTGs + solar ----
-    global _elec_cache, _elec_last_poll
-    if now - _elec_last_poll >= ELEC_POLL_SECONDS:
+    if elec_due:
         _elec_last_poll = now
-        elec = {}
+        elec = (
+            dict(packed_heat_electricity["electricity"])
+            if packed_heat_electricity is not None
+            else {}
+        )
 
-        # Bracket the sequential per-reactor reads with total-generation
-        # samples. Reactor output can change while the RPCs below are in flight;
-        # a residual that exists at only one endpoint is timing skew, not an
-        # `Other` generator family.
-        service_total_before = None
-        try:
-            service_total_before = conn.system_heat.total_electrical_generation()
-        except Exception:
-            pass
-
-        elec.update(_gather_reactor_telemetry(conn))
-
-        try:
-            sh = conn.system_heat
-            elec["rtg.count"] = sh.rtg_count()
-            elec["rtg.outputEcPerSec"] = round(sh.rtg_total_output(), 2)
-        except Exception:
-            pass
-
-        solar_ec = 0.0
-        try:
-            panels = vessel.parts.solar_panels
-            readings = [
-                (sp.energy_flow, sp.sun_exposure) for sp in panels
-            ]
-            readings.extend(curved_solar_readings(vessel.parts))
-            panel_count, total_flow, average_exposure = solar_summary(readings)
-            solar_ec = total_flow
-            elec["solar.count"] = panel_count
-            elec["solar.outputEcPerSec"] = round(total_flow, 2)
-            elec["solar.efficiency"] = round(average_exposure, 3)
-        except Exception:
-            pass
-
-        # ---- Total generation + "all other" ----------------------------------
-        # The service's TotalElectricalGeneration covers reactors + RTGs + fuel
-        # cells + alternators (NOT solar -- we read solar natively above). So the
-        # true vessel total = service total + native solar. "All other" is then
-        # whatever isn't itemized in the reactor/solar/RTG cards: fuel cells,
-        # alternators, and any modded producer the service could read.
-        try:
-            sh = conn.system_heat
-            service_total_after = service_total_before
+        if packed_heat_electricity is None:
+            # Bracket the sequential legacy per-reactor reads with generation
+            # samples. The packed path is already one atomic service capture.
+            service_total_before = None
             try:
-                service_total_after = sh.total_electrical_generation()  # excludes solar
+                service_total_before = (
+                    conn.system_heat.total_electrical_generation()
+                )
             except Exception:
                 pass
-            service_total = latest_generation_total(
-                service_total_before,
-                service_total_after,
-            )
-            if service_total is None:
-                raise RuntimeError("SystemHeat generation total unavailable")
-            total_gen = service_total + solar_ec
 
-            reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
-            rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
-            other = bracketed_generation_remainder(
-                service_total_before,
-                service_total_after,
-                reactor_sum,
-                rtg_ec,
-            )
+            elec.update(_gather_reactor_telemetry(conn))
 
-            elec["elec.totalGenEcPerSec"] = round(total_gen, 2)
-            elec["elec.otherEcPerSec"] = round(other or 0.0, 2)
-        except Exception:
-            pass  # service absent -> dashboard just won't show total/other
+            try:
+                sh = conn.system_heat
+                elec["rtg.count"] = sh.rtg_count()
+                elec["rtg.outputEcPerSec"] = round(sh.rtg_total_output(), 2)
+            except Exception:
+                pass
+
+            solar_ec = 0.0
+            try:
+                panels = vessel.parts.solar_panels
+                readings = [
+                    (sp.energy_flow, sp.sun_exposure) for sp in panels
+                ]
+                readings.extend(curved_solar_readings(vessel.parts))
+                panel_count, total_flow, average_exposure = solar_summary(
+                    readings
+                )
+                solar_ec = total_flow
+                elec["solar.count"] = panel_count
+                elec["solar.outputEcPerSec"] = round(total_flow, 2)
+                elec["solar.efficiency"] = round(average_exposure, 3)
+            except Exception:
+                pass
+
+            # ---- Total generation + "all other" --------------------------
+            # Legacy SystemHeat excludes solar; add the stock/custom readings.
+            try:
+                sh = conn.system_heat
+                service_total_after = service_total_before
+                try:
+                    service_total_after = (
+                        sh.total_electrical_generation()
+                    )  # excludes solar
+                except Exception:
+                    pass
+                service_total = latest_generation_total(
+                    service_total_before,
+                    service_total_after,
+                )
+                if service_total is None:
+                    raise RuntimeError(
+                        "SystemHeat generation total unavailable"
+                    )
+                total_gen = service_total + solar_ec
+
+                reactor_sum = sum(
+                    r["ecPerSec"] for r in elec.get("elec.reactors", [])
+                )
+                rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
+                other = bracketed_generation_remainder(
+                    service_total_before,
+                    service_total_after,
+                    reactor_sum,
+                    rtg_ec,
+                )
+
+                elec["elec.totalGenEcPerSec"] = round(total_gen, 2)
+                elec["elec.otherEcPerSec"] = round(other or 0.0, 2)
+            except Exception:
+                pass  # service absent -> omit total/other
 
         if elec:
             _elec_cache = elec

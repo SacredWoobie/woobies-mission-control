@@ -178,6 +178,7 @@ $sourceFiles = @(
     @{ Source = 'damage.py'; Destination = 'Dashboard/damage.py' },
     @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
     @{ Source = 'heat.py'; Destination = 'Dashboard/heat.py' },
+    @{ Source = 'heat_electricity_snapshot.py'; Destination = 'Dashboard/heat_electricity_snapshot.py' },
     @{ Source = 'mission_planning.py'; Destination = 'Dashboard/mission_planning.py' },
     @{ Source = 'planner_persistence.py'; Destination = 'Dashboard/planner_persistence.py' },
     @{ Source = 'resource_snapshot.py'; Destination = 'Dashboard/resource_snapshot.py' },

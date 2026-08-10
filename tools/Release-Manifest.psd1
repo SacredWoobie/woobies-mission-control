@@ -36,10 +36,10 @@
         @{
             Folder = "KRPC.SystemHeat"
             File = "KRPC.SystemHeat.dll"
-            Version = "0.2.10.0"
-            Sha256 = "4077982BC2F2E6A49383E639695D4A81F1D33D0DE8C7D96E978B581BEED17D28"
+            Version = "0.2.11.0"
+            Sha256 = "6205C91B64A1B39B7F64BA418AC2CE26CDBC2A68637C2E0C8EA5AB69A6CF8202"
             License = "MIT"
-            SourceCommit = "f21a30016ab938e1e2bde1f1bf9e133442e3a45c"
+            SourceCommit = "5b15ecd83b95150c7a91006e2c49813a7ea9d6a1"
         }
         @{
             Folder = "KRPC.WoobiesMechJeb"

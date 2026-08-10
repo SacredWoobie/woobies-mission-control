@@ -4,6 +4,12 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced the one-second Flight heat and electricity workload to one bounded,
+  identity-stamped SystemHeat snapshot when service 0.2.11 is installed. The
+  single capture shares loop/component/radiator, reactor, RTG, generator, and
+  stock/Near Future solar enumeration; older, malformed, stale, or transiently
+  failing services retain the complete same-poll legacy fallback and unchanged
+  radiator/reactor control safeguards.
 - Reduced Flight staging telemetry to one bounded MechJeb-backed StageStats
   snapshot per poll when the new service is installed. Older services and
   invalid or not-yet-complete snapshots retain the existing same-poll fallback;
