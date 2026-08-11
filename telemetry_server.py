@@ -72,6 +72,7 @@ TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # legacy row fallback waits for MechJeb's async sim
 SMART_ASS_NEGATIVE_READY_POLL_SECONDS = 1.0
+REMOTE_TECH_BINDING_REFRESH_SECONDS = 5.0
 EDITOR_SUMMARY_RETRY_SECONDS = 1
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
@@ -169,6 +170,10 @@ _telemetry_mode = None
 _smart_ass_negative_ready_connection = None
 _smart_ass_negative_ready_vessel = None
 _smart_ass_negative_ready_last_poll = 0.0
+_remote_tech_binding_connection = None
+_remote_tech_binding_vessel = None
+_remote_tech_binding_comms = None
+_remote_tech_binding_last_refresh = 0.0
 
 # The mission-control overview deliberately uses independent polling tiers.
 # Current UT is read every frame; larger collections are scanned much less
@@ -3099,6 +3104,25 @@ def _smart_ass_vessel_key(vessel):
     return object_id if object_id is not None else id(vessel)
 
 
+def _clear_remote_tech_binding_cache():
+    global _remote_tech_binding_connection
+    global _remote_tech_binding_vessel
+    global _remote_tech_binding_comms
+    global _remote_tech_binding_last_refresh
+    _remote_tech_binding_connection = None
+    _remote_tech_binding_vessel = None
+    _remote_tech_binding_comms = None
+    _remote_tech_binding_last_refresh = 0.0
+
+
+def _remote_tech_vessel_key(vessel):
+    try:
+        object_id = getattr(vessel, "_object_id", None)
+    except Exception:
+        object_id = None
+    return object_id if object_id is not None else id(vessel)
+
+
 def _gather_sas(conn, vessel, control=None, known=None, now=None):
     """Return stock SAS and Smart A.S.S. state without coupling either source."""
     global _smart_ass_negative_ready_connection
@@ -3152,21 +3176,48 @@ def _gather_sas(conn, vessel, control=None, known=None, now=None):
     return result
 
 
-def _gather_remote_tech(conn, vessel):
-    """Return RemoteTech link fields with one read of each live property."""
+def _gather_remote_tech(conn, vessel, now=None):
+    """Return live RemoteTech fields while reusing its stable vessel binding."""
+    global _remote_tech_binding_connection
+    global _remote_tech_binding_vessel
+    global _remote_tech_binding_comms
+    global _remote_tech_binding_last_refresh
     result = {}
+    current_time = time.time() if now is None else now
+    vessel_key = _remote_tech_vessel_key(vessel)
+    binding_age = current_time - _remote_tech_binding_last_refresh
+    binding_valid = (
+        conn is _remote_tech_binding_connection
+        and vessel_key == _remote_tech_binding_vessel
+        and _remote_tech_binding_comms is not None
+        and 0.0 <= binding_age < REMOTE_TECH_BINDING_REFRESH_SECONDS
+    )
     try:
-        rt = conn.remote_tech
-        available = rt.available
-        result["rt.available"] = available
-        if available:
+        if binding_valid:
+            comms = _remote_tech_binding_comms
+            result["rt.available"] = True
+        else:
+            _clear_remote_tech_binding_cache()
+            rt = conn.remote_tech
+            available = bool(rt.available)
+            result["rt.available"] = available
+            if not available:
+                return result
             comms = rt.comms(vessel)
-            has_connection = comms.has_connection
-            result["rt.hasConnection"] = has_connection
-            result["rt.signalDelay"] = (
-                comms.signal_delay if has_connection else None
-            )
+            if comms is None:
+                raise RuntimeError("RemoteTech returned no vessel binding")
+            _remote_tech_binding_connection = conn
+            _remote_tech_binding_vessel = vessel_key
+            _remote_tech_binding_comms = comms
+            _remote_tech_binding_last_refresh = current_time
+
+        has_connection = comms.has_connection
+        result["rt.hasConnection"] = has_connection
+        result["rt.signalDelay"] = (
+            comms.signal_delay if has_connection else None
+        )
     except Exception:
+        _clear_remote_tech_binding_cache()
         pass  # RemoteTech service not present this session
     return result
 
@@ -4758,6 +4809,7 @@ def gather_telemetry(conn):
         if mode != _telemetry_mode:
             previous_mode = _telemetry_mode
             _clear_smart_ass_api_ready_cache()
+            _clear_remote_tech_binding_cache()
             _stage_trace("mode_transition", previous=previous_mode, current=mode)
             if mode == "flight":
                 _stage_trace("cache_clear", reason="enter_flight",
@@ -4805,6 +4857,7 @@ def gather_telemetry(conn):
         sc = conn.space_center
         vessel = sc.active_vessel
     except Exception:
+        _clear_remote_tech_binding_cache()
         # Connected to kRPC, but no active vessel in a supported context (for
         # example, the tracking station, space center, main menu, or a scene
         # load). The dashboard uses this mode to show its inactive-scene overlay
@@ -4895,6 +4948,7 @@ def gather_telemetry(conn):
     if universal_time is not None:
         if _stage_last_ut is not None and universal_time < _stage_last_ut:
             _clear_smart_ass_api_ready_cache()
+            _clear_remote_tech_binding_cache()
             _stage_trace(
                 "ut_rewind", previousUt=_stage_last_ut,
                 currentUt=universal_time,
@@ -4946,7 +5000,7 @@ def gather_telemetry(conn):
         d["krpc.currentStage"] = cs
 
     # ---- comms: RemoteTech is authoritative here; stock CommNet is the fallback ----
-    d.update(_gather_remote_tech(conn, vessel))
+    d.update(_gather_remote_tech(conn, vessel, now=now))
 
     if not {
         "comm.krpc.canCommunicate", "comm.krpc.signalStrength"

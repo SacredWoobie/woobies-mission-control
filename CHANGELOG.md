@@ -4,6 +4,12 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced recurring RemoteTech telemetry work by reusing each confirmed
+  service/vessel binding for a bounded five-second window while continuing to
+  read connection state and signal delay every dashboard cycle. Vessel, scene,
+  connection, revert, refresh, and error boundaries discard the binding;
+  unavailable services retry immediately, and stock CommNet fallback and
+  telemetry fields retain their prior behavior.
 - Reduced recurring Flight telemetry work by avoiding a redundant stock control
   lookup when packed throttle is already known, reusing each RemoteTech link
   property within its cycle, and polling idle MechJeb planner capabilities and
