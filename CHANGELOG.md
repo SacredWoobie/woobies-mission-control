@@ -18,7 +18,10 @@ All notable public changes will be recorded here.
 - Reduced Flight resource telemetry to one bounded packed custom-service call
   per poll when WoobiesControlStats 0.2.15 is installed. Older services,
   malformed or stale snapshots, and transient failures retain the existing
-  optimized stock-kRPC collector as an immediate same-poll fallback.
+  optimized stock-kRPC collector as an immediate same-poll fallback. Stock
+  kRPC 0.6 clients that cannot expose KSP's vessel GUID now retain the packed
+  path after an active-vessel context check instead of rejecting every valid
+  service-stamped snapshot.
 - Reduced recurring stock-kRPC Flight reads by sharing each cycle's control,
   orbit, body, and flight proxies plus already-collected body, altitude, and
   throttle values with staging, current-stage, and SAS telemetry.
