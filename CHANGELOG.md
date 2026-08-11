@@ -4,6 +4,13 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced recurring Flight telemetry work by avoiding a redundant stock control
+  lookup when packed throttle is already known, reusing each RemoteTech link
+  property within its cycle, and polling idle MechJeb planner capabilities and
+  unavailable SmartASS readiness at a lifecycle-safe one-second cadence. Active
+  planning workers, commands, available SmartASS modes, scene/vessel/reconnect
+  changes, failures, all stock/older-service fallbacks, and telemetry fields
+  retain their prior behavior.
 - Reduced the recurring stock Flight identity, clock, thrust, navball,
   surface-motion, orbit, stage-index, CommNet, and SAS workload to one bounded,
   identity-stamped snapshot when WoobiesControlStats 0.2.16 is installed. The

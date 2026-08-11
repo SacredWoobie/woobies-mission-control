@@ -29,6 +29,29 @@ class _Bomb:
 
 
 class SharedFlightSnapshotTests(unittest.TestCase):
+    def test_staging_known_throttle_never_resolves_control_proxy(self):
+        class Vessel:
+            situation = "VesselSituation.flying"
+
+            @property
+            def control(self):
+                raise AssertionError("known throttle reacquired vessel.control")
+
+        result = staging.flight_conditions(
+            SimpleNamespace(),
+            vessel=Vessel(),
+            body=SimpleNamespace(),
+            flight=SimpleNamespace(static_pressure=0.0),
+            control=None,
+            known={
+                "stage.body": "Kerbin",
+                "stage.altitude": 1234.5,
+                "stage.throttle": 0.42,
+            },
+        )
+
+        self.assertEqual(result["stage.throttle"], 0.42)
+
     def test_staging_reuses_known_scalars_and_cycle_proxies(self):
         class Vessel:
             situation = "VesselSituation.flying"

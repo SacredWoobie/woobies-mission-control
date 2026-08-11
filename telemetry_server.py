@@ -71,6 +71,7 @@ RESOURCE_TOPOLOGY_REFRESH_SECONDS = 5.0
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
 STAGE_SETTLE_SECONDS = 0.12  # legacy row fallback waits for MechJeb's async sim
+SMART_ASS_NEGATIVE_READY_POLL_SECONDS = 1.0
 EDITOR_SUMMARY_RETRY_SECONDS = 1
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
@@ -165,6 +166,9 @@ _editor_rebuild_token = None
 _editor_rebuild_ready = True
 _editor_rebuild_trace_last = None
 _telemetry_mode = None
+_smart_ass_negative_ready_connection = None
+_smart_ass_negative_ready_vessel = None
+_smart_ass_negative_ready_last_poll = 0.0
 
 # The mission-control overview deliberately uses independent polling tiers.
 # Current UT is read every frame; larger collections are scanned much less
@@ -3078,8 +3082,28 @@ def _gather_science(conn, vessel):
 # ---------------------------------------------------------------------------
 # Telemetry gathering
 # ---------------------------------------------------------------------------
-def _gather_sas(conn, vessel, control=None, known=None):
+def _clear_smart_ass_api_ready_cache():
+    global _smart_ass_negative_ready_connection
+    global _smart_ass_negative_ready_vessel
+    global _smart_ass_negative_ready_last_poll
+    _smart_ass_negative_ready_connection = None
+    _smart_ass_negative_ready_vessel = None
+    _smart_ass_negative_ready_last_poll = 0.0
+
+
+def _smart_ass_vessel_key(vessel):
+    try:
+        object_id = getattr(vessel, "_object_id", None)
+    except Exception:
+        object_id = None
+    return object_id if object_id is not None else id(vessel)
+
+
+def _gather_sas(conn, vessel, control=None, known=None, now=None):
     """Return stock SAS and Smart A.S.S. state without coupling either source."""
+    global _smart_ass_negative_ready_connection
+    global _smart_ass_negative_ready_vessel
+    global _smart_ass_negative_ready_last_poll
     result = dict(known) if isinstance(known, dict) else {}
     if "krpc.sas" not in result:
         try:
@@ -3098,14 +3122,52 @@ def _gather_sas(conn, vessel, control=None, known=None):
         except Exception:
             pass
 
+    current_time = time.time() if now is None else now
+    vessel_key = _smart_ass_vessel_key(vessel)
+    negative_ready_age = current_time - _smart_ass_negative_ready_last_poll
+    if (
+        conn is _smart_ass_negative_ready_connection
+        and vessel_key == _smart_ass_negative_ready_vessel
+        and 0.0 <= negative_ready_age < SMART_ASS_NEGATIVE_READY_POLL_SECONDS
+    ):
+        return result
+
     try:
         mj = conn.mech_jeb
-        if mj.api_ready:
-            smart_ass_mode = str(mj.smart_ass.autopilot_mode)
-            result["mj.sasMode"] = smart_ass_mode
-            result["mj.sasActive"] = smart_ass_mode.split(".")[-1].lower() != "off"
+        if not mj.api_ready:
+            _smart_ass_negative_ready_connection = conn
+            _smart_ass_negative_ready_vessel = vessel_key
+            _smart_ass_negative_ready_last_poll = current_time
+            return result
+        # A positive result is deliberately never cached: Smart A.S.S. mode is
+        # live control state and must remain visible every telemetry cycle.
+        _clear_smart_ass_api_ready_cache()
+        smart_ass_mode = str(mj.smart_ass.autopilot_mode)
+        result["mj.sasMode"] = smart_ass_mode
+        result["mj.sasActive"] = smart_ass_mode.split(".")[-1].lower() != "off"
     except Exception:
-        pass
+        # Service/proxy failures are not negative availability. Fail closed in
+        # this frame and retry on the next one instead of caching the error.
+        _clear_smart_ass_api_ready_cache()
+    return result
+
+
+def _gather_remote_tech(conn, vessel):
+    """Return RemoteTech link fields with one read of each live property."""
+    result = {}
+    try:
+        rt = conn.remote_tech
+        available = rt.available
+        result["rt.available"] = available
+        if available:
+            comms = rt.comms(vessel)
+            has_connection = comms.has_connection
+            result["rt.hasConnection"] = has_connection
+            result["rt.signalDelay"] = (
+                comms.signal_delay if has_connection else None
+            )
+    except Exception:
+        pass  # RemoteTech service not present this session
     return result
 
 
@@ -4695,6 +4757,7 @@ def gather_telemetry(conn):
 
         if mode != _telemetry_mode:
             previous_mode = _telemetry_mode
+            _clear_smart_ass_api_ready_cache()
             _stage_trace("mode_transition", previous=previous_mode, current=mode)
             if mode == "flight":
                 _stage_trace("cache_clear", reason="enter_flight",
@@ -4831,6 +4894,7 @@ def gather_telemetry(conn):
     # kRPC omits it.
     if universal_time is not None:
         if _stage_last_ut is not None and universal_time < _stage_last_ut:
+            _clear_smart_ass_api_ready_cache()
             _stage_trace(
                 "ut_rewind", previousUt=_stage_last_ut,
                 currentUt=universal_time,
@@ -4882,15 +4946,7 @@ def gather_telemetry(conn):
         d["krpc.currentStage"] = cs
 
     # ---- comms: RemoteTech is authoritative here; stock CommNet is the fallback ----
-    try:
-        rt = conn.remote_tech
-        d["rt.available"] = rt.available
-        if rt.available:
-            comms = rt.comms(vessel)
-            d["rt.hasConnection"] = comms.has_connection
-            d["rt.signalDelay"] = comms.signal_delay if comms.has_connection else None
-    except Exception:
-        pass  # RemoteTech service not present this session
+    d.update(_gather_remote_tech(conn, vessel))
 
     if not {
         "comm.krpc.canCommunicate", "comm.krpc.signalStrength"
@@ -4980,6 +5036,7 @@ def gather_telemetry(conn):
         vessel,
         control=control,
         known=sas_known,
+        now=now,
     ))
 
     # ---- resources ----

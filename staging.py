@@ -159,13 +159,11 @@ def flight_conditions(
         except Exception:
             pass
     def update_throttle(candidate_control):
+        if "stage.throttle" in conditions:
+            return
         if candidate_control is None:
             candidate_control = vessel.control
-        throttle = (
-            None
-            if "stage.throttle" in conditions
-            else _finite_number(candidate_control.throttle)
-        )
+        throttle = _finite_number(candidate_control.throttle)
         if throttle is not None:
             conditions["stage.throttle"] = round(throttle, 4)
 
