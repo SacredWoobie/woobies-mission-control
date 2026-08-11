@@ -162,6 +162,58 @@ class PreferredResourceCollectorTests(unittest.TestCase):
             now=100.0,
         )
 
+    def test_missing_stock_guid_uses_service_identity_after_context_check(self):
+        service = SimpleNamespace(
+            packed_snapshot=mock.Mock(return_value=snapshot())
+        )
+        vessel = SimpleNamespace()
+        conn = SimpleNamespace(
+            vessel_resources=service,
+            space_center=SimpleNamespace(active_vessel=vessel),
+        )
+        with mock.patch.object(
+            telemetry_server, "_gather_resources"
+        ) as stock:
+            result = telemetry_server._gather_resources_preferred(
+                conn,
+                vessel,
+                current_stage=5,
+                resource_identity="display-name-cache-key",
+                expected_vessel_id=None,
+                now=100.0,
+            )
+
+        service.packed_snapshot.assert_called_once_with(5)
+        stock.assert_not_called()
+        self.assertEqual(result["r.resource[LiquidFuel]"], 100.0)
+
+    def test_missing_stock_guid_rejects_active_vessel_transition(self):
+        service = SimpleNamespace(
+            packed_snapshot=mock.Mock(return_value=snapshot())
+        )
+        vessel = SimpleNamespace()
+        fallback = {"res.status": "known", "source": "stock"}
+        conn = SimpleNamespace(
+            vessel_resources=service,
+            space_center=SimpleNamespace(
+                active_vessel=SimpleNamespace(marker="replacement")
+            ),
+        )
+        with mock.patch.object(
+            telemetry_server, "_gather_resources", return_value=fallback
+        ) as stock:
+            result = telemetry_server._gather_resources_preferred(
+                conn,
+                vessel,
+                current_stage=5,
+                resource_identity="display-name-cache-key",
+                expected_vessel_id=None,
+                now=100.0,
+            )
+
+        self.assertIs(result, fallback)
+        stock.assert_called_once()
+
     def test_invalid_or_failing_service_falls_back_in_same_poll(self):
         fallback = {"res.status": "known", "source": "stock"}
         for behavior in (

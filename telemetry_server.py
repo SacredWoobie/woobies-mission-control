@@ -209,6 +209,7 @@ _stage_partition_cache = None
 _HAS_CURRENT_STAGE = None
 _STAGE_STATS_CURRENT_STAGE_REPORTED = False
 _CURRENT_STAGE_UNSET = object()
+_RESOURCE_IDENTITY_UNSET = object()
 
 
 # ---------------------------------------------------------------------------
@@ -1235,7 +1236,8 @@ def _gather_resources(
 
 def _gather_resources_preferred(
         conn, vessel, current_stage=_CURRENT_STAGE_UNSET,
-        resource_identity=None, now=None):
+        resource_identity=None, now=None,
+        expected_vessel_id=_RESOURCE_IDENTITY_UNSET):
     """Prefer one custom-service call, retaining stock fallback in this poll."""
     stage = (
         _current_stage(vessel)
@@ -1246,9 +1248,24 @@ def _gather_resources_preferred(
         packed = conn.vessel_resources.packed_snapshot(
             stage if stage is not None else -1
         )
+        expected = (
+            resource_identity
+            if expected_vessel_id is _RESOURCE_IDENTITY_UNSET
+            else expected_vessel_id
+        )
+        if expected is None:
+            # Stock kRPC 0.6 doesn't expose KSP's vessel GUID. The packed
+            # service stamps its captured Vessel.id and keys its cache by that
+            # identity; one post-call proxy check prevents publishing a capture
+            # after an active-vessel transition without reviving the stock
+            # per-part topology walk.
+            if conn.space_center.active_vessel != vessel:
+                raise RuntimeError(
+                    "active vessel changed during resource snapshot"
+                )
         return decode_resource_snapshot(
             packed,
-            expected_vessel_id=resource_identity,
+            expected_vessel_id=expected,
             expected_stage=stage,
         )
     except Exception:
@@ -4936,6 +4953,7 @@ def gather_telemetry(conn):
                 current_stage=cs,
                 resource_identity=damage_key,
                 now=now,
+                expected_vessel_id=d.get("v.guid"),
             )
         except Exception:
             _res_cache = {"res.status": "unknown"}
