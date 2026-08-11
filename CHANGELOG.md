@@ -4,6 +4,13 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced the recurring stock Flight identity, clock, thrust, navball,
+  surface-motion, orbit, stage-index, CommNet, and SAS workload to one bounded,
+  identity-stamped snapshot when WoobiesControlStats 0.2.16 is installed. The
+  service reuses kRPC's official SpaceCenter wrappers only on explicit demand;
+  older, malformed, stale, or transiently failing services retain the complete
+  same-cycle stock collector, RemoteTech and SmartASS authority remain
+  independent, and no control behavior changes.
 - Reduced the one-second Flight heat and electricity workload to one bounded,
   identity-stamped SystemHeat snapshot when service 0.2.11 is installed. The
   single capture shares loop/component/radiator, reactor, RTG, generator, and

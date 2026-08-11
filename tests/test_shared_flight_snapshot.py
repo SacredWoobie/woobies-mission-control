@@ -1,9 +1,26 @@
+import base64
 import unittest
 from types import SimpleNamespace
 from unittest import mock
 
 import staging
 import telemetry_server
+
+
+def _encoded(value):
+    return base64.b64encode(value.encode("utf-8")).decode("ascii")
+
+
+def _flight_core_snapshot():
+    return "\t".join([
+        "WCS_FLIGHT_CORE_SNAPSHOT", "1", "1", "known",
+        _encoded("01234567-89ab-cdef-0123-456789abcdef"),
+        _encoded("Packed Core"), _encoded("Kerbin"), _encoded("Flying"),
+        "100", "12", "0.25", "100", "200", "90", "5", "0",
+        "1234.5", "100", "250", "1.2", "2200", "80000", "75000",
+        "120", "360", "0.01", "0.02", "1800", "50662.5", "3",
+        "1", "1", "1", _encoded("Prograde"),
+    ])
 
 
 class _Bomb:
@@ -250,6 +267,84 @@ class SharedFlightSnapshotTests(unittest.TestCase):
             "stage.body": "Kerbin",
             "stage.altitude": 1234.6,
             "stage.throttle": 0.25,
+        })
+
+    def test_packed_core_cycle_avoids_all_stock_hot_scalar_reads(self):
+        class Vessel:
+            _object_id = 42
+
+            def __getattr__(self, name):
+                raise AssertionError(f"unexpected stock Flight read: {name}")
+
+        vessel = Vessel()
+        scene = SimpleNamespace(flight="flight")
+        conn = SimpleNamespace(
+            krpc=SimpleNamespace(game_scene="flight", GameScene=scene),
+            space_center=SimpleNamespace(active_vessel=vessel),
+            vessel_flight_core=SimpleNamespace(
+                packed_snapshot=mock.Mock(return_value=_flight_core_snapshot())
+            ),
+        )
+        stage_result = {"stage.currentKsp": 3}
+
+        with mock.patch.multiple(
+            telemetry_server,
+            _telemetry_mode="flight",
+            _stage_cache={},
+            _stage_current_authority={},
+            _stage_last_poll=0.0,
+            _stage_last_ut=100.0,
+            _damage_cache={"damage.status": "known"},
+            _damage_last_poll=100.0,
+            _damage_cache_key="Packed Core",
+            _damage_last_ut=100.0,
+            _res_cache={"res.status": "known"},
+            _res_last_poll=100.0,
+            _res_cache_key=("Packed Core", 3),
+            _tgt_cache={},
+            _tgt_last_poll=100.0,
+            _sci_cache={},
+            _sci_last_poll=100.0,
+            _heat_cache={},
+            _heat_last_poll=0.0,
+            _elec_cache={},
+            _elec_last_poll=0.0,
+        ), mock.patch.object(
+            telemetry_server.time, "time", return_value=100.0
+        ), mock.patch.object(
+            telemetry_server, "_gather_stages", return_value=stage_result
+        ) as gather_stages, mock.patch.object(
+            telemetry_server,
+            "_gather_heat_electricity_preferred",
+            return_value={
+                "heat": {"heat.backend": "system_heat"},
+                "electricity": {"elec.reactorsStatus": "known"},
+            },
+        ), mock.patch.object(
+            telemetry_server,
+            "_attach_notes_telemetry",
+            side_effect=lambda payload, *_args: payload,
+        ), mock.patch.object(
+            telemetry_server,
+            "_finalize_telemetry",
+            side_effect=lambda _conn, payload: payload,
+        ):
+            result = telemetry_server.gather_telemetry(conn)
+
+        self.assertEqual(result["v.name"], "Packed Core")
+        self.assertEqual(result["krpc.currentStage"], 3)
+        self.assertEqual(result["krpc.sasMode"], "SASMode.prograde")
+        self.assertEqual(result["stage.staticPressureAtm"], 0.5)
+        context = gather_stages.call_args.kwargs["flight_context"]
+        self.assertIsNone(context["control"])
+        self.assertIsNone(context["body"])
+        self.assertIsNone(context["flight"])
+        self.assertEqual(context["known"], {
+            "stage.body": "Kerbin",
+            "stage.altitude": 1234.5,
+            "stage.throttle": 0.25,
+            "stage.staticPressureAtm": 0.5,
+            "stage.situation": "Flying",
         })
 
 

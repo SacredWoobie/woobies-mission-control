@@ -115,18 +115,27 @@ def flight_conditions(
         return conditions
 
     def update_body_conditions(candidate_body, candidate_flight):
+        needs_body = "stage.body" not in conditions
+        needs_altitude = "stage.altitude" not in conditions
+        needs_pressure = "stage.staticPressureAtm" not in conditions
+        if not (needs_body or needs_altitude or needs_pressure):
+            return
         if candidate_body is None:
             candidate_body = vessel.orbit.body
-        if "stage.body" not in conditions:
+        if needs_body:
             conditions["stage.body"] = str(candidate_body.name)
-        if candidate_flight is None:
+        if candidate_flight is None and (needs_altitude or needs_pressure):
             candidate_flight = vessel.flight(candidate_body.reference_frame)
         altitude = (
             None
-            if "stage.altitude" in conditions
+            if not needs_altitude
             else _finite_number(candidate_flight.mean_altitude)
         )
-        pressure_pa = _finite_number(candidate_flight.static_pressure)
+        pressure_pa = (
+            _finite_number(candidate_flight.static_pressure)
+            if needs_pressure
+            else None
+        )
         if altitude is not None:
             conditions["stage.altitude"] = round(altitude, 1)
         if pressure_pa is not None:
@@ -143,11 +152,12 @@ def flight_conditions(
             except Exception:
                 pass
 
-    try:
-        situation = str(vessel.situation).split(".")[-1].replace("_", " ").title()
-        conditions["stage.situation"] = situation
-    except Exception:
-        pass
+    if "stage.situation" not in conditions:
+        try:
+            situation = str(vessel.situation).split(".")[-1].replace("_", " ").title()
+            conditions["stage.situation"] = situation
+        except Exception:
+            pass
     def update_throttle(candidate_control):
         if candidate_control is None:
             candidate_control = vessel.control

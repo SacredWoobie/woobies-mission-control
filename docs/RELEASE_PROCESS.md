@@ -35,9 +35,9 @@ The Unreleased development manifest selects:
 
 | Service | Release |
 | --- | --- |
-| WoobiesControlStats | 0.2.15 |
+| WoobiesControlStats | 0.2.16 |
 | KRPC.StageStats | 0.2.10 |
-| KRPC.SystemHeat | 0.2.10 |
+| KRPC.SystemHeat | 0.2.11 |
 | KRPC.WoobiesMechJeb | 0.8.10 |
 
 This is not the published v0.5.1 service set; that remains documented in

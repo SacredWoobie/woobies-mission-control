@@ -41,6 +41,7 @@ from electricity import (
 from damage import gather_part_damage, read_loss_fields
 from heat import enrich_system_heat_result
 from heat_electricity_snapshot import decode_heat_electricity_snapshot
+from flight_core_snapshot import decode_flight_core_snapshot
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
     MissionPlanningController,
@@ -3077,24 +3078,25 @@ def _gather_science(conn, vessel):
 # ---------------------------------------------------------------------------
 # Telemetry gathering
 # ---------------------------------------------------------------------------
-def _gather_sas(conn, vessel, control=None):
+def _gather_sas(conn, vessel, control=None, known=None):
     """Return stock SAS and Smart A.S.S. state without coupling either source."""
-    result = {}
-    try:
-        selected_control = control if control is not None else vessel.control
+    result = dict(known) if isinstance(known, dict) else {}
+    if "krpc.sas" not in result:
         try:
-            result["krpc.sas"] = bool(selected_control.sas)
-        except Exception:
-            if control is None:
-                raise
-            selected_control = vessel.control
-            result["krpc.sas"] = bool(selected_control.sas)
-        try:
-            result["krpc.sasMode"] = str(selected_control.sas_mode)
+            selected_control = control if control is not None else vessel.control
+            try:
+                result["krpc.sas"] = bool(selected_control.sas)
+            except Exception:
+                if control is None:
+                    raise
+                selected_control = vessel.control
+                result["krpc.sas"] = bool(selected_control.sas)
+            try:
+                result["krpc.sasMode"] = str(selected_control.sas_mode)
+            except Exception:
+                pass
         except Exception:
             pass
-    except Exception:
-        pass
 
     try:
         mj = conn.mech_jeb
@@ -4610,6 +4612,26 @@ def _gather_throttle_state(vessel, control=None):
     return out
 
 
+def _gather_flight_core_preferred(conn, vessel, expected_vessel_id=None):
+    """Return one strict custom Flight snapshot, or ``None`` for stock reads."""
+    try:
+        packed = conn.vessel_flight_core.packed_snapshot()
+        result = decode_flight_core_snapshot(
+            packed,
+            expected_vessel_id=expected_vessel_id,
+        )
+        if expected_vessel_id is None:
+            # Stock kRPC 0.6 omits KSP's vessel GUID. The service stamps the
+            # active vessel's canonical Guid and checks its reference after the
+            # capture; this one post-call proxy check closes the client-side
+            # transition window before any packed values are published.
+            if conn.space_center.active_vessel != vessel:
+                raise RuntimeError("active vessel changed during Flight snapshot")
+        return result
+    except Exception:
+        return None
+
+
 def _stage_flight_context(vessel, control, body, flight, telemetry):
     """Share core Flight reads with the slower StageStats enrichment poll."""
     known = {}
@@ -4622,6 +4644,7 @@ def _stage_flight_context(vessel, control, body, flight, telemetry):
     for source, target, digits in (
         ("v.altitude", "stage.altitude", 1),
         ("krpc.throttle", "stage.throttle", 4),
+        ("stage.staticPressureAtm", "stage.staticPressureAtm", 4),
     ):
         try:
             value = telemetry[source]
@@ -4633,6 +4656,12 @@ def _stage_flight_context(vessel, control, body, flight, telemetry):
                 known[target] = round(float(value), digits)
         except (KeyError, TypeError, ValueError):
             pass
+    try:
+        situation = telemetry["stage.situation"]
+        if situation is not None:
+            known["stage.situation"] = str(situation)
+    except (KeyError, TypeError, ValueError):
+        pass
     return {
         "vessel": vessel,
         "control": control,
@@ -4729,19 +4758,9 @@ def gather_telemetry(conn):
     d["editor.active"] = False
     now = time.time()
     control = None
-    try:
-        control = vessel.control
-    except Exception:
-        # Individual consumers retain their original retry/fallback behavior.
-        pass
-
-    # ---- clocks (every tick) ----
     universal_time = None
-    try:
-        d["v.name"] = vessel.name
-    except Exception:
-        d["v.name"] = ""
-
+    body = None
+    fbody = None
     try:
         vessel_guid = str(_overview_value(vessel, "id", "")).strip()
         if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
@@ -4749,46 +4768,60 @@ def gather_telemetry(conn):
     except Exception:
         pass
 
-    try:
-        universal_time = sc.ut
-        d["t.universalTime"] = universal_time
-        d["v.missionTime"] = vessel.met
-    except Exception:
-        pass
+    # ---- clocks + thrust + navball + Flight/orbit stock core ----
+    # WCS 0.2.16 performs the same official SpaceCenter wrapper reads behind
+    # one demand-only RPC. Absence, invalid data, or a vessel transition falls
+    # through to the complete pre-feature stock path in this same cycle.
+    flight_core = _gather_flight_core_preferred(
+        conn,
+        vessel,
+        expected_vessel_id=d.get("v.guid"),
+    )
+    if flight_core is not None:
+        d.update(flight_core)
+        universal_time = d.get("t.universalTime")
+    else:
+        try:
+            control = vessel.control
+        except Exception:
+            # Individual consumers retain their original retry behavior.
+            pass
+        try:
+            d["v.name"] = vessel.name
+        except Exception:
+            d["v.name"] = ""
+        try:
+            universal_time = sc.ut
+            d["t.universalTime"] = universal_time
+            d["v.missionTime"] = vessel.met
+        except Exception:
+            pass
 
-    # ---- throttle + active-engine thrust ----
-    d.update(_gather_throttle_state(vessel, control=control))
+        d.update(_gather_throttle_state(vessel, control=control))
+        try:
+            orbit = vessel.orbit
+            body = orbit.body
+            srf = vessel.flight(vessel.surface_reference_frame)
+            fbody = vessel.flight(body.reference_frame)
 
-    # ---- navball + flight + orbit (every tick; all cheap) ----
-    body = None
-    fbody = None
-    try:
-        orbit = vessel.orbit
-        body = orbit.body
-        srf = vessel.flight(vessel.surface_reference_frame)   # navball attitude
-        fbody = vessel.flight(body.reference_frame)           # surface-relative motion
-
-        d["n.heading"] = srf.heading
-        d["n.pitch"] = srf.pitch
-        d["n.roll"] = srf.roll
-
-        d["v.altitude"] = fbody.mean_altitude
-        d["v.verticalSpeed"] = fbody.vertical_speed
-        d["v.surfaceSpeed"] = fbody.speed
-        d["v.geeForce"] = fbody.g_force
-        d["v.orbitalVelocity"] = orbit.speed
-
-        d["o.ApA"] = orbit.apoapsis_altitude
-        d["o.PeA"] = orbit.periapsis_altitude
-        d["o.timeToAp"] = orbit.time_to_apoapsis
-        d["o.timeToPe"] = orbit.time_to_periapsis
-        d["o.inclination"] = math.degrees(orbit.inclination)  # kRPC: radians
-        d["o.eccentricity"] = orbit.eccentricity
-        d["o.period"] = orbit.period
-
-        d["v.body"] = body.name
-    except Exception:
-        pass
+            d["n.heading"] = srf.heading
+            d["n.pitch"] = srf.pitch
+            d["n.roll"] = srf.roll
+            d["v.altitude"] = fbody.mean_altitude
+            d["v.verticalSpeed"] = fbody.vertical_speed
+            d["v.surfaceSpeed"] = fbody.speed
+            d["v.geeForce"] = fbody.g_force
+            d["v.orbitalVelocity"] = orbit.speed
+            d["o.ApA"] = orbit.apoapsis_altitude
+            d["o.PeA"] = orbit.periapsis_altitude
+            d["o.timeToAp"] = orbit.time_to_apoapsis
+            d["o.timeToPe"] = orbit.time_to_periapsis
+            d["o.inclination"] = math.degrees(orbit.inclination)
+            d["o.eccentricity"] = orbit.eccentricity
+            d["o.period"] = orbit.period
+            d["v.body"] = body.name
+        except Exception:
+            pass
 
     # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
     # Revert-to-launch rewinds universal time while the process and kRPC
@@ -4840,9 +4873,11 @@ def gather_telemetry(conn):
     _trace_stage_publish(d, "flight")
 
     # ---- current stage index ----
-    cs = _current_stage(
-        vessel, _stage_current_authority, control=control
-    )
+    cs = d.get("krpc.currentStage") if flight_core is not None else None
+    if cs is None:
+        cs = _current_stage(
+            vessel, _stage_current_authority, control=control
+        )
     if cs is not None:
         d["krpc.currentStage"] = cs
 
@@ -4857,12 +4892,15 @@ def gather_telemetry(conn):
     except Exception:
         pass  # RemoteTech service not present this session
 
-    try:
-        c = vessel.comms
-        d["comm.krpc.canCommunicate"] = c.can_communicate
-        d["comm.krpc.signalStrength"] = c.signal_strength
-    except Exception:
-        pass  # no antenna / no CommNet
+    if not {
+        "comm.krpc.canCommunicate", "comm.krpc.signalStrength"
+    }.issubset(d):
+        try:
+            c = vessel.comms
+            d["comm.krpc.canCommunicate"] = c.can_communicate
+            d["comm.krpc.signalStrength"] = c.signal_strength
+        except Exception:
+            pass  # no antenna / no CommNet
 
     # ---- Authoritative broken craft parts ---------------------------------
     # Bind the cache to the active vessel and UT lifecycle so a vessel switch
@@ -4932,7 +4970,17 @@ def gather_telemetry(conn):
     # but stock SAS can pulse on briefly before MechJeb turns it back off. Send
     # both sources so the dashboard can keep Smart A.S.S. authoritative during
     # that handoff instead of flashing a stock mode.
-    d.update(_gather_sas(conn, vessel, control=control))
+    sas_known = {
+        key: d[key]
+        for key in ("krpc.sas", "krpc.sasMode")
+        if key in d
+    }
+    d.update(_gather_sas(
+        conn,
+        vessel,
+        control=control,
+        known=sas_known,
+    ))
 
     # ---- resources ----
     resource_context = (
