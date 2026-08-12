@@ -117,19 +117,20 @@ export function calculateElectricityPlan(input: {
   const selected = selectedComponents(input.components, input.included);
   const generation = roleTotal(selected, "producer", solarScale);
   const draw = roleTotal(selected, "consumer", solarScale);
+  const solarGeneration = roleTotal(selected.filter((component) => component.solarScaled), "producer", solarScale);
+  const nonSolarGeneration = roleTotal(selected.filter((component) => !component.solarScaled), "producer", solarScale);
   const net = generation === undefined || draw === undefined ? undefined : generation - draw;
   const currentEc = finiteNonNegative(input.currentEc);
   const maxEc = finiteNonNegative(input.maxEc);
   const eclipse = maximumCentralEclipseSeconds(input.body, input.scenario.altitudeMeters);
-  const eclipseRequired = draw === undefined || eclipse === undefined ? undefined : draw * eclipse;
+  const eclipseRequired = draw === undefined || eclipse === undefined || nonSolarGeneration === undefined
+    ? undefined : Math.max(0, draw - nonSolarGeneration) * eclipse;
   const margin = currentEc === undefined || eclipseRequired === undefined ? undefined : currentEc - eclipseRequired;
   const endurance = currentEc === undefined || net === undefined || net >= 0 ? undefined : currentEc / -net;
   const recharge = currentEc === undefined || maxEc === undefined || net === undefined || net <= 0
     ? undefined : Math.max(0, maxEc - currentEc) / net;
 
   const period = circularOrbitSeconds(input.body, input.scenario.altitudeMeters);
-  const solarGeneration = roleTotal(selected.filter((component) => component.solarScaled), "producer", solarScale);
-  const nonSolarGeneration = roleTotal(selected.filter((component) => !component.solarScaled), "producer", solarScale);
   const recurringOrbitSustainable = period === undefined || eclipse === undefined || draw === undefined
     || solarGeneration === undefined || nonSolarGeneration === undefined
     ? undefined

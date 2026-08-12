@@ -1985,6 +1985,19 @@ button { font: inherit; }
   .editor-mode .editor-staging-slice .stage-table.editor { max-height: clamp(210px,31vh,285px); overflow: auto; scrollbar-width: thin; }
   .editor-mode .editor-staging-slice .stage-table.editor .st-head { position: sticky; z-index: 1; top: 0; }
   .editor-mode .editor-orbit-plan-slice, .editor-mode .editor-delta-v-plan-slice { width: 100%; align-self: start; }
+  .editor-mode .editor-electricity-panel .body { gap: 6px; padding: 7px; }
+  .editor-mode .editor-electricity-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .editor-mode .editor-electricity-assessment { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .editor-mode .editor-electricity-metric { padding: 4px 6px; }
+  .editor-mode .editor-electricity-controls { display: grid; grid-template-columns: minmax(110px,125px) minmax(135px,160px) minmax(0,1fr); align-items: end; }
+  .editor-mode .editor-electricity-presets { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); min-width: 0; }
+  .editor-mode .editor-electricity-presets button { min-width: 0; padding-inline: 4px; white-space: nowrap; }
+  .editor-mode .editor-electricity-categories { grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 112px; gap: 1px; border: 1px solid var(--slate-dim); background: var(--slate-dim); }
+  .editor-mode .editor-electricity-category { min-width: 0; border: 0; background: var(--panel-2); }
+  .editor-mode .editor-electricity-category-button { overflow: hidden; gap: 5px; }
+  .editor-mode .editor-electricity-category-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editor-mode .editor-electricity-categories:has(.editor-electricity-components) { grid-template-columns: minmax(0,1fr); }
+  .editor-mode .editor-electricity-components { max-height: 96px; overflow: auto; }
 }
 
 @media (orientation: landscape) and (min-width: 1220px) {

@@ -368,8 +368,11 @@ describe("Dashboard lifecycle", () => {
     expect(editorWorkspace?.classList.contains("no-planning-companion")).toBe(true);
     expect(editorWorkspace?.firstElementChild?.id).toBe("editorContext");
     expect(editorContent?.firstElementChild).toBe(editorPrimary);
-    expect(editorPrimary?.firstElementChild?.classList.contains("editor-staging-slice")).toBe(true);
-    expect(editorPrimary?.lastElementChild?.id).toBe("editorSummary");
+    expect(editorPrimary?.firstElementChild?.id).toBe("editorElectricity");
+    const editorAnalysisPair = editorPrimary?.lastElementChild;
+    expect(editorAnalysisPair?.classList.contains("editor-analysis-pair")).toBe(true);
+    expect(editorAnalysisPair?.firstElementChild?.classList.contains("editor-staging-slice")).toBe(true);
+    expect(editorAnalysisPair?.lastElementChild?.id).toBe("editorSummary");
     expect(editorSecondary?.querySelector("#editorSummary")).toBeNull();
     expect(screen.getByLabelText("Reference body")).toBeTruthy();
 

@@ -23,9 +23,23 @@ describe("editor electricity planner model", () => {
     expect(plan.drawEcPerSec).toBe(0.5);
     expect(plan.netEcPerSec).toBeCloseTo(2.3);
     expect(plan.rechargeSeconds).toBeCloseTo(200 / 2.3);
-    expect(plan.eclipseRequiredEc).toBeGreaterThan(0);
+    expect(plan.eclipseRequiredEc).toBe(0);
     expect(plan.recurringOrbitSustainable).toBe(true);
     expect(plan.solarScaleAssumption).toBe(1);
+  });
+
+  it("credits non-solar generation during eclipse battery sizing", () => {
+    const plan = calculateElectricityPlan({
+      components,
+      included: {},
+      currentEc: 300,
+      maxEc: 500,
+      body,
+      scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
+    });
+    expect(plan.eclipseRequiredEc).toBeCloseTo(
+      Math.max(0, 0.5 - 0.8) * plan.eclipseDurationSeconds!,
+    );
   });
 
   it("propagates unknown modules and solar assumptions rather than treating them as zero", () => {

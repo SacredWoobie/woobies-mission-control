@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { representativeElectricityFixture } from "../electricityPlanner/fixtures";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 import { EditorElectricityPanel } from "./EditorElectricityPanel";
@@ -7,6 +9,8 @@ import { EditorElectricityPanel } from "./EditorElectricityPanel";
 function renderPanel() {
   return render(<PanelVisibilityProvider><EditorElectricityPanel snapshot={representativeElectricityFixture} /></PanelVisibilityProvider>);
 }
+
+afterEach(cleanup);
 
 describe("EditorElectricityPanel", () => {
   it("renders editor-only planning outputs and the conservative assumptions", () => {
@@ -22,9 +26,9 @@ describe("EditorElectricityPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Producers off" }));
     fireEvent.click(screen.getByRole("button", { name: /Solar/ }));
     const toggle = screen.getByRole("checkbox", { name: /OX-4L/ });
-    expect(toggle).not.toBeChecked();
+    expect((toggle as HTMLInputElement).checked).toBe(false);
     fireEvent.click(toggle);
-    expect(toggle).toBeChecked();
+    expect((toggle as HTMLInputElement).checked).toBe(true);
   });
 
   it("makes unavailable analysis explicit", () => {
