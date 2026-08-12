@@ -226,7 +226,15 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(v051_product, "0.5.1")
         self.assertEqual(v051_services["WoobiesControlStats"], "0.2.7.0")
 
-    def test_v060_release_manifest_records_krpc_060_service_cohort(self):
+    def test_v060_release_pack_remains_immutable(self):
+        v060_product, v060_services = read_manifest(
+            ROOT / "tools" / "Release-Pack-v0.6.0.psd1"
+        )
+
+        self.assertEqual(v060_product, "0.6.0")
+        self.assertEqual(v060_services["WoobiesControlStats"], "0.2.16.0")
+
+    def test_v061_release_manifest_records_krpc_060_service_cohort(self):
         manifest = (
             ROOT / "tools" / "Release-Manifest.psd1"
         ).read_text(encoding="utf-8")
@@ -237,7 +245,7 @@ class ReleaseContractTests(unittest.TestCase):
         spec.loader.exec_module(launcher)
 
         self.assertIn('ReleaseState = "Release"', manifest)
-        self.assertIn('ProductVersion = "0.6.0"', manifest)
+        self.assertIn('ProductVersion = "0.6.1"', manifest)
         self.assertIn('Version = "0.6.0"', manifest)
         self.assertIn(
             'PackageSha256 = "6B4399A8DB57C41DD15323FCD79DC3AA440999AEFED808729A5C850BAC1A17C8"',
@@ -262,7 +270,7 @@ class ReleaseContractTests(unittest.TestCase):
             r'SourceCommit = "5b15ecd83b95150c7a91006e2c49813a7ea9d6a1"',
         )
 
-    def test_v060_release_pack_matches_the_selected_manifest(self):
+    def test_v061_release_pack_matches_the_selected_manifest(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
             encoding="utf-8"
         )
@@ -273,15 +281,15 @@ class ReleaseContractTests(unittest.TestCase):
             ROOT / "tools" / "Release-Manifest.psd1"
         )
         pack_product, pack_services = read_manifest(
-            ROOT / "tools" / "Release-Pack-v0.6.0.psd1"
+            ROOT / "tools" / "Release-Pack-v0.6.1.psd1"
         )
 
         self.assertIn("$manifest.ReleaseState -eq 'Unreleased'", publish_script)
         self.assertIn("Choose and align the product release version", publish_script)
-        self.assertEqual(manifest_product, "0.6.0")
+        self.assertEqual(manifest_product, "0.6.1")
         self.assertEqual(pack_product, manifest_product)
         self.assertEqual(pack_services, manifest_services)
-        self.assertIn("v0.6.0 release manifest selects", release_process)
+        self.assertIn("v0.6.1 release manifest selects", release_process)
 
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
@@ -316,14 +324,14 @@ class ReleaseContractTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn(
-            "Current public release: **[v0.6.0]"
+            "Current public release: **[v0.6.1]"
             "(https://github.com/SacredWoobie/woobies-mission-control/"
-            "releases/tag/v0.6.0)**",
+            "releases/tag/v0.6.1)**",
             readme,
         )
-        self.assertIn("The v0.6.0 public release selects", readme)
+        self.assertIn("The v0.6.1 public release selects", readme)
         self.assertNotIn("Next release candidate", readme)
-        self.assertNotIn("v0.6.0 release candidate", readme)
+        self.assertNotIn("v0.6.1 release candidate", readme)
 
     def test_only_react_loopback_runtime_is_supported(self):
         self.assertFalse((ROOT / "ksp_mission_dashboard.html").exists())
@@ -444,17 +452,17 @@ class ReleaseContractTests(unittest.TestCase):
                 "zz-05-flight-plan-workspace.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.6.0.zip"
+        zip_name = "Woobies-Mission-Control-v0.6.1.zip"
         checksum_name = f"{zip_name}.sha256"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.6.0.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.6.1.{name}" for name in image_names
         ]
         source_archive_name = (
-            "Woobies-Mission-Control-v0.6.0.zz-00-"
+            "Woobies-Mission-Control-v0.6.1.zz-00-"
             "KRPC.WoobiesMechJeb-0.8.10-source.zip"
         )
         update_name = (
-            "Woobies-Mission-Control-v0.6.0.zz-90-runtime-update.zip"
+            "Woobies-Mission-Control-v0.6.1.zz-90-runtime-update.zip"
         )
         update_checksum_name = f"{update_name}.sha256"
         self.assertEqual(
@@ -573,6 +581,24 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("persistent unexpected part-loss detection", release_section)
         self.assertIn("`DAMAGE` annunciator", release_section)
         self.assertIn("kRPC 0.6.0", release_section)
+        for internal_term in (
+            "worktree",
+            "spike/",
+            "profiler",
+            "audit lane",
+            "process development",
+        ):
+            self.assertNotIn(internal_term, release_section.casefold())
+
+    def test_v061_release_notes_explain_the_updater_bootstrap(self):
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        release_section = changelog.split(
+            "## v0.6.1 - Managed runtime updates", 1
+        )[1].split("\n## ", 1)[0]
+
+        self.assertIn("explicitly confirmed in-app updater", release_section)
+        self.assertIn("one normal full-package install", release_section)
+        self.assertIn("never writes the user's selected live KSP", release_section)
         for internal_term in (
             "worktree",
             "spike/",

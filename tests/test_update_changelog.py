@@ -107,9 +107,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("kRPC 0.6 and faster Flight telemetry", section)
-        self.assertIn("persistent unexpected part-loss detection", section)
-        self.assertIn("`DAMAGE` annunciator", section)
+        self.assertIn("Managed runtime updates", section)
+        self.assertIn("explicitly confirmed in-app updater", section)
+        self.assertIn("never writes the user's selected live KSP", section)
 
 
 if __name__ == "__main__":
