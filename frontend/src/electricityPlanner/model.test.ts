@@ -71,6 +71,18 @@ describe("editor electricity planner model", () => {
     expect(scenario.solarScale).toBe(0.962);
   });
 
+  it("treats the zero body-efficiency sentinel as unavailable sunlight", () => {
+    const zeroEfficiencyBody = { ...body, solarEfficiency: 0 };
+    const snapshot = { ...representativeElectricityFixture, "editor.elec.bodies": [zeroEfficiencyBody] };
+    expect(defaultElectricityScenario(snapshot).solarScale).toBeUndefined();
+    const plan = calculateElectricityPlan({
+      components: [components[0]], included: {}, body: zeroEfficiencyBody,
+      scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 0 },
+    });
+    expect(plan.solarScaleAssumption).toBeUndefined();
+    expect(plan.generationEcPerSec).toBeUndefined();
+  });
+
   it("keeps representative, dense, missing, and degraded telemetry states distinct", () => {
     expect(representativeElectricityFixture["editor.elec.status"]).toBe("ready");
     expect(denseElectricityFixture["editor.elec.components"]).toHaveLength(48);

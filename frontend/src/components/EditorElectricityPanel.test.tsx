@@ -5,9 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { representativeElectricityFixture } from "../electricityPlanner/fixtures";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 import { EditorElectricityPanel } from "./EditorElectricityPanel";
+import type { TelemetrySnapshot } from "../telemetry/types";
 
-function renderPanel() {
-  return render(<PanelVisibilityProvider><EditorElectricityPanel snapshot={representativeElectricityFixture} /></PanelVisibilityProvider>);
+function renderPanel(snapshot: TelemetrySnapshot = representativeElectricityFixture) {
+  return render(<PanelVisibilityProvider><EditorElectricityPanel snapshot={snapshot} /></PanelVisibilityProvider>);
 }
 
 afterEach(cleanup);
@@ -39,5 +40,12 @@ describe("EditorElectricityPanel", () => {
   it("makes unavailable analysis explicit", () => {
     render(<PanelVisibilityProvider><EditorElectricityPanel snapshot={{ ...representativeElectricityFixture, "editor.elec.status": "unavailable" }} /></PanelVisibilityProvider>);
     expect(screen.getByText(/Electricity analysis is unavailable/)).toBeTruthy();
+  });
+
+  it("shows unresolved body illumination as unavailable rather than zero percent", () => {
+    const body = representativeElectricityFixture["editor.elec.bodies"]![0];
+    renderPanel({ ...representativeElectricityFixture, "editor.elec.bodies": [{ ...body, solarEfficiency: 0 }] });
+    expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0);
+    expect(screen.queryByText("0.0%")).toBeNull();
   });
 });

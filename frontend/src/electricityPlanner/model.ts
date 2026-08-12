@@ -50,7 +50,7 @@ export function defaultElectricityScenario(snapshot: TelemetrySnapshot): Electri
   return {
     bodyName,
     altitudeMeters: atmosphereDepth === undefined ? undefined : atmosphereDepth + 10_000,
-    solarScale: finiteNonNegative(body?.solarEfficiency),
+    solarScale: positive(body?.solarEfficiency),
   };
 }
 
@@ -113,7 +113,9 @@ export function calculateElectricityPlan(input: {
   body?: EditorElectricityBodyTelemetry;
   scenario: ElectricityScenario;
 }): ElectricityPlan {
-  const solarScale = finiteNonNegative(input.scenario.solarScale);
+  // Zero is the wire sentinel for unresolved star/luminosity data, not a
+  // confidently known zero-sunlight environment.
+  const solarScale = positive(input.scenario.solarScale);
   const selected = selectedComponents(input.components, input.included);
   const generation = roleTotal(selected, "producer", solarScale);
   const draw = roleTotal(selected, "consumer", solarScale);
