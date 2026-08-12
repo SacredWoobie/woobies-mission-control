@@ -4,6 +4,13 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Kept live altitude and distance readouts within their intended width when a
+  rounded value crosses a precision or unit boundary, such as 99,999.6 m
+  becoming 100.00 km instead of 100.000 km.
+- Expanded Mock Mission Control's Flight scene with a repeating altitude
+  stress cycle spanning short values and km, Mm, and Gm rollover boundaries so
+  display-width regressions remain visible during routine UI checks.
+
 ## v0.6.1 - Managed runtime updates
 
 - Added an explicitly confirmed in-app updater for updater-capable release

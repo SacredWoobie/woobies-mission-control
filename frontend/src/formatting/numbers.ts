@@ -200,12 +200,32 @@ function distanceBand(
   return { scale: 1e9, decimals: 1, unit: "Gm" };
 }
 
+function displayDistanceBand(
+  magnitude: number,
+  preset: DistancePreset,
+) {
+  let band = distanceBand(magnitude, preset);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const roundedMagnitude = Number(fixed(magnitude / band.scale, band.decimals, false)) * band.scale;
+    const roundedBand = distanceBand(roundedMagnitude, preset);
+    if (
+      roundedBand.scale === band.scale
+      && roundedBand.decimals === band.decimals
+      && roundedBand.unit === band.unit
+    ) {
+      return band;
+    }
+    band = roundedBand;
+  }
+  return band;
+}
+
 export function formatDistance(
   meters: number | undefined,
   preset: DistancePreset,
 ) {
   if (!isFiniteNumber(meters)) return UNAVAILABLE;
-  const band = distanceBand(Math.abs(meters), preset);
+  const band = displayDistanceBand(Math.abs(meters), preset);
   return `${fixed(meters / band.scale, band.decimals)}${THIN_SPACE}${band.unit}`;
 }
 
