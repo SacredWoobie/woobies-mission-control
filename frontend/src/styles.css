@@ -964,17 +964,17 @@ button { font: inherit; }
   min-width: 0;
 }
 .flight-workspace-shell[data-fixed-empty="true"] { grid-template-areas: "status" "controls" "tabbed"; }
-.flight-workspace-shell > .status-strip { grid-area: status; min-width: 0; margin: 0 0 0 8px; }
+.flight-workspace-shell > .status-strip { grid-area: status; min-width: 0; margin: 0; }
 .flight-fixed-region {
   grid-area: fixed;
   display: flex;
   align-self: start;
   width: 100%;
   min-width: 0;
-  padding: 8px;
+  padding: 0;
   flex-direction: column;
   gap: 12px;
-  background: color-mix(in srgb,var(--panel) 28%,transparent);
+  background: transparent;
 }
 .flight-fixed-bottom-row { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; align-items: start; }
 .flight-fixed-region[data-bottom-layout="two-up"] .flight-fixed-bottom-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -983,39 +983,11 @@ button { font: inherit; }
   align-self: start;
   width: 100%;
   min-width: 0;
-  padding: 8px;
-  background: color-mix(in srgb,var(--panel) 20%,transparent);
+  padding: 0;
+  background: transparent;
 }
-/* Flight is the dashboard's hardware-forward scene. These frames stay on the
-   two persistent regions so the panel layout, selector, and mounted panel
-   identities remain entirely structural rather than decorative. */
-.flight-fixed-region,
-.flight-tabbed-region {
-  position: relative;
-  isolation: isolate;
-  border: 1px solid var(--surface-seam);
-  border-radius: var(--surface-radius-bezel);
-  background: var(--surface-plate);
-  box-shadow: var(--surface-depth-raised);
-}
-.flight-fixed-region::before,
-.flight-tabbed-region::before {
-  position: absolute;
-  z-index: 0;
-  inset: 4px;
-  border: 1px solid color-mix(in srgb,var(--surface-seam) 60%,transparent);
-  border-radius: calc(var(--surface-radius-bezel) - 1px);
-  background:
-    radial-gradient(circle at 3px 3px,var(--surface-well) 0 3px,transparent 3.5px),
-    radial-gradient(circle at calc(100% - 3px) 3px,var(--surface-well) 0 3px,transparent 3.5px),
-    radial-gradient(circle at 3px calc(100% - 3px),var(--surface-well) 0 3px,transparent 3.5px),
-    radial-gradient(circle at calc(100% - 3px) calc(100% - 3px),var(--surface-well) 0 3px,transparent 3.5px);
-  box-shadow: var(--surface-depth-recessed);
-  content: "";
-  pointer-events: none;
-}
-.flight-fixed-region > *,
-.flight-tabbed-region > * { position: relative; z-index: 1; }
+/* Persistent Flight regions are layout owners only. Their child panels and
+   control plate provide the scene's hardware edges without nested chassis. */
 
 /* Four context cells and read-only Flight instruments sit below their face,
    while controls retain their established raised treatment. Dense inventory
@@ -1370,13 +1342,6 @@ button { font: inherit; }
   .panel-compact#flightNote .notes-font-controls button { min-height: 36px; }
 }
 @media (pointer: fine) and (orientation: landscape) and (min-width: 1500px) and (max-height: 900px) {
-  /* The Flight footer remains absolutely anchored in the short desktop view.
-     Feather only the lower edge of the fixed chassis so its new plate face
-     does not turn the footer into an unreadable overlay. The bezel, inset
-     seam, and mounted panels retain their normal geometry and depth. */
-  .flight-fixed-region {
-    background: linear-gradient(180deg, #101722 0%, #0b1018 calc(100% - 38px), rgba(11,16,24,.18) calc(100% - 20px), transparent 100%);
-  }
   .flight-workspace-shell #target > .body { display: grid; align-items: start; grid-template-columns: minmax(0,1fr) 112px; gap: 8px; }
   .flight-workspace-shell #target .target-command-feedback,
   .flight-workspace-shell #target .tgt-name { grid-column: 1 / -1; }
@@ -2457,8 +2422,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .panel-hide-button,
   .panel-collapse-button { border-color: currentColor; }
 
-  .flight-fixed-region::before,
-  .flight-tabbed-region::before { display: none; }
 }
 
 @container (max-width: 460px) {
@@ -2469,13 +2432,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 @media (prefers-reduced-motion: reduce) {
   .stage-table.flight .st-row.newly-active > span { animation: none; }
   .flight-workspace-selection-indicator { transition: none; }
-}
-
-@container flight-shell (max-width: 520px) {
-  .flight-fixed-region,
-  .flight-tabbed-region { padding: 6px; }
-  .flight-fixed-region::before,
-  .flight-tabbed-region::before { display: none; }
 }
 
 @container (max-width: 520px) {
