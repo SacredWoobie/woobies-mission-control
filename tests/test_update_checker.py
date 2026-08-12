@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,11 @@ VALID_RELEASE = {
         "https://github.com/SacredWoobie/"
         "woobies-mission-control/releases/tag/v0.3.0"
     ),
+    "draft": False,
+    "prerelease": False,
+    "immutable": False,
+    "body": "Release notes",
+    "assets": [],
 }
 
 
@@ -25,8 +31,8 @@ class FakeResponse:
     def __exit__(self, _exc_type, _exc, _traceback):
         return False
 
-    def read(self):
-        return self.payload
+    def read(self, size=-1):
+        return self.payload if size < 0 else self.payload[:size]
 
 
 class UpdateCheckerTests(unittest.TestCase):
@@ -121,6 +127,54 @@ class UpdateCheckerTests(unittest.TestCase):
 
             self.assertEqual(ksp_dashboard_app.load_update_state(path), state)
             self.assertFalse(path.with_suffix(".json.tmp").exists())
+
+    def test_packaged_startup_blocks_pending_update_without_exact_token(self):
+        update = ksp_dashboard_app.runtime_update
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "package"
+            dashboard = root / "Dashboard"
+            dashboard.mkdir(parents=True)
+            (root / update.INSTALL_MANIFEST_NAME).write_text("{}", encoding="utf-8")
+            transaction_id = "1" * 32
+            paths = update._transaction_paths(root, transaction_id)
+            paths["transaction_root"].mkdir(parents=True)
+            update._atomic_write_json(
+                paths["active"],
+                {"schema": 1, "transaction_id": transaction_id},
+            )
+            update._journal(paths, "awaiting_restart", helper_pid=None)
+            before = paths["journal"].read_bytes()
+
+            with self.assertRaises(update.TransactionError):
+                ksp_dashboard_app.runtime_start_context(dashboard, {})
+            package_root, token = ksp_dashboard_app.runtime_start_context(
+                dashboard, {"WMC_UPDATE_TRANSACTION": transaction_id}
+            )
+
+            self.assertEqual(package_root, root.resolve())
+            self.assertEqual(token, transaction_id)
+            self.assertEqual(paths["journal"].read_bytes(), before)
+
+    def test_source_checkout_has_no_managed_startup_guard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dashboard = Path(directory) / "Dashboard"
+            dashboard.mkdir()
+            self.assertEqual(
+                ksp_dashboard_app.runtime_start_context(dashboard, {}),
+                (None, None),
+            )
+
+    @unittest.skipUnless(os.name == "nt", "launcher mutex is Windows-specific")
+    def test_only_one_launcher_instance_owns_a_package_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first = ksp_dashboard_app.LauncherInstanceGuard(directory)
+            try:
+                with self.assertRaisesRegex(RuntimeError, "already running"):
+                    ksp_dashboard_app.LauncherInstanceGuard(directory)
+            finally:
+                first.close()
+            replacement = ksp_dashboard_app.LauncherInstanceGuard(directory)
+            replacement.close()
 
 
 if __name__ == "__main__":

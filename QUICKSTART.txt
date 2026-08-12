@@ -43,6 +43,18 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    launcher provides the official download address and can be run again after
    Python is installed.
 
+   UPDATES: The first release that includes managed updates must still be
+   downloaded and extracted once as a complete ZIP. After that, a newer
+   verified release shows Review & install in this window. Mission Control
+   downloads the smaller runtime-update asset, lets you review its notes and
+   local managed-file changes, and changes nothing until you choose Install
+   and restart. It preserves this package's .venv, logs, settings, README,
+   gallery, and unknown files. It may refresh only the service repair copies
+   inside this package; it never updates the selected live KSP GameData folder.
+   If verification, the health check, or restart fails, the updater restores
+   the previous managed files and retries recovery before the next normal
+   launch. View release remains available for a manual full-ZIP update.
+
 3. SELECT KSP AND INSTALL THE SERVICES
 
    Before starting KSP, choose the main Kerbal Space Program installation

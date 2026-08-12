@@ -59,6 +59,11 @@ class UpdateAndChangelogTests(unittest.TestCase):
                 "https://github.com/SacredWoobie/"
                 "woobies-mission-control/releases/tag/v0.2.2"
             ),
+            "draft": False,
+            "prerelease": False,
+            "immutable": False,
+            "body": "Cached release notes",
+            "assets": [],
         }
         self.assertIsNotNone(app.get_fresh_cached_release(state, now=now))
         state["app_version"] = "0.2.2"

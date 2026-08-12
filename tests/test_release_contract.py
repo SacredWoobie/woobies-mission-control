@@ -453,6 +453,10 @@ class ReleaseContractTests(unittest.TestCase):
             "Woobies-Mission-Control-v0.6.0.zz-00-"
             "KRPC.WoobiesMechJeb-0.8.10-source.zip"
         )
+        update_name = (
+            "Woobies-Mission-Control-v0.6.0.zz-90-runtime-update.zip"
+        )
+        update_checksum_name = f"{update_name}.sha256"
         self.assertEqual(
             sorted(
                 [
@@ -460,6 +464,8 @@ class ReleaseContractTests(unittest.TestCase):
                     checksum_name,
                     source_archive_name,
                     *release_image_names,
+                    update_name,
+                    update_checksum_name,
                 ],
                 key=str.casefold,
             ),
@@ -468,6 +474,8 @@ class ReleaseContractTests(unittest.TestCase):
                 checksum_name,
                 source_archive_name,
                 *release_image_names,
+                update_name,
+                update_checksum_name,
             ],
         )
         self.assertIn(
@@ -475,9 +483,38 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertIn("$zipPath, $checksumPath", publish_script)
         self.assertIn(
-            ") + $sourceArchiveOutputPaths + $releaseImagePaths + @(",
+            ") + $sourceArchiveOutputPaths + $releaseImagePaths + $releaseUpdatePaths + @(",
             publish_script,
         )
+
+    def test_release_packager_emits_verified_managed_update_contract(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+
+        for packaged_source in (
+            "runtime_update.py",
+            "runtime_update_helper.py",
+        ):
+            self.assertIn(
+                f"@{{ Source = '{packaged_source}'; Destination = "
+                f"'Dashboard/{packaged_source}' }}",
+                publish_script,
+            )
+        self.assertIn("WMC-INSTALL-MANIFEST.json", publish_script)
+        self.assertIn("$packageName.zz-90-runtime-update.zip", publish_script)
+        self.assertIn("compatible_updater_protocols = @(1)", publish_script)
+        self.assertIn("Runtime-update ZIP entries do not exactly match", publish_script)
+        self.assertIn("Runtime-update ZIP hash mismatch", publish_script)
+        self.assertIn("must be smaller than the normal release ZIP", publish_script)
+        self.assertIn("status --porcelain", publish_script)
+        self.assertIn("must be assembled from a clean Git checkout", publish_script)
+
+        self.assertIn("repos/$Repository/immutable-releases", publish_script)
+        self.assertIn("X-GitHub-Api-Version: 2026-03-10", publish_script)
+        self.assertIn("$immutableSetting.enabled -ne $true", publish_script)
+        self.assertNotIn("-X PUT", publish_script)
+        self.assertNotIn("--method PUT", publish_script)
 
     def test_v050_release_notes_preserve_utf8_and_exclude_mock_only_history(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(

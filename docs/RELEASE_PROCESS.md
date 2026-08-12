@@ -99,13 +99,24 @@ The packager:
   a separate release asset;
 - packages the consolidated third-party software notices;
 - creates an unpacked allowlisted package under `release-output`;
-- creates the ZIP, checksum, generated build information, and release notes;
+- creates the full ZIP, checksum, generated build information, and release
+  notes;
+- writes `WMC-INSTALL-MANIFEST.json` into the full package and creates one
+  universal `.zz-90-runtime-update.zip` plus `.sha256` sidecar containing only
+  the product-managed runtime, legal notices, and packaged DLL repair copies;
 - stages five curated standalone screenshot assets using names that sort after
   the ZIP and checksum in GitHub's release asset list;
-- audits the ZIP for missing files and forbidden source/build artifacts.
+- audits both ZIPs for exact manifest membership, hashes, missing files, and
+  forbidden source/build artifacts, and requires the update ZIP to be smaller
+  than the full package.
 
 The end-user package contains the compiled `Dashboard\web` directory, never
 the frontend source, Node.js, Vite, pnpm, tests, or developer fixtures.
+The updater-managed manifest deliberately excludes `.venv`, launcher/setup
+logs, README and gallery files, local application data, and unknown files.
+Those remain user-owned. The package's four `GameData` service folders are
+managed repair copies; the updater never follows the launcher's selected KSP
+path or writes live KSP `GameData`.
 
 ## 4. Acceptance test the unpacked package
 
@@ -122,8 +133,22 @@ Before creating a GitHub draft:
 - verify Notes, KAC/stock alarms, stock/System Heat selection, reconnects,
   collapsed panels, planner persistence, transfer preview/confirmation, and
   launcher update/preflight behavior as applicable;
+- run the deterministic two-version updater acceptance fixture: verify a
+  successful update and restart acknowledgement, cancellation without package
+  mutation, rejection of mutable/tampered/wrong-host assets, rollback after a
+  locked file or injected mid-apply failure, recovery after helper termination,
+  preservation of `.venv`/settings/logs/unknown files, and an unchanged
+  disposable live-KSP sentinel tree;
 - follow `docs/images/v0.6.0/README.md` for the screenshot set and
   its source briefs.
+
+The first updater-capable public release cannot update from an older package,
+because those packages do not contain the trusted helper or install manifest.
+Install that release once through the normal full ZIP. Before it is published,
+the synthetic predecessor/current-candidate fixture is the required proof that
+its shipped updater can perform the future transaction. After the next release
+exists, add one public first-release-to-successor smoke test; do not create a
+fake public release or point production code at a test channel.
 
 Version 0.6.0 retains the current Mission Control, contract, Editor, and Flight
 Plan captures and refreshes the Flight Monitor slot with a managed-mock Chrome
@@ -140,7 +165,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.
 ```
 
 This creates a draft GitHub Release and uploads the ZIP, checksum, GPL source
-archive, and five curated screenshots. The screenshot filenames use a `.zz-01`
-through `.zz-05` suffix so `Woobies-Mission-Control-v0.6.0.zip` remains the
-first release asset. Review the draft, its generated notes, asset ordering,
-source archive, and final screenshots before publishing it.
+archive, runtime-update ZIP and checksum, and five curated screenshots. The
+screenshot filenames use a `.zz-01` through `.zz-05` suffix and the updater uses
+`.zz-90`, so `Woobies-Mission-Control-v0.6.0.zip` remains the first release
+asset. Review the draft, its generated notes, asset ordering, source archive,
+update manifests/checksums, and final screenshots before publishing it.
+
+GitHub immutable releases must be enabled for the repository before this
+command will create a draft. This is a deliberate manual repository-setting
+decision; the script verifies the setting but never enables it. Attach every
+asset while the release is a draft, then publish it. After publication, verify
+through the GitHub API that the stable release reports `immutable: true`, both
+runtime-update assets report `state: uploaded` and `sha256:` digests, and the
+launcher sees the same canonical tag and asset names. If any check fails, the
+launcher must retain its manual **View release** fallback and must not install.
