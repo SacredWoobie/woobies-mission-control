@@ -382,9 +382,9 @@ SCENES = {
             "continuous": True, "solarScaled": False, "valueKnown": True,
         }],
         "editor.elec.bodies": [{
-            "bodyName": "Kerbin", "starName": "Kerbol", "mu": 3.5316e12,
-            "radius": 600000, "rotationPeriod": 21600, "atmosDepth": 70000,
-            "SOI": 84159286, "maxStarDistance": 13599840256,
+            "bodyName": "Kerbin", "starName": "Kerbol", "gravitationalParameter": 3.5316e12,
+            "radius": 600000, "rotationPeriod": 21600, "atmosphereDepth": 70000,
+            "sphereOfInfluence": 84159286, "maxStarDistance": 13599840256,
             "luminosityScale": 1, "authoritative": True,
         }],
         "editor.elec.pending": False,

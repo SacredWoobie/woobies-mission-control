@@ -41,12 +41,16 @@ class Connection:
 class EditorElectricalSnapshotTests(unittest.TestCase):
     def setUp(self):
         telemetry_server._reset_editor_electrical_state()
+        telemetry_server._editor_identity = None
+        telemetry_server._editor_rebuild_cache = {}
 
     def test_decodes_complete_snapshot(self):
         result = decode_editor_electrical_snapshot(snapshot())
         self.assertEqual(result["editor.elec.backend"], "stock")
-        self.assertEqual(result["editor.elec.components"][0]["partId"], 42)
+        self.assertEqual(result["editor.elec.components"][0]["partId"], "42")
         self.assertTrue(result["editor.elec.bodies"][0]["authoritative"])
+        self.assertIn("gravitationalParameter", result["editor.elec.bodies"][0])
+        self.assertNotIn("mu", result["editor.elec.bodies"][0])
 
     def test_rejects_atomic_count_and_enum_failures(self):
         bad = snapshot()
@@ -61,14 +65,26 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
     def test_cache_retry_and_cross_craft_retention(self):
         service = Service()
         conn = Connection(service)
-        with mock.patch.object(telemetry_server.time, "time", side_effect=[1, 1.1, 1.3, 1.4, 2.5, 2.6]):
-            first = telemetry_server._attach_editor_electrical(conn, {})
-            cached = telemetry_server._attach_editor_electrical(conn, {})
+        telemetry_server._editor_identity = ("Save", "craft-1", "root-1")
+        with mock.patch.object(telemetry_server.time, "time", side_effect=[1, 1.1, 1.3, 1.4, 2.5]):
+            first = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 1}
+            )
+            cached = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 1}
+            )
             service.payload = ["bad"]
-            retained = telemetry_server._attach_editor_electrical(conn, {})
-            throttled = telemetry_server._attach_editor_electrical(conn, {})
+            retained = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 2}
+            )
+            throttled = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 2}
+            )
             service.payload = snapshot(craft="craft-2", revision=2)
-            changed = telemetry_server._attach_editor_electrical(conn, {})
+            telemetry_server._editor_identity = ("Save", "craft-2", "root-1")
+            changed = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 2}
+            )
         self.assertEqual(service.calls, 3)
         self.assertEqual(first["editor.elec.craftPersistentId"], "craft-1")
         self.assertEqual(cached["editor.elec.craftPersistentId"], "craft-1")

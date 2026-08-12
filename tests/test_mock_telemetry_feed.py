@@ -65,6 +65,9 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertFalse(self.editor["editor.elec.pending"])
         self.assertEqual(self.editor["editor.elec.components"][0]["role"], "consumer")
         self.assertTrue(self.editor["editor.elec.bodies"][0]["authoritative"])
+        self.assertIn("gravitationalParameter", self.editor["editor.elec.bodies"][0])
+        self.assertIn("atmosphereDepth", self.editor["editor.elec.bodies"][0])
+        self.assertIn("sphereOfInfluence", self.editor["editor.elec.bodies"][0])
 
     def test_reactor_inventory_has_two_fission_and_one_fusion_reactor(self):
         reactors = self.flight["elec.reactors"]

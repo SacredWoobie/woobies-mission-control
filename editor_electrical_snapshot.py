@@ -30,6 +30,11 @@ def _integer(value, label, minimum=0):
     return number
 
 
+def _integer_text(value, label, minimum=0):
+    _integer(value, label, minimum)
+    return value
+
+
 def _number(value, label, minimum=None):
     try:
         number = float(value)
@@ -89,7 +94,9 @@ def decode_editor_electrical_snapshot(payload):
             raise ValueError("Invalid EditorElectrical component role")
         components.append({
             "stableId": _text(row[1], "component stable id"),
-            "partId": _integer(row[2], "component part id"),
+            # The wire token is decimal-only but persistent part IDs are
+            # dashboard identity strings, preserving their canonical spelling.
+            "partId": _integer_text(row[2], "component part id"),
             "partTitle": _text(row[3], "component part title"),
             "moduleName": _text(row[4], "component module name"),
             "category": _text(row[5], "component category"),
@@ -113,9 +120,9 @@ def decode_editor_electrical_snapshot(payload):
         max_distance = _number(row[8], "body max star distance", 0)
         luminosity = _number(row[9], "body luminosity", 0)
         bodies.append({"bodyName": _text(row[1], "body name"),
-            "starName": _text(row[2], "star name"), "mu": mu,
+            "starName": _text(row[2], "star name"), "gravitationalParameter": mu,
             "radius": radius, "rotationPeriod": rotation,
-            "atmosDepth": atmosphere, "SOI": soi,
+            "atmosphereDepth": atmosphere, "sphereOfInfluence": soi,
             "maxStarDistance": max_distance, "luminosityScale": luminosity,
             "authoritative": _flag(row[10], "body authoritative")})
     return {"editor.elec.status": header[2], "editor.elec.backend": header[3],
