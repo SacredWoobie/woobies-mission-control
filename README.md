@@ -1,17 +1,17 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.6.0](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.6.0)**
+Current public release: **[v0.6.1](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.6.1)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.6.0 updates Mission Control for kRPC 0.6 and substantially reduces
-the recurring Flight telemetry workload. It also adds persistent unexpected
-part-loss detection and authoritative broken-part monitoring through the
-Master Warning and DAMAGE annunciator, with safe fallback behavior for older
-service versions.
+Version 0.6.1 adds an explicitly confirmed managed-runtime updater for future
+releases. This first updater-capable build still requires one normal full-ZIP
+install; later releases can replace only verified package-managed files while
+preserving local state, retaining a complete rollback, and never writing the
+selected live KSP `GameData` folder.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -112,7 +112,7 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The v0.6.0 public release selects four independently versioned kRPC extensions.
+The v0.6.1 public release selects four independently versioned kRPC extensions.
 Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |

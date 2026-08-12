@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.6.1 - Managed runtime updates
+
 - Added an explicitly confirmed in-app updater for updater-capable release
   packages. It accepts only stable immutable GitHub releases, verifies the
   runtime archive against GitHub's SHA-256 digest and its checksum sidecar,
