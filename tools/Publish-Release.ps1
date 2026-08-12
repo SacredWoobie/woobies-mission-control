@@ -556,10 +556,38 @@ $updateManifest = [ordered]@{
 Write-Utf8Json -Path (Join-Path $updateStageRoot 'update-manifest.json') -Value $updateManifest
 
 Write-Step 'Creating runtime-update archive and checksum'
-Compress-Archive `
-    -Path (Join-Path $updateStageRoot '*') `
-    -DestinationPath $updateArchivePath `
-    -CompressionLevel Optimal
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$updateArchiveStream = [System.IO.File]::Open(
+    $updateArchivePath,
+    [System.IO.FileMode]::CreateNew,
+    [System.IO.FileAccess]::ReadWrite,
+    [System.IO.FileShare]::None
+)
+try {
+    $updateArchiveWriter = [System.IO.Compression.ZipArchive]::new(
+        $updateArchiveStream,
+        [System.IO.Compression.ZipArchiveMode]::Create,
+        $false
+    )
+    try {
+        $updateArchiveInputs = @('update-manifest.json') + $payloadPaths
+        foreach ($relativePath in $updateArchiveInputs) {
+            $entryName = $relativePath.Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $updateArchiveWriter,
+                (Join-Path $updateStageRoot $relativePath),
+                $entryName,
+                [System.IO.Compression.CompressionLevel]::Optimal
+            ) | Out-Null
+        }
+    }
+    finally {
+        $updateArchiveWriter.Dispose()
+    }
+}
+finally {
+    $updateArchiveStream.Dispose()
+}
 $updateHash = Get-FileHash -LiteralPath $updateArchivePath -Algorithm SHA256
 $updateChecksumLine = (
     "$($updateHash.Hash.ToLowerInvariant())  " +
@@ -572,7 +600,6 @@ $updateChecksumLine = (
     [System.Text.UTF8Encoding]::new($false)
 )
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
 $updateArchive = [System.IO.Compression.ZipFile]::OpenRead($updateArchivePath)
 try {
     $updateEntries = @(
