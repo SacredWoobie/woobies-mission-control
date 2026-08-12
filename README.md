@@ -144,6 +144,15 @@ service copies that would otherwise register the same kRPC API twice. Load a
 save before testing the connection; kRPC normally stops its servers at KSP's
 main menu.
 
+Updater-capable packages add a **Review & install** action when a newer stable,
+immutable release passes GitHub digest, checksum, archive, and compatibility
+verification. The first such release is still a normal full-ZIP install. Later
+updates replace only manifest-owned package runtime and repair-copy files, with
+an external helper, complete touched-file backup, health check, restart
+acknowledgement, and automatic rollback/recovery. Package `.venv`, local app
+data, logs, README/gallery files, and unknown files are preserved, and this
+flow never writes the selected live KSP `GameData` folder.
+
 The accepted local endpoints are:
 
 | Purpose | Address or port |

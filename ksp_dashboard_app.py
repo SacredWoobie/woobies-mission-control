@@ -30,7 +30,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.parse
 import urllib.error
 import urllib.request
 import webbrowser
@@ -38,6 +37,8 @@ from pathlib import Path
 
 import tkinter as tk
 from tkinter import filedialog, font as tkfont, messagebox, scrolledtext, ttk
+
+import runtime_update
 
 
 HERE = Path(__file__).resolve().parent
@@ -54,7 +55,7 @@ LATEST_RELEASE_API = (
 )
 UPDATE_CACHE_SECONDS = 24 * 60 * 60
 UPDATE_TIMEOUT_SECONDS = 4
-_VERSION_TAG = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+MAX_RELEASE_RESPONSE_BYTES = 2 * 1024 * 1024
 
 
 def _default_update_state_path():
@@ -65,6 +66,48 @@ def _default_update_state_path():
 
 
 UPDATE_STATE_PATH = _default_update_state_path()
+UPDATE_DOWNLOAD_ROOT = UPDATE_STATE_PATH.parent / "updates"
+
+
+class LauncherInstanceGuard:
+    """Hold one Windows launcher instance per resolved package directory."""
+
+    def __init__(self, directory=HERE):
+        self.handle = None
+        if os.name != "nt":
+            return
+        from ctypes import wintypes
+
+        identity = hashlib.sha256(
+            str(Path(directory).resolve()).casefold().encode("utf-8")
+        ).hexdigest()[:32]
+        name = f"Local\\WoobiesMissionControlLauncher-{identity}"
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.argtypes = (
+            wintypes.LPVOID,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        )
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        ctypes.set_last_error(0)
+        handle = kernel32.CreateMutexW(None, False, name)
+        if not handle:
+            raise OSError(ctypes.get_last_error(), "could not create launcher guard")
+        if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+            kernel32.CloseHandle(handle)
+            raise RuntimeError(
+                "Mission Control is already running from this package. Close its "
+                "launcher window before starting another copy."
+            )
+        self.handle = handle
+        self._close_handle = kernel32.CloseHandle
+
+    def close(self):
+        if self.handle is not None:
+            self._close_handle(self.handle)
+            self.handle = None
 
 
 def _default_settings_path():
@@ -109,6 +152,109 @@ COMPONENTS = (
 
 # Prevent child processes from opening extra console windows on Windows.
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+CREATE_SUSPENDED = 0x00000004 if os.name == "nt" else 0
+
+
+def _create_component_job():
+    """Create a Windows job whose close terminates the complete child tree."""
+    if os.name != "nt":
+        return None
+    from ctypes import wintypes
+
+    class IO_COUNTERS(ctypes.Structure):
+        _fields_ = [
+            ("ReadOperationCount", ctypes.c_ulonglong),
+            ("WriteOperationCount", ctypes.c_ulonglong),
+            ("OtherOperationCount", ctypes.c_ulonglong),
+            ("ReadTransferCount", ctypes.c_ulonglong),
+            ("WriteTransferCount", ctypes.c_ulonglong),
+            ("OtherTransferCount", ctypes.c_ulonglong),
+        ]
+
+    class BASIC_LIMITS(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong),
+            ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", wintypes.DWORD),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", wintypes.DWORD),
+            ("SchedulingClass", wintypes.DWORD),
+        ]
+
+    class EXTENDED_LIMITS(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", BASIC_LIMITS),
+            ("IoInfo", IO_COUNTERS),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.argtypes = (wintypes.LPVOID, wintypes.LPCWSTR)
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = (
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    )
+    kernel32.SetInformationJobObject.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.CreateJobObjectW(None, None)
+    if not handle:
+        raise OSError(ctypes.get_last_error(), "could not create component process job")
+    limits = EXTENDED_LIMITS()
+    limits.BasicLimitInformation.LimitFlags = 0x00002000  # KILL_ON_JOB_CLOSE
+    if not kernel32.SetInformationJobObject(
+        handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)
+    ):
+        error = ctypes.get_last_error()
+        kernel32.CloseHandle(handle)
+        raise OSError(error, "could not secure component process job")
+    return handle
+
+
+def _assign_component_job(job_handle, process_handle):
+    if os.name != "nt" or job_handle is None:
+        return
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    if not kernel32.AssignProcessToJobObject(job_handle, process_handle):
+        raise OSError(
+            ctypes.get_last_error(), "could not own the component process tree"
+        )
+
+
+def _resume_component_process(process_handle):
+    if os.name != "nt":
+        return
+    from ctypes import wintypes
+
+    ntdll = ctypes.WinDLL("ntdll")
+    ntdll.NtResumeProcess.argtypes = (wintypes.HANDLE,)
+    ntdll.NtResumeProcess.restype = ctypes.c_long
+    status = ntdll.NtResumeProcess(process_handle)
+    if status < 0:
+        raise OSError(status, "could not resume the secured component process")
+
+
+def _close_component_job(job_handle):
+    if os.name == "nt" and job_handle is not None:
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle(job_handle)
 
 PACKAGED_GAMEDATA = HERE.parent / "GameData"
 CHANGELOG_CANDIDATES = (HERE / "CHANGELOG.md", HERE.parent / "CHANGELOG.md")
@@ -1775,12 +1921,7 @@ def install_service_dlls(
 
 def parse_version_tag(tag):
     """Return a comparable three-part version tuple, or ``None``."""
-    if not isinstance(tag, str):
-        return None
-    match = _VERSION_TAG.fullmatch(tag.strip())
-    if not match:
-        return None
-    return tuple(int(part) for part in match.groups())
+    return runtime_update.parse_version(tag)
 
 
 def classify_release(current_version, latest_tag):
@@ -1798,26 +1939,7 @@ def classify_release(current_version, latest_tag):
 
 def validate_release_payload(payload):
     """Validate and return the update fields used from a GitHub response."""
-    if not isinstance(payload, dict):
-        raise ValueError("GitHub returned an invalid release response")
-
-    tag_name = payload.get("tag_name")
-    html_url = payload.get("html_url")
-    if parse_version_tag(tag_name) is None:
-        raise ValueError("the latest release tag is not vMAJOR.MINOR.PATCH")
-    if not isinstance(html_url, str):
-        raise ValueError("the latest release does not have a web address")
-
-    parsed = urllib.parse.urlparse(html_url)
-    expected_path = "/sacredwoobie/woobies-mission-control/releases/"
-    if (
-        parsed.scheme != "https"
-        or parsed.netloc.lower() != "github.com"
-        or not parsed.path.lower().startswith(expected_path)
-    ):
-        raise ValueError("the latest release has an unexpected web address")
-
-    return {"tag_name": tag_name.strip(), "html_url": html_url}
+    return runtime_update.validate_release_payload(payload)
 
 
 def fetch_latest_release(opener=urllib.request.urlopen, timeout=UPDATE_TIMEOUT_SECONDS):
@@ -1827,11 +1949,14 @@ def fetch_latest_release(opener=urllib.request.urlopen, timeout=UPDATE_TIMEOUT_S
         headers={
             "Accept": "application/vnd.github+json",
             "User-Agent": f"Woobies-Mission-Control/{APP_VERSION}",
-            "X-GitHub-Api-Version": "2022-11-28",
+            "X-GitHub-Api-Version": runtime_update.GITHUB_API_VERSION,
         },
     )
     with opener(request, timeout=timeout) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+        encoded = response.read(MAX_RELEASE_RESPONSE_BYTES + 1)
+        if len(encoded) > MAX_RELEASE_RESPONSE_BYTES:
+            raise ValueError("GitHub returned an unexpectedly large release response")
+        payload = json.loads(encoded.decode("utf-8"))
     return validate_release_payload(payload)
 
 
@@ -2177,7 +2302,15 @@ class Backend:
         self.log = log
         self.environment_provider = environment_provider
         self.proc = None
+        self.job_handle = None
+        self.job_lock = threading.Lock()
         self.startup_ready = False
+
+    def _close_job(self):
+        with self.job_lock:
+            handle = self.job_handle
+            self.job_handle = None
+        _close_component_job(handle)
 
     def running(self):
         return self.proc is not None and self.proc.poll() is None
@@ -2191,10 +2324,12 @@ class Backend:
             return False
 
         self.log(self.name, "starting...")
+        job_handle = None
         try:
             child_environment = os.environ.copy()
             if self.environment_provider is not None:
                 child_environment.update(self.environment_provider())
+            job_handle = _create_component_job()
             self.proc = subprocess.Popen(
                 self.argv,
                 cwd=str(HERE),
@@ -2202,11 +2337,28 @@ class Backend:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                creationflags=CREATE_NO_WINDOW,
+                creationflags=CREATE_NO_WINDOW | CREATE_SUSPENDED,
                 env=child_environment,
             )
+            if job_handle is not None:
+                _assign_component_job(job_handle, self.proc._handle)
+                with self.job_lock:
+                    self.job_handle = job_handle
+                job_handle = None
+            _resume_component_process(self.proc._handle)
         except Exception as exc:
             self.log(self.name, f"FAILED to start: {exc}")
+            if self.proc is not None and self.proc.poll() is None:
+                try:
+                    self.proc.terminate()
+                    self.proc.wait(timeout=2)
+                except (OSError, subprocess.TimeoutExpired):
+                    try:
+                        self.proc.kill()
+                    except OSError:
+                        pass
+            _close_component_job(job_handle)
+            self._close_job()
             self.proc = None
             return False
 
@@ -2226,15 +2378,26 @@ class Backend:
         except Exception as exc:
             self.log(self.name, f"log reader stopped: {exc}")
             return_code = process.poll()
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+        self._close_job()
         self.log(self.name, f"exited (code {return_code}).")
 
     def stop(self):
         if not self.running():
+            self._close_job()
             self.startup_ready = False
             return
         self.log(self.name, "stopping...")
         try:
-            self.proc.terminate()
+            if os.name == "nt" and self.job_handle is not None:
+                # Closing the job atomically terminates the direct child and
+                # every descendant it created. This prevents a grandchild from
+                # retaining a managed package file during self-update.
+                self._close_job()
+            else:
+                self.proc.terminate()
             try:
                 self.proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
@@ -2244,6 +2407,7 @@ class Backend:
         except Exception as exc:
             self.log(self.name, f"error while stopping: {exc}")
         finally:
+            self._close_job()
             self.startup_ready = False
 
 
@@ -2307,8 +2471,15 @@ class ScrollableLauncherPane(ttk.Frame):
 
 
 class App:
-    def __init__(self, root, update_state_path=UPDATE_STATE_PATH,
-                 settings_path=SETTINGS_PATH):
+    def __init__(
+        self,
+        root,
+        update_state_path=UPDATE_STATE_PATH,
+        settings_path=SETTINGS_PATH,
+        update_download_root=UPDATE_DOWNLOAD_ROOT,
+        restart_transaction=None,
+        package_root=None,
+    ):
         self.root = root
         self.log_queue = queue.Queue()
         self.update_queue = queue.Queue()
@@ -2319,11 +2490,21 @@ class App:
         self.component_setups = set()
         self.update_state_path = Path(update_state_path)
         self.update_state = load_update_state(self.update_state_path)
+        self.update_download_root = Path(update_download_root)
         self.settings_path = Path(settings_path)
         self.settings = load_settings(self.settings_path)
         self.update_generation = 0
         self.update_checking = False
+        self.update_staging = False
+        self.update_handoff_active = False
         self.latest_release_url = None
+        self.latest_release = None
+        self.installable_update = None
+        self.staged_update = None
+        self.update_install_dialog = None
+        self.restart_transaction = restart_transaction
+        self.package_root = Path(package_root) if package_root is not None else None
+        self.restart_visibility_deadline = None
         self.changelog_path = find_changelog_path()
         self.changelog_dialog = None
         self.prerequisite_fix_dialog = None
@@ -2361,36 +2542,45 @@ class App:
             style="Shell.TLabel",
         )
         self.update_status.pack(side="left", fill="x", expand=True)
-        self.view_release_button = ttk.Button(
-            update_bar,
-            text="View release",
-            state="disabled",
-            command=self._open_latest_release,
-        )
-        self.view_release_button.pack(side="right", padx=(4, 0))
-        self.changelog_button = ttk.Button(
-            update_bar,
-            text="Changelog",
-            state="normal" if self.changelog_path is not None else "disabled",
-            command=lambda: self._show_changelog(current_version_only=False),
-        )
-        self.changelog_button.pack(side="right", padx=(4, 0))
-        self.check_updates_button = ttk.Button(
-            update_bar,
-            text="Check now",
-            command=lambda: self._start_update_check(use_cache=False),
-        )
-        self.check_updates_button.pack(side="right", padx=(4, 0))
+        update_actions = ttk.Frame(update_bar, style="Shell.TFrame")
+        update_actions.pack(side="right")
         self.check_updates_var = tk.BooleanVar(
             value=self.update_state.get("check_enabled", True) is not False
         )
         self.check_updates_control = CheckXControl(
-            update_bar,
+            update_actions,
             self.check_updates_var,
             "AUTOMATIC UPDATE CHECKS",
             self._toggle_automatic_updates,
         )
-        self.check_updates_control.pack(side="right", padx=(6, 0))
+        self.check_updates_control.pack(side="left", padx=(6, 0))
+        self.check_updates_button = ttk.Button(
+            update_actions,
+            text="Check now",
+            command=lambda: self._start_update_check(use_cache=False),
+        )
+        self.check_updates_button.pack(side="left", padx=(4, 0))
+        self.install_update_button = ttk.Button(
+            update_actions,
+            text="Review & install",
+            state="disabled",
+            command=self._stage_available_update,
+        )
+        self.install_update_button.pack(side="left", padx=(4, 0))
+        self.changelog_button = ttk.Button(
+            update_actions,
+            text="Changelog",
+            state="normal" if self.changelog_path is not None else "disabled",
+            command=lambda: self._show_changelog(current_version_only=False),
+        )
+        self.changelog_button.pack(side="left", padx=(4, 0))
+        self.view_release_button = ttk.Button(
+            update_actions,
+            text="View release",
+            state="disabled",
+            command=self._open_latest_release,
+        )
+        self.view_release_button.pack(side="left", padx=(4, 0))
 
         self.main_panes = tk.PanedWindow(
             root,
@@ -2712,6 +2902,16 @@ class App:
         self._drain_krpc_test_queue()
         self._drain_component_setup_queue()
         self._refresh()
+        if self.restart_transaction is not None:
+            self.update_status.config(
+                text="Finishing verified update restart...",
+                foreground=THEME["amber"],
+            )
+            self.root.after_idle(self._acknowledge_update_restart)
+        else:
+            self._schedule_post_start_tasks()
+
+    def _schedule_post_start_tasks(self):
         if self.check_updates_var.get():
             self.root.after(300, lambda: self._start_update_check(use_cache=True))
         else:
@@ -3560,13 +3760,15 @@ class App:
         self.root.after(100, self._drain_log)
 
     def _start_update_check(self, use_cache):
-        if self.update_checking:
+        if self.update_checking or self.update_staging or self.staged_update is not None:
             return
 
         if use_cache:
             cached = get_fresh_cached_release(self.update_state)
             if cached is not None:
-                self._apply_release_status(cached)
+                # Cached metadata is display-only. Installation always starts
+                # from a fresh, authenticated GitHub response.
+                self._apply_release_status(cached, allow_install=False)
                 return
             cached_app_version = self.update_state.get("app_version")
             if (
@@ -3582,16 +3784,18 @@ class App:
         self.update_generation += 1
         generation = self.update_generation
         self.update_checking = True
+        self.installable_update = None
         self.update_status.config(
             text="Checking GitHub for updates...", foreground=THEME["slate"]
         )
         self.check_updates_button.config(state="disabled")
+        self.install_update_button.config(state="disabled")
 
         def worker():
             try:
                 release = fetch_latest_release()
             except Exception as exc:
-                self.update_queue.put((generation, "error", str(exc)))
+                self.update_queue.put((generation, "check_error", str(exc)))
             else:
                 self.update_queue.put((generation, "release", release))
 
@@ -3602,42 +3806,95 @@ class App:
             while True:
                 generation, result_type, result = self.update_queue.get_nowait()
                 if generation != self.update_generation:
+                    if result_type == "staged":
+                        try:
+                            runtime_update.discard_staged_transaction(
+                                result["root"], result["transaction_id"]
+                            )
+                        except Exception:
+                            pass
                     continue
 
-                self.update_checking = False
-                self.check_updates_button.config(state="normal")
                 if result_type == "release":
+                    self.update_checking = False
+                    self.check_updates_button.config(state="normal")
                     self.update_state.update(result)
                     self.update_state["app_version"] = APP_VERSION
                     self.update_state["last_checked"] = time.time()
                     self.update_state["check_enabled"] = self.check_updates_var.get()
                     self._save_update_state()
-                    self._apply_release_status(result)
-                else:
+                    self._apply_release_status(result, allow_install=True)
+                elif result_type == "check_error":
+                    self.update_checking = False
+                    self.check_updates_button.config(state="normal")
                     self.update_status.config(
                         text="Couldn’t check for updates (offline is OK)",
                         foreground=THEME["slate_dim"],
                     )
                     self._enqueue("updates", f"update check unavailable: {result}")
+                elif result_type == "staged":
+                    self.update_staging = False
+                    self.staged_update = result
+                    self.update_status.config(
+                        text=f"Verified {result['release']['tag_name']} - ready to review",
+                        foreground=THEME["green"],
+                    )
+                    self._show_update_install_dialog(result)
+                elif result_type == "stage_error":
+                    self.update_staging = False
+                    self.check_updates_button.config(state="normal")
+                    if self.installable_update is not None:
+                        self.install_update_button.config(state="normal")
+                    self.update_status.config(
+                        text="Update could not be verified; no package files changed",
+                        foreground=THEME["amber"],
+                    )
+                    self._enqueue("updates", f"update verification failed: {result}")
+                    messagebox.showerror(
+                        "Update not installed",
+                        "Mission Control could not safely verify and stage the update. "
+                        "No installed package files were changed.\n\n" + str(result),
+                        parent=self.root,
+                    )
         except queue.Empty:
             pass
         self.root.after(100, self._drain_update_queue)
 
-    def _apply_release_status(self, release):
+    def _apply_release_status(self, release, allow_install=False):
         tag_name = release["tag_name"]
+        self.latest_release = release
         self.latest_release_url = release["html_url"]
         self.view_release_button.config(state="normal")
+        self.installable_update = None
+        self.install_update_button.config(state="disabled")
 
         status = classify_release(APP_VERSION, tag_name)
         if status == "available":
-            self.update_status.config(
-                text=f"Update available: {tag_name}",
-                foreground=THEME["cyan"],
-            )
-            self._enqueue(
-                "updates",
-                f"{tag_name} is available; use View release to review it.",
-            )
+            offer = None
+            if allow_install:
+                offer = runtime_update.assess_release_offer(release, APP_VERSION, HERE)
+            if offer is not None and offer["installable"]:
+                self.installable_update = {"release": release, **offer}
+                self.install_update_button.config(state="normal")
+                self.update_status.config(
+                    text=f"Verified update available: {tag_name}",
+                    foreground=THEME["cyan"],
+                )
+                self._enqueue(
+                    "updates",
+                    f"{tag_name} can update this installed package; review it before installing.",
+                )
+            else:
+                if offer is None:
+                    reason = (
+                        "Select Check now to verify whether in-app installation is available."
+                    )
+                    status_text = f"Update available: {tag_name} - select Check now"
+                else:
+                    reason = offer["reason"]
+                    status_text = f"Update available: {tag_name} (manual download)"
+                self.update_status.config(text=status_text, foreground=THEME["cyan"])
+                self._enqueue("updates", f"{tag_name}: {reason}")
         elif status == "development":
             self.update_status.config(
                 text=f"Development build—newer than published {tag_name}",
@@ -3649,10 +3906,314 @@ class App:
                 foreground=THEME["green"],
             )
 
+    def _stage_available_update(self):
+        offer = self.installable_update
+        if offer is None or self.update_staging or self.staged_update is not None:
+            return
+        self.update_generation += 1
+        generation = self.update_generation
+        self.update_staging = True
+        self.check_updates_button.config(state="disabled")
+        self.install_update_button.config(state="disabled")
+        release = offer["release"]
+        self.update_status.config(
+            text=f"Downloading and verifying {release['tag_name']}...",
+            foreground=THEME["slate"],
+        )
+
+        def worker():
+            try:
+                version = runtime_update.canonical_version(release["tag_name"])
+                archive = runtime_update.download_verified_update(
+                    release,
+                    self.update_download_root / f"v{version}",
+                )
+                staged = runtime_update.stage_transaction(offer["root"], archive)
+                if generation != self.update_generation:
+                    runtime_update.discard_staged_transaction(
+                        offer["root"], staged["transaction_id"]
+                    )
+                    return
+                result = {
+                    **staged,
+                    "root": offer["root"],
+                    "release": release,
+                    "archive_size": archive.stat().st_size,
+                }
+            except Exception as exc:
+                self.update_queue.put((generation, "stage_error", str(exc)))
+            else:
+                self.update_queue.put((generation, "staged", result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_update_install_dialog(self, staged):
+        if self.update_install_dialog is not None:
+            try:
+                if self.update_install_dialog.winfo_exists():
+                    self.update_install_dialog.lift()
+                    return
+            except tk.TclError:
+                self.update_install_dialog = None
+
+        # The update decision owns the launcher while it is visible.  In
+        # particular, do not leave a changelog grab/focus chain behind if a
+        # staged update becomes ready while that secondary window is open.
+        if self.changelog_dialog is not None:
+            try:
+                if self.changelog_dialog.winfo_exists():
+                    self._close_changelog()
+            except tk.TclError:
+                self.changelog_dialog = None
+
+        dialog = tk.Toplevel(self.root)
+        self.update_install_dialog = dialog
+        dialog.title(f"Install {staged['release']['tag_name']} - {APP_NAME}")
+        dialog.transient(self.root)
+        dialog.geometry("720x610")
+        dialog.minsize(600, 470)
+        dialog.configure(background=THEME["bg"])
+
+        body = ttk.Frame(dialog, padding=(18, 16))
+        body.pack(fill="both", expand=True)
+        ttk.Label(
+            body,
+            text=f"READY TO UPDATE TO v{staged['target_version']}",
+            style="DialogTitle.TLabel",
+            anchor="w",
+        ).pack(fill="x")
+        size_mb = staged["archive_size"] / (1024 * 1024)
+        ttk.Label(
+            body,
+            text=(
+                f"Verified download: {size_mb:.2f} MB. Mission Control will stop only "
+                "the components launched from this window, update its packaged runtime, "
+                "run a health check, and restart."
+            ),
+            style="DialogBody.TLabel",
+            wraplength=670,
+            justify="left",
+        ).pack(fill="x", pady=(8, 4))
+        ttk.Label(
+            body,
+            text=(
+                "Preserved: the package .venv, settings, logs, README, gallery images, "
+                "and unknown files. Your selected live KSP/GameData installation is never "
+                "changed by this updater; only the repair copies inside this package may change."
+            ),
+            style="DialogBody.TLabel",
+            wraplength=670,
+            justify="left",
+        ).pack(fill="x", pady=(0, 8))
+
+        differences = staged.get("local_differences") or []
+        if differences:
+            names = ", ".join(item["path"] for item in differences[:5])
+            if len(differences) > 5:
+                names += f", and {len(differences) - 5} more"
+            ttk.Label(
+                body,
+                text=(
+                    "Locally changed managed files will be replaced (and backed up): "
+                    + names
+                ),
+                foreground=THEME["amber"],
+                style="Shell.TLabel",
+                wraplength=670,
+                justify="left",
+            ).pack(fill="x", pady=(0, 8))
+
+        ttk.Label(body, text="RELEASE NOTES", style="Section.TLabel").pack(
+            fill="x", pady=(4, 4)
+        )
+        notes = scrolledtext.ScrolledText(
+            body,
+            wrap="word",
+            state="normal",
+            height=13,
+            font=UI_FONT,
+            background=THEME["input"],
+            foreground=THEME["amber"],
+            insertbackground=THEME["cyan"],
+            borderwidth=1,
+            relief="solid",
+            padx=9,
+            pady=7,
+        )
+        notes.pack(fill="both", expand=True)
+        notes.insert("1.0", staged["release"].get("body") or "No release notes provided.")
+        notes.config(state="disabled")
+
+        footer = ttk.Frame(body)
+        footer.pack(fill="x", pady=(12, 0))
+        self.update_cancel_button = ttk.Button(
+            footer, text="Cancel", width=10, command=self._cancel_staged_update
+        )
+        self.update_cancel_button.pack(side="right")
+        self.update_cancel_button.bind(
+            "<Return>", lambda _event: self._cancel_staged_update()
+        )
+        self.update_confirm_button = ttk.Button(
+            footer,
+            text="Install and restart",
+            command=self._install_staged_update,
+        )
+        self.update_confirm_button.pack(side="right", padx=(0, 8))
+        self.update_confirm_button.bind(
+            "<Return>", lambda _event: self._install_staged_update()
+        )
+
+        dialog.protocol("WM_DELETE_WINDOW", self._cancel_staged_update)
+        dialog.bind("<Escape>", lambda _event: self._cancel_staged_update())
+        dialog.update_idletasks()
+        x = self.root.winfo_rootx() + max(
+            0, (self.root.winfo_width() - dialog.winfo_width()) // 2
+        )
+        y = self.root.winfo_rooty() + max(
+            0, (self.root.winfo_height() - dialog.winfo_height()) // 2
+        )
+        dialog.geometry(f"{dialog.winfo_width()}x{dialog.winfo_height()}+{x}+{y}")
+        dialog.grab_set()
+        dialog.lift()
+        self.update_confirm_button.focus_set()
+
+    def _cancel_staged_update(self):
+        staged = self.staged_update
+        if staged is None:
+            return
+        try:
+            runtime_update.discard_staged_transaction(
+                staged["root"], staged["transaction_id"]
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Could not clear staged update",
+                str(exc),
+                parent=self.update_install_dialog or self.root,
+            )
+            return
+        self.staged_update = None
+        dialog = self.update_install_dialog
+        self.update_install_dialog = None
+        if dialog is not None:
+            dialog.destroy()
+        if self.installable_update is not None:
+            self.install_update_button.config(state="normal")
+            self.check_updates_button.config(state="normal")
+            self.update_status.config(
+                text=f"Verified update available: {self.installable_update['release']['tag_name']}",
+                foreground=THEME["cyan"],
+            )
+        self._enqueue("updates", "staged update canceled; no package files changed.")
+
+    def _install_staged_update(self):
+        staged = self.staged_update
+        if staged is None or self.update_handoff_active:
+            return
+        if self.component_setups:
+            messagebox.showerror(
+                "Component setup still running",
+                "Wait for the package-local Python component setup to finish before "
+                "installing the Mission Control update.",
+                parent=self.update_install_dialog,
+            )
+            return
+        self.update_confirm_button.config(state="disabled")
+        self.update_cancel_button.config(state="disabled")
+        self.update_status.config(
+            text="Stopping Mission Control components and starting the updater...",
+            foreground=THEME["amber"],
+        )
+        for backend in self.backends:
+            backend.stop()
+        still_running = [backend.name for backend in self.backends if backend.running()]
+        if still_running:
+            self.update_confirm_button.config(state="normal")
+            self.update_cancel_button.config(state="normal")
+            messagebox.showerror(
+                "Update could not start",
+                "These Mission Control components did not stop: "
+                + ", ".join(still_running)
+                + ". No package files were changed.",
+                parent=self.update_install_dialog,
+            )
+            return
+        try:
+            runtime_update.activate_transaction(
+                staged["root"],
+                staged["transaction_id"],
+                launcher_pid=os.getpid(),
+                python_executable=PYTHON,
+            )
+        except Exception as exc:
+            self.update_confirm_button.config(state="normal")
+            self.update_cancel_button.config(state="normal")
+            self.update_status.config(
+                text="Update handoff failed; no package files changed",
+                foreground=THEME["amber"],
+            )
+            messagebox.showerror(
+                "Update could not start",
+                "The external updater could not be started. No package files were "
+                "changed.\n\n" + str(exc),
+                parent=self.update_install_dialog,
+            )
+            return
+        self.update_handoff_active = True
+        self.staged_update = None
+        self.root.destroy()
+
+    def _acknowledge_update_restart(self):
+        try:
+            if self.package_root is None:
+                raise runtime_update.TransactionError(
+                    "updated launcher does not know its package root"
+                )
+            runtime_update.acknowledge_restart(
+                self.package_root, self.restart_transaction
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Update startup check failed",
+                "The updated launcher could not confirm a healthy restart. The updater "
+                "will restore the previous version.\n\n" + str(exc),
+                parent=self.root,
+            )
+            self.root.destroy()
+            return
+        os.environ.pop("WMC_UPDATE_TRANSACTION", None)
+        self._enqueue("updates", "updated launcher startup acknowledged.")
+        self.restart_visibility_deadline = time.monotonic() + 15
+        self.root.after(200, self._finish_update_restart)
+
+    def _finish_update_restart(self):
+        status = runtime_update.pending_update_status(self.package_root)
+        if not status["pending"]:
+            self.restart_transaction = None
+            self.restart_visibility_deadline = None
+            self.root.deiconify()
+            self.root.lift()
+            self._schedule_post_start_tasks()
+            return
+        if time.monotonic() < self.restart_visibility_deadline:
+            self.root.after(200, self._finish_update_restart)
+            return
+        messagebox.showerror(
+            "Update did not finish",
+            "The external updater did not complete its final commit. Mission Control "
+            "will close so the normal launcher can recover the previous version.\n\n"
+            + status["message"],
+            parent=self.root,
+        )
+        self.root.destroy()
+
     def _toggle_automatic_updates(self):
         enabled = self.check_updates_var.get()
         self.update_state["check_enabled"] = enabled
         self._save_update_state()
+
+        if self.update_staging or self.staged_update is not None:
+            return
 
         if enabled:
             self._start_update_check(use_cache=True)
@@ -3673,6 +4234,12 @@ class App:
             self._enqueue("updates", f"couldn't save update preferences: {exc}")
 
     def _maybe_show_changelog(self):
+        # Never allow the delayed startup changelog to steal the modal grab or
+        # keyboard focus from a verified update decision.  If the user cancels,
+        # the changelog can still be opened from its launcher button; if the
+        # update proceeds, the successor's changelog is the relevant one.
+        if self.staged_update is not None or self.update_install_dialog is not None:
+            return
         changelog = load_changelog(self.changelog_path)
         current_notes = extract_version_changelog(changelog, APP_VERSION)
         if should_show_changelog(
@@ -3995,6 +4562,30 @@ class App:
         self.root.after(500, self._refresh)
 
     def _on_close(self):
+        if self.update_staging:
+            close_anyway = messagebox.askyesno(
+                "Update verification in progress",
+                "Mission Control is still downloading or verifying an update. Close "
+                "anyway? No installed package files have been changed.",
+                parent=self.root,
+            )
+            if not close_anyway:
+                return
+            self.update_generation += 1
+        if self.staged_update is not None and not self.update_handoff_active:
+            try:
+                runtime_update.discard_staged_transaction(
+                    self.staged_update["root"],
+                    self.staged_update["transaction_id"],
+                )
+            except Exception as exc:
+                messagebox.showerror(
+                    "Could not clear staged update",
+                    str(exc),
+                    parent=self.root,
+                )
+                return
+            self.staged_update = None
         for backend in self.backends:
             backend.stop()
         self.root.destroy()
@@ -4020,10 +4611,47 @@ def _fatal(_exc):
         print(traceback_text)
 
 
+def runtime_start_context(directory=HERE, environment=None):
+    """Fail closed when a packaged launch has unresolved update state."""
+    dashboard = Path(directory).resolve()
+    environment = os.environ if environment is None else environment
+    if dashboard.name.casefold() != "dashboard":
+        return None, None
+    root = dashboard.parent
+    active_marker = (
+        root
+        / runtime_update.UPDATE_DIRECTORY_NAME
+        / runtime_update.ACTIVE_TRANSACTION_NAME
+    )
+    if not (root / runtime_update.INSTALL_MANIFEST_NAME).is_file() and not active_marker.exists():
+        return None, None
+    token = environment.get("WMC_UPDATE_TRANSACTION")
+    status = runtime_update.pending_update_status(root, token)
+    if status["pending"]:
+        raise runtime_update.TransactionError(status["message"])
+    restart_transaction = (
+        status.get("transaction_id")
+        if status.get("state") in {"checking", "awaiting_restart"}
+        else None
+    )
+    return root, restart_transaction
+
+
 def main():
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    package_root, restart_transaction = runtime_start_context()
+    instance_guard = LauncherInstanceGuard()
+    try:
+        root = tk.Tk()
+        if restart_transaction is not None:
+            root.withdraw()
+        App(
+            root,
+            restart_transaction=restart_transaction,
+            package_root=package_root,
+        )
+        root.mainloop()
+    finally:
+        instance_guard.close()
 
 
 if __name__ == "__main__":

@@ -14,6 +14,10 @@ set "DASHBOARD_REQUIREMENTS=%~dp0requirements-dashboard.txt"
 set "PANEL_REQUIREMENTS=%~dp0requirements-panel.txt"
 set "SETUP_MENU=%~dp0Select Mission Control Setup.ps1"
 set "SETUP_LOG=%~dp0mission_control_setup.log"
+set "PACKAGE_ROOT=%~dp0.."
+set "UPDATE_HELPER=%~dp0runtime_update_helper.py"
+set "INSTALL_MANIFEST=%~dp0..\WMC-INSTALL-MANIFEST.json"
+set "ACTIVE_UPDATE=%~dp0..\.wmc-update\active.json"
 set "SETUP_ONLY="
 set "SETUP_SELECTION="
 set "SETUP_REQUIREMENTS="
@@ -42,7 +46,7 @@ if not "%~1"=="" (
 )
 
 call :launcher_ready
-if not errorlevel 1 goto launch
+if not errorlevel 1 goto prepare_launch
 
 echo.
 echo Woobie's Mission Control needs a one-time setup.
@@ -141,6 +145,15 @@ echo Setup complete. Your system Python installation was not changed.
 
 if defined SETUP_ONLY exit /b 0
 
+:prepare_launch
+if exist "%INSTALL_MANIFEST%" goto prepare_managed_launch
+if not exist "%ACTIVE_UPDATE%" goto launch
+
+:prepare_managed_launch
+if not exist "%UPDATE_HELPER%" goto update_recovery_failed
+"%VENV_PYTHON%" "%UPDATE_HELPER%" prepare-launch "%PACKAGE_ROOT%"
+if errorlevel 1 goto update_recovery_failed
+
 :launch
 if exist "%VENV_PYTHONW%" (
     start "" "%VENV_PYTHONW%" "%APP%"
@@ -160,16 +173,25 @@ exit /b 1
 echo Checking Woobie's Mission Control without changing any files...
 echo.
 call :launcher_ready
-if not errorlevel 1 (
-    echo READY: The local Mission Control environment is available.
-    "%VENV_PYTHON%" --version
-    call :dashboard_ready
-    if errorlevel 1 (echo Dashboard: NOT SET UP) else (echo Dashboard: READY)
-    call :panel_ready
-    if errorlevel 1 (echo ESP32 Controlpad: NOT SET UP) else (echo ESP32 Controlpad: READY)
-    exit /b 0
-)
+if errorlevel 1 goto check_not_ready
+if exist "%INSTALL_MANIFEST%" goto check_managed_runtime
+if exist "%ACTIVE_UPDATE%" goto check_managed_runtime
+goto check_components
 
+:check_managed_runtime
+call :runtime_update_ready
+if errorlevel 1 exit /b 3
+
+:check_components
+echo READY: The local Mission Control environment is available.
+"%VENV_PYTHON%" --version
+call :dashboard_ready
+if errorlevel 1 (echo Dashboard: NOT SET UP) else (echo Dashboard: READY)
+call :panel_ready
+if errorlevel 1 (echo ESP32 Controlpad: NOT SET UP) else (echo ESP32 Controlpad: READY)
+exit /b 0
+
+:check_not_ready
 if exist "%VENV_PYTHON%" (
     echo INCOMPLETE: A local environment exists, but required packages are missing.
 ) else (
@@ -199,6 +221,23 @@ exit /b %errorlevel%
 if not exist "%VENV_PYTHON%" exit /b 1
 "%VENV_PYTHON%" -c "import importlib.metadata as m, krpc, google.protobuf, serial; expected={'krpc':'0.6.0','protobuf':'7.35.1','pyserial':'3.5'}; raise SystemExit(0 if all(m.version(name) == version for name, version in expected.items()) else 1)" >nul 2>&1
 exit /b %errorlevel%
+
+:runtime_update_ready
+if not exist "%UPDATE_HELPER%" (
+    echo Runtime updater: MISSING
+    exit /b 1
+)
+if defined WMC_UPDATE_TRANSACTION (
+    "%VENV_PYTHON%" "%UPDATE_HELPER%" status "%PACKAGE_ROOT%" --transaction-token "%WMC_UPDATE_TRANSACTION%"
+) else (
+    "%VENV_PYTHON%" "%UPDATE_HELPER%" status "%PACKAGE_ROOT%"
+)
+if errorlevel 1 (
+    echo Runtime updater: RECOVERY REQUIRED
+    exit /b 1
+)
+echo Runtime updater: READY
+exit /b 0
 
 :find_python
 py -3.14 -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)" >nul 2>&1
@@ -242,6 +281,15 @@ if exist "%ProgramFiles%\Python314\python.exe" (
 )
 
 exit /b 1
+
+:update_recovery_failed
+echo.
+echo ERROR: Mission Control could not safely finish or recover a pending update.
+echo No normal components were started.
+echo Review the update log under:
+echo "%PACKAGE_ROOT%\.wmc-update"
+pause
+exit /b 3
 
 :python_missing
 echo.

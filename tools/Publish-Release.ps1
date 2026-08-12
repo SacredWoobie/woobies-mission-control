@@ -87,7 +87,87 @@ function Copy-AllowlistedFile {
     Copy-Item -LiteralPath $source -Destination $destination -Force
 }
 
+function Write-Utf8Json {
+    param(
+        [string]$Path,
+        [Parameter(Mandatory)]
+        $Value
+    )
+
+    $json = $Value | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText(
+        $Path,
+        $json + [Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
+function Get-PackageFileRecord {
+    param(
+        [string]$StageRoot,
+        [string]$RelativePath,
+        [string]$ManifestPath = $RelativePath
+    )
+
+    $path = Join-Path $StageRoot $RelativePath
+    Assert-RequiredFile $path
+    $file = Get-Item -LiteralPath $path
+    return [ordered]@{
+        path = $ManifestPath.Replace('\', '/')
+        size = [long]$file.Length
+        sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+}
+
+function Test-ManagedRuntimePath {
+    param([string]$RelativePath)
+
+    $path = $RelativePath.Replace('\', '/')
+    $segments = @($path.Split('/'))
+    if ($script:RuntimeUpdateContract.root_managed_files -ccontains $path) {
+        return $true
+    }
+    if ($path -ceq $script:RuntimeUpdateContract.dashboard_contract_path) {
+        return $true
+    }
+    if ($segments.Count -eq 2 -and $segments[0] -ceq 'Dashboard') {
+        $extension = [System.IO.Path]::GetExtension($segments[1]).ToLowerInvariant()
+        return $script:RuntimeUpdateContract.dashboard_top_level_extensions -ccontains $extension
+    }
+    if ($path -ceq $script:RuntimeUpdateContract.dashboard_web_index) {
+        return $true
+    }
+    if ($segments.Count -eq 4 -and
+        $segments[0] -ceq 'Dashboard' -and
+        $segments[1] -ceq 'web' -and
+        $segments[2] -ceq 'assets') {
+        $extension = [System.IO.Path]::GetExtension($segments[3]).ToLowerInvariant()
+        return $script:RuntimeUpdateContract.dashboard_asset_extensions -ccontains $extension
+    }
+    if ($segments.Count -ge 3 -and
+        $segments[0] -ceq 'GameData' -and
+        $script:RuntimeUpdateContract.service_folders -ccontains $segments[1]) {
+        return $true
+    }
+    if ($segments.Count -eq 2 -and
+        $segments[0] -ceq 'SOURCE' -and
+        $segments[1].EndsWith(
+            $script:RuntimeUpdateContract.source_archive_suffix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        return $true
+    }
+    return $false
+}
+
 $repoRoot = Get-FullPath (Join-Path $PSScriptRoot '..')
+$runtimeUpdateContractPath = Join-Path $repoRoot 'runtime-update-contract.json'
+Assert-RequiredFile $runtimeUpdateContractPath
+$script:RuntimeUpdateContract = Get-Content -LiteralPath $runtimeUpdateContractPath `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($script:RuntimeUpdateContract.schema -ne 1) {
+    throw 'runtime-update-contract.json has an unsupported schema.'
+}
 $manifestPath = Join-Path $PSScriptRoot 'Release-Manifest.psd1'
 $frontendBuildScript = Join-Path $PSScriptRoot 'Build-Frontend.ps1'
 $frontendRoot = Join-Path $repoRoot 'frontend'
@@ -138,6 +218,9 @@ $packageName = "Woobies-Mission-Control-v$Version"
 $stageRoot = Join-Path $OutputDirectory $packageName
 $zipPath = Join-Path $OutputDirectory "$packageName.zip"
 $checksumPath = Join-Path $OutputDirectory "$packageName.zip.sha256"
+$updateArchivePath = Join-Path $OutputDirectory "$packageName.zz-90-runtime-update.zip"
+$updateChecksumPath = "$updateArchivePath.sha256"
+$updateStageRoot = Join-Path $OutputDirectory "$packageName-runtime-update-stage"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
     @{ Source = 'docs/images/v0.6.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
@@ -166,7 +249,8 @@ $sourceArchiveAssets = @(
         }
 )
 $sourceArchiveOutputPaths = @($sourceArchiveAssets | ForEach-Object { $_.OutputPath })
-foreach ($path in @($stageRoot, $zipPath, $checksumPath, $notesPath) + $releaseImagePaths + $sourceArchiveOutputPaths) {
+$releaseUpdatePaths = @($updateArchivePath, $updateChecksumPath)
+foreach ($path in @($stageRoot, $zipPath, $checksumPath, $updateStageRoot, $notesPath) + $releaseUpdatePaths + $releaseImagePaths + $sourceArchiveOutputPaths) {
     Assert-SafeChildPath -Parent $OutputDirectory -Child $path
 }
 
@@ -174,6 +258,9 @@ $sourceFiles = @(
     @{ Source = 'Start KSP Dashboard.bat'; Destination = 'Dashboard/Start KSP Dashboard.bat' },
     @{ Source = 'Select Mission Control Setup.ps1'; Destination = 'Dashboard/Select Mission Control Setup.ps1' },
     @{ Source = 'ksp_dashboard_app.py'; Destination = 'Dashboard/ksp_dashboard_app.py' },
+    @{ Source = 'runtime_update.py'; Destination = 'Dashboard/runtime_update.py' },
+    @{ Source = 'runtime_update_helper.py'; Destination = 'Dashboard/runtime_update_helper.py' },
+    @{ Source = 'runtime-update-contract.json'; Destination = 'Dashboard/runtime-update-contract.json' },
     @{ Source = 'panel_bridge.py'; Destination = 'Dashboard/panel_bridge.py' },
     @{ Source = 'damage.py'; Destination = 'Dashboard/damage.py' },
     @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
@@ -328,6 +415,20 @@ if ($CreateDraftRelease) {
         throw "Local '$Target' does not match origin/$Target."
     }
     Invoke-CheckedCommand -Command 'gh' -Arguments @('auth', 'status', '--hostname', 'github.com')
+    $immutableJson = & gh api `
+        -H 'Accept: application/vnd.github+json' `
+        -H 'X-GitHub-Api-Version: 2026-03-10' `
+        "repos/$Repository/immutable-releases"
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to verify the repository immutable-release setting.'
+    }
+    $immutableSetting = $immutableJson | ConvertFrom-Json
+    if ($immutableSetting.enabled -ne $true) {
+        throw (
+            'GitHub release immutability must be enabled before creating an ' +
+            'updater-capable draft release.'
+        )
+    }
     $existingJson = & gh release list --repo $Repository --limit 1000 --json tagName
     if ($LASTEXITCODE -ne 0) {
         throw 'Unable to inspect existing GitHub releases.'
@@ -346,7 +447,10 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 if (Test-Path -LiteralPath $stageRoot) {
     Remove-Item -LiteralPath $stageRoot -Recurse -Force
 }
-foreach ($path in @($zipPath, $checksumPath, $notesPath) + $releaseImagePaths + $sourceArchiveOutputPaths) {
+if (Test-Path -LiteralPath $updateStageRoot) {
+    Remove-Item -LiteralPath $updateStageRoot -Recurse -Force
+}
+foreach ($path in @($zipPath, $checksumPath, $notesPath) + $releaseUpdatePaths + $releaseImagePaths + $sourceArchiveOutputPaths) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Force
     }
@@ -379,16 +483,18 @@ Assert-RequiredFile (Join-Path $frontendDist 'index.html')
 New-Item -ItemType Directory -Path $webTarget -Force | Out-Null
 Copy-Item -Path (Join-Path $frontendDist '*') -Destination $webTarget -Recurse -Force
 
-$sourceCommit = 'not-a-git-checkout'
+$sourceCommit = $null
 if ((Test-Path -LiteralPath (Join-Path $repoRoot '.git')) -and (Get-Command 'git' -ErrorAction SilentlyContinue)) {
     $sourceCommit = (& git -C $repoRoot rev-parse HEAD 2>$null).Trim()
-    if (-not $sourceCommit) {
-        $sourceCommit = 'unknown'
-    }
-    elseif (@(& git -C $repoRoot status --porcelain).Count -gt 0) {
-        $sourceCommit += ' (working tree modified)'
-    }
+    $sourceDirty = @(& git -C $repoRoot status --porcelain)
 }
+if (-not $sourceCommit -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+    throw 'Runtime-update packages require an exact Git source commit.'
+}
+if ($sourceDirty.Count -gt 0) {
+    throw 'Runtime-update packages must be assembled from a clean Git checkout.'
+}
+$sourceCommit = $sourceCommit.ToLowerInvariant()
 $buildLines = @(
     "Woobie's Mission Control v$Version",
     "Assembled UTC: $([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))",
@@ -409,6 +515,231 @@ foreach ($sourceArchive in $sourceArchiveInputs) {
     $buildLines,
     [System.Text.UTF8Encoding]::new($false)
 )
+
+Write-Step 'Creating managed installation and runtime-update manifests'
+$runtimeSurfacePaths = @(
+    Get-ChildItem -LiteralPath $stageRoot -Recurse -File |
+        ForEach-Object {
+            $_.FullName.Substring($stageRoot.Length).TrimStart('\').Replace('\', '/')
+        } |
+        Where-Object {
+            $_.StartsWith('Dashboard/', [System.StringComparison]::Ordinal) -or
+            $_.StartsWith('GameData/', [System.StringComparison]::Ordinal) -or
+            $_.StartsWith('SOURCE/', [System.StringComparison]::Ordinal)
+        }
+)
+$unmanagedRuntimePaths = @(
+    $runtimeSurfacePaths | Where-Object { -not (Test-ManagedRuntimePath $_) }
+)
+if ($unmanagedRuntimePaths.Count -gt 0) {
+    throw (
+        'Packaged runtime paths are absent from runtime-update-contract.json: ' +
+        ($unmanagedRuntimePaths -join ', ')
+    )
+}
+$managedPaths = [string[]]@(
+    Get-ChildItem -LiteralPath $stageRoot -Recurse -File |
+        ForEach-Object {
+            $_.FullName.Substring($stageRoot.Length).TrimStart('\').Replace('\', '/')
+        } |
+        Where-Object { Test-ManagedRuntimePath $_ }
+)
+[System.Array]::Sort(
+    $managedPaths,
+    [System.StringComparer]::OrdinalIgnoreCase
+)
+if ($managedPaths.Count -eq 0) {
+    throw 'The managed runtime file set is empty.'
+}
+$managedRecords = @(
+    $managedPaths |
+        ForEach-Object { Get-PackageFileRecord -StageRoot $stageRoot -RelativePath $_ }
+)
+$serviceRecords = @(
+    $serviceInputs |
+        Sort-Object { $_.Folder.ToLowerInvariant() } |
+        ForEach-Object {
+            [ordered]@{
+                name = $_.Folder
+                version = $_.Version
+                sha256 = $_.Hash
+            }
+        }
+)
+$installManifest = [ordered]@{
+    schema = 1
+    product_version = $Version
+    updater_protocol = 1
+    source_commit = $sourceCommit
+    services = $serviceRecords
+    files = $managedRecords
+}
+$installManifestPath = Join-Path $stageRoot 'WMC-INSTALL-MANIFEST.json'
+Write-Utf8Json -Path $installManifestPath -Value $installManifest
+
+New-Item -ItemType Directory -Path (Join-Path $updateStageRoot 'payload') -Force | Out-Null
+foreach ($relativePath in $managedPaths + @('WMC-INSTALL-MANIFEST.json')) {
+    $source = Join-Path $stageRoot $relativePath
+    $destination = Join-Path (Join-Path $updateStageRoot 'payload') $relativePath
+    New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
+    Copy-Item -LiteralPath $source -Destination $destination -Force
+}
+$payloadPaths = [string[]]@(
+    Get-ChildItem -LiteralPath (Join-Path $updateStageRoot 'payload') -Recurse -File |
+        ForEach-Object {
+            $_.FullName.Substring($updateStageRoot.Length).TrimStart('\').Replace('\', '/')
+        }
+)
+[System.Array]::Sort(
+    $payloadPaths,
+    [System.StringComparer]::OrdinalIgnoreCase
+)
+$payloadRecords = @(
+    $payloadPaths |
+        ForEach-Object { Get-PackageFileRecord -StageRoot $updateStageRoot -RelativePath $_ }
+)
+$updateManifest = [ordered]@{
+    schema = 1
+    product_version = $Version
+    source_commit = $sourceCommit
+    compatible_updater_protocols = @(1)
+    services = $serviceRecords
+    files = $payloadRecords
+}
+Write-Utf8Json -Path (Join-Path $updateStageRoot 'update-manifest.json') -Value $updateManifest
+
+$contractLimits = $script:RuntimeUpdateContract.limits
+$updateManifestFile = Get-Item -LiteralPath (Join-Path $updateStageRoot 'update-manifest.json')
+if ($payloadRecords.Count + 1 -gt [long]$contractLimits.archive_entries) {
+    throw 'Runtime-update payload exceeds the updater archive entry limit.'
+}
+if ($updateManifestFile.Length -gt [long]$contractLimits.archive_file_bytes) {
+    throw 'Runtime-update manifest exceeds the updater per-file limit.'
+}
+$expandedBytes = [long]$updateManifestFile.Length
+foreach ($record in $payloadRecords) {
+    if ($record.path.Length -gt [long]$contractLimits.relative_path_length) {
+        throw "Runtime-update path exceeds the updater length limit: $($record.path)"
+    }
+    if ([long]$record.size -gt [long]$contractLimits.archive_file_bytes) {
+        throw "Runtime-update file exceeds the updater per-file limit: $($record.path)"
+    }
+    $expandedBytes += [long]$record.size
+}
+if ($expandedBytes -gt [long]$contractLimits.archive_expanded_bytes) {
+    throw 'Runtime-update payload exceeds the updater expanded-size limit.'
+}
+
+Write-Step 'Creating runtime-update archive and checksum'
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$updateArchiveStream = [System.IO.File]::Open(
+    $updateArchivePath,
+    [System.IO.FileMode]::CreateNew,
+    [System.IO.FileAccess]::ReadWrite,
+    [System.IO.FileShare]::None
+)
+try {
+    $updateArchiveWriter = [System.IO.Compression.ZipArchive]::new(
+        $updateArchiveStream,
+        [System.IO.Compression.ZipArchiveMode]::Create,
+        $false
+    )
+    try {
+        $updateArchiveInputs = @('update-manifest.json') + $payloadPaths
+        foreach ($relativePath in $updateArchiveInputs) {
+            $entryName = $relativePath.Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $updateArchiveWriter,
+                (Join-Path $updateStageRoot $relativePath),
+                $entryName,
+                [System.IO.Compression.CompressionLevel]::Optimal
+            ) | Out-Null
+        }
+    }
+    finally {
+        $updateArchiveWriter.Dispose()
+    }
+}
+finally {
+    $updateArchiveStream.Dispose()
+}
+$updateArchiveFile = Get-Item -LiteralPath $updateArchivePath
+if ($updateArchiveFile.Length -gt [long]$contractLimits.download_bytes) {
+    throw 'Runtime-update ZIP exceeds the updater download limit.'
+}
+$updateHash = Get-FileHash -LiteralPath $updateArchivePath -Algorithm SHA256
+$updateChecksumLine = (
+    "$($updateHash.Hash.ToLowerInvariant())  " +
+    "$([System.IO.Path]::GetFileName($updateArchivePath))" +
+    [Environment]::NewLine
+)
+[System.IO.File]::WriteAllText(
+    $updateChecksumPath,
+    $updateChecksumLine,
+    [System.Text.UTF8Encoding]::new($false)
+)
+if ((Get-Item -LiteralPath $updateChecksumPath).Length -gt [long]$contractLimits.checksum_bytes) {
+    throw 'Runtime-update checksum exceeds the updater checksum limit.'
+}
+
+$updateArchive = [System.IO.Compression.ZipFile]::OpenRead($updateArchivePath)
+try {
+    $updateEntries = @(
+        $updateArchive.Entries |
+            Where-Object { -not $_.FullName.EndsWith('/') }
+    )
+    if ($updateEntries.Count -gt [long]$contractLimits.archive_entries) {
+        throw 'Runtime-update ZIP exceeds the updater archive entry limit.'
+    }
+    $archiveExpandedBytes = [long]0
+    foreach ($entry in $updateEntries) {
+        if ($entry.Length -gt [long]$contractLimits.archive_file_bytes) {
+            throw "Runtime-update ZIP entry exceeds the updater per-file limit: $($entry.FullName)"
+        }
+        $archiveExpandedBytes += [long]$entry.Length
+    }
+    if ($archiveExpandedBytes -gt [long]$contractLimits.archive_expanded_bytes) {
+        throw 'Runtime-update ZIP exceeds the updater expanded-size limit.'
+    }
+    $expectedUpdateEntries = @('update-manifest.json') + $payloadRecords.path
+    $actualUpdateEntries = @($updateEntries | ForEach-Object { $_.FullName.Replace('\', '/') })
+    if ($actualUpdateEntries.Count -ne $expectedUpdateEntries.Count -or
+        @($expectedUpdateEntries | Where-Object { $actualUpdateEntries -notcontains $_ }).Count -gt 0 -or
+        @($actualUpdateEntries | Where-Object { $expectedUpdateEntries -notcontains $_ }).Count -gt 0) {
+        throw 'Runtime-update ZIP entries do not exactly match update-manifest.json.'
+    }
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        foreach ($record in $payloadRecords) {
+            $entry = $updateEntries |
+                Where-Object { $_.FullName.Replace('\', '/') -eq $record.path } |
+                Select-Object -First 1
+            if (-not $entry -or $entry.Length -ne $record.size) {
+                throw "Runtime-update ZIP size mismatch: $($record.path)"
+            }
+            $stream = $entry.Open()
+            try {
+                $entryHash = [System.BitConverter]::ToString(
+                    $sha256.ComputeHash($stream)
+                ).Replace('-', '').ToLowerInvariant()
+            }
+            finally {
+                $stream.Dispose()
+            }
+            if ($entryHash -ne $record.sha256) {
+                throw "Runtime-update ZIP hash mismatch: $($record.path)"
+            }
+        }
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+finally {
+    $updateArchive.Dispose()
+}
+Remove-Item -LiteralPath $updateStageRoot -Recurse -Force
 
 $notesPattern = "(?ms)^## v$([regex]::Escape($Version))[^\r\n]*\r?\n(?<body>.*?)(?=^## |\z)"
 $notesMatch = [regex]::Match($changelog, $notesPattern)
@@ -439,7 +770,7 @@ $requiredEntries = @(
     $serviceInputs.Destination +
     $serviceCompanionInputs.Destination +
     $sourceArchiveInputs.Destination +
-    @('Dashboard/web/index.html', 'BUILD-INFO.txt')
+    @('Dashboard/web/index.html', 'BUILD-INFO.txt', 'WMC-INSTALL-MANIFEST.json')
 )
 foreach ($required in $requiredEntries) {
     if ($relativeStageFiles -notcontains $required) {
@@ -456,6 +787,11 @@ if ($forbidden.Count -gt 0) {
 Write-Step 'Creating ZIP and checksum'
 Compress-Archive -Path (Join-Path $stageRoot '*') -DestinationPath $zipPath -CompressionLevel Optimal
 $hash = Get-FileHash -LiteralPath $zipPath -Algorithm SHA256
+$fullZipFile = Get-Item -LiteralPath $zipPath
+$updateZipFile = Get-Item -LiteralPath $updateArchivePath
+if ($updateZipFile.Length -ge $fullZipFile.Length) {
+    throw 'The runtime-update asset must be smaller than the normal release ZIP.'
+}
 $checksumLine = "$($hash.Hash.ToLowerInvariant())  $([System.IO.Path]::GetFileName($zipPath))$([Environment]::NewLine)"
 [System.IO.File]::WriteAllText($checksumPath, $checksumLine, [System.Text.UTF8Encoding]::new($false))
 
@@ -488,6 +824,8 @@ Write-Host "`nRelease candidate verified:" -ForegroundColor Green
 Write-Host "  Unpacked: $stageRoot"
 Write-Host "  ZIP:      $zipPath"
 Write-Host "  SHA-256:  $($hash.Hash.ToLowerInvariant())"
+Write-Host "  Update:   $updateArchivePath"
+Write-Host "  Update SHA-256: $($updateHash.Hash.ToLowerInvariant())"
 Write-Host "  Notes:    $notesPath"
 if ($releaseImagePaths.Count -gt 0) {
     Write-Host '  Images:'
@@ -512,7 +850,7 @@ Write-Step 'Creating draft GitHub release'
 $releaseArguments = @(
     'release', 'create', "v$Version",
     $zipPath, $checksumPath
-) + $sourceArchiveOutputPaths + $releaseImagePaths + @(
+) + $sourceArchiveOutputPaths + $releaseImagePaths + $releaseUpdatePaths + @(
     '--repo', $Repository,
     '--target', $Target,
     '--title', "Woobie's Mission Control v$Version",
