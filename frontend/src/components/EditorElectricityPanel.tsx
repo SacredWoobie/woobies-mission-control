@@ -15,12 +15,11 @@ function duration(value: number | undefined) {
   return `${number(value / 3600, 1)} h`;
 }
 
-function categoryRows(components: readonly EditorElectricityComponentTelemetry[], included: Readonly<Record<string, boolean>>) {
-  const rows = new Map<string, { components: EditorElectricityComponentTelemetry[]; enabled: number }>();
+function groupedComponents(components: readonly EditorElectricityComponentTelemetry[]) {
+  const rows = new Map<string, EditorElectricityComponentTelemetry[]>();
   for (const component of components) {
-    const row = rows.get(component.category) ?? { components: [], enabled: 0 };
-    row.components.push(component);
-    if (included[component.stableId] ?? component.defaultIncluded) row.enabled += 1;
+    const row = rows.get(component.category) ?? [];
+    row.push(component);
     rows.set(component.category, row);
   }
   return [...rows.entries()];
@@ -28,7 +27,6 @@ function categoryRows(components: readonly EditorElectricityComponentTelemetry[]
 
 export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const [session, setSession] = useState<ElectricityPlannerSession>();
-  const [openCategory, setOpenCategory] = useState<string>();
   const components = snapshot["editor.elec.components"] ?? [];
   const status = snapshot["editor.elec.status"];
   const pending = snapshot["editor.elec.pending"] === true;
@@ -48,7 +46,6 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
     body,
     scenario: plannerScenario,
   }), [body, components, plannerScenario, session?.includedByStableId, snapshot]);
-  const rows = categoryRows(components, session?.includedByStableId ?? {});
   const unavailable = status === "unavailable";
   const retained = snapshot["editor.elec.retained"] === true;
   const incomplete = components.some((component) => !component.valueKnown);
@@ -60,6 +57,16 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
   const setScenario = (change: Partial<NonNullable<ElectricityPlannerSession["scenario"]>>) => {
     setSession((current) => current ? { ...current, scenario: { ...current.scenario, ...change } } : current);
   };
+  const toggleComponent = (component: EditorElectricityComponentTelemetry) => {
+    const included = session?.includedByStableId[component.stableId] ?? component.defaultIncluded;
+    setSession((current) => current ? {
+      ...current,
+      includedByStableId: { ...current.includedByStableId, [component.stableId]: !included },
+    } : current);
+  };
+  const depletion = plan.netEcPerSec !== undefined && plan.netEcPerSec >= 0
+    ? "No depletion"
+    : duration(plan.batteryEnduranceSeconds);
 
   return (
     <Panel id="editorElectricity" className="editor-electricity-panel" title="Electricity planner" tag="EDITOR ONLY · READ-ONLY">
@@ -77,33 +84,60 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
                   <Metric label="Storage" value={`${number(snapshot["editor.elec.currentEc"], 0)} / ${number(snapshot["editor.elec.maxEc"], 0)} EC`} />
                 </div>
                 <div className="editor-electricity-controls">
-                  <label>Body<select aria-label="Electricity planner body" onChange={(event) => setScenario({ bodyName: event.target.value })} value={plannerScenario.bodyName ?? ""}>{(snapshot["editor.elec.bodies"] ?? []).map((candidate) => <option key={candidate.bodyName} value={candidate.bodyName}>{candidate.bodyName}</option>)}</select></label>
+                  <label>Body<select aria-label="Electricity planner body" onChange={(event) => {
+                    const selectedBody = findPlannerBody(snapshot["editor.elec.bodies"], event.target.value);
+                    setScenario({ bodyName: event.target.value, solarScale: selectedBody?.solarEfficiency });
+                  }} value={plannerScenario.bodyName ?? ""}>{(snapshot["editor.elec.bodies"] ?? []).map((candidate) => <option key={candidate.bodyName} value={candidate.bodyName}>{candidate.bodyName}</option>)}</select></label>
                   <label>Orbit altitude<input aria-label="Electricity planner orbital altitude (m)" min={0} onChange={(event) => setScenario({ altitudeMeters: event.target.value === "" ? undefined : Number(event.target.value) })} step={1000} type="number" value={plannerScenario.altitudeMeters ?? ""} /><small>m ASL</small></label>
                   <div className="editor-electricity-presets" aria-label="Planner presets" role="group">
                     <button onClick={() => preset("backend-defaults")} type="button">Backend defaults</button><button onClick={() => preset("all-included")} type="button">All included</button><button onClick={() => preset("producers-off")} type="button">Producers off</button><button onClick={() => preset("reset")} type="button">Reset</button>
                   </div>
                 </div>
+                <div className="editor-electricity-operational" aria-label="Electrical endurance comparison">
+                  <Metric label="Battery depletion" value={depletion} tone={plan.netEcPerSec !== undefined && plan.netEcPerSec < 0 ? "bad" : "ok"} />
+                  <Metric label="Time in eclipse" value={duration(plan.eclipseDurationSeconds)} />
+                  <Metric label="Solar efficiency" value={plan.solarScaleAssumption === undefined ? "Unavailable" : `${number(plan.solarScaleAssumption * 100, 1)}%`} />
+                </div>
                 <div className="editor-electricity-assessment">
-                  <Metric label="Maximum central eclipse" value={duration(plan.eclipseDurationSeconds)} />
                   <Metric label="Required EC" value={`${number(plan.eclipseRequiredEc, 0)} EC`} />
                   <Metric label="Eclipse margin" value={`${number(plan.eclipseMarginEc, 0)} EC`} tone={plan.eclipseMarginEc !== undefined && plan.eclipseMarginEc < 0 ? "bad" : "ok"} />
                   <Metric label="Recharge" value={duration(plan.rechargeSeconds)} />
                   <Metric label="Recurring orbit" value={plan.recurringOrbitSustainable === undefined ? "Unavailable" : plan.recurringOrbitSustainable ? "Sustainable" : "Deficit"} tone={plan.recurringOrbitSustainable === false ? "bad" : "ok"} />
-                  {(plan.netEcPerSec !== undefined && plan.netEcPerSec < 0) && <Metric label="Battery endurance" value={duration(plan.batteryEnduranceSeconds)} tone="bad" />}
                 </div>
-                <p className="editor-electricity-assumption">Conservative maximum central eclipse · circular orbit · solar output assumes {plan.solarScaleAssumption === undefined ? "unknown illumination" : `${number(plan.solarScaleAssumption, 2)}× reference sunlight`}. This planner never changes KSP or module state.</p>
-                <div className="editor-electricity-categories" aria-label="Electrical component categories">
-                  {rows.map(([category, row]) => <div className="editor-electricity-category" key={category}>
-                    <button aria-expanded={openCategory === category} className="editor-electricity-category-button" onClick={() => setOpenCategory((current) => current === category ? undefined : category)} type="button"><span>{category}</span><span>{row.enabled}/{row.components.length} included</span></button>
-                    {openCategory === category && <div className="editor-electricity-components">{row.components.map((component) => {
-                      const included = session?.includedByStableId[component.stableId] ?? component.defaultIncluded;
-                      return <label className="editor-electricity-component" key={component.stableId}><input checked={included} onChange={() => setSession((current) => current ? { ...current, includedByStableId: { ...current.includedByStableId, [component.stableId]: !included } } : current)} type="checkbox" /><span><strong>{component.partTitle}</strong><small>{component.moduleName} · {component.role} · {component.valueKnown ? `${number(component.referenceEcPerSec)} EC/s` : "rate unknown"}</small></span></label>;
-                    })}</div>}
-                  </div>)}
+                <p className="editor-electricity-assumption">Conservative maximum central eclipse · circular orbit · solar output scaled to {plan.solarScaleAssumption === undefined ? "unknown illumination" : `${number(plan.solarScaleAssumption * 100, 1)}% efficiency at ${plannerScenario.bodyName ?? "the selected body"}`}. This planner never changes KSP or module state.</p>
+                <div className="editor-electricity-ledgers" aria-label="Electrical producers and consumers">
+                  <PowerLedger components={components.filter((component) => component.role === "producer")} included={session?.includedByStableId ?? {}} label="Power Generated" onToggle={toggleComponent} rate={plan.generationEcPerSec} />
+                  <PowerLedger components={components.filter((component) => component.role === "consumer")} included={session?.includedByStableId ?? {}} label="Power Consumed" onToggle={toggleComponent} rate={plan.drawEcPerSec} />
                 </div>
               </>
             )}
     </Panel>
+  );
+}
+
+function PowerLedger({ components, included, label, onToggle, rate }: {
+  components: readonly EditorElectricityComponentTelemetry[];
+  included: Readonly<Record<string, boolean>>;
+  label: "Power Generated" | "Power Consumed";
+  onToggle(component: EditorElectricityComponentTelemetry): void;
+  rate: number | undefined;
+}) {
+  const enabled = components.filter((component) => included[component.stableId] ?? component.defaultIncluded).length;
+  return (
+    <details className="editor-electricity-ledger">
+      <summary><span>{label}</span><strong>{number(rate)} EC/s</strong><small>{enabled}/{components.length} included</small></summary>
+      <div className="editor-electricity-ledger-body">
+        {components.length === 0 ? <p>No components reported.</p> : groupedComponents(components).map(([category, categoryComponents]) => (
+          <section className="editor-electricity-ledger-group" key={category}>
+            <h3>{category}</h3>
+            {categoryComponents.map((component) => {
+              const checked = included[component.stableId] ?? component.defaultIncluded;
+              return <label className="editor-electricity-component" key={component.stableId}><input checked={checked} onChange={() => onToggle(component)} type="checkbox" /><span><strong>{component.partTitle}</strong><small>{component.moduleName} · {component.valueKnown ? `${number(component.referenceEcPerSec)} EC/s reference` : "rate unknown"}</small></span></label>;
+            })}
+          </section>
+        ))}
+      </div>
+    </details>
   );
 }
 

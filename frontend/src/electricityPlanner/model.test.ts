@@ -66,7 +66,9 @@ describe("editor electricity planner model", () => {
   });
 
   it("defaults from authoritative body atmosphere rather than staging altitude", () => {
-    expect(defaultElectricityScenario({ ...representativeElectricityFixture, "stage.altitude": 123 }).altitudeMeters).toBe(80_000);
+    const scenario = defaultElectricityScenario({ ...representativeElectricityFixture, "stage.altitude": 123 });
+    expect(scenario.altitudeMeters).toBe(80_000);
+    expect(scenario.solarScale).toBe(0.962);
   });
 
   it("keeps representative, dense, missing, and degraded telemetry states distinct", () => {

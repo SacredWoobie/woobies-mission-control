@@ -16,15 +16,20 @@ describe("EditorElectricityPanel", () => {
   it("renders editor-only planning outputs and the conservative assumptions", () => {
     renderPanel();
     expect(screen.getByText("EDITOR ONLY · READ-ONLY")).toBeTruthy();
-    expect(screen.getByText("Maximum central eclipse")).toBeTruthy();
+    expect(screen.getByText("Battery depletion")).toBeTruthy();
+    expect(screen.getByText("Time in eclipse")).toBeTruthy();
+    expect(screen.getByText("Solar efficiency")).toBeTruthy();
+    expect(screen.getByText("96.2%")).toBeTruthy();
+    expect(screen.getByText("Power Generated")).toBeTruthy();
+    expect(screen.getByText("Power Consumed")).toBeTruthy();
     expect(screen.getByText(/Conservative maximum central eclipse/)).toBeTruthy();
     expect(screen.getByText(/This planner never changes KSP/)).toBeTruthy();
   });
 
-  it("supports presets and bounded category drill-down without persistence", () => {
+  it("supports presets and separate generated/consumed drill-downs without persistence", () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: "Producers off" }));
-    fireEvent.click(screen.getByRole("button", { name: /Solar/ }));
+    fireEvent.click(screen.getByText("Power Generated"));
     const toggle = screen.getByRole("checkbox", { name: /OX-4L/ });
     expect((toggle as HTMLInputElement).checked).toBe(false);
     fireEvent.click(toggle);

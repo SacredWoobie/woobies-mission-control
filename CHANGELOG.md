@@ -7,10 +7,12 @@ All notable public changes will be recorded here.
 - Added a read-only VAB/SPH electricity planner with mod-aware and stock
   producer/consumer inventories, battery endurance, conservative circular-orbit
   eclipse sizing, recharge and recurring-orbit checks, and session-only
-  component/scenario controls. The editor electrical snapshot is event-driven:
+  component/scenario controls. Separate generated/consumed ledgers and a compact
+  endurance comparison expose depletion time, eclipse time, and body-relative
+  solar efficiency together. The editor electrical snapshot is event-driven:
   stable dashboard frames reuse the last confirmed craft model instead of
   repeatedly polling kRPC, while craft changes and bounded compatibility
-  retries refresh it. WoobiesControlStats 0.2.17 supplies the optional
+  retries refresh it. WoobiesControlStats 0.2.18 supplies the optional
   Dynamic Battery Storage-backed and stock-fallback editor service.
 
 ## v0.6.1 - Managed runtime updates

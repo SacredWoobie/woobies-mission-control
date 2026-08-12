@@ -50,7 +50,7 @@ export function defaultElectricityScenario(snapshot: TelemetrySnapshot): Electri
   return {
     bodyName,
     altitudeMeters: atmosphereDepth === undefined ? undefined : atmosphereDepth + 10_000,
-    solarScale: 1,
+    solarScale: finiteNonNegative(body?.solarEfficiency),
   };
 }
 

@@ -425,8 +425,8 @@ export interface EditorElectricityBodyTelemetry {
   rotationPeriod?: number;
   atmosphereDepth?: number;
   sphereOfInfluence?: number;
-  maxStarDistance?: number;
-  luminosityScale?: number;
+  solarDistance?: number;
+  solarEfficiency?: number;
   authoritative: boolean;
 }
 

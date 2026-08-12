@@ -50,6 +50,8 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
         self.assertEqual(result["editor.elec.components"][0]["partId"], "42")
         self.assertTrue(result["editor.elec.bodies"][0]["authoritative"])
         self.assertIn("gravitationalParameter", result["editor.elec.bodies"][0])
+        self.assertEqual(result["editor.elec.bodies"][0]["solarDistance"], 13599840256)
+        self.assertEqual(result["editor.elec.bodies"][0]["solarEfficiency"], 1)
         self.assertNotIn("mu", result["editor.elec.bodies"][0])
 
     def test_rejects_atomic_count_and_enum_failures(self):

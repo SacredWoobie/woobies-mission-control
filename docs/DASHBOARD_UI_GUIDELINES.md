@@ -180,6 +180,9 @@ density.
   Staging and Resource Inventory. Its scenario and component toggles are
   session-only read-only calculations; they never share flight controls or
   mutate the craft.
+- Electricity generation and consumption use two adjacent disclosure ledgers.
+  Battery depletion, conservative eclipse time, and selected-body solar
+  efficiency remain visible together without opening either ledger.
 - Eight powered stages fit before staging begins internal scrolling. Dense
   layouts keep the active stage visible and explain grouped or omitted stages.
 - Pinned Resonant Orbit and Mission Plan panels are operational briefings, not

@@ -384,8 +384,8 @@ SCENES = {
         "editor.elec.bodies": [{
             "bodyName": "Kerbin", "starName": "Kerbol", "gravitationalParameter": 3.5316e12,
             "radius": 600000, "rotationPeriod": 21600, "atmosphereDepth": 70000,
-            "sphereOfInfluence": 84159286, "maxStarDistance": 13599840256,
-            "luminosityScale": 1, "authoritative": True,
+            "sphereOfInfluence": 84159286, "solarDistance": 13599840256,
+            "solarEfficiency": 0.962, "authoritative": True,
         }],
         "editor.elec.pending": False,
         "editor.elec.retained": False,

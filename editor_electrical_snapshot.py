@@ -127,13 +127,13 @@ def decode_editor_electrical_snapshot(payload):
         rotation = _number(row[5], "body rotation", 0)
         atmosphere = _number(row[6], "body atmosphere", 0)
         soi = _number(row[7], "body SOI", 0)
-        max_distance = _number(row[8], "body max star distance", 0)
-        luminosity = _number(row[9], "body luminosity", 0)
+        solar_distance = _number(row[8], "body solar distance", 0)
+        solar_efficiency = _number(row[9], "body solar efficiency", 0)
         bodies.append({"bodyName": _text(row[1], "body name"),
             "starName": _text(row[2], "star name"), "gravitationalParameter": mu,
             "radius": radius, "rotationPeriod": rotation,
             "atmosphereDepth": atmosphere, "sphereOfInfluence": soi,
-            "maxStarDistance": max_distance, "luminosityScale": luminosity,
+            "solarDistance": solar_distance, "solarEfficiency": solar_efficiency,
             "authoritative": _flag(row[10], "body authoritative")})
     return {"editor.elec.status": header[2], "editor.elec.backend": header[3],
         "editor.elec.backendVersion": _text(header[4], "backend version"),

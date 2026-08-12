@@ -8,8 +8,8 @@ const kerbinBody = {
   rotationPeriod: 21_600,
   atmosphereDepth: 70_000,
   sphereOfInfluence: 84_159_286,
-  maxStarDistance: 13_599_840_256,
-  luminosityScale: 1,
+  solarDistance: 13_599_840_256,
+  solarEfficiency: 0.962,
   authoritative: true,
 } as const;
 
