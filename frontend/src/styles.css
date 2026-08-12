@@ -1370,6 +1370,13 @@ button { font: inherit; }
   .panel-compact#flightNote .notes-font-controls button { min-height: 36px; }
 }
 @media (pointer: fine) and (orientation: landscape) and (min-width: 1500px) and (max-height: 900px) {
+  /* The Flight footer remains absolutely anchored in the short desktop view.
+     Feather only the lower edge of the fixed chassis so its new plate face
+     does not turn the footer into an unreadable overlay. The bezel, inset
+     seam, and mounted panels retain their normal geometry and depth. */
+  .flight-fixed-region {
+    background: linear-gradient(180deg, #101722 0%, #0b1018 calc(100% - 38px), rgba(11,16,24,.18) calc(100% - 20px), transparent 100%);
+  }
   .flight-workspace-shell #target > .body { display: grid; align-items: start; grid-template-columns: minmax(0,1fr) 112px; gap: 8px; }
   .flight-workspace-shell #target .target-command-feedback,
   .flight-workspace-shell #target .tgt-name { grid-column: 1 / -1; }
