@@ -490,13 +490,16 @@ foreach ($sourceArchive in $sourceArchiveInputs) {
 )
 
 Write-Step 'Creating managed installation and runtime-update manifests'
-$managedPaths = @(
+$managedPaths = [string[]]@(
     Get-ChildItem -LiteralPath $stageRoot -Recurse -File |
         ForEach-Object {
             $_.FullName.Substring($stageRoot.Length).TrimStart('\').Replace('\', '/')
         } |
-        Where-Object { Test-ManagedRuntimePath $_ } |
-        Sort-Object { $_.ToLowerInvariant() }
+        Where-Object { Test-ManagedRuntimePath $_ }
+)
+[System.Array]::Sort(
+    $managedPaths,
+    [System.StringComparer]::OrdinalIgnoreCase
 )
 if ($managedPaths.Count -eq 0) {
     throw 'The managed runtime file set is empty.'
@@ -534,12 +537,15 @@ foreach ($relativePath in $managedPaths + @('WMC-INSTALL-MANIFEST.json')) {
     New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
     Copy-Item -LiteralPath $source -Destination $destination -Force
 }
-$payloadPaths = @(
+$payloadPaths = [string[]]@(
     Get-ChildItem -LiteralPath (Join-Path $updateStageRoot 'payload') -Recurse -File |
         ForEach-Object {
             $_.FullName.Substring($updateStageRoot.Length).TrimStart('\').Replace('\', '/')
-        } |
-        Sort-Object { $_.ToLowerInvariant() }
+        }
+)
+[System.Array]::Sort(
+    $payloadPaths,
+    [System.StringComparer]::OrdinalIgnoreCase
 )
 $payloadRecords = @(
     $payloadPaths |

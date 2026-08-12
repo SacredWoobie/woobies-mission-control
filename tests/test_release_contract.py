@@ -504,6 +504,10 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("WMC-INSTALL-MANIFEST.json", publish_script)
         self.assertIn("$packageName.zz-90-runtime-update.zip", publish_script)
         self.assertIn("compatible_updater_protocols = @(1)", publish_script)
+        self.assertGreaterEqual(
+            publish_script.count("[System.StringComparer]::OrdinalIgnoreCase"),
+            2,
+        )
         self.assertIn("ZipFileExtensions]::CreateEntryFromFile", publish_script)
         self.assertIn("$entryName = $relativePath.Replace('\\', '/')", publish_script)
         self.assertIn("Runtime-update ZIP entries do not exactly match", publish_script)
