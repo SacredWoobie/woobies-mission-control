@@ -26,17 +26,43 @@
   --control-surface: #0b1821;
   --control-surface-hover: #12202c;
   --instrument-surface: #05080c;
-  --surface-bezel: linear-gradient(180deg, #141c26 0%, #090e15 100%);
-  --surface-plate: linear-gradient(180deg, #101722 0%, #0b1018 100%);
-  --surface-rail: linear-gradient(180deg, #080d13 0%, #0c121a 100%);
-  --surface-well: #060a0f;
-  --surface-raised-face: linear-gradient(180deg, #15212d 0%, #0b141d 100%);
-  --surface-seam: #26364a;
-  --surface-radius-bezel: 4px;
-  --surface-radius-face: 2px;
-  --surface-depth-raised: inset 0 1px 0 rgba(255,255,255,.055), inset 0 -1px 0 rgba(0,0,0,.55), 0 2px 7px rgba(0,0,0,.5);
-  --surface-depth-recessed: inset 0 1px 3px rgba(0,0,0,.85);
-  --surface-depth-engraved: 0 1px 0 rgba(255,255,255,.025), inset 0 -1px 0 rgba(0,0,0,.72);
+  /* Namespaced machined-surface stops remain opaque so contrast tooling can
+     reason about the actual painted background rather than a gradient alias. */
+  --surface-panel-top: #111925;
+  --surface-panel-bottom: #0a1017;
+  --surface-bezel-color: #202c3c;
+  --surface-bezel-lit: #2b3a4d;
+  --surface-grout: #070b10;
+  --surface-plate-top: #0e141d;
+  --surface-plate-bottom: #080d13;
+  --surface-well-top: #080d14;
+  --surface-well-bottom: #0b1219;
+  --surface-rail-top: #1b2532;
+  --surface-rail-bottom: #131b26;
+  --surface-raised-top: #182231;
+  --surface-raised-bottom: #0d141d;
+  --surface-status-cell-top: #121a25;
+  --surface-status-cell-bottom: #0d141d;
+  --surface-screw: radial-gradient(circle at 36% 30%, #4c5867 0%, #2a323c 55%, #0e131a 100%);
+  --surface-bezel: linear-gradient(180deg, var(--surface-panel-top) 0%, var(--surface-panel-bottom) 100%);
+  --surface-plate: linear-gradient(180deg, var(--surface-plate-top) 0%, var(--surface-plate-bottom) 100%);
+  --surface-rail: linear-gradient(180deg, var(--surface-rail-top) 0%, var(--surface-rail-bottom) 100%);
+  --surface-well: linear-gradient(180deg, var(--surface-well-top) 0%, var(--surface-well-bottom) 100%);
+  --surface-raised-face: linear-gradient(180deg, var(--surface-raised-top) 0%, var(--surface-raised-bottom) 100%);
+  --surface-seam: var(--surface-grout);
+  --surface-radius-hw: 3px;
+  --surface-radius-bezel: 5px;
+  --surface-radius-plate: 6px;
+  --surface-radius-face: var(--surface-radius-hw);
+  --surface-depth-raised: inset 0 1px 0 rgba(255,255,255,.045), inset 0 -1px 0 rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.45);
+  --surface-depth-control: inset 0 1px 0 rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.5);
+  --surface-depth-recessed: inset 0 1px 2px rgba(0,0,0,.65), inset 0 -1px 0 rgba(255,255,255,.028);
+  --surface-depth-deep: inset 0 1px 3px rgba(0,0,0,.85);
+  --surface-depth-engraved: inset 0 1px 0 rgba(255,255,255,.055), 0 1px 0 rgba(255,255,255,.028);
+  --surface-depth-plate: inset 0 1px 0 rgba(255,255,255,.042), inset 0 -1px 0 rgba(0,0,0,.6), 0 2px 10px rgba(0,0,0,.35);
+  --surface-etch: 0 1px 0 rgba(0,0,0,.9);
+  --surface-glow-amber: 0 0 13px rgba(255,180,84,.3);
+  --surface-glow-cyan: 0 0 13px rgba(78,201,224,.3);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
   color-scheme: dark;
   color: var(--amber);
@@ -214,8 +240,8 @@ button { font: inherit; }
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--rule);
-  border-top-color: var(--surface-seam);
+  border: 1px solid var(--surface-bezel-color);
+  border-top-color: var(--surface-bezel-lit);
   border-radius: var(--surface-radius-bezel);
   background: var(--surface-bezel);
   box-shadow: var(--surface-depth-raised);
@@ -228,10 +254,11 @@ button { font: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid var(--rule);
-  color: var(--slate);
+  border-bottom: 1px solid var(--surface-grout);
+  color: #8b99ad;
   background: var(--surface-rail);
   box-shadow: var(--surface-depth-engraved);
+  text-shadow: var(--surface-etch);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .22em;
@@ -247,7 +274,7 @@ button { font: inherit; }
   border-radius: var(--surface-radius-face);
   color: var(--slate);
   background: var(--surface-raised-face);
-  box-shadow: var(--surface-depth-raised);
+  box-shadow: var(--surface-depth-control);
   cursor: pointer;
   font: 17px/14px var(--mono);
   letter-spacing: 0;
@@ -270,7 +297,7 @@ button { font: inherit; }
   border-radius: var(--surface-radius-face);
   color: var(--cyan);
   background: var(--surface-raised-face);
-  box-shadow: var(--surface-depth-raised);
+  box-shadow: var(--surface-depth-control);
   cursor: pointer;
   font: 9px/1 var(--mono);
   letter-spacing: .06em;
@@ -514,9 +541,9 @@ button { font: inherit; }
 .res-row:last-of-type { border-bottom: 0; }
 .res-name { overflow: hidden; color: var(--slate); font-size: 10px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .meter { position: relative; min-width: 0; }
-.meter .track { height: 16px; overflow: hidden; border: 1px solid var(--rule-bright); border-radius: 2px; background: var(--instrument-surface); }
+.meter .track { height: 16px; overflow: hidden; border: 1px solid var(--rule-bright); border-radius: var(--surface-radius-hw); background: #070c12; box-shadow: var(--surface-depth-deep); }
 .meter .fill,
-.editor-resource-meter .fill { display: block; height: 100%; background: linear-gradient(90deg, #3c8c53, var(--green)); }
+.editor-resource-meter .fill { display: block; height: 100%; background: linear-gradient(180deg,#a9f0ae 0%,#5cca6a 100%); box-shadow: 0 0 9px rgba(126,231,135,.45); }
 .meter .fill.mid,
 .editor-resource-meter .fill.mid { background: linear-gradient(90deg, #865d25, var(--amber)); }
 .meter .fill.low,
@@ -971,10 +998,14 @@ button { font: inherit; }
   align-self: start;
   width: 100%;
   min-width: 0;
-  padding: 0;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid #1a2431;
+  border-radius: var(--surface-radius-plate);
+  background: var(--surface-plate);
+  box-shadow: var(--surface-depth-plate);
   flex-direction: column;
   gap: 12px;
-  background: transparent;
 }
 .flight-fixed-bottom-row { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; align-items: start; }
 .flight-fixed-region[data-bottom-layout="two-up"] .flight-fixed-bottom-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -983,28 +1014,51 @@ button { font: inherit; }
   align-self: start;
   width: 100%;
   min-width: 0;
-  padding: 0;
-  background: transparent;
+  position: relative;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid #1a2431;
+  border-radius: var(--surface-radius-plate);
+  background: var(--surface-plate);
+  box-shadow: var(--surface-depth-plate);
 }
-/* Persistent Flight regions are layout owners only. Their child panels and
-   control plate provide the scene's hardware edges without nested chassis. */
+/* One machined perimeter per persistent region. Pseudo-elements only carry
+   the four screw heads: never a second frame, fill, or shadow. */
+.flight-fixed-region, .flight-tabbed-region { position: relative; }
+.flight-fixed-region::before, .flight-fixed-region::after,
+.flight-tabbed-region::before, .flight-tabbed-region::after {
+  position: absolute;
+  z-index: 1;
+  left: 2px;
+  right: 2px;
+  height: 6px;
+  background: var(--surface-screw) left center / 6px 6px no-repeat,
+              var(--surface-screw) right center / 6px 6px no-repeat;
+  content: "";
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,.06));
+  pointer-events: none;
+}
+.flight-fixed-region::before, .flight-tabbed-region::before { top: 2px; }
+.flight-fixed-region::after, .flight-tabbed-region::after { bottom: 2px; }
 
 /* Four context cells and read-only Flight instruments sit below their face,
    while controls retain their established raised treatment. Dense inventory
    rows deliberately remain flat for fast scanning. */
 .flight-workspace-shell > .status-strip {
-  border-color: var(--surface-seam);
-  background: var(--surface-seam);
-  box-shadow: var(--surface-depth-recessed);
+  border: 1px solid var(--surface-bezel-color);
+  border-top-color: #2d3d51;
+  border-radius: var(--surface-radius-bezel);
+  background: var(--surface-grout);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 2px 9px rgba(0,0,0,.5);
 }
 .flight-workspace-shell > .status-strip :is(.flight-context-identity,.clockcell,.cs-cell) {
-  background: var(--surface-well);
-  box-shadow: var(--surface-depth-engraved);
+  background: linear-gradient(180deg,var(--surface-status-cell-top) 0%,var(--surface-status-cell-bottom) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
 }
 .flight-workspace-shell :is(#asc .sas-box,#asc .asc-flight-metric:not(.hero),#asc .attitude-strip > div,#asc .stats-grid .stat,#target .tgt-grid .stat,#elec .ec-overview-card,#sci .sci-overview-card,#heat .heat-idle-state,#heat .heat-entity) {
-  border-color: var(--surface-seam);
+  border-color: #1a2431;
   background: var(--surface-well);
-  box-shadow: var(--surface-depth-recessed);
+  box-shadow: var(--surface-depth-deep);
 }
 .flight-workspace-shell :is(#cons .meter .track,#asc .heading-tape,#asc .thr-track,#elec .ec-meter-track,#elec .rx-charge-track,#heat .heat-temperature-track,#sci .sci-meter-track) {
   border-color: var(--surface-seam);
@@ -1025,11 +1079,11 @@ button { font: inherit; }
   justify-content: space-between;
   align-self: center;
   gap: 14px;
-  border: 1px solid var(--rule);
-  border-top-color: #26364a;
-  border-radius: 4px;
-  background: linear-gradient(180deg,#141c26 0%,#0a1017 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), inset 0 -1px 0 rgba(0,0,0,.55), 0 2px 7px rgba(0,0,0,.5);
+  border: 1px solid var(--surface-bezel-color);
+  border-top-color: var(--surface-bezel-lit);
+  border-radius: var(--surface-radius-bezel);
+  background: var(--surface-bezel);
+  box-shadow: var(--surface-depth-raised);
 }
 .flight-workspace-controls { display: flex; min-width: 0; align-items: center; gap: 8px; flex: 0 0 auto; }
 .flight-control-divider { width: 2px; align-self: stretch; margin: 2px 0; border-left: 1px solid rgba(0,0,0,.7); border-right: 1px solid rgba(255,255,255,.05); }
@@ -1040,10 +1094,10 @@ button { font: inherit; }
   min-width: 0;
   padding: 2px;
   gap: 3px;
-  border: 1px solid #1b2532;
-  border-radius: 3px;
-  background: #060a0f;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,.85);
+  border: 1px solid var(--surface-bezel-color);
+  border-radius: var(--surface-radius-hw);
+  background: var(--surface-grout);
+  box-shadow: var(--surface-depth-deep);
 }
 .flight-workspace-selection-indicator {
   position: absolute;
@@ -1052,9 +1106,9 @@ button { font: inherit; }
   width: 96px;
   height: calc(100% - 4px);
   border: 1px solid var(--accent-border-hover);
-  border-radius: 2px;
+  border-radius: var(--surface-radius-hw);
   background: linear-gradient(180deg,#173248 0%,#0f2534 100%);
-  box-shadow: 0 0 10px rgba(78,201,224,.2), inset 0 1px 0 rgba(78,201,224,.22);
+  box-shadow: inset 0 1px 0 rgba(78,201,224,.22);
   transition: transform .3s cubic-bezier(.34,1.45,.44,1);
   transform: translateX(0);
 }
@@ -1077,7 +1131,7 @@ button { font: inherit; }
   letter-spacing: .12em;
   text-shadow: 0 1px 0 rgba(0,0,0,.8);
 }
-.flight-workspace-selector button[aria-selected="true"] { color: var(--cyan); text-shadow: 0 0 9px rgba(78,201,224,.4); }
+.flight-workspace-selector button[aria-selected="true"] { color: var(--cyan); text-shadow: var(--surface-etch); }
 .flight-workspace-selector button:hover { color: var(--cyan); }
 .flight-workspace-rebalance { display: grid; width: 30px; height: 30px; min-width: 30px; padding: 0; place-items: center; border: 1px solid #2f4152; border-radius: 50%; color: var(--amber); background: radial-gradient(circle at 50% 28%,#1c2632 0%,#0c1219 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.6); cursor: pointer; font: 15px var(--mono); }
 .flight-workspace-rebalance:hover { border-color: var(--amber-accent); background: radial-gradient(circle at 50% 28%,#263443 0%,#111923 100%); }
@@ -1125,6 +1179,8 @@ button { font: inherit; }
 
 @container flight-shell (max-width: 520px) {
   .flight-workspace-label, .flight-control-divider { display: none; }
+  .flight-fixed-region::before, .flight-fixed-region::after,
+  .flight-tabbed-region::before, .flight-tabbed-region::after { display: none; }
 }
 
 /* At the portrait target the control plate has moved out of the context
@@ -1137,9 +1193,10 @@ button { font: inherit; }
     display: block;
     width: calc(100% - 16px);
     overflow: hidden;
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    background: var(--rule);
+    border: 1px solid var(--surface-bezel-color);
+    border-top-color: #2d3d51;
+    border-radius: var(--surface-radius-bezel);
+    background: var(--surface-grout);
   }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip > .panel { border: 0; border-radius: 0; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock,
@@ -1155,7 +1212,7 @@ button { font: inherit; }
     display: grid;
     grid-template-columns: minmax(155px,1.05fr) minmax(200px,1.4fr) minmax(170px,1.2fr) minmax(180px,1.2fr);
     gap: 1px;
-    background: var(--rule);
+    background: var(--surface-grout);
   }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .clock-grid,
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip #clock .comms-strip { display: contents; }
@@ -1176,8 +1233,9 @@ button { font: inherit; }
     min-width: 0;
     padding: 5px 8px;
     border: 0;
-    background: var(--panel);
     justify-content: flex-start;
+    background: linear-gradient(180deg,var(--surface-status-cell-top) 0%,var(--surface-status-cell-bottom) 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
   }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .clockcell { display: flex; flex-direction: column; }
   .flight-workspace-shell[data-arrangement="stacked"] > .status-strip .calendar-toggle { min-width: 0; min-height: 22px; padding-inline: 3px; }
@@ -1267,9 +1325,10 @@ button { font: inherit; }
 .clockcell .label { margin-bottom: 5px; }
 .clock-primary-row { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
 .clock-primary-row .sub { margin-top: 0; }
-.clockcell .big { color: var(--amber); font-size: 22px; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.clockcell .big { color: var(--amber); font-size: 22px; letter-spacing: .04em; text-shadow: var(--surface-glow-amber); font-variant-numeric: tabular-nums; }
 .clockcell .sub { margin-top: 3px; color: var(--slate-muted-text); font-size: 10px; letter-spacing: .06em; }
-.met-cell .big { color: var(--cyan); }
+.met-cell .big { color: var(--cyan); text-shadow: var(--surface-glow-cyan); }
+.flight-context-identity strong { text-shadow: 0 0 13px rgba(78,201,224,.26); }
 .calendar-toggle { padding: 0; border: 0; color: var(--slate-muted-text); background: transparent; cursor: pointer; font: inherit; letter-spacing: inherit; }
 .calendar-toggle:hover { color: var(--cyan); }
 .comms-strip { display: grid; grid-template-columns: minmax(0,1fr); gap: 1px; border-top: 1px solid var(--rule); background: var(--rule); }
@@ -1981,9 +2040,10 @@ button { font: inherit; }
     max-width: 100%;
     overflow: hidden;
     align-self: flex-start;
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    background: var(--rule);
+    border: 1px solid var(--surface-bezel-color);
+    border-top-color: #2d3d51;
+    border-radius: var(--surface-radius-bezel);
+    background: var(--surface-grout);
   }
   .flight-workspace-shell[data-arrangement="side-by-side"] > .status-strip { padding-right: 0; }
   .status-strip > .panel { border: 0; border-radius: 0; }
@@ -2004,11 +2064,11 @@ button { font: inherit; }
     max-width: none;
     grid-template-columns: 240px 340px 280px 200px;
     gap: 1px;
-    background: var(--rule);
+    background: var(--surface-grout);
   }
   .status-strip #clock .clock-grid, .status-strip #clock .comms-strip { display: contents; }
   .status-strip #clock > h2 { display: none; }
-  .status-strip .flight-context-identity, .status-strip .clockcell, .status-strip .cs-cell { min-width: 0; padding: 4px 10px; border: 0; background: var(--panel); justify-content: flex-start; }
+  .status-strip .flight-context-identity, .status-strip .clockcell, .status-strip .cs-cell { min-width: 0; padding: 4px 10px; border: 0; background: linear-gradient(180deg,var(--surface-status-cell-top) 0%,var(--surface-status-cell-bottom) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); justify-content: flex-start; }
   .status-strip .clockcell { display: flex; flex-direction: column; }
   .status-strip .calendar-toggle { min-width: 0; min-height: 22px; padding-inline: 3px; }
   .status-strip .clockcell .big { font-size: 20px; }
@@ -2407,20 +2467,38 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 
 @media (prefers-contrast: more) {
   :root {
-    --surface-bezel: #0f151f;
-    --surface-plate: #0b1019;
-    --surface-rail: #080d13;
-    --surface-raised-face: var(--control-surface-hover);
-    --surface-seam: #748197;
+    --surface-bezel: var(--surface-panel-top);
+    --surface-plate: var(--surface-plate-top);
+    --surface-rail: var(--surface-rail-top);
+    --surface-well: var(--surface-well-top);
+    --surface-raised-face: var(--surface-raised-top);
+    --surface-seam: var(--surface-grout);
     --surface-depth-raised: none;
+    --surface-depth-control: none;
     --surface-depth-recessed: none;
+    --surface-depth-deep: none;
     --surface-depth-engraved: none;
+    --surface-depth-plate: none;
   }
 
   .panel { border-color: var(--surface-seam); }
   .panel > h2 { border-bottom-color: var(--surface-seam); }
   .panel-hide-button,
   .panel-collapse-button { border-color: currentColor; }
+  .flight-fixed-region,
+  .flight-tabbed-region { background: var(--surface-plate-top); }
+  .flight-workspace-shell > .status-strip :is(.flight-context-identity,.clockcell,.cs-cell),
+  .status-strip .flight-context-identity,
+  .status-strip .clockcell,
+  .status-strip .cs-cell { background: var(--surface-status-cell-top); box-shadow: none; }
+  .flight-workspace-shell > .status-strip,
+  .flight-workspace-selection-indicator { box-shadow: none; }
+  .flight-workspace-selection-indicator { background: var(--surface-raised-top); }
+  .meter .fill,
+  .editor-resource-meter .fill { background: var(--green); box-shadow: none; }
+  .flight-context-identity strong,
+  .clockcell .big,
+  .met-cell .big { text-shadow: none; }
 
 }
 

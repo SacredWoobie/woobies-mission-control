@@ -32,6 +32,24 @@ const canonicalLiteralTokens = new Set([
   "--text-value",
 ]);
 
+// Surface gradients must be composed from inspectable, opaque stops. Keeping
+// this separate from literal migration lets a stop participate in a gradient
+// without making every intentional screw, lens, or illustration literal fail.
+const opaqueSurfaceBackgroundTokens = new Set([
+  "--surface-panel-top",
+  "--surface-panel-bottom",
+  "--surface-plate-top",
+  "--surface-plate-bottom",
+  "--surface-well-top",
+  "--surface-well-bottom",
+  "--surface-rail-top",
+  "--surface-rail-bottom",
+  "--surface-raised-top",
+  "--surface-raised-bottom",
+  "--surface-status-cell-top",
+  "--surface-status-cell-bottom",
+]);
+
 const contrastContracts = [
   { foreground: "--slate-muted-text", background: "--panel", minimum: 4.5 },
   { foreground: "--slate", background: "--panel", minimum: 4.5 },
@@ -185,6 +203,12 @@ export function checkCssContract(sources) {
       }]),
   );
   const rootColors = new Map([...rootColorDefinitions].map(([name, definition]) => [name, definition.literal]));
+
+  for (const token of opaqueSurfaceBackgroundTokens) {
+    if (!rootColors.has(token)) {
+      failures.push(`Surface background stop ${token} must be defined as an opaque hex color in :root.`);
+    }
+  }
 
   for (const token of canonicalLiteralTokens) {
     const literal = rootColors.get(token);
