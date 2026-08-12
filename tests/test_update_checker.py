@@ -1,5 +1,7 @@
 import json
 import os
+import sys
+import time
 import tempfile
 import unittest
 from pathlib import Path
@@ -184,6 +186,43 @@ class UpdateCheckerTests(unittest.TestCase):
                 first.close()
             replacement = ksp_dashboard_app.LauncherInstanceGuard(directory)
             replacement.close()
+
+    @unittest.skipUnless(os.name == "nt", "component process jobs are Windows-specific")
+    def test_backend_stop_terminates_its_descendant_process_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child_pid_path = root / "child.pid"
+            script = root / "component.py"
+            script.write_text(
+                "import subprocess, sys, time\n"
+                f"marker = {str(child_pid_path)!r}\n"
+                "child = subprocess.Popen([sys.executable, '-c', "
+                "'import time; time.sleep(30)'])\n"
+                "open(marker, 'w', encoding='utf-8').write(str(child.pid))\n"
+                "time.sleep(30)\n",
+                encoding="utf-8",
+            )
+            backend = ksp_dashboard_app.Backend(
+                "synthetic tree", script, lambda *_args: None
+            )
+            self.assertTrue(backend.start())
+            deadline = time.monotonic() + 10
+            while not child_pid_path.is_file() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertTrue(child_pid_path.is_file())
+            child_pid = int(child_pid_path.read_text(encoding="utf-8"))
+            self.assertTrue(ksp_dashboard_app.runtime_update._pid_is_running(child_pid))
+
+            backend.stop()
+            deadline = time.monotonic() + 5
+            while (
+                ksp_dashboard_app.runtime_update._pid_is_running(child_pid)
+                and time.monotonic() < deadline
+            ):
+                time.sleep(0.05)
+            self.assertFalse(
+                ksp_dashboard_app.runtime_update._pid_is_running(child_pid)
+            )
 
 
 if __name__ == "__main__":

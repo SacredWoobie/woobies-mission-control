@@ -32,6 +32,7 @@ class WindowsRuntimeUpdateAcceptanceTests(unittest.TestCase):
 
             updater_source = (ROOT / "runtime_update.py").read_bytes()
             helper_source = (ROOT / "runtime_update_helper.py").read_bytes()
+            contract_source = (ROOT / "runtime-update-contract.json").read_bytes()
             check_batch = (
                 "@echo off\r\n"
                 "if /I not \"%~1\"==\"--check\" exit /b 2\r\n"
@@ -57,6 +58,7 @@ class WindowsRuntimeUpdateAcceptanceTests(unittest.TestCase):
                 "Dashboard/ksp_dashboard_app.py": b"# synthetic predecessor launcher\n",
                 "Dashboard/runtime_update.py": updater_source,
                 "Dashboard/runtime_update_helper.py": helper_source,
+                "Dashboard/runtime-update-contract.json": contract_source,
                 "Dashboard/Start KSP Dashboard.bat": check_batch,
                 "Dashboard/web/index.html": b"synthetic predecessor\n",
             }
@@ -165,6 +167,7 @@ class WindowsRuntimeUpdateAcceptanceTests(unittest.TestCase):
 
             updater_source = (ROOT / "runtime_update.py").read_bytes()
             production_helper = (ROOT / "runtime_update_helper.py").read_bytes()
+            contract_source = (ROOT / "runtime-update-contract.json").read_bytes()
             interruptible_helper = b"""\
 import argparse
 import time
@@ -205,6 +208,7 @@ update.apply_transaction(
                 "Dashboard/ksp_dashboard_app.py": b"old launcher\n",
                 "Dashboard/runtime_update.py": updater_source,
                 "Dashboard/runtime_update_helper.py": interruptible_helper,
+                "Dashboard/runtime-update-contract.json": contract_source,
                 "Dashboard/Start KSP Dashboard.bat": b"@echo off\r\nexit /b 0\r\n",
                 "Dashboard/web/index.html": b"old dashboard\n",
             }

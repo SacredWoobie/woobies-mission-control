@@ -152,6 +152,109 @@ COMPONENTS = (
 
 # Prevent child processes from opening extra console windows on Windows.
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+CREATE_SUSPENDED = 0x00000004 if os.name == "nt" else 0
+
+
+def _create_component_job():
+    """Create a Windows job whose close terminates the complete child tree."""
+    if os.name != "nt":
+        return None
+    from ctypes import wintypes
+
+    class IO_COUNTERS(ctypes.Structure):
+        _fields_ = [
+            ("ReadOperationCount", ctypes.c_ulonglong),
+            ("WriteOperationCount", ctypes.c_ulonglong),
+            ("OtherOperationCount", ctypes.c_ulonglong),
+            ("ReadTransferCount", ctypes.c_ulonglong),
+            ("WriteTransferCount", ctypes.c_ulonglong),
+            ("OtherTransferCount", ctypes.c_ulonglong),
+        ]
+
+    class BASIC_LIMITS(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong),
+            ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", wintypes.DWORD),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", wintypes.DWORD),
+            ("SchedulingClass", wintypes.DWORD),
+        ]
+
+    class EXTENDED_LIMITS(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", BASIC_LIMITS),
+            ("IoInfo", IO_COUNTERS),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.argtypes = (wintypes.LPVOID, wintypes.LPCWSTR)
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = (
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    )
+    kernel32.SetInformationJobObject.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.CreateJobObjectW(None, None)
+    if not handle:
+        raise OSError(ctypes.get_last_error(), "could not create component process job")
+    limits = EXTENDED_LIMITS()
+    limits.BasicLimitInformation.LimitFlags = 0x00002000  # KILL_ON_JOB_CLOSE
+    if not kernel32.SetInformationJobObject(
+        handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)
+    ):
+        error = ctypes.get_last_error()
+        kernel32.CloseHandle(handle)
+        raise OSError(error, "could not secure component process job")
+    return handle
+
+
+def _assign_component_job(job_handle, process_handle):
+    if os.name != "nt" or job_handle is None:
+        return
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    if not kernel32.AssignProcessToJobObject(job_handle, process_handle):
+        raise OSError(
+            ctypes.get_last_error(), "could not own the component process tree"
+        )
+
+
+def _resume_component_process(process_handle):
+    if os.name != "nt":
+        return
+    from ctypes import wintypes
+
+    ntdll = ctypes.WinDLL("ntdll")
+    ntdll.NtResumeProcess.argtypes = (wintypes.HANDLE,)
+    ntdll.NtResumeProcess.restype = ctypes.c_long
+    status = ntdll.NtResumeProcess(process_handle)
+    if status < 0:
+        raise OSError(status, "could not resume the secured component process")
+
+
+def _close_component_job(job_handle):
+    if os.name == "nt" and job_handle is not None:
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle(job_handle)
 
 PACKAGED_GAMEDATA = HERE.parent / "GameData"
 CHANGELOG_CANDIDATES = (HERE / "CHANGELOG.md", HERE.parent / "CHANGELOG.md")
@@ -2199,7 +2302,15 @@ class Backend:
         self.log = log
         self.environment_provider = environment_provider
         self.proc = None
+        self.job_handle = None
+        self.job_lock = threading.Lock()
         self.startup_ready = False
+
+    def _close_job(self):
+        with self.job_lock:
+            handle = self.job_handle
+            self.job_handle = None
+        _close_component_job(handle)
 
     def running(self):
         return self.proc is not None and self.proc.poll() is None
@@ -2213,10 +2324,12 @@ class Backend:
             return False
 
         self.log(self.name, "starting...")
+        job_handle = None
         try:
             child_environment = os.environ.copy()
             if self.environment_provider is not None:
                 child_environment.update(self.environment_provider())
+            job_handle = _create_component_job()
             self.proc = subprocess.Popen(
                 self.argv,
                 cwd=str(HERE),
@@ -2224,11 +2337,28 @@ class Backend:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                creationflags=CREATE_NO_WINDOW,
+                creationflags=CREATE_NO_WINDOW | CREATE_SUSPENDED,
                 env=child_environment,
             )
+            if job_handle is not None:
+                _assign_component_job(job_handle, self.proc._handle)
+                with self.job_lock:
+                    self.job_handle = job_handle
+                job_handle = None
+            _resume_component_process(self.proc._handle)
         except Exception as exc:
             self.log(self.name, f"FAILED to start: {exc}")
+            if self.proc is not None and self.proc.poll() is None:
+                try:
+                    self.proc.terminate()
+                    self.proc.wait(timeout=2)
+                except (OSError, subprocess.TimeoutExpired):
+                    try:
+                        self.proc.kill()
+                    except OSError:
+                        pass
+            _close_component_job(job_handle)
+            self._close_job()
             self.proc = None
             return False
 
@@ -2248,15 +2378,26 @@ class Backend:
         except Exception as exc:
             self.log(self.name, f"log reader stopped: {exc}")
             return_code = process.poll()
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+        self._close_job()
         self.log(self.name, f"exited (code {return_code}).")
 
     def stop(self):
         if not self.running():
+            self._close_job()
             self.startup_ready = False
             return
         self.log(self.name, "stopping...")
         try:
-            self.proc.terminate()
+            if os.name == "nt" and self.job_handle is not None:
+                # Closing the job atomically terminates the direct child and
+                # every descendant it created. This prevents a grandchild from
+                # retaining a managed package file during self-update.
+                self._close_job()
+            else:
+                self.proc.terminate()
             try:
                 self.proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
@@ -2266,6 +2407,7 @@ class Backend:
         except Exception as exc:
             self.log(self.name, f"error while stopping: {exc}")
         finally:
+            self._close_job()
             self.startup_ready = False
 
 

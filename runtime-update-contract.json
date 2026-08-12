@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "limits": {
+    "download_bytes": 33554432,
+    "checksum_bytes": 1024,
+    "archive_entries": 256,
+    "archive_file_bytes": 33554432,
+    "archive_expanded_bytes": 67108864,
+    "relative_path_length": 220
+  },
+  "root_managed_files": [
+    "BUILD-INFO.txt",
+    "CHANGELOG.md",
+    "LICENSE",
+    "QUICKSTART.txt",
+    "THIRD-PARTY/NOTICES.md",
+    "docs/CONTROL_PAD_PROTOCOL.md",
+    "firmware/KSP_control.ino"
+  ],
+  "dashboard_contract_path": "Dashboard/runtime-update-contract.json",
+  "dashboard_top_level_extensions": [
+    ".bat",
+    ".ps1",
+    ".py",
+    ".txt"
+  ],
+  "dashboard_web_index": "Dashboard/web/index.html",
+  "dashboard_asset_extensions": [
+    ".css",
+    ".js",
+    ".map"
+  ],
+  "service_folders": [
+    "KRPC.StageStats",
+    "KRPC.SystemHeat",
+    "KRPC.WoobiesMechJeb",
+    "WoobiesControlStats"
+  ],
+  "source_archive_suffix": "-source.zip"
+}

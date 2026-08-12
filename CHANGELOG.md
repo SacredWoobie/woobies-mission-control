@@ -8,7 +8,8 @@ All notable public changes will be recorded here.
   packages. It accepts only stable immutable GitHub releases, verifies the
   runtime archive against GitHub's SHA-256 digest and its checksum sidecar,
   preserves user-owned package state, and uses an external transactional
-  helper with automatic rollback and next-launch recovery. The first release
+  helper with identity-bound process handoff, complete component-tree shutdown,
+  automatic rollback, and next-launch recovery. The first release
   containing the updater still requires one normal full-package install, and
   the updater never writes the user's selected live KSP `GameData` folder.
 

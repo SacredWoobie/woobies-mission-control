@@ -495,6 +495,7 @@ class ReleaseContractTests(unittest.TestCase):
         for packaged_source in (
             "runtime_update.py",
             "runtime_update_helper.py",
+            "runtime-update-contract.json",
         ):
             self.assertIn(
                 f"@{{ Source = '{packaged_source}'; Destination = "
@@ -515,6 +516,16 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("must be smaller than the normal release ZIP", publish_script)
         self.assertIn("status --porcelain", publish_script)
         self.assertIn("must be assembled from a clean Git checkout", publish_script)
+        self.assertIn("runtime-update-contract.json", publish_script)
+        self.assertIn("$contractLimits.archive_entries", publish_script)
+        self.assertIn("$contractLimits.archive_file_bytes", publish_script)
+        self.assertIn("$contractLimits.archive_expanded_bytes", publish_script)
+        self.assertIn("$contractLimits.download_bytes", publish_script)
+        self.assertIn("$contractLimits.checksum_bytes", publish_script)
+        self.assertIn(
+            "Packaged runtime paths are absent from runtime-update-contract.json",
+            publish_script,
+        )
 
         self.assertIn("repos/$Repository/immutable-releases", publish_script)
         self.assertIn("X-GitHub-Api-Version: 2026-03-10", publish_script)

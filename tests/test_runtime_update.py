@@ -13,6 +13,9 @@ from unittest import mock
 import runtime_update as update
 
 
+CONTRACT_BYTES = Path(update.__file__).with_name("runtime-update-contract.json").read_bytes()
+
+
 def digest_bytes(value):
     return hashlib.sha256(value).hexdigest()
 
@@ -39,6 +42,7 @@ def write_installation(root, version="1.0.0", commit="a" * 40, files=None):
         "Dashboard/ksp_dashboard_app.py": b"old launcher\n",
         "Dashboard/runtime_update.py": b"old update module\n",
         "Dashboard/runtime_update_helper.py": b"old helper\n",
+        "Dashboard/runtime-update-contract.json": CONTRACT_BYTES,
         "Dashboard/Start KSP Dashboard.bat": b"old batch\r\n",
         "Dashboard/web/index.html": b"old index\n",
     }
@@ -258,6 +262,7 @@ class ManifestAndArchiveTests(unittest.TestCase):
     def test_managed_surface_excludes_state_gallery_readme_and_venv(self):
         accepted = (
             "Dashboard/runtime_update.py",
+            "Dashboard/runtime-update-contract.json",
             "Dashboard/web/assets/index-abc.js",
             "GameData/KRPC.StageStats/KRPC.StageStats.dll",
             "SOURCE/KRPC.WoobiesMechJeb-1.0.0-source.zip",
@@ -275,6 +280,28 @@ class ManifestAndArchiveTests(unittest.TestCase):
             self.assertTrue(update.is_allowed_managed_path(path), path)
         for path in rejected:
             self.assertFalse(update.is_allowed_managed_path(path), path)
+
+    def test_shared_contract_is_the_runtime_limit_and_allowlist_authority(self):
+        contract = json.loads(CONTRACT_BYTES)
+
+        self.assertEqual(
+            update.MAX_UPDATE_DOWNLOAD_BYTES,
+            contract["limits"]["download_bytes"],
+        )
+        self.assertEqual(
+            update.MAX_ARCHIVE_ENTRIES,
+            contract["limits"]["archive_entries"],
+        )
+        self.assertEqual(
+            update.MAX_ARCHIVE_FILE_BYTES,
+            contract["limits"]["archive_file_bytes"],
+        )
+        self.assertEqual(
+            update.MAX_ARCHIVE_EXPANDED_BYTES,
+            contract["limits"]["archive_expanded_bytes"],
+        )
+        for path in contract["root_managed_files"]:
+            self.assertTrue(update.is_allowed_managed_path(path), path)
 
     def test_archive_and_target_manifest_must_match_exactly(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -354,6 +381,7 @@ class TransactionTests(unittest.TestCase):
             "Dashboard/ksp_dashboard_app.py": b"new launcher\n",
             "Dashboard/runtime_update.py": b"new update module\n",
             "Dashboard/runtime_update_helper.py": b"new helper\n",
+            "Dashboard/runtime-update-contract.json": CONTRACT_BYTES,
             "Dashboard/Start KSP Dashboard.bat": b"new batch\r\n",
             "Dashboard/web/assets/index-new.js": b"new bundle\n",
             "Dashboard/web/index.html": b"new index\n",
@@ -750,7 +778,17 @@ class TransactionTests(unittest.TestCase):
             paths = activate_staged_for_test(root, staged["transaction_id"])
             plan = update._validate_plan(paths)
             update._prepare_backup(paths, plan)
-            update._journal(paths, "applying", helper_pid=os.getpid())
+            helper_identity = (
+                update._windows_process_identity(os.getpid())
+                if os.name == "nt"
+                else None
+            )
+            update._journal(
+                paths,
+                "applying",
+                helper_pid=os.getpid(),
+                helper_identity=update._identity_record(helper_identity),
+            )
 
             busy = update.recover_pending_update(root)
             self.assertEqual(busy["status"], "busy")
@@ -761,6 +799,21 @@ class TransactionTests(unittest.TestCase):
             recovered = update.recover_pending_update(root)
             self.assertEqual(recovered["status"], "recovered")
             self.assertEqual(update.load_install_manifest(root), current)
+
+    @unittest.skipUnless(os.name == "nt", "process identity is Windows-specific")
+    def test_pid_reuse_identity_never_matches_or_signals_an_unrelated_process(self):
+        identity = update._windows_process_identity(os.getpid())
+        reused = update.WindowsProcessIdentity(
+            pid=identity.pid,
+            creation_time=identity.creation_time + 1,
+            executable=identity.executable,
+        )
+
+        self.assertTrue(update._pid_is_running(os.getpid(), identity))
+        self.assertFalse(update._pid_is_running(os.getpid(), reused))
+        update._wait_for_pid_exit(os.getpid(), 0.01, reused)
+        update._terminate_restarted_process(os.getpid())
+        self.assertTrue(update._pid_is_running(os.getpid(), identity))
 
     def test_next_launch_retries_a_previous_incomplete_rollback(self):
         with tempfile.TemporaryDirectory() as directory:

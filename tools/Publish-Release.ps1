@@ -123,25 +123,51 @@ function Test-ManagedRuntimePath {
     param([string]$RelativePath)
 
     $path = $RelativePath.Replace('\', '/')
-    if ($path.StartsWith('Dashboard/', [System.StringComparison]::Ordinal)) {
+    $segments = @($path.Split('/'))
+    if ($script:RuntimeUpdateContract.root_managed_files -ccontains $path) {
         return $true
     }
-    if ($path.StartsWith('GameData/', [System.StringComparison]::Ordinal) -or
-        $path.StartsWith('SOURCE/', [System.StringComparison]::Ordinal)) {
+    if ($path -ceq $script:RuntimeUpdateContract.dashboard_contract_path) {
         return $true
     }
-    return $path -in @(
-        'BUILD-INFO.txt',
-        'CHANGELOG.md',
-        'LICENSE',
-        'QUICKSTART.txt',
-        'THIRD-PARTY/NOTICES.md',
-        'docs/CONTROL_PAD_PROTOCOL.md',
-        'firmware/KSP_control.ino'
-    )
+    if ($segments.Count -eq 2 -and $segments[0] -ceq 'Dashboard') {
+        $extension = [System.IO.Path]::GetExtension($segments[1]).ToLowerInvariant()
+        return $script:RuntimeUpdateContract.dashboard_top_level_extensions -ccontains $extension
+    }
+    if ($path -ceq $script:RuntimeUpdateContract.dashboard_web_index) {
+        return $true
+    }
+    if ($segments.Count -eq 4 -and
+        $segments[0] -ceq 'Dashboard' -and
+        $segments[1] -ceq 'web' -and
+        $segments[2] -ceq 'assets') {
+        $extension = [System.IO.Path]::GetExtension($segments[3]).ToLowerInvariant()
+        return $script:RuntimeUpdateContract.dashboard_asset_extensions -ccontains $extension
+    }
+    if ($segments.Count -ge 3 -and
+        $segments[0] -ceq 'GameData' -and
+        $script:RuntimeUpdateContract.service_folders -ccontains $segments[1]) {
+        return $true
+    }
+    if ($segments.Count -eq 2 -and
+        $segments[0] -ceq 'SOURCE' -and
+        $segments[1].EndsWith(
+            $script:RuntimeUpdateContract.source_archive_suffix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+        return $true
+    }
+    return $false
 }
 
 $repoRoot = Get-FullPath (Join-Path $PSScriptRoot '..')
+$runtimeUpdateContractPath = Join-Path $repoRoot 'runtime-update-contract.json'
+Assert-RequiredFile $runtimeUpdateContractPath
+$script:RuntimeUpdateContract = Get-Content -LiteralPath $runtimeUpdateContractPath `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($script:RuntimeUpdateContract.schema -ne 1) {
+    throw 'runtime-update-contract.json has an unsupported schema.'
+}
 $manifestPath = Join-Path $PSScriptRoot 'Release-Manifest.psd1'
 $frontendBuildScript = Join-Path $PSScriptRoot 'Build-Frontend.ps1'
 $frontendRoot = Join-Path $repoRoot 'frontend'
@@ -234,6 +260,7 @@ $sourceFiles = @(
     @{ Source = 'ksp_dashboard_app.py'; Destination = 'Dashboard/ksp_dashboard_app.py' },
     @{ Source = 'runtime_update.py'; Destination = 'Dashboard/runtime_update.py' },
     @{ Source = 'runtime_update_helper.py'; Destination = 'Dashboard/runtime_update_helper.py' },
+    @{ Source = 'runtime-update-contract.json'; Destination = 'Dashboard/runtime-update-contract.json' },
     @{ Source = 'panel_bridge.py'; Destination = 'Dashboard/panel_bridge.py' },
     @{ Source = 'damage.py'; Destination = 'Dashboard/damage.py' },
     @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
@@ -490,6 +517,26 @@ foreach ($sourceArchive in $sourceArchiveInputs) {
 )
 
 Write-Step 'Creating managed installation and runtime-update manifests'
+$runtimeSurfacePaths = @(
+    Get-ChildItem -LiteralPath $stageRoot -Recurse -File |
+        ForEach-Object {
+            $_.FullName.Substring($stageRoot.Length).TrimStart('\').Replace('\', '/')
+        } |
+        Where-Object {
+            $_.StartsWith('Dashboard/', [System.StringComparison]::Ordinal) -or
+            $_.StartsWith('GameData/', [System.StringComparison]::Ordinal) -or
+            $_.StartsWith('SOURCE/', [System.StringComparison]::Ordinal)
+        }
+)
+$unmanagedRuntimePaths = @(
+    $runtimeSurfacePaths | Where-Object { -not (Test-ManagedRuntimePath $_) }
+)
+if ($unmanagedRuntimePaths.Count -gt 0) {
+    throw (
+        'Packaged runtime paths are absent from runtime-update-contract.json: ' +
+        ($unmanagedRuntimePaths -join ', ')
+    )
+}
 $managedPaths = [string[]]@(
     Get-ChildItem -LiteralPath $stageRoot -Recurse -File |
         ForEach-Object {
@@ -561,6 +608,28 @@ $updateManifest = [ordered]@{
 }
 Write-Utf8Json -Path (Join-Path $updateStageRoot 'update-manifest.json') -Value $updateManifest
 
+$contractLimits = $script:RuntimeUpdateContract.limits
+$updateManifestFile = Get-Item -LiteralPath (Join-Path $updateStageRoot 'update-manifest.json')
+if ($payloadRecords.Count + 1 -gt [long]$contractLimits.archive_entries) {
+    throw 'Runtime-update payload exceeds the updater archive entry limit.'
+}
+if ($updateManifestFile.Length -gt [long]$contractLimits.archive_file_bytes) {
+    throw 'Runtime-update manifest exceeds the updater per-file limit.'
+}
+$expandedBytes = [long]$updateManifestFile.Length
+foreach ($record in $payloadRecords) {
+    if ($record.path.Length -gt [long]$contractLimits.relative_path_length) {
+        throw "Runtime-update path exceeds the updater length limit: $($record.path)"
+    }
+    if ([long]$record.size -gt [long]$contractLimits.archive_file_bytes) {
+        throw "Runtime-update file exceeds the updater per-file limit: $($record.path)"
+    }
+    $expandedBytes += [long]$record.size
+}
+if ($expandedBytes -gt [long]$contractLimits.archive_expanded_bytes) {
+    throw 'Runtime-update payload exceeds the updater expanded-size limit.'
+}
+
 Write-Step 'Creating runtime-update archive and checksum'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -595,6 +664,10 @@ try {
 finally {
     $updateArchiveStream.Dispose()
 }
+$updateArchiveFile = Get-Item -LiteralPath $updateArchivePath
+if ($updateArchiveFile.Length -gt [long]$contractLimits.download_bytes) {
+    throw 'Runtime-update ZIP exceeds the updater download limit.'
+}
 $updateHash = Get-FileHash -LiteralPath $updateArchivePath -Algorithm SHA256
 $updateChecksumLine = (
     "$($updateHash.Hash.ToLowerInvariant())  " +
@@ -606,6 +679,9 @@ $updateChecksumLine = (
     $updateChecksumLine,
     [System.Text.UTF8Encoding]::new($false)
 )
+if ((Get-Item -LiteralPath $updateChecksumPath).Length -gt [long]$contractLimits.checksum_bytes) {
+    throw 'Runtime-update checksum exceeds the updater checksum limit.'
+}
 
 $updateArchive = [System.IO.Compression.ZipFile]::OpenRead($updateArchivePath)
 try {
@@ -613,6 +689,19 @@ try {
         $updateArchive.Entries |
             Where-Object { -not $_.FullName.EndsWith('/') }
     )
+    if ($updateEntries.Count -gt [long]$contractLimits.archive_entries) {
+        throw 'Runtime-update ZIP exceeds the updater archive entry limit.'
+    }
+    $archiveExpandedBytes = [long]0
+    foreach ($entry in $updateEntries) {
+        if ($entry.Length -gt [long]$contractLimits.archive_file_bytes) {
+            throw "Runtime-update ZIP entry exceeds the updater per-file limit: $($entry.FullName)"
+        }
+        $archiveExpandedBytes += [long]$entry.Length
+    }
+    if ($archiveExpandedBytes -gt [long]$contractLimits.archive_expanded_bytes) {
+        throw 'Runtime-update ZIP exceeds the updater expanded-size limit.'
+    }
     $expectedUpdateEntries = @('update-manifest.json') + $payloadRecords.path
     $actualUpdateEntries = @($updateEntries | ForEach-Object { $_.FullName.Replace('\', '/') })
     if ($actualUpdateEntries.Count -ne $expectedUpdateEntries.Count -or

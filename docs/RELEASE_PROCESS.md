@@ -107,8 +107,9 @@ The packager:
 - stages five curated standalone screenshot assets using names that sort after
   the ZIP and checksum in GitHub's release asset list;
 - audits both ZIPs for exact manifest membership, hashes, missing files, and
-  forbidden source/build artifacts, and requires the update ZIP to be smaller
-  than the full package.
+  forbidden source/build artifacts; applies the shared
+  `runtime-update-contract.json` path and archive-size limits; and requires the
+  update ZIP to be smaller than the full package.
 
 The end-user package contains the compiled `Dashboard\web` directory, never
 the frontend source, Node.js, Vite, pnpm, tests, or developer fixtures.
@@ -137,8 +138,9 @@ Before creating a GitHub draft:
   successful update and restart acknowledgement, cancellation without package
   mutation, rejection of mutable/tampered/wrong-host assets, rollback after a
   locked file or injected mid-apply failure, recovery after helper termination,
-  preservation of `.venv`/settings/logs/unknown files, and an unchanged
-  disposable live-KSP sentinel tree;
+  PID-reuse-safe launcher/helper identity, complete owned component-tree
+  shutdown, preservation of `.venv`/settings/logs/unknown files, and an
+  unchanged disposable live-KSP sentinel tree;
 - follow `docs/images/v0.6.0/README.md` for the screenshot set and
   its source briefs.
 

@@ -19,8 +19,73 @@ import urllib.parse
 import urllib.request
 import uuid
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+
+def _load_runtime_contract():
+    path = Path(__file__).resolve().with_name("runtime-update-contract.json")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise RuntimeError(f"could not load the runtime-update contract: {exc}") from exc
+    expected = {
+        "schema",
+        "limits",
+        "root_managed_files",
+        "dashboard_contract_path",
+        "dashboard_top_level_extensions",
+        "dashboard_web_index",
+        "dashboard_asset_extensions",
+        "service_folders",
+        "source_archive_suffix",
+    }
+    if not isinstance(value, dict) or set(value) != expected or value["schema"] != 1:
+        raise RuntimeError("the runtime-update contract schema is invalid")
+    limit_keys = {
+        "download_bytes",
+        "checksum_bytes",
+        "archive_entries",
+        "archive_file_bytes",
+        "archive_expanded_bytes",
+        "relative_path_length",
+    }
+    limits = value["limits"]
+    if (
+        not isinstance(limits, dict)
+        or set(limits) != limit_keys
+        or any(
+            not isinstance(item, int) or isinstance(item, bool) or item <= 0
+            for item in limits.values()
+        )
+    ):
+        raise RuntimeError("the runtime-update contract limits are invalid")
+    for key in (
+        "root_managed_files",
+        "dashboard_top_level_extensions",
+        "dashboard_asset_extensions",
+        "service_folders",
+    ):
+        items = value[key]
+        if (
+            not isinstance(items, list)
+            or not items
+            or any(not isinstance(item, str) or not item for item in items)
+            or len({item.casefold() for item in items}) != len(items)
+        ):
+            raise RuntimeError(f"the runtime-update contract field {key} is invalid")
+    for key in (
+        "dashboard_contract_path",
+        "dashboard_web_index",
+        "source_archive_suffix",
+    ):
+        if not isinstance(value[key], str) or not value[key]:
+            raise RuntimeError(f"the runtime-update contract field {key} is invalid")
+    return value
+
+
+_RUNTIME_CONTRACT = _load_runtime_contract()
+_LIMITS = _RUNTIME_CONTRACT["limits"]
 
 INSTALL_MANIFEST_NAME = "WMC-INSTALL-MANIFEST.json"
 UPDATE_MANIFEST_NAME = "update-manifest.json"
@@ -32,14 +97,14 @@ RESTART_ACK_NAME = "restart-ack.json"
 UPDATER_PROTOCOL = 1
 RESTART_STABILITY_SECONDS = 1.0
 
-MAX_UPDATE_DOWNLOAD_BYTES = 32 * 1024 * 1024
-MAX_CHECKSUM_BYTES = 1024
+MAX_UPDATE_DOWNLOAD_BYTES = _LIMITS["download_bytes"]
+MAX_CHECKSUM_BYTES = _LIMITS["checksum_bytes"]
 MAX_RELEASE_NOTES_CHARS = 256 * 1024
 MAX_RELEASE_ASSETS = 128
-MAX_ARCHIVE_ENTRIES = 256
-MAX_ARCHIVE_FILE_BYTES = 32 * 1024 * 1024
-MAX_ARCHIVE_EXPANDED_BYTES = 64 * 1024 * 1024
-MAX_RELATIVE_PATH_LENGTH = 220
+MAX_ARCHIVE_ENTRIES = _LIMITS["archive_entries"]
+MAX_ARCHIVE_FILE_BYTES = _LIMITS["archive_file_bytes"]
+MAX_ARCHIVE_EXPANDED_BYTES = _LIMITS["archive_expanded_bytes"]
+MAX_RELATIVE_PATH_LENGTH = _LIMITS["relative_path_length"]
 
 REPOSITORY_OWNER = "SacredWoobie"
 REPOSITORY_NAME = "woobies-mission-control"
@@ -62,31 +127,15 @@ _WINDOWS_RESERVED = frozenset(
         *(f"LPT{index}" for index in range(1, 10)),
     }
 )
-_ROOT_MANAGED_FILES = frozenset(
-    {
-        "BUILD-INFO.txt",
-        "CHANGELOG.md",
-        "LICENSE",
-        "QUICKSTART.txt",
-        "THIRD-PARTY/NOTICES.md",
-        "docs/CONTROL_PAD_PROTOCOL.md",
-        "firmware/KSP_control.ino",
-    }
-)
-_SERVICE_FOLDERS = frozenset(
-    {
-        "KRPC.StageStats",
-        "KRPC.SystemHeat",
-        "KRPC.WoobiesMechJeb",
-        "WoobiesControlStats",
-    }
-)
+_ROOT_MANAGED_FILES = frozenset(_RUNTIME_CONTRACT["root_managed_files"])
+_SERVICE_FOLDERS = frozenset(_RUNTIME_CONTRACT["service_folders"])
 _UPDATER_CRITICAL_FILES = frozenset(
     {
         "Dashboard/Start KSP Dashboard.bat",
         "Dashboard/ksp_dashboard_app.py",
         "Dashboard/runtime_update.py",
         "Dashboard/runtime_update_helper.py",
+        _RUNTIME_CONTRACT["dashboard_contract_path"],
     }
 )
 
@@ -113,6 +162,23 @@ class InstallationError(UpdateError):
 
 class TransactionError(UpdateError):
     """A transactional apply, health check, recovery, or rollback failed."""
+
+
+@dataclass(frozen=True)
+class WindowsProcessIdentity:
+    """Identity strong enough to distinguish a PID from a later reuse."""
+
+    pid: int
+    creation_time: int
+    executable: str
+
+
+@dataclass
+class RestartedProcess:
+    """Keep the owned subprocess handle alive until commit or rollback."""
+
+    process: subprocess.Popen
+    identity: WindowsProcessIdentity | None
 
 
 def parse_version(value):
@@ -199,15 +265,23 @@ def _is_allowed_dashboard_path(path):
         return False
     if any(part.casefold().endswith((".log", ".pyc", ".pyo")) for part in parts):
         return False
+    if path == _RUNTIME_CONTRACT["dashboard_contract_path"]:
+        return True
     if len(parts) == 2:
         suffix = PurePosixPath(parts[-1]).suffix.casefold()
-        return suffix in {".py", ".txt", ".ps1", ".bat"}
+        return suffix in {
+            item.casefold()
+            for item in _RUNTIME_CONTRACT["dashboard_top_level_extensions"]
+        }
     if parts[1] != "web":
         return False
-    if len(parts) == 3 and parts[2] == "index.html":
+    if path == _RUNTIME_CONTRACT["dashboard_web_index"]:
         return True
     if len(parts) == 4 and parts[2] == "assets":
-        return PurePosixPath(parts[3]).suffix.casefold() in {".js", ".css", ".map"}
+        return PurePosixPath(parts[3]).suffix.casefold() in {
+            item.casefold()
+            for item in _RUNTIME_CONTRACT["dashboard_asset_extensions"]
+        }
     return False
 
 
@@ -225,7 +299,9 @@ def is_allowed_managed_path(path):
     if len(parts) >= 3 and parts[0] == "GameData" and parts[1] in _SERVICE_FOLDERS:
         return True
     if len(parts) == 2 and parts[0] == "SOURCE":
-        return parts[1].casefold().endswith("-source.zip")
+        return parts[1].casefold().endswith(
+            _RUNTIME_CONTRACT["source_archive_suffix"].casefold()
+        )
     return False
 
 
@@ -1138,6 +1214,9 @@ def activate_transaction(root, transaction_id, *, launcher_pid, python_executabl
         raise TransactionError("only a staged update transaction can be activated")
     if not isinstance(launcher_pid, int) or launcher_pid <= 0:
         raise TransactionError("launcher PID is invalid")
+    launcher_identity = (
+        _windows_process_identity(launcher_pid) if os.name == "nt" else None
+    )
     if python_executable is None:
         python_executable = Path(
             paths["root"] / "Dashboard" / ".venv" / "Scripts" / "python.exe"
@@ -1167,6 +1246,7 @@ def activate_transaction(root, transaction_id, *, launcher_pid, python_executabl
     helper_sources = (
         "Dashboard/runtime_update.py",
         "Dashboard/runtime_update_helper.py",
+        _RUNTIME_CONTRACT["dashboard_contract_path"],
     )
     command = [
         str(python_executable),
@@ -1200,7 +1280,14 @@ def activate_transaction(root, transaction_id, *, launcher_pid, python_executabl
                 record["size"],
                 record["sha256"],
             )
-        _journal(paths, "activated", launcher_pid=launcher_pid, helper_pid=None)
+        _journal(
+            paths,
+            "activated",
+            launcher_pid=launcher_pid,
+            launcher_identity=_identity_record(launcher_identity),
+            helper_pid=None,
+            helper_identity=None,
+        )
         _atomic_write_json(
             paths["active"], {"schema": 1, "transaction_id": transaction_id}
         )
@@ -1232,41 +1319,154 @@ def activate_transaction(root, transaction_id, *, launcher_pid, python_executabl
     return helper_pid
 
 
-def _pid_is_running(pid):
+def _windows_process_api():
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (
+        wintypes.DWORD,
+        wintypes.BOOL,
+        wintypes.DWORD,
+    )
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.GetProcessTimes.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    )
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.QueryFullProcessImageNameW.argtypes = (
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.LPWSTR,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    return ctypes, wintypes, kernel32
+
+
+def _filetime_value(value):
+    return (int(value.dwHighDateTime) << 32) | int(value.dwLowDateTime)
+
+
+def _windows_process_identity_from_handle(handle, pid):
+    ctypes, wintypes, kernel32 = _windows_process_api()
+    created = wintypes.FILETIME()
+    exited = wintypes.FILETIME()
+    kernel = wintypes.FILETIME()
+    user = wintypes.FILETIME()
+    if not kernel32.GetProcessTimes(
+        handle,
+        ctypes.byref(created),
+        ctypes.byref(exited),
+        ctypes.byref(kernel),
+        ctypes.byref(user),
+    ):
+        raise OSError(ctypes.get_last_error(), "could not identify updater process time")
+    capacity = wintypes.DWORD(32768)
+    buffer = ctypes.create_unicode_buffer(capacity.value)
+    if not kernel32.QueryFullProcessImageNameW(
+        handle, 0, buffer, ctypes.byref(capacity)
+    ):
+        raise OSError(ctypes.get_last_error(), "could not identify updater executable")
+    return WindowsProcessIdentity(
+        pid=pid,
+        creation_time=_filetime_value(created),
+        executable=str(Path(buffer.value).resolve()).casefold(),
+    )
+
+
+def _open_windows_process(pid):
+    ctypes, _wintypes, kernel32 = _windows_process_api()
+    handle = kernel32.OpenProcess(0x00100000 | 0x1000, False, pid)
+    if not handle:
+        error = ctypes.get_last_error()
+        if error == 87:  # ERROR_INVALID_PARAMETER: no process owns this PID.
+            return None
+        raise OSError(error, "could not open updater-owned process")
+    return handle
+
+
+def _windows_process_identity(pid):
+    if not isinstance(pid, int) or pid <= 0:
+        raise TransactionError("process PID is invalid")
+    handle = _open_windows_process(pid)
+    if handle is None:
+        raise TransactionError("could not securely identify the updater-owned process")
+    _ctypes, _wintypes, kernel32 = _windows_process_api()
+    try:
+        return _windows_process_identity_from_handle(handle, pid)
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _identity_record(identity):
+    if identity is None:
+        return None
+    return {
+        "pid": identity.pid,
+        "creation_time": identity.creation_time,
+        "executable": identity.executable,
+    }
+
+
+def _parse_identity_record(value, *, description):
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {
+        "pid",
+        "creation_time",
+        "executable",
+    }:
+        raise TransactionError(f"{description} identity is invalid")
+    pid = value["pid"]
+    creation_time = value["creation_time"]
+    executable = value["executable"]
+    if (
+        not isinstance(pid, int)
+        or isinstance(pid, bool)
+        or pid <= 0
+        or not isinstance(creation_time, int)
+        or isinstance(creation_time, bool)
+        or creation_time <= 0
+        or not isinstance(executable, str)
+        or not executable
+    ):
+        raise TransactionError(f"{description} identity is invalid")
+    return WindowsProcessIdentity(pid, creation_time, executable.casefold())
+
+
+def _pid_is_running(pid, identity=None):
     if not isinstance(pid, int) or pid <= 0:
         return False
     if os.name == "nt":
-        import ctypes
-        from ctypes import wintypes
-
-        process_query_limited_information = 0x1000
-        still_active = 259
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.OpenProcess.argtypes = (
-            wintypes.DWORD,
-            wintypes.BOOL,
-            wintypes.DWORD,
-        )
-        kernel32.OpenProcess.restype = wintypes.HANDLE
-        kernel32.GetExitCodeProcess.argtypes = (
-            wintypes.HANDLE,
-            ctypes.POINTER(wintypes.DWORD),
-        )
-        kernel32.GetExitCodeProcess.restype = wintypes.BOOL
-        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
-        kernel32.CloseHandle.restype = wintypes.BOOL
-        handle = kernel32.OpenProcess(
-            process_query_limited_information, False, pid
-        )
-        if not handle:
-            # Access denied still means that a process owns this PID. Other
-            # failures (most commonly an invalid PID) mean it has exited.
-            return ctypes.get_last_error() == 5
+        handle = _open_windows_process(pid)
+        if handle is None:
+            return False
+        ctypes, wintypes, kernel32 = _windows_process_api()
         try:
             exit_code = wintypes.DWORD()
             if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-                return True
-            return exit_code.value == still_active
+                raise OSError(ctypes.get_last_error(), "could not inspect process exit")
+            if exit_code.value != 259:
+                return False
+            if identity is not None:
+                observed = _windows_process_identity_from_handle(handle, pid)
+                if observed != identity:
+                    return False
+            return True
         finally:
             kernel32.CloseHandle(handle)
     try:
@@ -1276,9 +1476,37 @@ def _pid_is_running(pid):
     return True
 
 
-def _wait_for_pid_exit(pid, timeout):
+def _wait_for_pid_exit(pid, timeout, identity=None):
+    if os.name == "nt" and identity is not None:
+        handle = _open_windows_process(pid)
+        if handle is None:
+            return
+        _ctypes, _wintypes, kernel32 = _windows_process_api()
+        try:
+            exit_code = _wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(
+                handle, _ctypes.byref(exit_code)
+            ):
+                raise OSError(
+                    _ctypes.get_last_error(), "could not inspect launcher exit"
+                )
+            if exit_code.value != 259:
+                return
+            observed = _windows_process_identity_from_handle(handle, pid)
+            if observed != identity:
+                return
+            wait_result = kernel32.WaitForSingleObject(handle, int(timeout * 1000))
+            if wait_result == 0:
+                return
+            if wait_result == 0x102:
+                raise TransactionError(
+                    "the launcher did not exit before the update timeout"
+                )
+            raise OSError(wait_result, "could not wait for the launcher to exit")
+        finally:
+            kernel32.CloseHandle(handle)
     deadline = time.monotonic() + timeout
-    while _pid_is_running(pid):
+    while _pid_is_running(pid, identity):
         if time.monotonic() >= deadline:
             raise TransactionError("the launcher did not exit before the update timeout")
         time.sleep(0.1)
@@ -1494,6 +1722,9 @@ def _default_restart(paths, timeout=30):
         creationflags=0x08000000 if os.name == "nt" else 0,
     )
     try:
+        identity = (
+            _windows_process_identity(process.pid) if os.name == "nt" else None
+        )
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if paths["ack"].is_file():
@@ -1515,16 +1746,10 @@ def _default_restart(paths, timeout=30):
                             f"acknowledgement ({code})"
                         )
                     time.sleep(0.1)
-                # The restarted launcher is intentionally independent of the
-                # short-lived helper. Close only our Windows process handle
-                # after acknowledgement; this does not terminate the child.
-                process.poll()
-                if process.returncode is None and os.name == "nt":
-                    handle = getattr(process, "_handle", None)
-                    if handle is not None:
-                        handle.Close()
-                    process.returncode = 0
-                return process.pid
+                # Keep the owned process handle until the transaction has
+                # committed. If commit fails, rollback can terminate exactly
+                # this process without trusting a potentially reused PID.
+                return RestartedProcess(process, identity)
             code = process.poll()
             if code is not None:
                 raise TransactionError(
@@ -1576,6 +1801,8 @@ def _commit_transaction(paths, plan):
 
 
 def _terminate_restarted_process(value):
+    if isinstance(value, RestartedProcess):
+        value = value.process
     if isinstance(value, subprocess.Popen):
         if value.poll() is None:
             try:
@@ -1587,15 +1814,22 @@ def _terminate_restarted_process(value):
                 except OSError:
                     pass
         return
-    if not isinstance(value, int) or value <= 0 or not _pid_is_running(value):
+    # Never signal an integer PID supplied by a custom restart hook. Without a
+    # retained handle and creation identity, the PID could belong to a later,
+    # unrelated process.
+
+
+def _release_restarted_process(value):
+    if isinstance(value, RestartedProcess):
+        value = value.process
+    if not isinstance(value, subprocess.Popen):
         return
-    try:
-        os.kill(value, 15)
-    except OSError:
-        return
-    deadline = time.monotonic() + 5
-    while _pid_is_running(value) and time.monotonic() < deadline:
-        time.sleep(0.05)
+    value.poll()
+    if value.returncode is None and os.name == "nt":
+        handle = getattr(value, "_handle", None)
+        if handle is not None:
+            handle.Close()
+        value.returncode = 0
 
 
 def discard_staged_transaction(root, transaction_id):
@@ -1628,11 +1862,26 @@ def apply_transaction(
     journal = _load_json(paths["journal"], "update journal")
     if launcher_pid is None:
         launcher_pid = journal.get("launcher_pid")
-    _journal(paths, "waiting_for_launcher_exit", helper_pid=os.getpid(), launcher_pid=launcher_pid)
+    launcher_identity = _parse_identity_record(
+        journal.get("launcher_identity"), description="launcher"
+    )
+    if os.name == "nt" and launcher_pid is not None and launcher_identity is None:
+        raise TransactionError("the activated update has no trusted launcher identity")
+    helper_identity = (
+        _windows_process_identity(os.getpid()) if os.name == "nt" else None
+    )
+    _journal(
+        paths,
+        "waiting_for_launcher_exit",
+        helper_pid=os.getpid(),
+        helper_identity=_identity_record(helper_identity),
+        launcher_pid=launcher_pid,
+        launcher_identity=_identity_record(launcher_identity),
+    )
     restarted_process = None
     try:
         if launcher_pid is not None:
-            _wait_for_pid_exit(launcher_pid, 30)
+            _wait_for_pid_exit(launcher_pid, 30, launcher_identity)
         _journal(paths, "backing_up")
         _prepare_backup(paths, plan)
         _apply_target(paths, plan)
@@ -1641,7 +1890,9 @@ def apply_transaction(
             return _commit_transaction(paths, plan)
         _journal(paths, "awaiting_restart")
         restarted_process = (restart or _default_restart)(paths)
-        return _commit_transaction(paths, plan)
+        result = _commit_transaction(paths, plan)
+        _release_restarted_process(restarted_process)
+        return result
     except Exception as exc:
         if restarted_process is not None:
             _terminate_restarted_process(restarted_process)
@@ -1674,13 +1925,22 @@ def recover_pending_update(root):
     paths = _transaction_paths(root, marker["transaction_id"])
     journal = _load_json(paths["journal"], "update journal")
     helper_pid = journal.get("helper_pid")
+    helper_identity = _parse_identity_record(
+        journal.get("helper_identity"), description="helper"
+    )
     updated_at = journal.get("updated_at")
     helper_is_recent = (
         isinstance(updated_at, (int, float))
         and not isinstance(updated_at, bool)
         and 0 <= time.time() - updated_at < 10 * 60
     )
-    if helper_is_recent and _pid_is_running(helper_pid):
+    helper_is_owned = (
+        _pid_is_running(helper_pid)
+        if os.name != "nt"
+        else helper_identity is not None
+        and _pid_is_running(helper_pid, helper_identity)
+    )
+    if helper_is_recent and helper_is_owned:
         return {"status": "busy", "message": "A Mission Control update is still running."}
     state = journal.get("state")
     if state in {
