@@ -1751,6 +1751,14 @@
 }
 
 @media (max-width: 440px) {
+  .resonant-orbit-header-actions {
+    position: static;
+    right: auto;
+    bottom: auto;
+  }
+  .resonant-orbit-title {
+    padding-right: 0;
+  }
   .resonant-orbit-title p {
     display: none;
   }
