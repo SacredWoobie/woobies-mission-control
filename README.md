@@ -1,16 +1,17 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.5.1](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.5.1)**
+Current public release: **[v0.6.0](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.6.0)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.5.1 adds authoritative live contract deadlines, prioritizes a
-low-noise countdown in compact contract rows, and moves the absolute KSP due
-date into expanded briefings. It also reconciles the dashboard CSS foundation
-and adds automated CSS, Python, unit, build, Chrome, and Edge quality gates.
+Version 0.6.0 updates Mission Control for kRPC 0.6 and substantially reduces
+the recurring Flight telemetry workload. It also adds persistent unexpected
+part-loss detection and authoritative broken-part monitoring through the
+Master Warning and DAMAGE annunciator, with safe fallback behavior for older
+service versions.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -20,8 +21,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.5.1/space-center-overview.png">
-    <img src="docs/images/v0.5.1/space-center-overview.png" width="900" alt="Live Mission Control overview with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and an active-contract countdown">
+  <a href="docs/images/v0.6.0/space-center-overview.png">
+    <img src="docs/images/v0.6.0/space-center-overview.png" width="900" alt="Live Mission Control overview with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and an active-contract countdown">
   </a>
 </p>
 
@@ -63,8 +64,8 @@ custom allowances, and craft assignment.
 ### VAB and SPH
 
 <p align="center">
-  <a href="docs/images/v0.5.1/editor-craft-analysis.png">
-    <img src="docs/images/v0.5.1/editor-craft-analysis.png" width="900" alt="VAB craft analysis with consolidated craft totals, dense staging, resource inventory, and planning tools">
+  <a href="docs/images/v0.6.0/editor-craft-analysis.png">
+    <img src="docs/images/v0.6.0/editor-craft-analysis.png" width="900" alt="VAB craft analysis with consolidated craft totals, dense staging, resource inventory, and planning tools">
   </a>
 </p>
 
@@ -77,8 +78,8 @@ briefings beside the vehicle, with exact-plan editing when assumptions change.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.5.1/flight-monitor.png">
-    <img src="docs/images/v0.5.1/flight-monitor.png" width="900" alt="Flight Monitor workspace with persistent vessel state, projected navball, Master Caution, electricity, heat, science, and target panels">
+  <a href="docs/images/v0.6.0/flight-damage-monitor.png">
+    <img src="docs/images/v0.6.0/flight-damage-monitor.png" width="900" alt="Flight Monitor workspace with the DAMAGE annunciator and focused broken-part report visible">
   </a>
 </p>
 
@@ -111,16 +112,15 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The v0.5.1 public release selects four independently versioned kRPC extensions.
-Earlier release packs, including v0.5.0 with
-WoobiesControlStats 0.2.6, remain pinned to their original service bytes:
+The v0.6.0 public release selects four independently versioned kRPC extensions.
+Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
 | --- | --- | --- |
-| WoobiesControlStats | 0.2.7 | Roster, stored science, research-lab telemetry and controls, stock thermal data, authoritative contract deadlines, KAC bridge recovery, and guarded vessel termination |
-| KRPC.StageStats | 0.2.7 | Flight/editor staging, TWR ranges, and VAB/SPH craft totals |
-| KRPC.SystemHeat | 0.2.9 | System Heat loops, components, electrical integration, reactor control, and guarded per-loop radiator control |
-| KRPC.WoobiesMechJeb | 0.8.6 | MechJeb 2.15.3 staging and transfer-planning bridge |
+| WoobiesControlStats | 0.2.16 | Roster, science, stock thermal data, contract deadlines, vessel damage and persistent part-loss history, packed Flight/resources telemetry, KAC recovery, and guarded vessel termination |
+| KRPC.StageStats | 0.2.10 | Flight/editor staging, TWR ranges, VAB/SPH craft totals, and bounded packed Flight stage snapshots |
+| KRPC.SystemHeat | 0.2.11 | System Heat loops, components, electrical sources, reactor/radiator controls, and packed heat/electricity telemetry |
+| KRPC.WoobiesMechJeb | 0.8.10 | MechJeb 2.15.3 staging and transfer-planning bridge |
 
 Historical v0.4.0 and v0.4.1 release packs remain pinned to their published
 service bytes and provenance.

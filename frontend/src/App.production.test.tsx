@@ -23,7 +23,7 @@ describe("Production dashboard entry", () => {
     expect(screen.getByRole("button", { name: "Notes" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "DEV" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.5.1 · Production")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.6.0 · Production")).toBeTruthy();
 
     view.unmount();
     expect(disconnect).toHaveBeenCalledOnce();

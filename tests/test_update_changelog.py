@@ -102,9 +102,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Contract deadlines and UI foundations", section)
-        self.assertIn("authoritative live KSP deadlines", section)
-        self.assertIn("GitHub continuous integration", section)
+        self.assertIn("kRPC 0.6 and faster Flight telemetry", section)
+        self.assertIn("persistent unexpected part-loss detection", section)
+        self.assertIn("`DAMAGE` annunciator", section)
 
 
 if __name__ == "__main__":
