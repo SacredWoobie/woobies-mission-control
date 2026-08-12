@@ -19,10 +19,13 @@ after the 0.6 runtime and rebuilt service cohort pass live KSP validation.
    panels, including UT, separation, positions, velocities, relative vectors,
    and relative speed. Preserve explicit reference-frame labeling and the
    existing read-only preview plus separate-confirmation maneuver boundary.
-3. **Managed streaming spike.** Measure kRPC 0.6's TCP_NODELAY and transport
-   improvements, then compare managed streams with polling for the hottest 4 Hz
-   signals. Adopt only where it lowers latency or load without making scene
-   transitions and reconnects less reliable.
+3. **Managed streaming spike — completed, no promotion.** A measurement-only
+   spike compared one explicitly rate-limited 4 Hz packed Flight-core stream
+   with the existing pull path. It removed the repeated client RPCs and reduced
+   client cycle time, but median combined kRPC server update time increased and
+   KSP simulation throughput did not improve. Keep the proven demand-gated
+   polling path for this cohort; any future reconsideration requires fresh
+   evidence from the then-current code rather than reusing the discarded spike.
 4. **Richer vehicle-health telemetry.** Consider acceleration, surface
    prograde/retrograde, aerodynamic force/torque/lift/drag, engine flameout,
    parachute safety state, vessel loaded/packed state, and part crew for focused
@@ -40,5 +43,7 @@ after the 0.6 runtime and rebuilt service cohort pass live KSP validation.
 - Treat stock staging data as a fallback/cross-check until editor and flight
   behavior are compared live against StageStats and MechJeb.
 - Add telemetry fields additively and version any changed custom service API.
-- Benchmark stream changes through scene transitions, reconnects, reverts, and
-  missing-service states before replacing proven polling paths.
+- Do not promote the completed managed-stream experiment from this cohort. Any
+  future stream design must again prove lower total server work and better KSP
+  simulation—not only fewer client RPCs—through scene transitions, reconnects,
+  reverts, idle demand, and missing-service states.
