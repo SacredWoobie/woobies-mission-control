@@ -117,8 +117,9 @@ export function calculateElectricityPlan(input: {
   const selected = selectedComponents(input.components, input.included);
   const generation = roleTotal(selected, "producer", solarScale);
   const draw = roleTotal(selected, "consumer", solarScale);
-  const solarGeneration = roleTotal(selected.filter((component) => component.solarScaled), "producer", solarScale);
-  const nonSolarGeneration = roleTotal(selected.filter((component) => !component.solarScaled), "producer", solarScale);
+  const continuousProducers = selected.filter((component) => component.role === "producer" && component.continuous);
+  const solarGeneration = roleTotal(continuousProducers.filter((component) => component.solarScaled), "producer", solarScale);
+  const nonSolarGeneration = roleTotal(continuousProducers.filter((component) => !component.solarScaled), "producer", solarScale);
   const net = generation === undefined || draw === undefined ? undefined : generation - draw;
   const currentEc = finiteNonNegative(input.currentEc);
   const maxEc = finiteNonNegative(input.maxEc);

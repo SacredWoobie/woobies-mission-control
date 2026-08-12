@@ -42,6 +42,21 @@ describe("editor electricity planner model", () => {
     );
   });
 
+  it("does not credit conditional non-solar producers during eclipse", () => {
+    const conditional = components.map((component) => component.stableId === "rtg-a"
+      ? { ...component, continuous: false }
+      : component);
+    const plan = calculateElectricityPlan({
+      components: conditional,
+      included: {},
+      currentEc: 300,
+      maxEc: 500,
+      body,
+      scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
+    });
+    expect(plan.eclipseRequiredEc).toBeCloseTo(0.5 * plan.eclipseDurationSeconds!);
+  });
+
   it("propagates unknown modules and solar assumptions rather than treating them as zero", () => {
     const unknown = calculateElectricityPlan({ components: [{ ...components[0], valueKnown: false }], included: {}, scenario: { solarScale: 1 } });
     expect(unknown.generationEcPerSec).toBeUndefined();
