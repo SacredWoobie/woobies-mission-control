@@ -14,8 +14,8 @@
 .app-shell:has(.resonant-drawer) .dev-drawer-shell { opacity: 0; pointer-events: none; transform: translateX(-100%); }
 
 .resonant-drawer-backdrop { position: fixed; z-index: 11; inset: 0; border: 0; background: rgba(0,0,0,.58); cursor: default; }
-.resonant-drawer { position: fixed; z-index: 12; top: 0; right: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; width: min(980px,94vw); height: 100vh; color: var(--text-primary); background: #081018; border-left: 1px solid var(--rule-bright); box-shadow: -24px 0 70px rgba(0,0,0,.55); }
-.resonant-drawer > header { display: flex; justify-content: space-between; gap: 18px; padding: 16px 18px; border-bottom: 1px solid var(--rule); background: linear-gradient(90deg,rgba(78,201,224,.05),transparent 55%); }
+.resonant-drawer { position: fixed; z-index: 12; top: 0; right: 0; display: grid; grid-template-rows: auto minmax(0,1fr) auto; width: min(980px,94vw); height: 100vh; color: var(--text-primary); background: var(--surface-bezel); border-left: 1px solid var(--surface-seam); box-shadow: var(--surface-depth-engraved); }
+.resonant-drawer > header { display: flex; justify-content: space-between; gap: 18px; padding: 16px 18px; border-bottom: 1px solid var(--surface-seam); background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); }
 .resonant-drawer > header span, .resonant-result-head span { color: var(--cyan); font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .resonant-drawer > header h2 { margin: 3px 0 0; color: var(--amber); font-size: 16px; letter-spacing: .08em; text-transform: uppercase; }
 .resonant-drawer > header p { margin: 5px 0 0; color: var(--slate); font-size: 10px; }
@@ -23,7 +23,7 @@
 .resonant-drawer > header > button,
 .delta-v-header-actions > button:last-child { display: grid; width: 24px; min-width: 24px; height: 24px; padding: 0; place-items: center; }
 .resonant-drawer-body { min-height: 0; overflow: auto; }
-.resonant-drawer > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 18px; border-top: 1px solid var(--rule); color: var(--slate); background: #080e15; font-size: 9px; }
+.resonant-drawer > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 18px; border-top: 1px solid var(--surface-seam); color: var(--slate); background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); font-size: 9px; }
 .resonant-drawer > footer button { min-height: 36px; padding: 8px 14px; border: 1px solid var(--cyan); color: var(--cyan); background: rgba(78,201,224,.08); cursor: pointer; font-weight: 700; }
 .resonant-drawer > footer button:hover { color: #061014; background: var(--cyan); }
 .resonant-drawer > footer button.pinned { border-color: var(--green); color: var(--green); background: rgba(126,231,135,.08); }
@@ -34,19 +34,19 @@
 .resonant-save-fields { display: grid; min-width: min(520px,70vw); grid-template-columns: minmax(220px,1fr) auto; align-items: end; gap: 10px; }
 .resonant-save-fields label { display: grid; gap: 4px; }
 .resonant-save-fields label > span { color: var(--slate); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.resonant-save-fields input { min-height: 36px; padding: 7px 9px; border: 1px solid var(--rule-bright); outline: 0; color: var(--text-primary); background: #060c12; font: 10px var(--mono); }
+.resonant-save-fields input { min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 10px var(--mono); }
 .resonant-save-fields input:focus { border-color: var(--cyan); }
 .resonant-save-fields small { padding-bottom: 10px; color: var(--green); font-size: 9px; }
 
-.resonant-controls { display: grid; grid-template-columns: minmax(150px,1.2fr) 88px minmax(155px,1fr) minmax(210px,1.25fr); gap: 10px; align-items: end; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+.resonant-controls { display: grid; grid-template-columns: minmax(150px,1.2fr) 88px minmax(155px,1fr) minmax(210px,1.25fr); gap: 10px; align-items: end; padding: 14px 16px; border-bottom: 1px solid var(--surface-seam); background: var(--surface-plate); }
 .resonant-controls label, .resonant-advanced label { display: grid; gap: 6px; min-width: 0; }
 .resonant-controls label > span, .resonant-controls legend, .resonant-advanced label > span { color: var(--slate); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.resonant-controls input, .resonant-controls select, .resonant-advanced input { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--rule-bright); border-radius: 0; outline: 0; color: var(--text-primary); background: #060c12; font: 11px var(--mono); }
+.resonant-controls input, .resonant-controls select, .resonant-advanced input { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 11px var(--mono); }
 .resonant-controls input:focus, .resonant-controls select:focus, .resonant-advanced input:focus { border-color: var(--cyan); }
 .resonant-controls fieldset { margin: 0; padding: 0; border: 0; }
 .resonant-controls legend { margin-bottom: 6px; }
 .resonant-unit-control { grid-column: 1 / -1; width: 285px; }
-.resonant-segments { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--rule-bright); background: #060c12; }
+.resonant-segments { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--surface-seam); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .resonant-segments label { display: block; }
 .resonant-segments input { position: absolute; opacity: 0; pointer-events: none; }
 .resonant-segments label span { display: grid; min-height: 34px; place-items: center; border-right: 1px solid var(--rule); color: var(--slate); cursor: pointer; font-size: 10px; text-transform: capitalize; }
@@ -58,7 +58,7 @@
 .resonant-controls label > small { min-height: 11px; color: var(--slate-muted-text); font-size: 9px; }
 .resonant-controls label > small.resonant-catalog-live { color: var(--green); }
 
-.resonant-library { margin: 12px 16px; border: 1px solid var(--rule); background: #070d13; }
+.resonant-library { margin: 12px 16px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-plate); box-shadow: var(--surface-depth-engraved); }
 .resonant-library > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
 .resonant-library > header > div { display: flex; align-items: center; gap: 7px; color: var(--cyan); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .resonant-library > header strong { display: grid; min-width: 22px; height: 18px; padding: 0 4px; place-items: center; border: 1px solid var(--accent-border); color: var(--text-primary); }
@@ -79,7 +79,7 @@
 .resonant-library-actions button.delete { color: var(--slate); }
 .resonant-library-actions button:disabled { cursor: default; opacity: .75; }
 
-.resonant-advanced { margin: 12px 16px; border: 1px solid var(--rule); background: #070d13; }
+.resonant-advanced { margin: 12px 16px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-plate); box-shadow: var(--surface-depth-engraved); }
 .resonant-advanced summary { padding: 10px 12px; color: var(--slate); cursor: pointer; font-size: 10px; }
 .resonant-advanced[open] summary { border-bottom: 1px solid var(--rule); }
 .resonant-advanced > div { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; padding: 12px; }
@@ -110,7 +110,7 @@
 .resonant-result-head > strong.warning { color: var(--amber); border-color: rgba(255,180,84,.45); }
 .resonant-result-head > strong.danger { color: var(--warn); border-color: rgba(255,107,91,.45); }
 .resonant-result-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
-.resonant-result-grid article { min-width: 0; min-height: 86px; padding: 10px; border: 1px solid var(--rule); border-top-color: var(--accent-border); background: rgba(15,21,31,.75); }
+.resonant-result-grid article { min-width: 0; min-height: 86px; padding: 10px; border: 1px solid var(--surface-seam); border-top-color: var(--accent-border); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .resonant-result-grid article.delta { border-top-color: var(--amber-accent); }
 .resonant-result-grid article > span { display: block; margin-bottom: 7px; color: var(--slate); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .resonant-result-grid article > strong { display: block; overflow: hidden; color: var(--cyan); font-size: clamp(14px,1.8vw,20px); text-overflow: ellipsis; white-space: nowrap; }
@@ -123,9 +123,9 @@
 
 .delta-v-drawer-body { display: block; overflow: hidden; }
 .delta-v-planner { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; }
-.delta-v-configuration { flex: 0 1 auto; border-bottom: 1px solid var(--rule); background: linear-gradient(135deg,rgba(78,201,224,.035),transparent 48%); }
+.delta-v-configuration { flex: 0 1 auto; border-bottom: 1px solid var(--surface-seam); background: var(--surface-plate); }
 .delta-v-planner:has(> .delta-v-output) > .delta-v-configuration:not(.collapsed) { max-height: calc(100% - 360px); overflow-y: auto; overscroll-behavior: contain; }
-.delta-v-configuration-toggle { position: sticky; z-index: 2; top: 0; display: flex; width: 100%; min-height: 43px; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 16px; border: 0; border-bottom: 1px solid var(--rule); color: inherit; background: #0a121a; cursor: pointer; text-align: left; }
+.delta-v-configuration-toggle { position: sticky; z-index: 2; top: 0; display: flex; width: 100%; min-height: 43px; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 16px; border: 0; border-bottom: 1px solid var(--surface-seam); color: inherit; background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); cursor: pointer; text-align: left; }
 .delta-v-configuration.collapsed .delta-v-configuration-toggle { border-bottom: 0; }
 .delta-v-configuration-toggle > span { display: grid; min-width: 0; gap: 4px; }
 .delta-v-configuration-toggle b { color: var(--cyan); font-size: 9px; letter-spacing: .12em; }
@@ -151,7 +151,7 @@
 .delta-v-field-heading small.delta-v-input-error { color: var(--error-text); }
 .delta-v-controls legend { margin-bottom: 5px; }
 .delta-v-transfer-mode + small { display: block; margin-top: 3px; }
-.delta-v-controls select, .delta-v-controls input[type="number"] { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--rule-bright); border-radius: 0; outline: 0; color: var(--text-primary); background: #060c12; font: 11px var(--mono); }
+.delta-v-controls select, .delta-v-controls input[type="number"] { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 11px var(--mono); }
 .delta-v-controls select:focus, .delta-v-controls input[type="number"]:focus { border-color: var(--cyan); }
 .delta-v-controls input[aria-invalid="true"] { border-color: var(--warn); }
 .delta-v-controls small { min-height: 11px; color: var(--slate-muted-text); font-size: 9px; line-height: 1.25; }
@@ -166,6 +166,8 @@
 .delta-v-add-stop-row button:hover, .delta-v-add-stop-row button:focus-visible { border-color: var(--cyan); background: #102633; }
 .delta-v-add-stop-row button.secondary { border-color: var(--rule-bright); color: var(--slate); background: #0c141e; }
 .delta-v-add-stop-row button:disabled { opacity: .4; cursor: not-allowed; }
+.delta-v-add-stop-row button, .delta-v-plan-library-actions button, .delta-v-save-bar button, .delta-v-route-window-actions button, .delta-v-porkchop-button, .delta-v-add-step button, .delta-v-stay-control button, .delta-v-reset-button, .delta-v-saved-plans-button, .delta-v-assumptions-button { border-radius: var(--surface-radius-face); background: var(--surface-raised-face); box-shadow: var(--surface-depth-raised); }
+.delta-v-plan-library-actions button.delete, .delta-v-route-stop-actions button:last-child, .delta-v-custom-actions button { box-shadow: var(--surface-depth-raised); }
 .delta-v-endpoint-segments input:disabled + span { opacity: .35; cursor: not-allowed; }
 .delta-v-plan-library-empty { padding: 7px 9px; border: 1px dashed #294657; color: var(--slate-muted-text); font-size: 9px; }
 .delta-v-plan-library-list { display: grid; gap: 4px; }
@@ -197,16 +199,16 @@
 .delta-v-save-actions button { flex: 1 1 auto; }
 .delta-v-save-bar small { grid-column: 1 / -1; align-self: center; color: var(--green); font-size: 9px; }
 .delta-v-save-bar small.error { color: var(--error-text); }
-.delta-v-total { grid-area: budget-total; padding: 12px 15px; border: 1px solid var(--amber-accent); border-left: 3px solid var(--amber); background: linear-gradient(100deg,rgba(255,180,84,.09),rgba(15,21,31,.78)); }
+.delta-v-total { grid-area: budget-total; padding: 12px 15px; border: 1px solid var(--amber-accent); border-left: 3px solid var(--amber); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .delta-v-total > span, .delta-v-stat-grid span { display: block; color: var(--slate); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .delta-v-total > strong { display: block; margin-top: 6px; color: var(--amber); font-size: clamp(24px,3vw,34px); letter-spacing: -.035em; }
 .delta-v-total > small, .delta-v-stat-grid small { display: block; margin-top: 5px; color: var(--slate-muted-text); font-size: 9px; }
 .delta-v-stat-grid { display: grid; grid-area: budget-stats; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; }
-.delta-v-stat-grid article { min-width: 0; min-height: 74px; padding: 8px; border: 1px solid var(--rule); background: rgba(15,21,31,.75); }
+.delta-v-stat-grid article { min-width: 0; min-height: 74px; padding: 8px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .delta-v-stat-grid strong { display: block; overflow: hidden; margin-top: 6px; color: var(--cyan); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .delta-v-incomplete-bumper { display: inline-flex !important; width: max-content; min-height: 22px; align-items: center; padding: 3px 6px; border: 1px solid rgba(255,180,84,.55); color: var(--amber) !important; background: rgba(255,180,84,.07); font: 700 9px var(--mono) !important; letter-spacing: .08em !important; white-space: nowrap; }
 .delta-v-save-bar button:disabled { opacity: .45; cursor: not-allowed; }
-.delta-v-route { display: flex; grid-area: route; min-width: 0; min-height: 0; flex-direction: column; border: 1px solid var(--rule); background: #070d13; }
+.delta-v-route { display: flex; grid-area: route; min-width: 0; min-height: 0; flex-direction: column; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-plate); box-shadow: var(--surface-depth-engraved); }
 .delta-v-route > header { display: grid; grid-template-columns: 94px minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 7px 13px; border-bottom: 1px solid var(--rule); }
 .delta-v-route > header > span { font-size: 9px; }
 .delta-v-route-timing { display: grid; width: min(100%,620px); grid-template-columns: repeat(3,minmax(0,1fr)); justify-self: center; border-inline: 1px solid var(--rule); }
