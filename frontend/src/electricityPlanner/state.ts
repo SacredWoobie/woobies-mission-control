@@ -1,0 +1,60 @@
+import type { EditorElectricityComponentTelemetry, TelemetrySnapshot } from "../telemetry/types";
+import { defaultElectricityScenario, type ElectricityScenario } from "./model";
+
+export type ElectricityPlannerPreset = "backend-defaults" | "all-included" | "producers-off" | "reset";
+
+export interface ElectricityPlannerSession {
+  craftKey?: string;
+  includedByStableId: Record<string, boolean>;
+  scenario: ElectricityScenario;
+}
+
+export function plannerCraftKey(snapshot: TelemetrySnapshot): string | undefined {
+  const save = snapshot["game.saveFolder"]?.trim();
+  const craft = snapshot["editor.elec.craftPersistentId"] ?? snapshot["editor.craftPersistentId"];
+  const root = snapshot["editor.elec.rootPartPersistentId"] ?? snapshot["editor.rootPartPersistentId"];
+  const identity = craft?.trim() || root?.trim();
+  return save && identity ? `${save}:${identity}` : undefined;
+}
+
+function defaults(components: readonly EditorElectricityComponentTelemetry[]) {
+  return Object.fromEntries(components.map((component) => [component.stableId, component.defaultIncluded]));
+}
+
+/** Revisions reconcile by stable component ID; a different craft identity starts a new in-memory session. */
+export function reconcileElectricityPlannerSession(
+  previous: ElectricityPlannerSession | undefined,
+  snapshot: TelemetrySnapshot,
+): ElectricityPlannerSession {
+  const components = snapshot["editor.elec.components"] ?? [];
+  const craftKey = plannerCraftKey(snapshot);
+  if (!previous || previous.craftKey !== craftKey) {
+    return { craftKey, includedByStableId: defaults(components), scenario: defaultElectricityScenario(snapshot) };
+  }
+  const current = previous.includedByStableId;
+  return {
+    ...previous,
+    includedByStableId: Object.fromEntries(components.map((component) => [
+      component.stableId,
+      current[component.stableId] ?? component.defaultIncluded,
+    ])),
+  };
+}
+
+export function applyElectricityPlannerPreset(
+  state: ElectricityPlannerSession,
+  components: readonly EditorElectricityComponentTelemetry[],
+  preset: ElectricityPlannerPreset,
+  snapshot: TelemetrySnapshot,
+): ElectricityPlannerSession {
+  const includedByStableId = Object.fromEntries(components.map((component) => [component.stableId,
+    preset === "all-included" ? true
+      : preset === "producers-off" ? component.role !== "producer" && component.defaultIncluded
+        : component.defaultIncluded,
+  ]));
+  return {
+    ...state,
+    includedByStableId,
+    scenario: preset === "reset" ? defaultElectricityScenario(snapshot) : state.scenario,
+  };
+}
