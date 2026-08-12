@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import sys
 import time
 import tempfile
@@ -45,20 +44,35 @@ class UpdateCheckerTests(unittest.TestCase):
         end = source.index('self.main_panes = tk.PanedWindow', start)
         update_bar = source[start:end]
 
-        self.assertEqual(
-            re.findall(
-                r'text="(Check now|Review & install|Changelog|View release)"',
-                update_bar,
-            ),
-            ["Check now", "Review & install", "Changelog", "View release"],
+        workflow = (
+            ("check_updates_control", '"AUTOMATIC UPDATE CHECKS"'),
+            ("check_updates_button", 'text="Check now"'),
+            ("install_update_button", 'text="Review & install"'),
+            ("changelog_button", 'text="Changelog"'),
+            ("view_release_button", 'text="View release"'),
         )
+        positions = [
+            update_bar.index(f"self.{attribute} =") for attribute, _label in workflow
+        ]
+        self.assertEqual(positions, sorted(positions))
+        boundaries = positions[1:] + [len(update_bar)]
+        for (attribute, label), assignment, next_assignment in zip(
+            workflow, positions, boundaries
+        ):
+            definition = update_bar[assignment:next_assignment]
+            self.assertIn("update_actions,", definition)
+            self.assertIn(label, definition)
+            self.assertIn(f'self.{attribute}.pack(side="left"', definition)
+
+        self.assertIn('update_actions = ttk.Frame(update_bar', update_bar)
         for attribute in (
+            "check_updates_control",
             "check_updates_button",
             "install_update_button",
             "changelog_button",
             "view_release_button",
         ):
-            self.assertIn(f'{attribute}.pack(side="left"', update_bar)
+            self.assertEqual(update_bar.count(f"self.{attribute}.pack("), 1)
 
     def test_delayed_changelog_does_not_steal_an_update_decision(self):
         class Probe:
