@@ -59,6 +59,13 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual(self.editor["editor.craftPersistentId"], "9001")
         self.assertEqual(self.editor["editor.rootPartPersistentId"], "1001")
 
+    def test_editor_fixture_has_electrical_planner_snapshot(self):
+        self.assertEqual(self.editor["editor.elec.status"], "ready")
+        self.assertEqual(self.editor["editor.elec.backend"], "stock")
+        self.assertFalse(self.editor["editor.elec.pending"])
+        self.assertEqual(self.editor["editor.elec.components"][0]["role"], "consumer")
+        self.assertTrue(self.editor["editor.elec.bodies"][0]["authoritative"])
+
     def test_reactor_inventory_has_two_fission_and_one_fusion_reactor(self):
         reactors = self.flight["elec.reactors"]
 

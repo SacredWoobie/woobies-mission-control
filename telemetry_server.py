@@ -42,6 +42,7 @@ from damage import gather_part_damage, read_loss_fields
 from heat import enrich_system_heat_result
 from heat_electricity_snapshot import decode_heat_electricity_snapshot
 from flight_core_snapshot import decode_flight_core_snapshot
+from editor_electrical_snapshot import decode_editor_electrical_snapshot
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
     MissionPlanningController,
@@ -74,6 +75,8 @@ STAGE_SETTLE_SECONDS = 0.12  # legacy row fallback waits for MechJeb's async sim
 SMART_ASS_NEGATIVE_READY_POLL_SECONDS = 1.0
 REMOTE_TECH_BINDING_REFRESH_SECONDS = 5.0
 EDITOR_SUMMARY_RETRY_SECONDS = 1
+EDITOR_ELECTRICAL_POLL_SECONDS = 0.25
+EDITOR_ELECTRICAL_RETRY_SECONDS = 1.0
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
 NOTES_MAX_CATALOG = 500
@@ -166,6 +169,10 @@ _editor_rebuild_cache = {}
 _editor_rebuild_token = None
 _editor_rebuild_ready = True
 _editor_rebuild_trace_last = None
+_editor_electrical_cache = {}
+_editor_electrical_identity = None
+_editor_electrical_last_poll = 0.0
+_editor_electrical_retry_after = 0.0
 _telemetry_mode = None
 _smart_ass_negative_ready_connection = None
 _smart_ass_negative_ready_vessel = None
@@ -2058,6 +2065,63 @@ def _reset_editor_stage_state(revision=None, identity=None):
     _editor_summary_cache = {}
     _editor_rebuild_trace_last = None
     _clear_editor_candidates()
+    _reset_editor_electrical_state()
+
+
+def _reset_editor_electrical_state():
+    """Discard the isolated EditorElectrical cache at an editor boundary."""
+    global _editor_electrical_cache, _editor_electrical_identity
+    global _editor_electrical_last_poll, _editor_electrical_retry_after
+    _editor_electrical_cache = {}
+    _editor_electrical_identity = None
+    _editor_electrical_last_poll = 0.0
+    _editor_electrical_retry_after = 0.0
+
+
+def _attach_editor_electrical(conn, data):
+    """Attach one independently cached, atomically decoded editor snapshot."""
+    global _editor_electrical_cache, _editor_electrical_identity
+    global _editor_electrical_last_poll, _editor_electrical_retry_after
+    now = time.time()
+    if now < _editor_electrical_retry_after:
+        if _editor_electrical_cache:
+            data.update(_editor_electrical_cache)
+            data["editor.elec.retained"] = True
+        else:
+            data.update({"editor.elec.status": "unavailable",
+                         "editor.elec.pending": False,
+                         "editor.elec.retained": False})
+        return data
+    due = now - _editor_electrical_last_poll >= EDITOR_ELECTRICAL_POLL_SECONDS
+    retained = False
+    if due:
+        _editor_electrical_last_poll = now
+        try:
+            snapshot = decode_editor_electrical_snapshot(
+                conn.editor_electrical.snapshot()
+            )
+            identity = (snapshot["editor.elec.saveFolder"],
+                        snapshot["editor.elec.craftPersistentId"],
+                        snapshot["editor.elec.rootPartPersistentId"])
+            # A new identity must never receive previous-craft data, even for
+            # the failed/unstable service state that may follow a load.
+            if _editor_electrical_identity not in (None, identity):
+                _editor_electrical_cache = {}
+            _editor_electrical_cache = snapshot
+            _editor_electrical_identity = identity
+            _editor_electrical_retry_after = 0.0
+        except Exception:
+            _editor_electrical_retry_after = now + EDITOR_ELECTRICAL_RETRY_SECONDS
+            retained = bool(_editor_electrical_cache)
+    if _editor_electrical_cache:
+        data.update(_editor_electrical_cache)
+        data["editor.elec.pending"] = False
+        data["editor.elec.retained"] = retained
+    else:
+        data.update({"editor.elec.status": "unavailable",
+                     "editor.elec.pending": due,
+                     "editor.elec.retained": False})
+    return data
 
 
 def _begin_editor_revision(revision, identity):
@@ -4837,12 +4901,16 @@ def gather_telemetry(conn):
 
         if mode == "editor_vab":
             payload = _attach_notes_telemetry(
-                _gather_editor_telemetry(conn, "VAB")
+                _attach_editor_electrical(
+                    conn, _gather_editor_telemetry(conn, "VAB")
+                )
             )
             return _finalize_telemetry(conn, payload)
         if mode == "editor_sph":
             payload = _attach_notes_telemetry(
-                _gather_editor_telemetry(conn, "SPH")
+                _attach_editor_electrical(
+                    conn, _gather_editor_telemetry(conn, "SPH")
+                )
             )
             return _finalize_telemetry(conn, payload)
         if mode != "flight":
