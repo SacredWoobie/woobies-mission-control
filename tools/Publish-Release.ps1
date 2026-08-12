@@ -556,6 +556,7 @@ $updateManifest = [ordered]@{
 Write-Utf8Json -Path (Join-Path $updateStageRoot 'update-manifest.json') -Value $updateManifest
 
 Write-Step 'Creating runtime-update archive and checksum'
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $updateArchiveStream = [System.IO.File]::Open(
     $updateArchivePath,
