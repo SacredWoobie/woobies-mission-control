@@ -514,6 +514,29 @@ test("the Ascension orbit rail reflows before telemetry values truncate", async 
   await page.setViewportSize({ width: 969, height: 900 });
   await page.goto("/");
 
+  const targetNameLayout = async () => page.locator("#asc .target-metric").evaluate((metric) => {
+    const subtitle = metric.querySelector<HTMLElement>(".asc-flight-subtitle")!;
+    const metricRect = metric.getBoundingClientRect();
+    const subtitleRect = subtitle.getBoundingClientRect();
+    return {
+      clientHeight: subtitle.clientHeight,
+      clientWidth: subtitle.clientWidth,
+      contained: subtitleRect.left >= metricRect.left - 1
+        && subtitleRect.right <= metricRect.right + 1
+        && subtitleRect.top >= metricRect.top - 1
+        && subtitleRect.bottom <= metricRect.bottom + 1,
+      scrollHeight: subtitle.scrollHeight,
+      scrollWidth: subtitle.scrollWidth,
+      text: subtitle.textContent,
+    };
+  });
+  const expectTargetNameToFit = (layout: Awaited<ReturnType<typeof targetNameLayout>>) => {
+    expect(layout.text).toBe("Odyssey Station Docking Port");
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+    expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
+    expect(layout.contained).toBe(true);
+  };
+
   const narrow = await page.locator("#asc .orbit-rail").evaluate((rail) => {
     const stats = Array.from(rail.querySelectorAll<HTMLElement>(".stat"));
     const readouts = Array.from(rail.querySelectorAll<HTMLElement>(".label, .v"));
@@ -524,6 +547,7 @@ test("the Ascension orbit rail reflows before telemetry values truncate", async 
   });
   expect(narrow.rows).toBe(2);
   expect(narrow.overflowingReadouts).toBe(0);
+  expectTargetNameToFit(await targetNameLayout());
 
   await page.setViewportSize({ width: 1080, height: 1920 });
   const portraitTarget = await page.locator("#asc .orbit-rail").evaluate((rail) => {
@@ -538,6 +562,10 @@ test("the Ascension orbit rail reflows before telemetry values truncate", async 
     return new Set(stats.map((stat) => Math.round(stat.getBoundingClientRect().top))).size;
   });
   expect(wideTarget).toBe(1);
+  expectTargetNameToFit(await targetNameLayout());
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expectTargetNameToFit(await targetNameLayout());
 });
 
 test("the navball clips every projected world layer to the globe", async ({ page }) => {
@@ -617,7 +645,7 @@ test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome conte
   expect(plan.shellBottom).toBeLessThanOrEqual(plan.documentClientHeight);
 });
 
-test("fixed Flight headers, utility rail, and Heat rows use the compact aligned treatment", async ({ page }) => {
+test("fixed Flight headers, utility rail, and meter tracks use the compact aligned treatment", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
 
@@ -640,6 +668,15 @@ test("fixed Flight headers, utility rail, and Heat rows use the compact aligned 
   expect(bars.length).toBeGreaterThanOrEqual(2);
   expect(Math.max(...bars.map((bar) => bar.left)) - Math.min(...bars.map((bar) => bar.left))).toBeLessThanOrEqual(1);
   expect(Math.max(...bars.map((bar) => bar.right)) - Math.min(...bars.map((bar) => bar.right))).toBeLessThanOrEqual(1);
+
+  const meterRadii = await page.locator("#cons .meter .track, #elec .ec-meter-track, #heat .heat-temperature-track, #sci .sci-meter-track").evaluateAll((tracks) => (
+    tracks.map((track) => getComputedStyle(track).borderRadius)
+  ));
+  expect(new Set(meterRadii)).toEqual(new Set(["4px"]));
+  const consumableFillRadii = await page.locator("#cons .meter .fill").evaluateAll((fills) => (
+    fills.map((fill) => getComputedStyle(fill).borderRadius)
+  ));
+  expect(new Set(consumableFillRadii)).toEqual(new Set(["4px"]));
 });
 
 test("reactor detail uses extra runway before internal scrolling", async ({ page }) => {
