@@ -73,7 +73,7 @@
 .resonant-library-list article > div:first-child strong { color: var(--text-primary); font-size: 10px; }
 .resonant-library-list article > div:first-child span { margin-top: 4px; color: var(--slate); font-size: 9px; text-transform: uppercase; }
 .resonant-library-actions { display: flex; gap: 5px; }
-.resonant-library-actions button { min-height: 29px; padding: 5px 8px; border: 1px solid var(--rule-bright); color: var(--cyan); background: #0c141e; cursor: pointer; font: 9px var(--mono); text-transform: uppercase; }
+.resonant-library-actions button { min-height: 29px; padding: 5px 8px; border: 1px solid var(--rule-bright); color: var(--cyan); background: #0c141e; cursor: pointer; font: 10px var(--mono); text-transform: uppercase; }
 .resonant-library-actions button:hover, .resonant-library-actions button.active { border-color: var(--cyan); background: rgba(78,201,224,.1); }
 .resonant-library-actions button.active { border-color: var(--green); color: var(--green); }
 .resonant-library-actions button.delete { color: var(--slate); }
@@ -128,9 +128,9 @@
 .delta-v-configuration-toggle { position: sticky; z-index: 2; top: 0; display: flex; width: 100%; min-height: 43px; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 16px; border: 0; border-bottom: 1px solid var(--surface-seam); color: inherit; background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); cursor: pointer; text-align: left; }
 .delta-v-configuration.collapsed .delta-v-configuration-toggle { border-bottom: 0; }
 .delta-v-configuration-toggle > span { display: grid; min-width: 0; gap: 4px; }
-.delta-v-configuration-toggle b { color: var(--cyan); font-size: 9px; letter-spacing: .12em; }
+.delta-v-configuration-toggle b { color: var(--cyan); font-size: 10px; letter-spacing: .1em; }
 .delta-v-configuration-toggle small { overflow: hidden; color: var(--slate); font: 9px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-configuration-toggle > strong { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; color: var(--slate); font-size: 9px; letter-spacing: .1em; }
+.delta-v-configuration-toggle > strong { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; color: var(--slate); font-size: 10px; letter-spacing: .08em; }
 .delta-v-configuration-toggle i { color: var(--cyan); font-style: normal; font-size: 10px; }
 .delta-v-configuration-toggle:hover, .delta-v-configuration-toggle:focus-visible { background: rgba(78,201,224,.07); }
 .delta-v-configuration-toggle:hover > strong, .delta-v-configuration-toggle:focus-visible > strong { color: #c9dce7; }
@@ -162,7 +162,7 @@
 .delta-v-empty-stop span { color: var(--slate); font-size: 9px; letter-spacing: .08em; }
 .delta-v-empty-stop strong { color: var(--slate-muted-text); font-size: 9px; font-weight: 400; }
 .delta-v-add-stop-row { display: flex; min-height: 44px; margin-top: 16px; align-self: start; align-items: center; justify-self: end; gap: 6px; }
-.delta-v-add-stop-row button { min-height: 30px; padding: 5px 10px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 9px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-add-stop-row button { min-height: 30px; padding: 5px 10px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-add-stop-row button:hover, .delta-v-add-stop-row button:focus-visible { border-color: var(--cyan); background: #102633; }
 .delta-v-add-stop-row button.secondary { border-color: var(--rule-bright); color: var(--slate); background: #0c141e; }
 .delta-v-add-stop-row button:disabled { opacity: .4; cursor: not-allowed; }
@@ -178,7 +178,7 @@
 .delta-v-plan-library-list article strong { overflow: hidden; color: var(--text-primary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .delta-v-plan-library-list article span { overflow: hidden; color: var(--slate); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .delta-v-plan-library-actions { display: flex; gap: 4px; }
-.delta-v-plan-library-actions button { min-height: 27px; padding: 4px 7px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 8px var(--mono); }
+.delta-v-plan-library-actions button { min-height: 29px; padding: 4px 7px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); }
 .delta-v-plan-library-actions button.active { border-color: rgba(126,231,135,.45); color: var(--green); }
 .delta-v-plan-library-actions button.delete { border-color: #573b43; color: var(--error-text); background: #120b0f; }
 .delta-v-plan-library-actions button:disabled { opacity: .65; cursor: default; }
@@ -191,10 +191,10 @@
 .delta-v-summary > header > strong { padding: 5px 7px; border: 1px solid rgba(126,231,135,.35); color: var(--green); font-size: 9px; letter-spacing: .06em; }
 .delta-v-save-bar { display: grid; grid-area: budget-save; grid-template-columns: minmax(180px,1fr) auto auto; align-items: end; gap: 6px; }
 .delta-v-save-bar label { display: grid; gap: 3px; }
-.delta-v-save-bar label > span { color: var(--slate); font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.delta-v-save-bar input { width: 100%; min-height: 29px; padding: 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); }
+.delta-v-save-bar label > span { color: var(--slate); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.delta-v-save-bar input { width: 100%; min-height: 29px; padding: 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 10px var(--mono); }
 .delta-v-save-bar input:focus { border-color: var(--cyan); }
-.delta-v-save-bar button { min-height: 29px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 9px var(--mono); }
+.delta-v-save-bar button { min-height: 29px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); }
 .delta-v-save-actions { display: flex; min-width: 0; gap: 6px; }
 .delta-v-save-actions button { flex: 1 1 auto; }
 .delta-v-save-bar small { grid-column: 1 / -1; align-self: center; color: var(--green); font-size: 9px; }
@@ -214,14 +214,14 @@
 .delta-v-route-timing { display: grid; width: min(100%,620px); grid-template-columns: repeat(3,minmax(0,1fr)); justify-self: center; border-inline: 1px solid var(--rule); }
 .delta-v-route-timing > div { min-width: 0; padding: 2px 12px; border-right: 1px solid var(--rule); }
 .delta-v-route-timing > div:last-child { border-right: 0; }
-.delta-v-route-timing span { display: block; color: var(--slate); font-size: 8px; font-weight: 400; letter-spacing: .07em; text-transform: uppercase; }
+.delta-v-route-timing span { display: block; color: var(--slate); font-size: 10px; font-weight: 400; letter-spacing: .05em; text-transform: uppercase; }
 .delta-v-route-timing strong { display: block; overflow: hidden; margin-top: 3px; color: var(--text-primary); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .delta-v-route-window-actions { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 7px; }
-.delta-v-route-window-actions > span { color: var(--amber); font-size: 8px; letter-spacing: .04em; text-align: right; white-space: nowrap; }
-.delta-v-route-window-actions button { min-height: 29px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 9px var(--mono); letter-spacing: .04em; white-space: nowrap; }
+.delta-v-route-window-actions > span { color: var(--amber); font-size: 10px; letter-spacing: .03em; text-align: right; white-space: nowrap; }
+.delta-v-route-window-actions button { min-height: 29px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); letter-spacing: .04em; white-space: nowrap; }
 .delta-v-route-window-actions button:hover:not(:disabled), .delta-v-route-window-actions button:focus-visible { border-color: var(--cyan); background: #102633; }
 .delta-v-route-window-actions button:disabled { opacity: .4; cursor: not-allowed; }
-.delta-v-route-window-error { margin: 0; padding: 6px 13px; border-bottom: 1px solid rgba(201,104,91,.35); color: var(--error-text); background: rgba(201,104,91,.07); font-size: 9px; }
+.delta-v-route-window-error { margin: 0; padding: 6px 13px; border-bottom: 1px solid rgba(201,104,91,.35); color: var(--error-text); background: rgba(201,104,91,.07); font-size: 10px; }
 .delta-v-route-list { min-height: 0; flex: 1; overflow-x: hidden; overflow-y: auto; }
 .delta-v-leg { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 11px; min-height: 66px; padding: 9px 13px 9px 8px; border-bottom: 1px solid var(--rule); }
 .delta-v-leg:last-child { border-bottom: 0; }
@@ -239,14 +239,14 @@
 .delta-v-landing-options { align-items: end; }
 .delta-v-leg-options .delta-v-inline-reserve { display: grid; grid-template-columns: minmax(115px,auto) 125px; align-items: center; gap: 7px; cursor: default; }
 .delta-v-inline-reserve > span { color: var(--slate); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.delta-v-inline-reserve .resonant-input-unit input { width: 100%; min-height: 27px; padding: 4px 47px 4px 7px; border: 1px solid var(--rule-bright); color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); }
+.delta-v-inline-reserve .resonant-input-unit input { width: 100%; min-height: 27px; padding: 4px 47px 4px 7px; border: 1px solid var(--rule-bright); color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 10px var(--mono); }
 .delta-v-inline-reserve .resonant-input-unit > span { top: 7px; right: 29px; font-size: 9px; }
 .delta-v-leg:has(.delta-v-leg-options) { min-height: 72px; }
 .delta-v-leg.editing-stop { box-shadow: inset 2px 0 var(--amber); background: rgba(255,180,84,.035); }
 .delta-v-leg-side { display: grid; min-width: 90px; align-self: stretch; align-content: center; justify-items: end; gap: 5px; }
 .delta-v-leg-side > b { color: var(--cyan); font-size: 13px; text-align: right; white-space: nowrap; }
 .delta-v-route-stop-actions { display: flex; justify-content: flex-end; gap: 4px; }
-.delta-v-route-stop-actions button { min-height: 25px; padding: 2px 6px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 8px var(--mono); }
+.delta-v-route-stop-actions button { min-height: 27px; padding: 2px 6px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); }
 .delta-v-route-stop-actions button:last-child { width: 25px; min-width: 25px; padding: 0; border-color: #573b43; color: var(--error-text); background: #120b0f; font-size: 13px; }
 .delta-v-route-stop-actions button:hover, .delta-v-route-stop-actions button:focus-visible { border-color: currentColor; }
 .delta-v-leg-copy, .delta-v-leg-primary { min-width: 0; }
@@ -263,7 +263,7 @@
 .delta-v-leg-advisories > .delta-v-thermal-note { border: 1px solid rgba(255,180,84,.42); color: var(--amber); background: rgba(255,180,84,.07); }
 .delta-v-leg-advisories > .delta-v-thermal-note.not-detected { border-color: rgba(255,107,91,.48); color: #ff9b8f; background: rgba(255,107,91,.08); }
 .delta-v-leg-heading { display: flex; align-items: center; gap: 8px; }
-.delta-v-porkchop-button { min-height: 24px; flex: 0 0 auto; padding: 3px 6px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 9px var(--mono); letter-spacing: .06em; }
+.delta-v-porkchop-button { min-height: 26px; flex: 0 0 auto; padding: 3px 6px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); letter-spacing: .05em; }
 .delta-v-porkchop-button:hover, .delta-v-porkchop-button:focus-visible { border-color: var(--cyan); background: #102633; }
 .delta-v-leg-timeline { color: #9fcbd4 !important; }
 .delta-v-leg-timeline.conflict { color: var(--error-text) !important; }
@@ -282,17 +282,17 @@
 .delta-v-add-step button:hover, .delta-v-add-step button:focus-visible { border-color: var(--cyan); color: #d8f8ff; background: #153143; }
 
 .delta-v-stay-control { display: grid; width: 100%; max-width: 420px; grid-template-columns: minmax(150px,auto) auto; align-items: center; gap: 8px; padding: 5px 7px; border: 1px solid rgba(78,201,224,.35); background: rgba(78,201,224,.045); }
-.delta-v-stay-control > span { color: #b9cbd7; font-size: 9px; font-weight: 700; }
+.delta-v-stay-control > span { color: #b9cbd7; font-size: 10px; font-weight: 700; }
 .delta-v-stay-control > div { display: flex; align-items: center; gap: 4px; }
 .delta-v-stay-control button { display: grid; width: 27px; height: 27px; padding: 0; place-items: center; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 13px var(--mono); }
 .delta-v-stay-control button:disabled { opacity: .35; cursor: default; }
-.delta-v-stay-control label { display: flex; align-items: center; gap: 5px; color: var(--slate); font-size: 9px; }
-.delta-v-stay-control input { width: 54px; min-height: 27px; padding: 3px 5px; border: 1px solid #294657; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); text-align: right; }
+.delta-v-stay-control label { display: flex; align-items: center; gap: 5px; color: var(--slate); font-size: 10px; }
+.delta-v-stay-control input { width: 54px; min-height: 27px; padding: 3px 5px; border: 1px solid #294657; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 10px var(--mono); text-align: right; }
 .delta-v-calculated-stay { display: grid; width: 100%; max-width: 420px; min-height: 48px; align-content: center; gap: 3px; padding: 7px 10px; border: 1px solid rgba(255,180,84,.38); background: rgba(255,180,84,.045); }
-.delta-v-calculated-stay > span { color: var(--amber); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.delta-v-calculated-stay > span { color: var(--amber); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 .delta-v-calculated-stay > strong { color: #e3edf2; font-size: 13px; font-variant-numeric: tabular-nums; }
 .delta-v-calculated-stay > small { overflow: hidden; color: var(--slate); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-timeline-conflict { margin: 0; padding: 7px 13px; border-bottom: 1px solid rgba(201,104,91,.35); color: var(--error-text); background: rgba(201,104,91,.07); font-size: 9px; }
+.delta-v-timeline-conflict { margin: 0; padding: 7px 13px; border-bottom: 1px solid rgba(201,104,91,.35); color: var(--error-text); background: rgba(201,104,91,.07); font-size: 10px; }
 
 .porkchop-modal-backdrop { position: fixed; z-index: 1100; inset: 0; display: grid; padding: 28px; place-items: center; background: rgba(2,6,9,.84); }
 .porkchop-modal { display: flex; width: min(900px,calc(100vw - 56px)); max-height: calc(100vh - 56px); min-height: 0; flex-direction: column; overflow: auto; border: 1px solid var(--accent-border); background: #070d13; box-shadow: 0 20px 60px rgba(0,0,0,.52); }
@@ -305,7 +305,7 @@
 .porkchop-empty { display: grid; min-height: 300px; padding: 30px; place-content: center; justify-items: center; gap: 9px; text-align: center; }
 .porkchop-empty strong { color: var(--text-primary); font-size: 13px; }
 .porkchop-empty small { max-width: 460px; color: var(--slate); font-size: 9px; }
-.porkchop-empty button, .porkchop-modal > footer button { min-height: 31px; padding: 6px 11px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 9px var(--mono); }
+.porkchop-empty button, .porkchop-modal > footer button { min-height: 31px; padding: 6px 11px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); }
 .porkchop-plot-shell { display: grid; min-height: 280px; flex: 1 1 420px; grid-template-columns: 24px minmax(0,1fr); grid-template-rows: minmax(240px,1fr) 22px; padding: 14px 16px 0 10px; }
 .porkchop-y-label, .porkchop-x-label { display: grid; place-items: center; color: var(--slate); font: 9px var(--mono); letter-spacing: .1em; }
 .porkchop-y-label { writing-mode: vertical-rl; transform: rotate(180deg); }
@@ -317,7 +317,7 @@
 .porkchop-readouts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); border-block: 1px solid var(--rule); background: rgba(78,201,224,.025); }
 .porkchop-hover-readout, .porkchop-ideal-readout { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 7px 16px; color: var(--slate); font-size: 9px; }
 .porkchop-hover-readout { border-right: 1px solid var(--rule); }
-.porkchop-hover-readout > strong, .porkchop-ideal-readout > strong { width: 100%; color: var(--cyan); font-size: 8px; letter-spacing: .1em; }
+.porkchop-hover-readout > strong, .porkchop-ideal-readout > strong { width: 100%; color: var(--cyan); font-size: 10px; letter-spacing: .08em; }
 .porkchop-ideal-readout { background: rgba(255,180,84,.04); }
 .porkchop-ideal-readout > strong { color: var(--amber); }
 .porkchop-hover-readout b, .porkchop-ideal-readout b { margin-left: 3px; color: var(--text-primary); }
@@ -325,27 +325,27 @@
 .porkchop-filters > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 9px; border-bottom: 1px solid var(--rule); }
 .porkchop-filters > header > div { display: flex; align-items: center; gap: 8px; }
 .porkchop-filters > header > div:first-child { flex-wrap: wrap; }
-.porkchop-filters > header strong { color: var(--cyan); font-size: 8px; letter-spacing: .1em; }
-.porkchop-filters > header span { color: var(--slate); font-size: 8px; }
-.porkchop-filters > header button { padding: 2px 5px; border: 0; color: var(--slate); background: transparent; cursor: pointer; font: 8px var(--mono); }
+.porkchop-filters > header strong { color: var(--cyan); font-size: 10px; letter-spacing: .08em; }
+.porkchop-filters > header span { color: var(--slate); font-size: 9px; }
+.porkchop-filters > header button { padding: 2px 5px; border: 0; color: var(--slate); background: transparent; cursor: pointer; font: 10px var(--mono); }
 .porkchop-filters > header button:hover, .porkchop-filters > header button:focus-visible { color: var(--cyan); }
 .porkchop-filter-grid { display: grid; grid-template-columns: minmax(115px,.6fr) repeat(2,minmax(220px,1.7fr)); gap: 12px; padding: 7px 9px 8px; }
 .porkchop-filter-grid > label, .porkchop-range-filter { display: grid; min-width: 0; gap: 4px; }
-.porkchop-filter-grid span { color: var(--slate); font-size: 8px; letter-spacing: .07em; }
+.porkchop-filter-grid span { color: var(--slate); font-size: 9px; letter-spacing: .06em; }
 .porkchop-cost-filter > div { display: flex; align-items: center; gap: 5px; }
-.porkchop-cost-filter input { width: 82px; min-height: 27px; border: 1px solid #294657; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); text-align: right; }
-.porkchop-cost-filter b { color: var(--slate); font: 8px var(--mono); }
+.porkchop-cost-filter input { width: 82px; min-height: 27px; border: 1px solid #294657; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 10px var(--mono); text-align: right; }
+.porkchop-cost-filter b { color: var(--slate); font: 9px var(--mono); }
 .porkchop-range-filter { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .porkchop-range-filter > span { grid-column: 1 / -1; }
 .porkchop-range-filter label { display: grid; min-width: 0; gap: 2px; }
-.porkchop-range-filter label b { min-width: 0; overflow: hidden; color: #c7d6df; font: 8px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.porkchop-range-filter label b { min-width: 0; overflow: hidden; color: #c7d6df; font: 9px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
 .porkchop-range-filter input { width: 100%; min-height: 16px; accent-color: var(--cyan); cursor: pointer; }
 .porkchop-evaluation { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin: 10px 16px 0; border: 1px solid var(--rule); }
 .porkchop-evaluation > div { display: grid; gap: 4px; padding: 9px; border-right: 1px solid var(--rule); }
 .porkchop-evaluation > div:last-child { border-right: 0; }
-.porkchop-evaluation span { color: var(--slate); font-size: 9px; letter-spacing: .08em; }
+.porkchop-evaluation span { color: var(--slate); font-size: 10px; letter-spacing: .06em; }
 .porkchop-evaluation strong { color: var(--text-primary); font-size: 10px; }
-.porkchop-error { margin: 8px 16px 0; color: var(--error-text); font-size: 9px; }
+.porkchop-error { margin: 8px 16px 0; color: var(--error-text); font-size: 10px; }
 .porkchop-modal > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; }
 .porkchop-modal > footer button:last-child { border-color: var(--cyan); color: #071015; background: var(--cyan); }
 .porkchop-modal button:disabled { opacity: .42; cursor: not-allowed; }
@@ -370,13 +370,13 @@
 .delta-v-save-slot .delta-v-save-bar { align-items: center; }
 .delta-v-save-slot .delta-v-save-bar label { display: grid; min-width: 0; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 7px; }
 .delta-v-save-slot .delta-v-save-bar label > span { white-space: nowrap; }
-.resonant-drawer > header .delta-v-reset-button { min-height: 28px; padding: 6px 9px; border: 1px solid var(--amber-accent); color: var(--amber); background: rgba(255,180,84,.06); font: 9px var(--mono); letter-spacing: .08em; }
+.resonant-drawer > header .delta-v-reset-button { min-height: 28px; padding: 6px 9px; border: 1px solid var(--amber-accent); color: var(--amber); background: rgba(255,180,84,.06); font: 10px var(--mono); letter-spacing: .06em; }
 .resonant-drawer > header .delta-v-reset-button:hover:not(:disabled), .resonant-drawer > header .delta-v-reset-button:focus-visible { border-color: var(--amber); background: rgba(255,180,84,.13); }
 .resonant-drawer > header .delta-v-reset-button:disabled { opacity: .35; cursor: not-allowed; }
-.resonant-drawer > header .delta-v-saved-plans-button { display: flex; min-height: 28px; align-items: center; gap: 7px; padding: 4px 6px 4px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: rgba(78,201,224,.05); font: 9px var(--mono); letter-spacing: .06em; }
+.resonant-drawer > header .delta-v-saved-plans-button { display: flex; min-height: 28px; align-items: center; gap: 7px; padding: 4px 6px 4px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: rgba(78,201,224,.05); font: 10px var(--mono); letter-spacing: .05em; }
 .resonant-drawer > header .delta-v-saved-plans-button:hover, .resonant-drawer > header .delta-v-saved-plans-button:focus-visible { border-color: var(--cyan); background: rgba(78,201,224,.11); }
-.resonant-drawer > header .delta-v-saved-plans-button strong { display: grid; min-width: 19px; height: 18px; padding: 0 4px; place-items: center; border-left: 1px solid var(--accent-border); color: var(--text-primary); font-size: 9px; }
-.resonant-drawer > header .delta-v-assumptions-button { min-height: 28px; padding: 6px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: rgba(78,201,224,.05); font: 9px var(--mono); letter-spacing: .08em; }
+.resonant-drawer > header .delta-v-saved-plans-button strong { display: grid; min-width: 19px; height: 18px; padding: 0 4px; place-items: center; border-left: 1px solid var(--accent-border); color: var(--text-primary); font-size: 10px; }
+.resonant-drawer > header .delta-v-assumptions-button { min-height: 28px; padding: 6px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: rgba(78,201,224,.05); font: 10px var(--mono); letter-spacing: .06em; }
 .resonant-drawer > header .delta-v-assumptions-button:hover { border-color: var(--cyan); background: rgba(78,201,224,.11); }
 @media (min-width: 761px) {
   .resonant-drawer.delta-v-drawer > header {
@@ -487,7 +487,7 @@
 .delta-v-reset-modal { width: min(520px,92%); }
 .delta-v-reset-modal > p { margin: 0; padding: 18px 16px; color: #a9bfca; font-size: 10px; line-height: 1.55; }
 .delta-v-reset-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--rule); background: #080e15; }
-.delta-v-reset-actions button { min-height: 32px; padding: 7px 11px; border: 1px solid var(--accent-border); color: var(--cyan); background: rgba(78,201,224,.05); cursor: pointer; font: 9px var(--mono); letter-spacing: .06em; }
+.delta-v-reset-actions button { min-height: 32px; padding: 7px 11px; border: 1px solid var(--accent-border); color: var(--cyan); background: rgba(78,201,224,.05); cursor: pointer; font: 10px var(--mono); letter-spacing: .05em; }
 .delta-v-reset-actions button:hover, .delta-v-reset-actions button:focus-visible { border-color: var(--cyan); background: rgba(78,201,224,.11); }
 .delta-v-reset-actions button:last-child { border-color: var(--amber-accent); color: var(--amber); background: rgba(255,180,84,.08); }
 .delta-v-reset-actions button:last-child:hover, .delta-v-reset-actions button:last-child:focus-visible { border-color: var(--amber); background: rgba(255,180,84,.16); }
@@ -495,25 +495,25 @@
 .delta-v-plan-library-header-actions { display: flex; flex: 0 0 auto; flex-direction: row-reverse; align-items: center; gap: 8px; }
 .delta-v-plan-library-header-actions label { position: relative; display: inline-flex; cursor: pointer; }
 .delta-v-plan-library-header-actions label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.delta-v-plan-library-header-actions label span { display: inline-flex; min-height: 24px; align-items: center; padding: 3px 7px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); font-size: 8px; letter-spacing: .07em; }
+.delta-v-plan-library-header-actions label span { display: inline-flex; min-height: 26px; align-items: center; padding: 3px 7px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); font-size: 10px; letter-spacing: .05em; }
 .delta-v-plan-library-header-actions label input:checked + span { border-color: rgba(126,231,135,.48); color: var(--green); background: rgba(126,231,135,.07); }
 .delta-v-plan-library-header-actions label:focus-within span { outline: 1px solid var(--cyan); outline-offset: 2px; }
 .delta-v-plan-library-modal > p { margin: 0; padding: 10px 16px; border-bottom: 1px solid var(--rule); color: var(--slate); font-size: 9px; }
 .delta-v-plan-library-modal > .delta-v-plan-library-empty { display: grid; justify-items: center; gap: 10px; margin: 16px; padding: 28px 16px; text-align: center; }
-.delta-v-plan-library-empty button { min-height: 30px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 8px var(--mono); }
+.delta-v-plan-library-empty button { min-height: 30px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); }
 .delta-v-plan-library-modal > .delta-v-plan-library-list { min-height: 0; margin: 0; padding: 10px 12px 12px; overflow: auto; }
 .delta-v-plan-library-group { display: grid; gap: 4px; }
 .delta-v-plan-library-group + .delta-v-plan-library-group { margin-top: 8px; }
 .delta-v-plan-library-group-heading { display: flex; align-items: stretch; border-block: 1px solid var(--rule); background: rgba(255,180,84,.045); }
-.delta-v-plan-library-group-heading h4 { min-width: 0; margin: 0; padding: 5px 7px; color: var(--amber); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
-.delta-v-plan-library-group-heading button { margin-left: auto; padding: 4px 8px; border: 0; border-left: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 8px var(--mono); }
+.delta-v-plan-library-group-heading h4 { min-width: 0; margin: 0; padding: 5px 7px; color: var(--amber); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
+.delta-v-plan-library-group-heading button { margin-left: auto; padding: 4px 8px; border: 0; border-left: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 10px var(--mono); }
 .resonant-drawer > footer.delta-v-footer { color: var(--slate); }
 .resonant-drawer > footer.delta-v-footer strong { color: var(--cyan); font-size: 9px; letter-spacing: .08em; }
 
 .panel-restore-rail .panel-rail-button-flightOrbitPlan { margin-top: 4px; border-color: var(--amber-accent); color: var(--amber); background: #211a12; }
 .panel-restore-rail .panel-rail-button-flightDeltaVPlan, .panel-restore-rail .panel-rail-button-editorDeltaVPlan { margin-top: 4px; border-color: var(--accent-border); color: var(--cyan); background: #101c27; }
-.resonant-unpin { padding: 3px 6px; border: 1px solid var(--surface-amber-face-edge); border-radius: var(--surface-radius-face); color: var(--surface-amber-face-text); background: var(--surface-amber-face); box-shadow: var(--surface-depth-control); cursor: pointer; font-size: 9px; text-transform: uppercase; }
-.resonant-edit-plan { padding: 3px 7px; border: 1px solid var(--surface-cyan-face-edge); border-radius: var(--surface-radius-face); color: var(--cyan); background: var(--surface-cyan-face); box-shadow: var(--surface-depth-control); cursor: pointer; font-size: 9px; text-transform: uppercase; }
+.resonant-unpin { padding: 3px 6px; border: 1px solid var(--surface-amber-face-edge); border-radius: var(--surface-radius-face); color: var(--surface-amber-face-text); background: var(--surface-amber-face); box-shadow: var(--surface-depth-control); cursor: pointer; font-size: 10px; text-transform: uppercase; }
+.resonant-edit-plan { padding: 3px 7px; border: 1px solid var(--surface-cyan-face-edge); border-radius: var(--surface-radius-face); color: var(--cyan); background: var(--surface-cyan-face); box-shadow: var(--surface-depth-control); cursor: pointer; font-size: 10px; text-transform: uppercase; }
 .resonant-editor-plan { display: grid; grid-template-columns: minmax(174px,.85fr) minmax(0,1.55fr); gap: 7px; }
 .resonant-editor-constellation, .resonant-editor-plan-details { min-width: 0; border: 1px solid var(--rule); background: #090f17; }
 .resonant-editor-constellation { position: relative; min-height: 164px; padding: 4px; }
@@ -539,7 +539,7 @@
 .resonant-editor-plan-metrics span { margin-bottom: 5px; color: var(--slate); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
 .resonant-editor-plan-metrics strong { color: var(--cyan); font-size: 11px; }
 .resonant-editor-plan-metrics.carrier > div:last-child strong, .resonant-editor-plan-metrics.execution > div:first-child strong { color: var(--amber); }
-.resonant-editor-plan-status { display: flex; min-height: 27px; margin-top: auto; padding: 6px 8px; align-items: center; gap: 7px; border-top: 1px solid var(--rule); color: var(--slate); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.resonant-editor-plan-status { display: flex; min-height: 27px; margin-top: auto; padding: 6px 8px; align-items: center; gap: 7px; border-top: 1px solid var(--rule); color: var(--slate); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
 .resonant-editor-plan-status i { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px rgba(126,231,135,.35); }
 .resonant-editor-plan-status.warning { color: var(--amber); }
 .resonant-editor-plan-status.warning i { background: var(--amber); box-shadow: 0 0 6px rgba(255,180,84,.35); }
@@ -548,15 +548,15 @@
 .resonant-flight-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .resonant-flight-summary > div { min-width: 0; padding: 8px; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .resonant-flight-summary span { display: block; margin-bottom: 5px; color: var(--slate); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
-.resonant-flight-summary strong { display: block; color: var(--cyan); font-size: 9px; overflow-wrap: anywhere; }
+.resonant-flight-summary strong { display: block; color: var(--cyan); font-size: 10px; overflow-wrap: anywhere; }
 .resonant-orbit-target-heading { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resonant-orbit-target-state { min-width: 0; margin-top: 4px; }
-.resonant-orbit-target-status { display: block; box-sizing: border-box; width: 78px; min-width: 0; padding: 2px 8px; border: 1px solid var(--rule-bright); color: var(--slate); background: #0c141e; font-size: 8px; font-weight: 700; letter-spacing: .05em; line-height: 1.2; text-align: center; white-space: nowrap; }
+.resonant-orbit-target-status { display: block; box-sizing: border-box; width: 84px; min-width: 0; padding: 2px 7px; border: 1px solid var(--rule-bright); color: var(--slate); background: #0c141e; font-size: 9px; font-weight: 700; letter-spacing: .04em; line-height: 1.2; text-align: center; white-space: nowrap; }
 .resonant-orbit-target-status.low, .resonant-orbit-target-status.high { border-color: rgba(255,107,91,.55); color: #ff9b90; background: rgba(255,107,91,.1); }
 .resonant-orbit-target-status.in-range { border-color: rgba(126,231,135,.5); color: var(--green); background: rgba(126,231,135,.09); }
 .resonant-flight-guidance { display: grid; grid-template-columns: 30px 1fr; gap: 8px; margin-top: 8px; padding: 9px; border-left: 2px solid var(--amber); background: linear-gradient(100deg,rgba(255,180,84,.09),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
 .resonant-flight-guidance > span { color: var(--amber); font-size: 16px; }
-.resonant-flight-guidance strong { color: var(--text-primary); font-size: 9px; text-transform: uppercase; }
+.resonant-flight-guidance strong { color: var(--text-primary); font-size: 10px; text-transform: uppercase; }
 .resonant-flight-guidance p { margin: 4px 0 0; color: var(--slate); font-size: 9px; line-height: 1.45; }
 .resonant-editor-guidance { grid-template-columns: max-content minmax(0,1fr); gap: 10px; }
 .resonant-editor-guidance > span { padding-top: 1px; font-size: 12px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
@@ -568,7 +568,7 @@
 .resonant-progress { height: 5px; margin-top: 7px; overflow: hidden; border-radius: var(--surface-radius-hw); background: var(--surface-track); box-shadow: var(--surface-depth-deep); }
 .resonant-progress span { display: block; height: 100%; background: var(--surface-progress-fill); box-shadow: var(--surface-glow-progress); transition: width .18s ease; }
 .resonant-deployment-actions { display: flex; gap: 5px; margin-top: 7px; }
-.resonant-deployment-actions button { min-height: 28px; padding: 5px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate); background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font-size: 9px; }
+.resonant-deployment-actions button { min-height: 28px; padding: 5px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate); background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font-size: 10px; }
 .resonant-deployment-actions button:first-child { width: 30px; }
 .resonant-deployment-actions button:last-child { flex: 1; }
 .resonant-deployment-actions button:disabled { opacity: .45; cursor: not-allowed; }
@@ -578,9 +578,9 @@
 .delta-v-pinned-identity.editor { min-height: 29px; margin-bottom: 7px; padding: 6px 8px; border: 1px solid var(--rule); background: #090f17; }
 .delta-v-pinned-identity.editor strong { color: var(--amber); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-identity.editor span { flex: 0 0 auto; color: var(--green); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-.delta-v-pinned-scope { margin: -2px 0 7px; color: var(--cyan); font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
+.delta-v-pinned-scope { margin: -2px 0 7px; color: var(--cyan); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
 .delta-v-pinned-scope.legacy { color: var(--amber); }
-.delta-v-pinned-scope-warning { margin: 0 0 7px; padding: 6px 8px; border: 1px solid rgba(255,180,84,.45); color: #f0c987; background: rgba(255,180,84,.06); font-size: 8px; line-height: 1.35; }
+.delta-v-pinned-scope-warning { margin: 0 0 7px; padding: 6px 8px; border: 1px solid rgba(255,180,84,.45); color: #f0c987; background: rgba(255,180,84,.06); font-size: 10px; line-height: 1.4; }
 .delta-v-pinned-overview { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(138px,.9fr); gap: 7px; }
 .delta-v-pinned-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; }
 .delta-v-pinned-facts > div { min-width: 0; padding: 6px 7px; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
@@ -602,7 +602,7 @@
 .delta-v-editor-coverage > header strong { color: var(--cyan); font-size: 9px; letter-spacing: .06em; }
 .delta-v-editor-coverage > div { display: flex; min-width: 0; padding: 8px; align-items: baseline; justify-content: space-between; gap: 8px; }
 .delta-v-editor-coverage > div strong { overflow: hidden; color: var(--cyan); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-editor-coverage > div span { flex: 0 0 auto; color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+.delta-v-editor-coverage > div span { flex: 0 0 auto; color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-editor-coverage > footer { min-height: 26px; margin-top: auto; padding: 6px 8px; border-top: 1px solid var(--rule); color: var(--cyan); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-editor-coverage.surplus { border-color: rgba(126,231,135,.38); background: linear-gradient(100deg,rgba(126,231,135,.09),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
 .delta-v-editor-coverage.surplus > header strong, .delta-v-editor-coverage.surplus > footer { color: var(--green); }
@@ -613,11 +613,11 @@
 .delta-v-editor-coverage.unavailable { border-color: rgba(255,180,84,.38); }
 .delta-v-editor-coverage.unavailable > header strong, .delta-v-editor-coverage.unavailable > footer { color: var(--amber); }
 .delta-v-pinned-progress { display: flex; min-width: 0; margin-top: 7px; padding: 6px 8px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
-.delta-v-pinned-progress > span { color: var(--slate); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
-.delta-v-pinned-progress strong { color: var(--text-primary); font-size: 9px; white-space: nowrap; }
-.delta-v-pinned-progress button { min-width: 58px; padding: 5px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate); background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 8px var(--mono); text-transform: uppercase; }
+.delta-v-pinned-progress > span { color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-pinned-progress strong { color: var(--text-primary); font-size: 10px; white-space: nowrap; }
+.delta-v-pinned-progress button { min-width: 58px; padding: 5px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate); background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 10px var(--mono); text-transform: uppercase; }
 .delta-v-pinned-comparison { display: flex; min-width: 0; flex-direction: column; padding: 7px 8px; border: 1px solid var(--rule-bright); background: linear-gradient(100deg,rgba(78,201,224,.08),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
-.delta-v-pinned-comparison header { display: flex; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 8px; letter-spacing: .07em; }
+.delta-v-pinned-comparison header { display: flex; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 9px; letter-spacing: .06em; }
 .delta-v-pinned-comparison header strong { color: var(--cyan); }
 .delta-v-pinned-comparison p { margin: 7px 0; color: #b9cad5; font-size: 12px; line-height: 1.35; }
 .delta-v-pinned-comparison p span { display: block; margin-top: 4px; color: var(--slate); }
@@ -633,14 +633,14 @@
 .delta-v-pinned-window strong { color: var(--text-primary); font-size: 10px; }
 .delta-v-pinned-window small { display: block; margin-top: 4px; color: var(--slate); font-size: 9px; }
 .delta-v-launch-target { margin-top: 7px; padding: 8px; border: 1px solid rgba(78,201,224,.34); border-left: 2px solid var(--cyan); background: linear-gradient(100deg,rgba(78,201,224,.085),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
-.delta-v-launch-target > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 8px; letter-spacing: .07em; }
-.delta-v-launch-target > header strong { color: var(--cyan); font-size: 8px; }
+.delta-v-launch-target > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 9px; letter-spacing: .06em; }
+.delta-v-launch-target > header strong { color: var(--cyan); font-size: 9px; }
 .delta-v-launch-target-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin-top: 7px; }
 .delta-v-launch-target-grid > div { min-width: 0; padding: 6px 7px; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .delta-v-launch-target-grid span, .delta-v-launch-target-grid b, .delta-v-launch-target-grid small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-launch-target-grid span { margin-bottom: 3px; color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
-.delta-v-launch-target-grid b { color: var(--text-primary); font-size: 9px; }
-.delta-v-launch-target-grid small { margin-top: 3px; color: var(--slate); font-size: 8px; }
+.delta-v-launch-target-grid span { margin-bottom: 3px; color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-launch-target-grid b { color: var(--text-primary); font-size: 10px; }
+.delta-v-launch-target-grid small { margin-top: 3px; color: var(--slate); font-size: 9px; }
 .delta-v-progress-suggestion { display: flex; margin-top: 7px; padding: 9px; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid rgba(255,180,84,.48); border-left: 3px solid var(--amber); background: linear-gradient(100deg,rgba(255,180,84,.11),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
 .delta-v-progress-suggestion > div { min-width: 0; }
 .delta-v-progress-suggestion strong, .delta-v-progress-suggestion span { display: block; }
@@ -648,8 +648,8 @@
 .delta-v-progress-suggestion span { margin-top: 3px; color: #c5ced9; font-size: 12px; line-height: 1.4; }
 .delta-v-progress-suggestion button { min-height: 44px; padding: 8px 12px; flex: 0 0 auto; border: 1px solid var(--surface-amber-face-edge); border-radius: var(--surface-radius-face); color: var(--surface-amber-face-text); background: var(--surface-amber-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 12px var(--mono); text-transform: uppercase; }
 .delta-v-transfer-readiness { margin-top: 7px; padding: 8px; border: 1px solid var(--rule-bright); border-left: 2px solid var(--cyan); background: linear-gradient(100deg,rgba(78,201,224,.085),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
-.delta-v-transfer-readiness > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 8px; letter-spacing: .07em; }
-.delta-v-transfer-readiness > header strong { color: var(--cyan); font-size: 8px; }
+.delta-v-transfer-readiness > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--slate); font-size: 9px; letter-spacing: .06em; }
+.delta-v-transfer-readiness > header strong { color: var(--cyan); font-size: 10px; }
 .delta-v-readiness-toggle { display: inline-flex; min-width: 0; padding: 2px 0 2px 5px; align-items: center; gap: 4px; border: 0; color: var(--slate); background: transparent; cursor: pointer; font: inherit; letter-spacing: inherit; }
 .delta-v-readiness-toggle > span { width: 8px; color: currentColor; text-align: center; }
 .delta-v-readiness-toggle:hover { color: var(--cyan); }
@@ -664,33 +664,33 @@
 .delta-v-transfer-readiness.executed > header strong { color: var(--amber); }
 .delta-v-readiness-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; margin-top: 7px; }
 .delta-v-readiness-grid > div { min-width: 0; padding: 6px 7px; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
-.delta-v-readiness-grid span, .delta-v-maneuver-preview span { display: block; margin-bottom: 3px; color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
-.delta-v-readiness-grid b { display: block; overflow: hidden; color: var(--text-primary); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-readiness-body > p { margin: 6px 0 0; color: var(--slate); font-size: 8px; line-height: 1.35; }
+.delta-v-readiness-grid span, .delta-v-maneuver-preview span { display: block; margin-bottom: 3px; color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-readiness-grid b { display: block; overflow: hidden; color: var(--text-primary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.delta-v-readiness-body > p { margin: 6px 0 0; color: var(--slate); font-size: 10px; line-height: 1.4; }
 .delta-v-maneuver-preview { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; margin-top: 7px; }
 .delta-v-maneuver-preview > div { padding: 7px; border: 1px solid rgba(78,201,224,.28); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .delta-v-maneuver-preview strong, .delta-v-maneuver-preview small { display: block; }
-.delta-v-maneuver-preview strong { color: var(--cyan); font-size: 9px; }
-.delta-v-maneuver-preview small { margin-top: 3px; color: var(--slate); font-size: 8px; }
+.delta-v-maneuver-preview strong { color: var(--cyan); font-size: 10px; }
+.delta-v-maneuver-preview small { margin-top: 3px; color: var(--slate); font-size: 9px; }
 .delta-v-readiness-issues { display: grid; gap: 3px; margin: 7px 0 0; padding: 0; list-style: none; }
-.delta-v-readiness-issues li { padding-left: 11px; color: #b9cad5; font-size: 8px; line-height: 1.35; }
+.delta-v-readiness-issues li { padding-left: 11px; color: #b9cad5; font-size: 10px; line-height: 1.4; }
 .delta-v-readiness-issues li::before { margin-left: -11px; margin-right: 5px; color: var(--amber); content: "\25b8"; }
 .delta-v-readiness-issues.blockers li::before { color: #ff9b8f; }
 .delta-v-maneuver-error { color: #ff9b8f !important; }
 .delta-v-maneuver-actions { display: flex; min-height: 28px; margin-top: 7px; }
-.delta-v-maneuver-actions button { flex: 1; min-height: 28px; padding: 5px 8px; border: 1px solid var(--accent-border); color: var(--cyan); background: #0a131d; cursor: pointer; font: 8px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-maneuver-actions button { flex: 1; min-height: 30px; padding: 5px 8px; border: 1px solid var(--accent-border); color: var(--cyan); background: #0a131d; cursor: pointer; font: 10px var(--mono); letter-spacing: .03em; text-transform: uppercase; }
 .delta-v-maneuver-actions button:hover:not(:disabled), .delta-v-maneuver-actions button:focus-visible { border-color: var(--cyan); background: rgba(78,201,224,.08); }
 .delta-v-maneuver-actions button:disabled { opacity: .42; cursor: not-allowed; }
-.delta-v-maneuver-actions > span { padding: 6px 0; color: var(--green); font-size: 8px; line-height: 1.35; }
+.delta-v-maneuver-actions > span { padding: 6px 0; color: var(--green); font-size: 10px; line-height: 1.4; }
 .delta-v-pinned-route-toggle { display: flex; min-height: 30px; margin-top: 7px; padding: 4px 5px 4px 8px; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--rule); background: rgba(9,15,23,.65); }
-.delta-v-pinned-route-toggle > span { color: var(--slate); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
-.delta-v-pinned-route-toggle > button { min-height: 26px; padding: 4px 8px; border: 1px solid var(--surface-cyan-face-edge); border-radius: var(--surface-radius-face); color: var(--cyan); background: var(--surface-cyan-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 8px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-pinned-route-toggle > span { color: var(--slate); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-pinned-route-toggle > button { min-height: 28px; padding: 4px 8px; border: 1px solid var(--surface-cyan-face-edge); border-radius: var(--surface-radius-face); color: var(--cyan); background: var(--surface-cyan-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 10px var(--mono); letter-spacing: .03em; text-transform: uppercase; }
 .delta-v-pinned-route-toggle > button:hover, .delta-v-pinned-route-toggle > button:focus-visible { border-color: var(--cyan); background: rgba(78,201,224,.08); }
 .delta-v-editor-route-heading { display: flex; min-height: 26px; margin-top: 7px; padding: 5px 7px; align-items: center; gap: 8px; border: 1px solid var(--rule); background: rgba(9,15,23,.65); }
-.delta-v-editor-route-heading > span { min-width: 0; overflow: hidden; color: var(--slate); font-size: 9px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.delta-v-editor-route-heading > span { min-width: 0; overflow: hidden; color: var(--slate); font-size: 10px; letter-spacing: .05em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .delta-v-editor-route-heading > span b { color: var(--text-primary); font-weight: 600; }
 .delta-v-editor-route-heading > strong { margin-left: auto; color: var(--cyan); font-size: 11px; white-space: nowrap; }
-.delta-v-editor-route-heading > button { min-height: 22px; padding: 2px 6px; border: 1px solid var(--accent-border); color: var(--cyan); background: #0a131d; cursor: pointer; font: 8px var(--mono); text-transform: uppercase; }
+.delta-v-editor-route-heading > button { min-height: 24px; padding: 2px 6px; border: 1px solid var(--accent-border); color: var(--cyan); background: #0a131d; cursor: pointer; font: 10px var(--mono); text-transform: uppercase; }
 .delta-v-pinned-route { display: grid; gap: 3px; margin-top: 7px; }
 .delta-v-pinned-route > div { display: grid; min-width: 0; gap: 6px; padding: 5px 6px; align-items: center; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: linear-gradient(180deg,#101823 0%,#0b1118 100%); box-shadow: var(--surface-depth-control); }
 .delta-v-pinned-route.flight > div { grid-template-columns: 28px 21px minmax(0,1fr) auto; }
@@ -703,28 +703,28 @@
 .delta-v-pinned-route.editor > div:not(:last-child) .delta-v-pinned-step-number::after { position: absolute; top: 18px; left: 8px; z-index: -1; width: 1px; height: 13px; background: var(--accent-border); content: ""; }
 .delta-v-pinned-route.editor .delta-v-pinned-step-copy > strong { font-size: 11px; }
 .delta-v-pinned-route.editor > div > b { font-size: 11px; }
-.delta-v-pinned-route.editor > div > b.assisted { padding: 2px 5px; border: 1px solid rgba(255,180,84,.42); color: var(--amber); background: rgba(255,180,84,.06); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
-.delta-v-editor-route-omitted { display: flex; min-height: 29px; padding: 5px 8px 5px 33px; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: rgba(78,201,224,.035); cursor: pointer; font: 8px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+.delta-v-pinned-route.editor > div > b.assisted { padding: 2px 5px; border: 1px solid rgba(255,180,84,.42); color: var(--amber); background: rgba(255,180,84,.06); font-size: 9px; letter-spacing: .03em; text-transform: uppercase; }
+.delta-v-editor-route-omitted { display: flex; min-height: 29px; padding: 5px 8px 5px 33px; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: rgba(78,201,224,.035); cursor: pointer; font: 10px var(--mono); letter-spacing: .03em; text-transform: uppercase; }
 .delta-v-editor-route-omitted span { color: var(--cyan); }
 .delta-v-pinned-check { display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid var(--accent-border); border-radius: var(--surface-radius-face); color: transparent; background: var(--surface-track); box-shadow: var(--surface-depth-deep), 0 1px 0 rgba(255,255,255,.035); cursor: pointer; }
 .delta-v-pinned-check:hover, .delta-v-pinned-check:focus-visible { border-color: var(--green); color: var(--green); background: rgba(126,231,135,.07); }
 .delta-v-pinned-check span { color: inherit !important; font-size: 11px !important; }
 .delta-v-pinned-step-number { color: var(--slate); font-size: 8px; }
 .delta-v-pinned-step-copy { min-width: 0; }
-.delta-v-pinned-step-copy > strong { display: block; overflow: hidden; color: var(--text-primary); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-pinned-step-copy > small { display: flex; min-width: 0; gap: 6px; margin-top: 3px; color: var(--slate); font-size: 8px; }
+.delta-v-pinned-step-copy > strong { display: block; overflow: hidden; color: var(--text-primary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.delta-v-pinned-step-copy > small { display: flex; min-width: 0; gap: 6px; margin-top: 3px; color: var(--slate); font-size: 9px; }
 .delta-v-pinned-step-copy > small span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-pinned-step-copy > small b { flex: 0 0 auto; color: var(--amber); font-size: 8px; }
-.delta-v-pinned-route > div > b { color: var(--cyan); font-size: 9px; white-space: nowrap; }
+.delta-v-pinned-step-copy > small b { flex: 0 0 auto; color: var(--amber); font-size: 9px; }
+.delta-v-pinned-route > div > b { color: var(--cyan); font-size: 10px; white-space: nowrap; }
 .delta-v-pinned-route > .delta-v-pinned-complete { display: flex; padding: 12px; align-items: center; justify-content: space-between; border-color: rgba(126,231,135,.35); background: linear-gradient(100deg,rgba(126,231,135,.09),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
-.delta-v-pinned-complete strong { color: var(--green); font-size: 9px; text-transform: uppercase; }
-.delta-v-pinned-complete span { color: var(--slate); font-size: 8px; }
+.delta-v-pinned-complete strong { color: var(--green); font-size: 10px; text-transform: uppercase; }
+.delta-v-pinned-complete span { color: var(--slate); font-size: 9px; }
 .delta-v-pinned-completed { margin-top: 6px; border: 1px solid var(--rule); background: rgba(9,15,23,.55); }
-.delta-v-pinned-completed summary { padding: 6px 8px; color: var(--slate); cursor: pointer; font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+.delta-v-pinned-completed summary { padding: 6px 8px; color: var(--slate); cursor: pointer; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
 .delta-v-pinned-completed > div { display: grid; gap: 3px; padding: 0 5px 5px; }
-.delta-v-pinned-completed button { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: #b9cad5; background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 8px var(--mono); text-align: left; }
+.delta-v-pinned-completed button { display: flex; min-height: 30px; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: #b9cad5; background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 10px var(--mono); text-align: left; }
 .delta-v-pinned-completed button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delta-v-pinned-completed button b { flex: 0 0 auto; color: var(--cyan); font-size: 8px; text-transform: uppercase; }
+.delta-v-pinned-completed button b { flex: 0 0 auto; color: var(--cyan); font-size: 10px; text-transform: uppercase; }
 .delta-v-pinned-thermal { margin-top: 7px; padding: 7px 8px; border: 1px solid rgba(255,180,84,.42); color: var(--amber); background: linear-gradient(100deg,rgba(255,180,84,.1),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); font-size: 9px; line-height: 1.35; }
 .delta-v-pinned-thermal.not-detected { border-color: rgba(255,107,91,.48); color: #ff9b8f; background: linear-gradient(100deg,rgba(255,107,91,.11),rgba(15,21,31,.78)); }
 .delta-v-pinned-thermal.detected { border-color: rgba(126,231,135,.35); color: var(--green); background: linear-gradient(100deg,rgba(126,231,135,.09),rgba(15,21,31,.78)); }
@@ -1318,7 +1318,7 @@
 /* Editor planning companions use the same compact rail contract as the rest of
    the dense Editor workspace while retaining larger coarse-pointer targets. */
 .editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 { min-height: 28px; padding: 3px 8px; gap: 8px; font-size: 10px; }
-.editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 :is(.resonant-edit-plan,.resonant-unpin) { height: 22px; min-height: 22px; padding: 2px 6px; font-size: 8px; }
+.editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 :is(.resonant-edit-plan,.resonant-unpin) { height: 22px; min-height: 22px; padding: 2px 6px; font-size: 10px; }
 
 @media (pointer: coarse) {
   .editor-mode :is(#editorOrbitPlan,#editorDeltaVPlan) > h2 { min-height: 44px; padding-block: 4px; }
@@ -1390,8 +1390,8 @@
   .resonant-editor-satellite-count strong { font-size: 19px; }
   .resonant-editor-satellite-count span { font-size: 8px; }
   .resonant-editor-plan-details > header, .resonant-editor-plan-metrics > div { padding-inline: 6px; }
-  .resonant-editor-plan-metrics span { font-size: 8px; letter-spacing: .02em; }
-  .resonant-editor-plan-metrics strong { font-size: 9px; }
+  .resonant-editor-plan-metrics span { font-size: 9px; letter-spacing: .02em; }
+  .resonant-editor-plan-metrics strong { font-size: 10px; }
 }
 
 @media (orientation: landscape) and (max-height: 700px) {

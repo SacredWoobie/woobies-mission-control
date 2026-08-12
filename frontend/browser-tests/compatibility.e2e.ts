@@ -1,4 +1,29 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+
+async function expectVisibleFontFloor(
+  locator: Locator,
+  minimum: number,
+  label: string,
+) {
+  const result = await locator.evaluateAll((elements, floor) => {
+    const visible = elements.filter((element) => {
+      const style = getComputedStyle(element);
+      return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+    });
+    return {
+      checked: visible.length,
+      violations: visible
+        .map((element) => ({
+          fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+          text: element.textContent?.trim().replace(/\s+/g, " ").slice(0, 80) ?? "",
+        }))
+        .filter((entry) => entry.fontSize < floor),
+    };
+  }, minimum);
+
+  expect(result.checked, `${label} should render at least one element`).toBeGreaterThan(0);
+  expect(result.violations, `${label} should render at ${minimum}px or larger`).toEqual([]);
+}
 
 test("developer controls stay out of screenshots until the corner is engaged", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -55,6 +80,88 @@ test("planner drawers do not force horizontal overflow near the landscape breakp
 test("native controls opt into the dark system color scheme", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
+});
+
+test("operational typography keeps its semantic floor across scenes", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  await expectVisibleFontFloor(page.locator([
+    ".annunciator-indicator",
+    ".flight-stage-group button",
+    ".target-clear-button",
+    ".heat-loop-control",
+    ".sci-research-toggle",
+    ".sci-transmit-science",
+    ".sci-alarm-controls button",
+  ].join(",")), 10, "Flight operational controls");
+  await expectVisibleFontFloor(page.locator([
+    ".flight-stage-total > span",
+    ".flight-stage-conditions > span",
+    ".flight-workspace-label",
+    ".attitude-strip .label",
+    ".ec-label",
+    ".sci-label",
+  ].join(",")), 9, "Flight compact operational labels");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectVisibleFontFloor(page.locator(".meter .cap"), 9, "compact consumable values");
+  await expectVisibleFontFloor(
+    page.locator(".heat-temperature-value, .heat-net-flux, .heat-ratio-value"),
+    9,
+    "compact heat values",
+  );
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+  await expectVisibleFontFloor(page.locator([
+    ".editor-sim-title",
+    ".editor-sim-control",
+    ".editor-altitude-presets button",
+    ".editor-recalculate",
+    ".editor-sim-feedback .editor-state",
+  ].join(",")), 10, "Editor simulation controls");
+
+  await page.setViewportSize({ width: 800, height: 1280 });
+  const editorPortraitOverflow = await page.locator(".editor-workspace").evaluate((element) => ({
+    documentClientWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    workspaceClientWidth: element.clientWidth,
+    workspaceScrollWidth: element.scrollWidth,
+  }));
+  expect(editorPortraitOverflow.documentScrollWidth).toBeLessThanOrEqual(editorPortraitOverflow.documentClientWidth);
+  expect(editorPortraitOverflow.workspaceScrollWidth).toBeLessThanOrEqual(editorPortraitOverflow.workspaceClientWidth + 1);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const planner = page.getByRole("dialog", { name: "Delta-v planner" });
+  await expectVisibleFontFloor(planner.locator([
+    ".delta-v-configuration-toggle b",
+    ".delta-v-configuration-toggle > strong",
+    ".delta-v-add-stop-row button",
+    ".delta-v-route-timing span",
+    ".delta-v-route-window-actions button",
+    ":scope > header .delta-v-reset-button",
+    ":scope > header .delta-v-saved-plans-button",
+    ":scope > header .delta-v-assumptions-button",
+  ].join(",")), 10, "planner controls and operational timing");
+  await planner.getByRole("button", { name: "Close delta-v planner" }).click();
+
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "inactive", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+  await expectVisibleFontFloor(page.locator([
+    ".overview-vessel-actions button",
+    ".overview-source",
+    ".overview-alarm-type",
+    ".transfer-window-status",
+  ].join(",")), 10, "Mission Control actions and statuses");
+  await expectVisibleFontFloor(page.locator([
+    ".overview-roster-summary-chip > span",
+    ".overview-contract-focus-overview > div > span",
+  ].join(",")), 9, "Mission Control compact operational labels");
 });
 
 test("dense Editor analysis uses the empty planning width and reveals the active stage", async ({ page }) => {
@@ -478,9 +585,13 @@ test("the Flight control plate reflows all five indicators and its reserved slot
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
 });
 
-test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", async ({ page }) => {
+test("Flight MONITOR and PLAN remain overlap-free at proposal targets", async ({ page }) => {
   await page.goto("/");
-  for (const viewport of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }]) {
+  for (const viewport of [
+    { width: 1920, height: 1080, allowsVerticalScroll: false },
+    { width: 1080, height: 1920, allowsVerticalScroll: false },
+    { width: 800, height: 1280, allowsVerticalScroll: true },
+  ]) {
     await page.setViewportSize(viewport);
     for (const view of ["MONITOR", "PLAN"]) {
       await page.getByRole("tab", { name: view, exact: true }).click();
@@ -504,7 +615,9 @@ test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", asy
         };
       });
       expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
-      expect(layout.shellBottom).toBeLessThanOrEqual(layout.viewportHeight);
+      if (!viewport.allowsVerticalScroll) {
+        expect(layout.shellBottom).toBeLessThanOrEqual(layout.viewportHeight);
+      }
       expect(layout.overlaps).toBe(0);
     }
   }
@@ -796,6 +909,7 @@ test("Mission Control contract focus preserves keyboard, scroll, and responsive 
   for (const viewport of [
     { width: 1280, height: 800 },
     { width: 1080, height: 1920 },
+    { width: 800, height: 1280 },
   ]) {
     await page.setViewportSize(viewport);
     const overflow = await page.evaluate(() => ({

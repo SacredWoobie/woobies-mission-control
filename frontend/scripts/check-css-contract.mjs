@@ -230,6 +230,9 @@ export function checkCssContract(sources) {
     for (const match of masked.matchAll(/(?:^|[;{])\s*color\s*:\s*var\(\s*--slate-dim\s*\)/gim)) {
       failures.push(`${source.file}:${lineNumberAt(source.text, match.index)} uses low-contrast --slate-dim for text; use --slate-muted-text or a stronger semantic text token.`);
     }
+    for (const match of masked.matchAll(/\bbackground(?:-color)?\s*:\s*var\(\s*--rule\s*\)/gi)) {
+      failures.push(`${source.file}:${lineNumberAt(source.text, match.index)} paints grid grout with --rule; use --surface-grout and reserve --rule for borders.`);
+    }
   }
 
   const rootSource = sources.find((source) => source.file === "src/styles.css");
