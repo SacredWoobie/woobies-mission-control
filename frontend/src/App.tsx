@@ -16,6 +16,7 @@ import { DatalinkDrawer } from "./components/DatalinkDrawer";
 import { DeveloperDrawer, type TelemetrySource } from "./components/DeveloperDrawer";
 import { ElectricityPanel } from "./components/ElectricityPanel";
 import { EditorContextPanel } from "./components/EditorContextPanel";
+import { EditorElectricityPanel } from "./components/EditorElectricityPanel";
 import { EditorSummaryPanel } from "./components/EditorSummaryPanel";
 import { FlightDashboard } from "./components/FlightDashboard";
 import { ClockPanel } from "./components/FlightStatusPanels";
@@ -90,6 +91,7 @@ function FixtureDashboard({ mode, notesOpen, onCloseNotes, onSetNotesOpen }: { m
           ? (
             <EditorWorkspace
               context={<EditorContextPanel commandEnabled={false} onSendCommand={() => false} snapshot={snapshot} />}
+              electricity={<EditorElectricityPanel snapshot={snapshot} />}
               snapshot={snapshot}
               staging={<StagingPanel snapshot={snapshot} />}
               summary={<EditorSummaryPanel snapshot={snapshot} />}

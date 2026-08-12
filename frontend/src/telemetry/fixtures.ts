@@ -1,4 +1,5 @@
 import type { NoteTelemetry, TelemetrySnapshot } from "./types";
+import { representativeElectricityFixture } from "../electricityPlanner/fixtures";
 
 const editorStages = [
   { index: 0, ksp: 0, dvAtmo: 500, dvVac: 650, twr: 0.8, twrAtmo: 0.8, twrVac: 1.0, burn: 42 },
@@ -265,6 +266,7 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
 };
 
 export const editorTelemetryFixture: TelemetrySnapshot = {
+  ...representativeElectricityFixture,
   "context.mode": "editor",
   "flight.active": false,
   "identity.available": true,
