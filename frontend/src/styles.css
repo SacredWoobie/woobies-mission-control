@@ -444,7 +444,7 @@ button { font: inherit; }
 
 /* Editor overview keeps craft identity, headline totals, and simulation inputs in one full-width rail. */
 .editor-overview { min-width: 0; overflow: hidden; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-bezel); box-shadow: var(--surface-depth-engraved); }
-.editor-overview-summary { display: grid; min-width: 0; grid-template-columns: minmax(340px,500px) 240px 220px minmax(0,1fr); border-bottom: 1px solid var(--surface-seam); background: var(--surface-seam); }
+.editor-overview-summary { display: grid; min-width: 0; grid-template-columns: minmax(340px,500px) 240px 220px minmax(0,1fr); border-bottom: 1px solid var(--surface-seam); background: var(--surface-plate); }
 .editor-overview-craft, .editor-overview-metric { display: flex; min-width: 0; min-height: 68px; padding: 9px 12px; justify-content: center; flex-direction: column; gap: 4px; border-right: 1px solid var(--surface-seam); background: var(--surface-plate); box-shadow: var(--surface-depth-engraved); }
 .editor-overview .label { font-size: 9px; }
 .editor-craft { overflow: hidden; margin: 0; color: var(--cyan); font-size: 18px; font-weight: 500; letter-spacing: .03em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
