@@ -985,6 +985,60 @@ button { font: inherit; }
   padding: 8px;
   background: color-mix(in srgb,var(--panel) 20%,transparent);
 }
+/* Flight is the dashboard's hardware-forward scene. These frames stay on the
+   two persistent regions so the panel layout, selector, and mounted panel
+   identities remain entirely structural rather than decorative. */
+.flight-fixed-region,
+.flight-tabbed-region {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--surface-seam);
+  border-radius: var(--surface-radius-bezel);
+  background: var(--surface-plate);
+  box-shadow: var(--surface-depth-raised);
+}
+.flight-fixed-region::before,
+.flight-tabbed-region::before {
+  position: absolute;
+  z-index: 0;
+  inset: 4px;
+  border: 1px solid color-mix(in srgb,var(--surface-seam) 60%,transparent);
+  border-radius: calc(var(--surface-radius-bezel) - 1px);
+  background:
+    radial-gradient(circle at 3px 3px,var(--surface-well) 0 3px,transparent 3.5px),
+    radial-gradient(circle at calc(100% - 3px) 3px,var(--surface-well) 0 3px,transparent 3.5px),
+    radial-gradient(circle at 3px calc(100% - 3px),var(--surface-well) 0 3px,transparent 3.5px),
+    radial-gradient(circle at calc(100% - 3px) calc(100% - 3px),var(--surface-well) 0 3px,transparent 3.5px);
+  box-shadow: var(--surface-depth-recessed);
+  content: "";
+  pointer-events: none;
+}
+.flight-fixed-region > *,
+.flight-tabbed-region > * { position: relative; z-index: 1; }
+
+/* Four context cells and read-only Flight instruments sit below their face,
+   while controls retain their established raised treatment. Dense inventory
+   rows deliberately remain flat for fast scanning. */
+.flight-workspace-shell > .status-strip {
+  border-color: var(--surface-seam);
+  background: var(--surface-seam);
+  box-shadow: var(--surface-depth-recessed);
+}
+.flight-workspace-shell > .status-strip :is(.flight-context-identity,.clockcell,.cs-cell) {
+  background: var(--surface-well);
+  box-shadow: var(--surface-depth-engraved);
+}
+.flight-workspace-shell :is(#asc .sas-box,#asc .asc-flight-metric:not(.hero),#asc .attitude-strip > div,#asc .stats-grid .stat,#target .tgt-grid .stat,#elec .ec-overview-card,#sci .sci-overview-card,#heat .heat-idle-state,#heat .heat-entity) {
+  border-color: var(--surface-seam);
+  background: var(--surface-well);
+  box-shadow: var(--surface-depth-recessed);
+}
+.flight-workspace-shell :is(#cons .meter .track,#asc .heading-tape,#asc .thr-track,#elec .ec-meter-track,#elec .rx-charge-track,#heat .heat-temperature-track,#sci .sci-meter-track) {
+  border-color: var(--surface-seam);
+  background: var(--surface-well);
+  box-shadow: var(--surface-depth-recessed);
+}
+.flight-workspace-shell :is(#cons .res-row,#stage .st-row > span,#elec .ec-source-row,#heat .heat-component-row,#sci .sl-row) { box-shadow: none; }
 .flight-control-plate {
   z-index: 2;
   grid-area: controls;
@@ -2394,6 +2448,9 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .panel > h2 { border-bottom-color: var(--surface-seam); }
   .panel-hide-button,
   .panel-collapse-button { border-color: currentColor; }
+
+  .flight-fixed-region::before,
+  .flight-tabbed-region::before { display: none; }
 }
 
 @container (max-width: 460px) {
@@ -2404,6 +2461,13 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 @media (prefers-reduced-motion: reduce) {
   .stage-table.flight .st-row.newly-active > span { animation: none; }
   .flight-workspace-selection-indicator { transition: none; }
+}
+
+@container flight-shell (max-width: 520px) {
+  .flight-fixed-region,
+  .flight-tabbed-region { padding: 6px; }
+  .flight-fixed-region::before,
+  .flight-tabbed-region::before { display: none; }
 }
 
 @container (max-width: 520px) {
