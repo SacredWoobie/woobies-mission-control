@@ -116,7 +116,7 @@ def fake_connection():
         alarm_manager=SimpleNamespace(alarms=[stock_alarm]),
     )
     return SimpleNamespace(
-        krpc=SimpleNamespace(current_game_scene="GameScene.space_center"),
+        krpc=SimpleNamespace(game_scene="GameScene.space_center"),
         space_center=sc,
         mission_overview=MissionOverviewService(),
         vessel_management=VesselManagementService(),
@@ -246,7 +246,7 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
 
     def test_rejects_switch_outside_space_center_scenes(self):
         conn = fake_connection()
-        conn.krpc.current_game_scene = "GameScene.flight"
+        conn.krpc.game_scene = "GameScene.flight"
 
         result = telemetry_server._apply_telemetry_command(conn, {
             "type": "overview.vessel.switch",
@@ -368,7 +368,7 @@ class MissionOverviewTelemetryTests(unittest.TestCase):
 
     def test_rejects_edit_outside_space_center_scenes(self):
         conn = fake_connection()
-        conn.krpc.current_game_scene = "GameScene.flight"
+        conn.krpc.game_scene = "GameScene.flight"
 
         result = telemetry_server._apply_telemetry_command(conn, {
             "type": "overview.vessel.edit",

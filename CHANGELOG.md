@@ -4,6 +4,73 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reduced recurring RemoteTech telemetry work by reusing each confirmed
+  service/vessel binding for a bounded five-second window while continuing to
+  read connection state and signal delay every dashboard cycle. Vessel, scene,
+  connection, revert, refresh, and error boundaries discard the binding;
+  unavailable services retry immediately, and stock CommNet fallback and
+  telemetry fields retain their prior behavior.
+- Reduced recurring Flight telemetry work by avoiding a redundant stock control
+  lookup when packed throttle is already known, reusing each RemoteTech link
+  property within its cycle, and polling idle MechJeb planner capabilities and
+  unavailable SmartASS readiness at a lifecycle-safe one-second cadence. Active
+  planning workers, commands, available SmartASS modes, scene/vessel/reconnect
+  changes, failures, all stock/older-service fallbacks, and telemetry fields
+  retain their prior behavior.
+- Reduced the recurring stock Flight identity, clock, thrust, navball,
+  surface-motion, orbit, stage-index, CommNet, and SAS workload to one bounded,
+  identity-stamped snapshot when WoobiesControlStats 0.2.16 is installed. The
+  service reuses kRPC's official SpaceCenter wrappers only on explicit demand;
+  older, malformed, stale, or transiently failing services retain the complete
+  same-cycle stock collector, RemoteTech and SmartASS authority remain
+  independent, and no control behavior changes.
+- Reduced the one-second Flight heat and electricity workload to one bounded,
+  identity-stamped SystemHeat snapshot when service 0.2.11 is installed. The
+  single capture shares loop/component/radiator, reactor, RTG, generator, and
+  stock/Near Future solar enumeration; older, malformed, stale, or transiently
+  failing services retain the complete same-poll legacy fallback and unchanged
+  radiator/reactor control safeguards.
+- Reduced Flight staging telemetry to one bounded MechJeb-backed StageStats
+  snapshot per poll when the new service is installed. Older services and
+  invalid or not-yet-complete snapshots retain the existing same-poll fallback;
+  the Flight service now keeps MechJeb's asynchronous simulation warm only for
+  a short period after telemetry demand instead of on every disconnected frame.
+- Reduced Flight resource telemetry to one bounded packed custom-service call
+  per poll when WoobiesControlStats 0.2.15 is installed. Older services,
+  malformed or stale snapshots, and transient failures retain the existing
+  optimized stock-kRPC collector as an immediate same-poll fallback. Stock
+  kRPC 0.6 clients that cannot expose KSP's vessel GUID now retain the packed
+  path after an active-vessel context check instead of rejecting every valid
+  service-stamped snapshot.
+- Reduced recurring stock-kRPC Flight reads by sharing each cycle's control,
+  orbit, body, and flight proxies plus already-collected body, altitude, and
+  throttle values with staging, current-stage, and SAS telemetry.
+- Reduced kRPC workload from Flight resource telemetry. Resource names,
+  capacities, current-stage ownership, and container topology are reused across
+  hot amount polls with bounded safety refresh and automatic full-scan
+  fallback; idle/coasting craft use a slower cadence while commanded or
+  measured thrust retains the existing fast cadence.
+- Added save-persistent unexpected part-loss detection for stock and modded
+  craft hardware. Normal staging, undocking, clamp release, EVA construction,
+  and fairing jettison remain quiet; losses stay actionable until their branch
+  is deliberately discarded, then remain visible in the focused DAMAGE history.
+  The recorder reacts to vessel events and uses a low-frequency part-ID safety
+  poll, avoiding full metadata and module scans during steady-state frames.
+  A packed snapshot transfers current damage and persisted loss history in one
+  kRPC call, while older services retain the aligned-array fallback.
+- Added authoritative broken-part monitoring for stock and modded deployable
+  equipment, wheels, reaction wheels, and conservative mod failure signals.
+  Damage raises Master Warning through a new `DAMAGE` annunciator and opens a
+  focused report identifying the affected part groups. The new VesselDamage
+  service performs a cached in-game PartModule scan, while older service sets
+  retain the narrower stock kRPC fallback.
+- Updated the dashboard feed and panel bridge runtime contract to kRPC 0.6.0
+  with its required protobuf 7.35.1 Python runtime, coherent server-core
+  preflight checks, and rebuilt custom-service compatibility versions.
+- Migrated scene reads to kRPC 0.6's supported `game_scene` property while
+  preserving the dashboard telemetry schema, ports, and control-safety
+  boundaries.
+
 ## v0.5.1 - Contract deadlines and UI foundations
 
 - Added authoritative live KSP deadlines to Active Contracts when the new

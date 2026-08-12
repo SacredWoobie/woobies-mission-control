@@ -1,5 +1,5 @@
 import { isFiniteNumber } from "../formatting/numbers";
-import type { HeatLoopTelemetry, ReactorTelemetry, TelemetrySnapshot } from "../telemetry/types";
+import type { DamagePartTelemetry, HeatLoopTelemetry, ReactorTelemetry, TelemetrySnapshot } from "../telemetry/types";
 import type {
   AnnunciatorObservation,
   AnnunciatorRule,
@@ -303,6 +303,78 @@ function commsEvaluation(snapshot: TelemetrySnapshot): RuleEvaluation {
   };
 }
 
+const DAMAGE_KIND_LABELS: Record<DamagePartTelemetry["kind"], string> = {
+  solar_panel: "solar panel",
+  radiator: "radiator",
+  antenna: "antenna",
+  landing_leg: "landing leg",
+  wheel: "wheel",
+  reaction_wheel: "reaction wheel",
+  engine: "engine",
+  tank: "tank",
+  wing: "wing",
+  sas: "SAS unit",
+  rcs: "RCS part",
+  command: "command part",
+  structural: "structural part",
+  other: "part",
+};
+
+function damageIdentity(part: DamagePartTelemetry) {
+  if (part.condition === "lost" && part.eventId?.trim()) {
+    return `loss:${encodeURIComponent(part.eventId.trim())}`;
+  }
+  return [part.kind, part.name, part.tag ?? "", part.module ?? ""]
+    .map((value) => encodeURIComponent(value.trim().toLocaleLowerCase()))
+    .join(":");
+}
+
+function damageEvaluation(snapshot: TelemetrySnapshot): RuleEvaluation {
+  const status = snapshot["damage.status"];
+  const lossStatus = snapshot["damage.lossStatus"];
+  const attachedKnown = status === "known";
+  const lossKnown = lossStatus === "known";
+  const lossUnavailable = lossStatus === "unavailable" || lossStatus === undefined;
+  if (!attachedKnown && !lossKnown) return { kind: "source-unknown" };
+  const parts = snapshot["damage.parts"];
+  if (!Array.isArray(parts)) return { kind: "source-unknown" };
+  const observations = parts.map((part, index) => {
+    if (!part || typeof part !== "object") return unknown(`unidentified-${index}`);
+    const condition = part.condition ?? "damaged";
+    if ((condition === "damaged" && !attachedKnown) || (condition === "lost" && !lossKnown)) {
+      return unknown(`unavailable-${index}`);
+    }
+    const label = DAMAGE_KIND_LABELS[part.kind];
+    if (
+      !label
+      || (condition !== "damaged" && condition !== "lost")
+      || typeof part.name !== "string"
+      || !part.name.trim()
+      || (part.tag !== undefined && typeof part.tag !== "string")
+      || (part.module !== undefined && typeof part.module !== "string")
+      || (part.detector !== undefined && typeof part.detector !== "string")
+      || (part.partId !== undefined && !Number.isSafeInteger(part.partId))
+      || (part.eventId !== undefined && typeof part.eventId !== "string")
+      || (condition === "lost" && !part.eventId?.trim())
+      || !Number.isSafeInteger(part.count)
+      || part.count <= 0
+    ) return unknown(`unidentified-${index}`);
+    const count = part.count;
+    const identity = damageIdentity(part);
+    const named = part.tag?.trim() ? `${part.name} (${part.tag.trim()})` : part.name;
+    const family = count === 1 ? label : `${label}s`;
+    const verb = condition === "lost" ? "lost" : "damaged";
+    return active(identity, "warning", `${count} ${verb} ${family}: ${named}.`);
+  });
+  if (!attachedKnown) observations.push(unknown("attached-scan"));
+  if (!lossKnown && !lossUnavailable) observations.push(unknown("loss-ledger"));
+  return {
+    kind: "known",
+    complete: attachedKnown && (lossKnown || lossUnavailable),
+    observations,
+  };
+}
+
 export const SYSTEM_HEAT_RULE: AnnunciatorRule = {
   ruleId: "system-heat-loop",
   sourceId: "systemheat",
@@ -351,12 +423,23 @@ export const COMMS_LINK_RULE: AnnunciatorRule = {
   evaluate: commsEvaluation,
 };
 
+export const PART_DAMAGE_RULE: AnnunciatorRule = {
+  ruleId: "craft-part-damage",
+  sourceId: "damage",
+  subsystem: "DAMAGE",
+  defaultTier: "warning",
+  activationDwellMs: 0,
+  latchSubDwell: true,
+  evaluate: damageEvaluation,
+};
+
 export const ACTIVE_FLIGHT_ANNUNCIATOR_RULES: AnnunciatorRule[] = [
   SYSTEM_HEAT_RULE,
   REACTOR_TEMPERATURE_RULE,
   REACTOR_INTEGRITY_RULE,
   ELECTRIC_CHARGE_RULE,
   COMMS_LINK_RULE,
+  PART_DAMAGE_RULE,
 ];
 
 export const FLIGHT_ANNUNCIATOR_CONDITION_TABLE: FlightAnnunciatorConditionContract[] = [
@@ -428,6 +511,20 @@ export const FLIGHT_ANNUNCIATOR_CONDITION_TABLE: FlightAnnunciatorConditionContr
     identity: "Singleton active vessel, reset on persistent vessel change or revert.",
     completeness: "RemoteTech availability and connection boolean, otherwise stock canCommunicate boolean, sampled every frame.",
     rationale: "Short handoff drops are diagnostic blips; sustained loss is actionable but not inherently destructive.",
+  },
+  {
+    ruleId: PART_DAMAGE_RULE.ruleId,
+    registration: "active",
+    sourceId: "damage",
+    subsystem: "DAMAGE",
+    tier: "warning",
+    activationDwellMs: 0,
+    latchSubDwell: true,
+    trip: "A complete stock kRPC breakable-part scan reports one or more broken parts.",
+    reset: "A complete scan no longer contains the grouped broken-part identity for the global clear dwell.",
+    identity: "Breakable part kind plus title and optional user tag, grouped for identical parts and scoped to the active vessel.",
+    completeness: "damage.status=known and the complete damage.parts array; incomplete scans hold condition state and surface source diagnostics only.",
+    rationale: "Physical part damage is immediately actionable and persistent, so it raises warning without activation dwell and remains in history after repair or separation.",
   },
   {
     ruleId: "stock-part-heat",

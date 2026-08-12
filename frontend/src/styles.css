@@ -1180,10 +1180,12 @@ button { font: inherit; }
 .annunciator-lamp:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .annunciator-indicators { display: grid; min-width: 0; align-content: center; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; }
 .annunciator-indicator { min-width: 0; min-height: 22px; padding: 3px 4px; overflow: hidden; border: 1px solid #303944; border-radius: 2px; color: var(--slate-muted-text); background: #0b1117; cursor: default; font: 8px var(--mono); font-weight: 700; letter-spacing: .06em; text-overflow: ellipsis; white-space: nowrap; }
+.annunciator-indicator:last-child { grid-column: 1 / -1; }
 .annunciator-indicator:disabled { opacity: 1; }
 .annunciator-indicator.new { border-color: #b74738; color: #240705; background: linear-gradient(180deg,#ff826f,#d84132); box-shadow: 0 0 8px rgba(255,107,91,.54), inset 0 0 5px rgba(255,220,211,.35); cursor: pointer; }
 .annunciator-indicator.acknowledged { border-color: #8d651a; color: #211503; background: linear-gradient(180deg,#ffd75a,#c98716); box-shadow: 0 0 6px rgba(251,191,36,.32), inset 0 0 4px rgba(255,248,194,.28); }
-.annunciator-indicator.new:hover, .annunciator-indicator.new:focus-visible { filter: brightness(1.12); outline: 2px solid var(--cyan); outline-offset: 1px; }
+.annunciator-indicator.acknowledged:not(:disabled) { cursor: pointer; }
+.annunciator-indicator.new:hover, .annunciator-indicator.new:focus-visible, .annunciator-indicator.acknowledged:not(:disabled):hover, .annunciator-indicator.acknowledged:not(:disabled):focus-visible { filter: brightness(1.12); outline: 2px solid var(--cyan); outline-offset: 1px; }
 .annunciator-backdrop { position: fixed; z-index: 1200; inset: 0; display: grid; padding: max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); place-items: center; background: rgba(2,6,9,.82); }
 .annunciator-history { display: flex; width: min(620px,100%); max-height: min(760px,92vh); overflow: hidden; border: 1px solid var(--accent-border); border-radius: 5px; outline: 0; background: #081019; box-shadow: 0 18px 60px rgba(0,0,0,.62); flex-direction: column; }
 .annunciator-history > header { display: flex; padding: 13px 16px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--rule); background: linear-gradient(135deg,#101c29,#0a1018); }
@@ -1203,6 +1205,12 @@ button { font: inherit; }
 .annunciator-episode-head span { color: var(--slate); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
 .annunciator-episode p { margin: 6px 0; color: #d6dee8; font-size: 10px; line-height: 1.45; }
 .annunciator-episode small { color: var(--slate-muted-text); font-size: 8px; letter-spacing: .04em; }
+.annunciator-loss { padding: 9px 11px; border: 1px solid #61322e; border-left: 3px solid var(--warn); border-radius: 3px; background: #18100f; }
+.annunciator-loss.cleared { border-color: var(--rule); border-left-color: var(--slate); background: #0d141c; }
+.annunciator-loss .annunciator-episode-head strong { color: var(--warn); font-size: 11px; letter-spacing: .04em; }
+.annunciator-loss.cleared .annunciator-episode-head strong { color: #d6dee8; }
+.annunciator-loss p { margin: 6px 0; color: #d6dee8; font-size: 10px; line-height: 1.45; }
+.annunciator-loss small { color: var(--slate-muted-text); font-size: 8px; letter-spacing: .04em; }
 .annunciator-empty { margin: 0; padding: 14px; border: 1px dashed var(--rule); color: var(--slate-muted-text); background: #070c12; text-align: center; }
 
 /* Flight information rails collapse in place; compact chrome is pointer-aware. */

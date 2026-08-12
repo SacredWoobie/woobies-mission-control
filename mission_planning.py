@@ -6,6 +6,7 @@ import time
 
 BODY_CATALOG_POLL_SECONDS = 300.0
 CRAFT_IDENTITY_POLL_SECONDS = 1.0
+PLANNER_CAPABILITIES_POLL_SECONDS = 1.0
 ATMOSPHERE_SAMPLE_COUNT = 33
 MAX_BODY_NAME_LENGTH = 128
 MAX_REQUEST_ID_LENGTH = 128
@@ -380,14 +381,34 @@ def _build_controller():
     identity_cache = {"identity.available": False}
     identity_last_poll = 0.0
     identity_mode = None
+    planner_capabilities_connection = None
+    planner_capabilities_last_poll = 0.0
+    planner_capabilities_mode = None
+    planner_capabilities_last_ut = None
 
-    def planner_for(conn):
-        service = conn.mech_jeb
-        planner = service.transfer_planner
-        state["available"] = bool(planner.available)
-        state["compatibilityReady"] = bool(service.type_compatibility_ready)
-        state["detectedVersion"] = str(planner.detected_mech_jeb_version)
-        state["compatibilityTarget"] = str(planner.compatibility_target)
+    def planner_for(conn, checked_at=None):
+        nonlocal planner_capabilities_connection
+        nonlocal planner_capabilities_last_poll
+        try:
+            service = conn.mech_jeb
+            planner = service.transfer_planner
+            capabilities = {
+                "available": bool(planner.available),
+                "compatibilityReady": bool(service.type_compatibility_ready),
+                "detectedVersion": str(planner.detected_mech_jeb_version),
+                "compatibilityTarget": str(planner.compatibility_target),
+            }
+        except Exception:
+            # Never retain an apparently fresh capability cache after a failed
+            # kRPC read. The next frame or command must retry immediately.
+            planner_capabilities_connection = None
+            planner_capabilities_last_poll = 0.0
+            raise
+        state.update(capabilities)
+        planner_capabilities_connection = conn
+        planner_capabilities_last_poll = (
+            time.time() if checked_at is None else checked_at
+        )
         return planner
 
     def fail(message):
@@ -1089,6 +1110,7 @@ def _build_controller():
     def attach_planning(conn, payload):
         nonlocal catalog_cache, catalog_last_poll
         nonlocal identity_cache, identity_last_poll, identity_mode
+        nonlocal planner_capabilities_mode, planner_capabilities_last_ut
         nonlocal transfer_windows_last_ut, maneuver_node_last_ut
         nonlocal prepared_ejection_token, prepared_ejection_session
         current_time = time.time()
@@ -1103,28 +1125,35 @@ def _build_controller():
 
         result = dict(payload)
         current_ut = result.get("t.universalTime")
+        planner_capabilities_ut_rewound = False
         if (
             isinstance(current_ut, (int, float))
             and not isinstance(current_ut, bool)
             and math.isfinite(float(current_ut))
         ):
+            current_ut = float(current_ut)
+            planner_capabilities_ut_rewound = (
+                planner_capabilities_last_ut is not None
+                and current_ut < planner_capabilities_last_ut
+            )
+            planner_capabilities_last_ut = current_ut
             if (
                 maneuver_node_last_ut is not None
-                and float(current_ut) < maneuver_node_last_ut
+                and current_ut < maneuver_node_last_ut
             ):
                 maneuver_node.update(_maneuver_node_state())
                 prepared_ejection_token = ""
                 prepared_ejection_session = ""
-            maneuver_node_last_ut = float(current_ut)
+            maneuver_node_last_ut = current_ut
             if (
                 transfer_windows_last_ut is not None
-                and float(current_ut) < transfer_windows_last_ut
+                and current_ut < transfer_windows_last_ut
                 and transfer_windows["state"] not in {
                     "queued", "paused", "running", "cancelling",
                 }
             ):
                 transfer_windows.update(_transfer_windows_state())
-            transfer_windows_last_ut = float(current_ut)
+            transfer_windows_last_ut = current_ut
         mode = result.get("context.mode")
         if (
             mode != identity_mode
@@ -1182,11 +1211,25 @@ def _build_controller():
                 prepared_ejection_session = ""
         if catalog_cache:
             result["catalog.bodies"] = list(catalog_cache)
-        try:
-            planner_for(conn)
-        except Exception:
-            state["available"] = False
-            state["compatibilityReady"] = False
+        planner_mode_changed = mode != planner_capabilities_mode
+        planner_capabilities_mode = mode
+        planner_capabilities_age = current_time - planner_capabilities_last_poll
+        if (
+            conn is not planner_capabilities_connection
+            or planner_mode_changed
+            or planner_capabilities_ut_rewound
+            or planner_capabilities_age < 0.0
+            or planner_capabilities_age >= PLANNER_CAPABILITIES_POLL_SECONDS
+        ):
+            try:
+                planner_for(conn, checked_at=current_time)
+            except Exception:
+                state.update({
+                    "available": False,
+                    "compatibilityReady": False,
+                    "detectedVersion": "",
+                    "compatibilityTarget": "",
+                })
         refresh_transfer_windows(conn)
         refresh_transfer(conn)
         for key, value in state.items():

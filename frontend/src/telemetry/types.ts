@@ -89,6 +89,50 @@ export interface StockHeatPartTelemetry {
   netW?: number;
 }
 
+export type DamagePartKind =
+  | "solar_panel"
+  | "radiator"
+  | "antenna"
+  | "landing_leg"
+  | "wheel"
+  | "reaction_wheel"
+  | "engine"
+  | "tank"
+  | "wing"
+  | "sas"
+  | "rcs"
+  | "command"
+  | "structural"
+  | "other";
+
+export interface DamagePartTelemetry {
+  kind: DamagePartKind;
+  name: string;
+  tag?: string;
+  module?: string;
+  detector?: string;
+  condition?: "damaged" | "lost";
+  partId?: number;
+  eventId?: string;
+  count: number;
+}
+
+export interface DamageLossEventTelemetry {
+  eventId: string;
+  partId: number;
+  name: string;
+  partName?: string;
+  tag?: string;
+  module?: string;
+  kind: DamagePartKind;
+  state: "active" | "cleared";
+  occurrenceUt: number;
+  occurrenceMet: number;
+  clearedUt?: number;
+  clearReason?: string;
+  cause: string;
+}
+
 export type ReactorControlAction = "start" | "stop" | "start_charging" | "stop_charging";
 export type ReactorChargeState = "off" | "charging" | "ready" | "running";
 
@@ -526,6 +570,19 @@ export interface TelemetrySnapshot {
   "heat.removedW"?: number;
   "heat.netW"?: number;
   "heat.parts"?: StockHeatPartTelemetry[];
+  "damage.status"?: "known" | "incomplete" | "unknown";
+  "damage.source"?: "vessel_damage" | "stock_krpc";
+  "damage.parts"?: DamagePartTelemetry[];
+  "damage.checkedKinds"?: DamagePartKind[];
+  "damage.incompleteKinds"?: string[];
+  "damage.unsupportedKinds"?: DamagePartKind[];
+  "damage.checkedCount"?: number;
+  "damage.checkedModuleCount"?: number;
+  "damage.readErrorCount"?: number;
+  "damage.damagedCount"?: number;
+  "damage.detectors"?: string[];
+  "damage.lossStatus"?: "known" | "unavailable" | "incomplete" | "loading";
+  "damage.lossEvents"?: DamageLossEventTelemetry[];
   "elec.reactors"?: ReactorTelemetry[];
   "elec.reactorsStatus"?: "known" | "not_applicable" | "unknown";
   "elec.sources"?: ElectricitySourceTelemetry[];

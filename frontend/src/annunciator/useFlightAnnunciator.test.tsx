@@ -7,6 +7,13 @@ import { flightTelemetryFixture, inactiveTelemetryFixture } from "../telemetry/f
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { useFlightAnnunciator } from "./useFlightAnnunciator";
 
+const heatOnlyFixture: TelemetrySnapshot = {
+  ...flightTelemetryFixture,
+  "damage.status": "known",
+  "damage.parts": [],
+  "damage.damagedCount": 0,
+};
+
 function Harness({
   connectionState,
   frameCount,
@@ -38,7 +45,7 @@ describe("live Flight annunciator controller", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const { rerender } = render(
-      <Harness connectionState="linked" frameCount={1} lastFrameAt={1_000} snapshot={flightTelemetryFixture} />,
+      <Harness connectionState="linked" frameCount={1} lastFrameAt={1_000} snapshot={heatOnlyFixture} />,
     );
     expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|1");
 
@@ -46,7 +53,7 @@ describe("live Flight annunciator controller", () => {
     act(() => vi.advanceTimersByTime(5_250));
     expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|2");
 
-    rerender(<Harness connectionState="linked" frameCount={2} lastFrameAt={6_250} snapshot={flightTelemetryFixture} />);
+    rerender(<Harness connectionState="linked" frameCount={2} lastFrameAt={6_250} snapshot={heatOnlyFixture} />);
     act(() => vi.advanceTimersByTime(250));
     expect(screen.getByTestId("summary").textContent).toBe("unacknowledged|HEAT|1");
 
@@ -58,7 +65,7 @@ describe("live Flight annunciator controller", () => {
     vi.useFakeTimers();
     vi.setSystemTime(2_000);
     const hotSnapshot: TelemetrySnapshot = {
-      ...flightTelemetryFixture,
+      ...heatOnlyFixture,
       "heat.backend": "system_heat",
       "heat.systemHeatStatus": "known",
       "heat.loops": [{

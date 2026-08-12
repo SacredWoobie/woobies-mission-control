@@ -11,6 +11,7 @@ import {
   COMMS_LINK_RULE,
   ELECTRIC_CHARGE_RULE,
   FLIGHT_ANNUNCIATOR_CONDITION_TABLE,
+  PART_DAMAGE_RULE,
   REACTOR_INTEGRITY_RULE,
   REACTOR_TEMPERATURE_RULE,
   SYSTEM_HEAT_RULE,
@@ -195,5 +196,66 @@ describe("Flight annunciator rule catalog", () => {
     })).toMatchObject({ kind: "known", observations: [{ state: "clear" }] });
     expect(evaluate(COMMS_LINK_RULE, { "rt.available": true })).toEqual({ kind: "source-unknown" });
     expect(evaluate(COMMS_LINK_RULE, {})).toEqual({ kind: "source-unknown" });
+  });
+
+  it("raises immediate grouped damage warnings only from complete authoritative scans", () => {
+    expect(evaluate(PART_DAMAGE_RULE, { "damage.status": "unknown" })).toEqual({ kind: "source-unknown" });
+    expect(evaluate(PART_DAMAGE_RULE, { "damage.status": "incomplete", "damage.parts": [] })).toEqual({ kind: "source-unknown" });
+    expect(evaluate(PART_DAMAGE_RULE, { "damage.status": "known", "damage.parts": [] })).toEqual({
+      kind: "known",
+      complete: true,
+      observations: [],
+    });
+    expect(evaluate(PART_DAMAGE_RULE, {
+      "damage.status": "known",
+      "damage.parts": [null] as never,
+    })).toMatchObject({
+      kind: "known",
+      complete: true,
+      observations: [{ state: "unknown" }],
+    });
+    expect(evaluate(PART_DAMAGE_RULE, {
+      "damage.status": "known",
+      "damage.parts": [
+        { kind: "radiator", name: "Large Folding Radiator", tag: "Port loop", count: 2 },
+        { kind: "solar_panel", name: "OX-4L", count: 1 },
+        { kind: "other", name: "Modded Reliability Unit", module: "ReliabilityModule", count: 1 },
+      ],
+    })).toMatchObject({
+      kind: "known",
+      complete: true,
+      observations: [
+        { state: "active", tier: "warning", message: "2 damaged radiators: Large Folding Radiator (Port loop)." },
+        { state: "active", tier: "warning", message: "1 damaged solar panel: OX-4L." },
+        { state: "active", tier: "warning", message: "1 damaged part: Modded Reliability Unit." },
+      ],
+    });
+  });
+
+  it("raises stable immediate loss warnings even when attached-part scanning is incomplete", () => {
+    expect(evaluate(PART_DAMAGE_RULE, {
+      "damage.status": "incomplete",
+      "damage.lossStatus": "known",
+      "damage.parts": [{
+        kind: "antenna",
+        name: "F-RA Relay Antenna Feed",
+        condition: "lost",
+        count: 1,
+        partId: 202,
+        eventId: "persisted-loss-202",
+      }],
+    })).toMatchObject({
+      kind: "known",
+      complete: false,
+      observations: [
+        {
+          instanceId: "loss:persisted-loss-202",
+          state: "active",
+          tier: "warning",
+          message: "1 lost antenna: F-RA Relay Antenna Feed.",
+        },
+        { instanceId: "attached-scan", state: "unknown" },
+      ],
+    });
   });
 });

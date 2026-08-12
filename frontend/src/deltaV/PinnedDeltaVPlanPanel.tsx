@@ -375,7 +375,7 @@ export function PinnedDeltaVPlanPanel({
     </div>
     {!pinned.craftBound && <>
       <div className="delta-v-pinned-scope legacy">LEGACY GLOBAL PIN</div>
-      <div className="delta-v-pinned-scope-warning" role="alert">Craft identity is unavailable. Install or repair StageStats 0.2.7, then pin this plan to the intended craft.</div>
+      <div className="delta-v-pinned-scope-warning" role="alert">Craft identity is unavailable. Install or repair StageStats 0.2.10, then pin this plan to the intended craft.</div>
     </>}
     {scene === "editor" ? (
       <div aria-label="Mission delta-v overview" className="delta-v-editor-briefing">

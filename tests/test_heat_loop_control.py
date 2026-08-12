@@ -31,7 +31,7 @@ class FakeSystemHeat:
 def fake_connection(service, vessel_guid="vessel-1"):
     return SimpleNamespace(
         krpc=SimpleNamespace(
-            current_game_scene="flight",
+            game_scene="flight",
             GameScene=SimpleNamespace(flight="flight"),
         ),
         stage_stats=SimpleNamespace(

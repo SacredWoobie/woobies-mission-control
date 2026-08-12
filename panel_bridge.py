@@ -112,7 +112,7 @@ def connect_krpc_with_retry(
 
 def active_vessel_if_flying(connection):
     """Return the active vessel, None outside flight, and raise if disconnected."""
-    scene = connection.krpc.current_game_scene
+    scene = connection.krpc.game_scene
     if scene != connection.krpc.GameScene.flight:
         return None
     try:

@@ -24,10 +24,67 @@ class FakeVessel:
         })()
 
 
+class CountingResources:
+    def __init__(self, values):
+        self.values = dict(values)
+        self.names_reads = 0
+        self.max_reads = 0
+        self.amount_reads = 0
+        self.fail_next_amount = False
+
+    @property
+    def names(self):
+        self.names_reads += 1
+        return list(self.values)
+
+    def max(self, name):
+        self.max_reads += 1
+        return self.values[name][1]
+
+    def amount(self, name):
+        self.amount_reads += 1
+        if self.fail_next_amount:
+            self.fail_next_amount = False
+            raise RuntimeError("stale resource proxy")
+        return self.values[name][0]
+
+
+class CountingParts:
+    def __init__(self):
+        self.items = []
+        self.all_reads = 0
+        self.engines = []
+
+    @property
+    def all(self):
+        self.all_reads += 1
+        return list(self.items)
+
+
+class CountingVessel:
+    def __init__(self):
+        self.resources = CountingResources({
+            "LiquidFuel": (100.0, 200.0),
+            "Oxidizer": (120.0, 240.0),
+        })
+        self.stage_resources = CountingResources({
+            "LiquidFuel": (40.0, 80.0),
+        })
+        self.stage_calls = 0
+        self.parts = CountingParts()
+
+    def resources_in_decouple_stage(self, stage, cumulative=False):
+        self.stage_calls += 1
+        if stage == 1 and cumulative is False:
+            return self.stage_resources
+        return CountingResources({})
+
+
 class ResourceTelemetryTests(unittest.TestCase):
     def setUp(self):
         telemetry_server._HAS_CURRENT_STAGE = None
         telemetry_server._STAGE_STATS_CURRENT_STAGE_REPORTED = False
+        telemetry_server._clear_resource_topology_cache()
 
     def test_prefers_stock_current_stage_over_stage_stats_snapshot(self):
         vessel = FakeVessel(stock_stage=4)
@@ -80,6 +137,110 @@ class ResourceTelemetryTests(unittest.TestCase):
 
         authority = telemetry_server._current_stage_authority({})
         self.assertEqual(authority, {})
+
+    def test_resource_polling_is_slow_while_idle_and_fast_under_thrust(self):
+        self.assertEqual(
+            telemetry_server._resource_poll_interval({}),
+            telemetry_server.RES_IDLE_POLL_SECONDS,
+        )
+        self.assertEqual(
+            telemetry_server._resource_poll_interval({"krpc.throttle": 0.2}),
+            telemetry_server.RES_POLL_SECONDS,
+        )
+        self.assertEqual(
+            telemetry_server._resource_poll_interval({"v.thrust": 0.01}),
+            telemetry_server.RES_POLL_SECONDS,
+        )
+
+    def test_hot_poll_reuses_names_capacities_and_stage_resolution(self):
+        vessel = CountingVessel()
+
+        first = telemetry_server._gather_resources(
+            vessel,
+            current_stage=2,
+            resource_identity="vessel-a",
+            now=100.0,
+        )
+        vessel.resources.values["LiquidFuel"] = (95.0, 200.0)
+        second = telemetry_server._gather_resources(
+            vessel,
+            current_stage=2,
+            resource_identity="vessel-a",
+            now=101.0,
+        )
+
+        self.assertEqual(first["r.resource[LiquidFuel]"], 100.0)
+        self.assertEqual(second["r.resource[LiquidFuel]"], 95.0)
+        self.assertEqual(vessel.resources.names_reads, 1)
+        self.assertEqual(vessel.resources.max_reads, 2)
+        self.assertEqual(vessel.resources.amount_reads, 4)
+        self.assertEqual(vessel.stage_resources.names_reads, 1)
+        self.assertEqual(vessel.stage_resources.max_reads, 1)
+        self.assertEqual(vessel.stage_resources.amount_reads, 2)
+        self.assertEqual(vessel.stage_calls, 1)
+
+    def test_topology_safety_refresh_rereads_cold_values(self):
+        vessel = CountingVessel()
+        telemetry_server._gather_resources(
+            vessel, current_stage=2, resource_identity="vessel-a", now=100.0
+        )
+        vessel.resources.values["LiquidFuel"] = (90.0, 210.0)
+
+        refreshed = telemetry_server._gather_resources(
+            vessel,
+            current_stage=2,
+            resource_identity="vessel-a",
+            now=105.0,
+        )
+
+        self.assertEqual(refreshed["r.resourceMax[LiquidFuel]"], 210.0)
+        self.assertEqual(vessel.resources.names_reads, 2)
+        self.assertEqual(vessel.resources.max_reads, 4)
+        self.assertEqual(vessel.stage_calls, 2)
+        self.assertEqual(vessel.parts.all_reads, 3)
+
+    def test_topology_change_rebuilds_part_ownership_partition(self):
+        vessel = CountingVessel()
+        telemetry_server._gather_resources(
+            vessel, current_stage=2, resource_identity="vessel-a", now=100.0
+        )
+        vessel.parts.items.append(SimpleNamespace(_object_id=7))
+
+        telemetry_server._gather_resources(
+            vessel, current_stage=2, resource_identity="vessel-a", now=105.0
+        )
+
+        self.assertEqual(vessel.parts.all_reads, 4)
+
+    def test_stage_change_invalidates_topology_immediately(self):
+        vessel = CountingVessel()
+        telemetry_server._gather_resources(
+            vessel, current_stage=2, resource_identity="vessel-a", now=100.0
+        )
+        telemetry_server._gather_resources(
+            vessel, current_stage=1, resource_identity="vessel-a", now=100.1
+        )
+
+        self.assertEqual(vessel.resources.names_reads, 2)
+        self.assertGreater(vessel.stage_calls, 1)
+
+    def test_stale_hot_proxy_clears_cache_and_uses_full_scan(self):
+        vessel = CountingVessel()
+        telemetry_server._gather_resources(
+            vessel, current_stage=2, resource_identity="vessel-a", now=100.0
+        )
+        vessel.resources.fail_next_amount = True
+
+        recovered = telemetry_server._gather_resources(
+            vessel,
+            current_stage=2,
+            resource_identity="vessel-a",
+            now=101.0,
+        )
+
+        self.assertEqual(recovered["res.status"], "known")
+        self.assertEqual(recovered["r.resource[LiquidFuel]"], 100.0)
+        self.assertIsNone(telemetry_server._resource_topology_cache)
 
     def test_explicit_fallback_stage_populates_current_resource_values(self):
         vessel = FakeVessel()
@@ -141,7 +302,7 @@ class ResourceTelemetryTests(unittest.TestCase):
         game_scene = SimpleNamespace(flight="flight")
         conn = SimpleNamespace(
             krpc=SimpleNamespace(
-                current_game_scene="flight",
+                game_scene="flight",
                 GameScene=game_scene,
             ),
             space_center=SimpleNamespace(

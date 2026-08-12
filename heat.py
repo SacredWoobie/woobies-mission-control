@@ -66,12 +66,9 @@ def _radiator_part_ids(service, loop_id):
     return sorted(normalized)
 
 
-def _component_groups(service, loop_id):
-    names = _list_call(service, "loop_component_part_names", loop_id)
-    part_ids = _list_call(service, "loop_component_part_ids", loop_id)
-    module_names = _list_call(service, "loop_component_module_names", loop_id)
-    roles = _list_call(service, "loop_component_roles", loop_id)
-    fluxes = _list_call(service, "loop_component_fluxes", loop_id)
+def _component_groups_from_columns(
+    names, part_ids, module_names, roles, fluxes
+):
     if names is None or roles is None or fluxes is None:
         return None
 
@@ -173,6 +170,38 @@ def _component_groups(service, loop_id):
         (radiators if rejection_role else producers).append(group)
 
     return {"producers": producers, "radiators": radiators}
+
+
+def group_component_rows(rows):
+    """Group strict packed component rows through the legacy UI semantics."""
+    if not isinstance(rows, list) or len(rows) > 2048:
+        raise ValueError("invalid System Heat component rows")
+    names = []
+    part_ids = []
+    module_names = []
+    roles = []
+    fluxes = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("invalid System Heat component row")
+        names.append(row["name"])
+        part_ids.append(row["partId"])
+        module_names.append(row["moduleName"])
+        roles.append(row["role"])
+        fluxes.append(row["fluxKw"])
+    return _component_groups_from_columns(
+        names, part_ids, module_names, roles, fluxes
+    )
+
+
+def _component_groups(service, loop_id):
+    return _component_groups_from_columns(
+        _list_call(service, "loop_component_part_names", loop_id),
+        _list_call(service, "loop_component_part_ids", loop_id),
+        _list_call(service, "loop_component_module_names", loop_id),
+        _list_call(service, "loop_component_roles", loop_id),
+        _list_call(service, "loop_component_fluxes", loop_id),
+    )
 
 
 def enrich_system_heat_result(service, result):

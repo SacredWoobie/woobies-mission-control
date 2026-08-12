@@ -87,7 +87,8 @@ COMPONENTS = (
         "dashboard": True,
         "requirements": "requirements-dashboard.txt",
         "dependencies": (
-            ("krpc", "krpc", "0.5.4"),
+            ("krpc", "krpc", "0.6.0"),
+            ("protobuf", "google.protobuf", "7.35.1"),
             ("websockets", "websockets", "16.0"),
         ),
     },
@@ -99,7 +100,8 @@ COMPONENTS = (
         "dashboard": False,
         "requirements": "requirements-panel.txt",
         "dependencies": (
-            ("krpc", "krpc", "0.5.4"),
+            ("krpc", "krpc", "0.6.0"),
+            ("protobuf", "google.protobuf", "7.35.1"),
             ("pyserial", "serial", "3.5"),
         ),
     },
@@ -117,10 +119,10 @@ SERVICE_DLLS = (
     ("KRPC.WoobiesMechJeb", "Mission planning / MechJeb bridge"),
 )
 SERVICE_TESTED_VERSIONS = {
-    "WoobiesControlStats": "0.2.7",
-    "KRPC.StageStats": "0.2.7",
-    "KRPC.SystemHeat": "0.2.9",
-    "KRPC.WoobiesMechJeb": "0.8.6",
+    "WoobiesControlStats": "0.2.16",
+    "KRPC.StageStats": "0.2.10",
+    "KRPC.SystemHeat": "0.2.11",
+    "KRPC.WoobiesMechJeb": "0.8.10",
 }
 SUPERSEDED_SERVICE_DLLS_BY_SERVICE = {
     "WoobiesControlStats": (
@@ -139,6 +141,9 @@ SUPERSEDED_SERVICE_DLLS = tuple(
 KSP_TESTED_VERSION = "1.12.5"
 CORE_DLL_LOCATIONS = {
     "KRPC.dll": Path("kRPC") / "KRPC.dll",
+    "KRPC.Core.dll": Path("kRPC") / "KRPC.Core.dll",
+    "KRPC.SpaceCenter.dll": Path("kRPC") / "KRPC.SpaceCenter.dll",
+    "Google.Protobuf.dll": Path("kRPC") / "Google.Protobuf.dll",
     "MechJeb2.dll": Path("MechJeb2") / "Plugins" / "MechJeb2.dll",
     "WoobiesControlStats.dll": (
         Path("WoobiesControlStats") / "WoobiesControlStats.dll"
@@ -164,6 +169,7 @@ KRPC_SERVICE_ATTRIBUTES = (
     ("system_heat", "SystemHeat"),
     ("vessel_science", "VesselScience"),
     ("stock_thermal", "StockThermal"),
+    ("vessel_damage", "VesselDamage"),
 )
 SYSTEM_HEAT_MOD_PATH = Path("SystemHeat") / "Plugin" / "SystemHeat.dll"
 KSP_PREREQUISITES = (
@@ -171,7 +177,32 @@ KSP_PREREQUISITES = (
         "key": "krpc",
         "title": "kRPC",
         "relative_path": Path("kRPC") / "KRPC.dll",
-        "tested_version": "0.5.4",
+        "tested_version": "0.6.0",
+        "expected_sha256": "5aa1d0cdc8eecde0a3efbf16dee8bfa575f4acd94e8960619f642861f7afd2e4",
+        "required": True,
+    },
+    {
+        "key": "krpc_core",
+        "title": "kRPC core API",
+        "relative_path": Path("kRPC") / "KRPC.Core.dll",
+        "tested_version": "0.6.0.0",
+        "expected_sha256": "0c7e447fc801c41d38169e82e39cb06c04df9973a4d6afa9d4c12e76ab313ad8",
+        "required": True,
+    },
+    {
+        "key": "krpc_space_center",
+        "title": "kRPC SpaceCenter service",
+        "relative_path": Path("kRPC") / "KRPC.SpaceCenter.dll",
+        "tested_version": "0.6.0.0",
+        "expected_sha256": "ef3855f132477d3dd7c3a8fb8aae1fbbe8cca54f23bec5c333c04a91665bd8a4",
+        "required": True,
+    },
+    {
+        "key": "krpc_protobuf",
+        "title": "kRPC server protobuf runtime",
+        "relative_path": Path("kRPC") / "Google.Protobuf.dll",
+        "tested_version": "3.10.1.0",
+        "expected_sha256": "2210e190ecfa7b27f48b6601fdad544e8adb0a9bdcb70d775c8bbdd5e48b5cee",
         "required": True,
     },
     {
@@ -180,7 +211,7 @@ KSP_PREREQUISITES = (
         "relative_path": (
             Path("KRPC.WoobiesMechJeb") / "KRPC.WoobiesMechJeb.dll"
         ),
-        "tested_version": "0.8.6",
+        "tested_version": "0.8.10",
         "required": False,
     },
     {
@@ -853,7 +884,11 @@ def dll_layout_inventory(ksp_root_value):
     }
 
 
-def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_version):
+def prerequisite_inventory(
+    ksp_root_value,
+    version_reader=read_windows_file_version,
+    hash_reader=sha256_file,
+):
     """Describe installed kRPC and MechJeb prerequisites without loading DLLs."""
     if isinstance(ksp_root_value, os.PathLike):
         ksp_root_value = os.fspath(ksp_root_value)
@@ -866,6 +901,7 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
             else None
         )
         installed_version = None
+        installed_sha256 = None
         if root is None:
             status = "unconfigured"
         elif target is None or not target.is_file():
@@ -882,7 +918,15 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
             elif versions_equivalent(
                 installed_version, definition["tested_version"]
             ):
-                status = "current"
+                expected_sha256 = definition.get("expected_sha256")
+                if expected_sha256 is not None:
+                    installed_sha256 = hash_reader(target).lower()
+                status = (
+                    "checksum_mismatch"
+                    if expected_sha256 is not None
+                    and installed_sha256 != expected_sha256.lower()
+                    else "current"
+                )
             else:
                 status = "untested"
         inventory.append(
@@ -890,6 +934,7 @@ def prerequisite_inventory(ksp_root_value, version_reader=read_windows_file_vers
                 **definition,
                 "target": target,
                 "installed_version": installed_version,
+                "installed_sha256": installed_sha256,
                 "status": status,
             }
         )
@@ -1256,6 +1301,7 @@ def expected_krpc_services(prerequisites, services):
             ("mission_overview", "MissionOverview"),
             ("vessel_science", "VesselScience"),
             ("stock_thermal", "StockThermal"),
+            ("vessel_damage", "VesselDamage"),
         ),
         "KRPC.StageStats": (("stage_stats", "StageStats"),),
         "KRPC.SystemHeat": (("system_heat", "SystemHeat"),),
@@ -1271,8 +1317,23 @@ def expected_krpc_services(prerequisites, services):
 def live_connection_recommendations(state):
     """Build suggested actions from the most recent live kRPC result."""
     status = state.get("status")
-    if status not in {"failed", "retry_exhausted", "service_issue"}:
+    if status not in {
+        "failed", "retry_exhausted", "service_issue", "version_issue"
+    }:
         return []
+    if status == "version_issue":
+        return [
+            {
+                "key": "krpc.live.version",
+                "title": "Live kRPC server version",
+                "observed": f"Connected to kRPC {state.get('server_version') or 'unknown'}",
+                "expected": "kRPC 0.6.0",
+                "fix": (
+                    "Close KSP and install the complete official kRPC 0.6.0 "
+                    "server package before testing Mission Control again."
+                ),
+            }
+        ]
     if status == "service_issue":
         missing = ", ".join(state.get("missing_services", [])) or "unknown"
         return [
@@ -1327,11 +1388,11 @@ def prerequisite_recommendations(inventory, configuration):
         )
         if status == "missing":
             observed = "Not installed"
-            if key == "krpc":
+            if key.startswith("krpc"):
                 fix = (
-                    f"Install kRPC {tested} through CKAN or the official kRPC "
-                    "release, then start KSP and load a save once so kRPC can "
-                    "create its server settings."
+                    "Install the complete official kRPC 0.6.0 server package "
+                    "through CKAN or the official release; do not mix files "
+                    "from different kRPC versions."
                 )
             elif key == "krpc_mechjeb":
                 fix = (
@@ -1351,11 +1412,21 @@ def prerequisite_recommendations(inventory, configuration):
                     f"KRPC.WoobiesMechJeb {tested} from this release."
                 )
             else:
-                package = "kRPC" if key == "krpc" else "MechJeb 2"
+                package = "kRPC" if key.startswith("krpc") else "MechJeb 2"
                 fix = (
                     f"Use CKAN to reinstall {package} {tested} so its version "
                     "metadata and DLLs come from one known package."
                 )
+        elif status == "checksum_mismatch":
+            observed = (
+                f"Installed version {installed}, but its SHA-256 is not the "
+                "official tested file"
+            )
+            fix = (
+                "Close KSP and reinstall the complete official kRPC 0.6.0 "
+                "server package. Do not keep or mix same-version DLLs from "
+                "another package."
+            )
         else:
             observed = f"Installed version {installed}"
             direction = compare_versions(installed, tested)
@@ -1368,7 +1439,7 @@ def prerequisite_recommendations(inventory, configuration):
                     f"installed bridge with KRPC.WoobiesMechJeb {tested}."
                 )
             else:
-                package = "kRPC" if key == "krpc" else "MechJeb 2"
+                package = "kRPC" if key.startswith("krpc") else "MechJeb 2"
                 fix = (
                     f"For known-good compatibility, use CKAN to {action} "
                     f"{package} to {tested}. Other versions may work, but "
@@ -1854,6 +1925,8 @@ def component_preflight(
     component_name,
     port_open=tcp_port_open,
     dashboard_port_available=local_tcp_port_available,
+    version_reader=read_windows_file_version,
+    hash_reader=sha256_file,
 ):
     """Return actionable errors and warnings before a kRPC component starts."""
     if isinstance(ksp_root_value, os.PathLike):
@@ -1863,7 +1936,7 @@ def component_preflight(
     warnings = []
     ksp_installation = ksp_installation_inventory(ksp_root_value)
     dll_layout = dll_layout_inventory(ksp_root_value)
-    inventory = prerequisite_inventory(ksp_root_value)
+    inventory = prerequisite_inventory(ksp_root_value, version_reader, hash_reader)
     configuration = krpc_configuration_inventory(ksp_root_value)
 
     if root is None:
@@ -1906,11 +1979,20 @@ def component_preflight(
                 "GameData could not be scanned completely for duplicate DLLs."
             )
 
-        krpc_item = next(item for item in inventory if item["key"] == "krpc")
-        if krpc_item["status"] == "missing":
+        krpc_runtime_issues = [
+            item
+            for item in inventory
+            if item["required"] and item["status"] != "current"
+        ]
+        if krpc_runtime_issues:
+            details = ", ".join(
+                f"{item['title']} ({item['status']})"
+                for item in krpc_runtime_issues
+            )
             errors.append(
-                "kRPC is missing from the selected KSP GameData folder. Install "
-                "kRPC 0.5.4 before starting this component."
+                "The required kRPC 0.6.0 runtime is incomplete or mismatched: "
+                f"{details}. Close KSP and install the complete official kRPC "
+                "0.6.0 server package before starting this component."
             )
 
         status = configuration["status"]
@@ -2900,6 +2982,8 @@ class App:
                 text, color = f"{item['tested_version']} tested", THEME["green"]
             elif status == "untested":
                 text, color = f"{version} - untested", THEME["amber"]
+            elif status == "checksum_mismatch":
+                text, color = f"{version} - unexpected file", THEME["warn"]
             else:
                 text, color = "Installed - version unknown", THEME["amber"]
             self.prerequisite_status_labels[item["key"]].config(
@@ -2966,6 +3050,11 @@ class App:
             statuses.get(key) in {"missing", "untested", "unknown_version"}
             for key in ("krpc_mechjeb", "mechjeb")
         )
+        required_runtime_attention = [
+            item
+            for item in inventory
+            if item["required"] and item["status"] != "current"
+        ]
         if root is None:
             summary_text, summary_color = "Choose a KSP folder", THEME["slate_dim"]
         elif ksp_status == "invalid":
@@ -2974,12 +3063,14 @@ class App:
             summary_text, summary_color = "Move release out of GameData", THEME["warn"]
         elif layout_status == "issues":
             summary_text, summary_color = "DLL layout needs attention", THEME["warn"]
-        elif statuses.get("krpc") == "missing":
-            summary_text, summary_color = "kRPC required", THEME["warn"]
+        elif any(
+            item["status"] == "missing" for item in required_runtime_attention
+        ):
+            summary_text, summary_color = "kRPC runtime incomplete", THEME["warn"]
         elif config_status in {"custom", "invalid"}:
             summary_text, summary_color = "Setup needs attention", THEME["warn"]
-        elif statuses.get("krpc") in {"untested", "unknown_version"}:
-            summary_text, summary_color = "kRPC version untested", THEME["amber"]
+        elif required_runtime_attention:
+            summary_text, summary_color = "kRPC runtime mismatched", THEME["warn"]
         elif config_status == "not_initialized":
             summary_text, summary_color = "kRPC not initialized", THEME["amber"]
         elif optional_attention:
@@ -3008,6 +3099,9 @@ class App:
         elif status == "service_issue":
             count = len(self.live_krpc_state.get("missing_services", []))
             text, color = f"Connected - {count} service issue(s)", THEME["amber"]
+        elif status == "version_issue":
+            version = self.live_krpc_state.get("server_version") or "unknown"
+            text, color = f"Connected - server {version} unsupported", THEME["warn"]
         elif status == "retry_exhausted":
             text, color = "Startup timed out - test connection", THEME["amber"]
         elif status == "failed":
@@ -3063,12 +3157,26 @@ class App:
                         for attribute, title in expected.items()
                         if not payload["services"].get(attribute, False)
                     ]
+                    server_version = payload.get("server_version")
+                    version_issue = not versions_equivalent(
+                        server_version, "0.6.0"
+                    )
                     self.live_krpc_state = {
-                        "status": "service_issue" if missing else "connected",
-                        "server_version": payload.get("server_version"),
+                        "status": (
+                            "version_issue"
+                            if version_issue
+                            else "service_issue" if missing else "connected"
+                        ),
+                        "server_version": server_version,
                         "missing_services": missing,
                     }
-                    if missing:
+                    if version_issue:
+                        self._enqueue(
+                            "preflight",
+                            "live kRPC test connected to server version "
+                            f"{server_version or 'unknown'}; version 0.6.0 is required.",
+                        )
+                    elif missing:
                         self._enqueue(
                             "preflight",
                             "live kRPC test connected, but services were missing: "

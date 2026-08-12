@@ -38,11 +38,16 @@ from electricity import (
     latest_generation_total,
     solar_summary,
 )
+from damage import gather_part_damage, read_loss_fields
 from heat import enrich_system_heat_result
+from heat_electricity_snapshot import decode_heat_electricity_snapshot
+from flight_core_snapshot import decode_flight_core_snapshot
 from mission_planning import (
     MAX_ACTION_ID_LENGTH,
     MissionPlanningController,
 )
+from resource_snapshot import decode_resource_snapshot
+from stage_snapshot import decode_flight_stage_snapshot
 from staging import enrich_stage_result, flight_conditions
 from telemetry_runtime import create_telemetry_runtime
 
@@ -59,10 +64,15 @@ DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"
 SCI_POLL_SECONDS = 5      # science walk is many RPCs
 HEAT_POLL_SECONDS = 1     # heat via the custom kRPC service is cheap
 ELEC_POLL_SECONDS = 1     # per-reactor + solar + RTG
-RES_POLL_SECONDS = 0.5    # 2N calls for N resources aboard
+DAMAGE_POLL_SECONDS = 1   # complete stock breakable-part collections
+RES_POLL_SECONDS = 0.5    # Fast path while the vessel is producing thrust.
+RES_IDLE_POLL_SECONDS = 2.0  # Retain useful drain/refill updates while idle.
+RESOURCE_TOPOLOGY_REFRESH_SECONDS = 5.0
 TGT_POLL_SECONDS = 0.5    # target + docking geometry
 STAGE_POLL_SECONDS = 0.5  # dv changes continuously during a burn; ~2 Hz readout
-STAGE_SETTLE_SECONDS = 0.12  # let MechJeb's 100 ms async sim finish before read
+STAGE_SETTLE_SECONDS = 0.12  # legacy row fallback waits for MechJeb's async sim
+SMART_ASS_NEGATIVE_READY_POLL_SECONDS = 1.0
+REMOTE_TECH_BINDING_REFRESH_SECONDS = 5.0
 EDITOR_SUMMARY_RETRY_SECONDS = 1
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
@@ -112,8 +122,16 @@ _heat_cache = {}
 _heat_last_poll = 0.0
 _elec_cache = {}
 _elec_last_poll = 0.0
+_damage_cache = {}
+_damage_last_poll = 0.0
+_damage_cache_key = None
+_damage_last_ut = None
+_damage_loss_cache = None
+_damage_loss_revision = None
 _res_cache = {}
 _res_last_poll = 0.0
+_res_cache_key = None
+_resource_topology_cache = None
 _tgt_cache = {}
 _tgt_last_poll = 0.0
 _stage_cache = {}
@@ -149,6 +167,13 @@ _editor_rebuild_token = None
 _editor_rebuild_ready = True
 _editor_rebuild_trace_last = None
 _telemetry_mode = None
+_smart_ass_negative_ready_connection = None
+_smart_ass_negative_ready_vessel = None
+_smart_ass_negative_ready_last_poll = 0.0
+_remote_tech_binding_connection = None
+_remote_tech_binding_vessel = None
+_remote_tech_binding_comms = None
+_remote_tech_binding_last_refresh = 0.0
 
 # The mission-control overview deliberately uses independent polling tiers.
 # Current UT is read every frame; larger collections are scanned much less
@@ -186,7 +211,7 @@ NOTES_FAVORITES_PATH = _default_notes_favorites_path()
 _stage_partition_cache = None
 
 # kRPC builds differ in whether vessel.control.current_stage is available. Probe
-# the stock property once and retain the result. StageStats 0.2.7 exposes KSP's
+# the stock property once and retain the result. StageStats 0.2.8 exposes KSP's
 # direct vessel.currentStage value as a compatibility fallback.
 #   None  = not probed yet
 #   True  = present, use it
@@ -194,6 +219,7 @@ _stage_partition_cache = None
 _HAS_CURRENT_STAGE = None
 _STAGE_STATS_CURRENT_STAGE_REPORTED = False
 _CURRENT_STAGE_UNSET = object()
+_RESOURCE_IDENTITY_UNSET = object()
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +594,188 @@ def _resource_values_for_parts(parts):
     return values
 
 
+def _resource_capacities(resources, include_zero=False):
+    """Read the cold names/capacities for one kRPC resource container."""
+    capacities = {}
+    for name in resources.names:
+        if not _is_consumable_resource(name):
+            continue
+        maximum = resources.max(name)
+        if include_zero or maximum > 0:
+            capacities[name] = maximum
+    return capacities
+
+
+def _clear_resource_topology_cache(clear_partition=True):
+    """Discard vessel/stage resource topology and its part assignment."""
+    global _resource_topology_cache, _stage_partition_cache
+    _resource_topology_cache = None
+    if clear_partition:
+        _stage_partition_cache = None
+
+
+def _resource_part_signature(vessel):
+    """Return stable kRPC part object IDs with one bounded part-list read."""
+    parts = list(vessel.parts.all)
+    return tuple(
+        getattr(part, "_object_id", id(part))
+        for part in parts
+    )
+
+
+def _same_resource_vessel(cached, vessel, identity):
+    """Compare a cache context without requiring remote proxies to be hashable."""
+    if identity:
+        return cached.get("identity") == identity
+    try:
+        return cached.get("vessel") == vessel
+    except Exception:
+        return cached.get("vessel") is vessel
+
+
+def _build_stage_resource_topology(vessel, current_stage):
+    """Resolve the current stage once and retain only cold topology data."""
+    for decouple_stage in range(current_stage - 1, -2, -1):
+        resources = vessel.resources_in_decouple_stage(
+            stage=decouple_stage,
+            cumulative=False,
+        )
+        capacities = _resource_capacities(resources)
+        if not capacities:
+            continue
+
+        activation_stage, parts = _stage_partition_parts(
+            vessel, decouple_stage, current_stage
+        )
+        if parts is None:
+            return {
+                "resource_stage": decouple_stage,
+                "activation_stage": None,
+                "capacities": capacities,
+                "sources": [(resources, tuple(capacities))],
+            }
+
+        aggregate_capacities = {}
+        sources = []
+        for part in parts:
+            part_resources = part.resources
+            part_capacities = _resource_capacities(part_resources)
+            if not part_capacities:
+                continue
+            sources.append((part_resources, tuple(part_capacities)))
+            for name, maximum in part_capacities.items():
+                aggregate_capacities[name] = (
+                    aggregate_capacities.get(name, 0.0) + maximum
+                )
+        return {
+            "resource_stage": decouple_stage,
+            "activation_stage": activation_stage,
+            "capacities": aggregate_capacities,
+            "sources": sources,
+        }
+    return None
+
+
+def _build_resource_topology(
+        vessel, current_stage, identity, now, part_signature):
+    """Build a bounded cold snapshot for repeated hot amount reads."""
+    vessel_resources = vessel.resources
+    vessel_capacities = _resource_capacities(
+        vessel_resources,
+        include_zero=True,
+    )
+    stage = None
+    if current_stage is not None:
+        stage = _build_stage_resource_topology(vessel, current_stage)
+    return {
+        "vessel": vessel,
+        "identity": identity,
+        "current_stage": current_stage,
+        "built_at": now,
+        "part_signature": part_signature,
+        "vessel_capacities": vessel_capacities,
+        "vessel_sources": [
+            (vessel_resources, tuple(vessel_capacities))
+        ],
+        "stage": stage,
+    }
+
+
+def _current_resource_topology(vessel, current_stage, identity, now):
+    """Return a matching fresh topology, rebuilding on every context epoch."""
+    global _resource_topology_cache
+    cached = _resource_topology_cache
+    same_context = False
+    if cached is not None:
+        try:
+            same_context = (
+                _same_resource_vessel(cached, vessel, identity)
+                and cached.get("current_stage") == current_stage
+            )
+            if same_context and (
+                now - cached["built_at"] < RESOURCE_TOPOLOGY_REFRESH_SECONDS
+            ):
+                return cached
+        except Exception:
+            same_context = False
+
+    # One part-list read detects docking, undocking, destruction, and mod-driven
+    # topology changes without repeating per-part metadata calls. Preserve the
+    # existing partition only for an expired but otherwise unchanged context.
+    part_signature = _resource_part_signature(vessel)
+    keep_partition = (
+        same_context
+        and cached.get("part_signature") == part_signature
+    )
+    _clear_resource_topology_cache(clear_partition=not keep_partition)
+    topology = _build_resource_topology(
+        vessel,
+        current_stage,
+        identity,
+        now,
+        part_signature,
+    )
+    _resource_topology_cache = topology
+    return topology
+
+
+def _resource_amounts(sources, capacities):
+    """Aggregate hot amounts using cached container handles and resource names."""
+    amounts = {name: 0.0 for name in capacities}
+    for resources, names in sources:
+        for name in names:
+            amounts[name] += resources.amount(name)
+    return amounts
+
+
+def _render_resource_topology(topology):
+    """Project cached cold data plus live amounts into the public schema."""
+    capacities = topology["vessel_capacities"]
+    amounts = _resource_amounts(topology["vessel_sources"], capacities)
+    out = {
+        "res.status": "known",
+        "res.names": list(capacities),
+        "res.stageKnown": topology["current_stage"] is not None,
+    }
+    for name, maximum in capacities.items():
+        out[f"r.resource[{name}]"] = amounts[name]
+        out[f"r.resourceMax[{name}]"] = maximum
+
+    stage = topology.get("stage")
+    if stage is not None:
+        out["res.stageResourceStage"] = stage["resource_stage"]
+        if stage["activation_stage"] is not None:
+            out["res.stageActivationStage"] = stage["activation_stage"]
+        stage_amounts = _resource_amounts(
+            stage["sources"],
+            stage["capacities"],
+        )
+        for name, maximum in stage["capacities"].items():
+            out[f"r.resourceCurrent[{name}]"] = stage_amounts[name]
+            out[f"r.resourceCurrentMax[{name}]"] = maximum
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Notes mod compatibility (zer0Kerbal/Notes)
 # ---------------------------------------------------------------------------
@@ -915,12 +1123,18 @@ def _current_stage_resource_values(vessel, current_stage):
     return None, None, {}
 
 
-def _current_stage(vessel, stage_snapshot=None):
+def _current_stage(vessel, stage_snapshot=None, control=None):
     """Return the active KSP stage from stock kRPC or StageStats."""
     global _HAS_CURRENT_STAGE, _STAGE_STATS_CURRENT_STAGE_REPORTED
     if _HAS_CURRENT_STAGE is not False:
         try:
-            stage = int(vessel.control.current_stage)
+            selected_control = control if control is not None else vessel.control
+            try:
+                stage = int(selected_control.current_stage)
+            except Exception:
+                if control is None:
+                    raise
+                stage = int(vessel.control.current_stage)
             if _HAS_CURRENT_STAGE is None:
                 print("[telemetry] current-stage resources use stock kRPC.")
             _HAS_CURRENT_STAGE = True
@@ -963,8 +1177,8 @@ def _current_stage_authority(stage_result):
 # ---------------------------------------------------------------------------
 # Resources (vessel total + current stage)
 # ---------------------------------------------------------------------------
-def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
-    """Return vessel and current-stage resources for dashboard rendering."""
+def _gather_resources_full_scan(vessel, current_stage=_CURRENT_STAGE_UNSET):
+    """Original compatibility path for a complete uncached resource scan."""
     out = {"res.status": "known"}
     try:
         res = vessel.resources
@@ -1000,6 +1214,88 @@ def _gather_resources(vessel, current_stage=_CURRENT_STAGE_UNSET):
             out[f"r.resourceCurrentMax[{name}]"] = maximum
 
     return out
+
+
+def _gather_resources(
+        vessel, current_stage=_CURRENT_STAGE_UNSET,
+        resource_identity=None, now=None):
+    """Return resources using cached cold topology and live hot amounts.
+
+    Any topology-build or cached-proxy failure clears the optimization and
+    returns through the original complete scan in the same poll.
+    """
+    if now is None:
+        now = time.time()
+    stage = (
+        _current_stage(vessel)
+        if current_stage is _CURRENT_STAGE_UNSET
+        else current_stage
+    )
+    try:
+        topology = _current_resource_topology(
+            vessel,
+            stage,
+            resource_identity,
+            now,
+        )
+        return _render_resource_topology(topology)
+    except Exception:
+        _clear_resource_topology_cache()
+        return _gather_resources_full_scan(vessel, current_stage=stage)
+
+
+def _gather_resources_preferred(
+        conn, vessel, current_stage=_CURRENT_STAGE_UNSET,
+        resource_identity=None, now=None,
+        expected_vessel_id=_RESOURCE_IDENTITY_UNSET):
+    """Prefer one custom-service call, retaining stock fallback in this poll."""
+    stage = (
+        _current_stage(vessel)
+        if current_stage is _CURRENT_STAGE_UNSET
+        else current_stage
+    )
+    try:
+        packed = conn.vessel_resources.packed_snapshot(
+            stage if stage is not None else -1
+        )
+        expected = (
+            resource_identity
+            if expected_vessel_id is _RESOURCE_IDENTITY_UNSET
+            else expected_vessel_id
+        )
+        if expected is None:
+            # Stock kRPC 0.6 doesn't expose KSP's vessel GUID. The packed
+            # service stamps its captured Vessel.id and keys its cache by that
+            # identity; one post-call proxy check prevents publishing a capture
+            # after an active-vessel transition without reviving the stock
+            # per-part topology walk.
+            if conn.space_center.active_vessel != vessel:
+                raise RuntimeError(
+                    "active vessel changed during resource snapshot"
+                )
+        return decode_resource_snapshot(
+            packed,
+            expected_vessel_id=expected,
+            expected_stage=stage,
+        )
+    except Exception:
+        return _gather_resources(
+            vessel,
+            current_stage=stage,
+            resource_identity=resource_identity,
+            now=now,
+        )
+
+
+def _resource_poll_interval(telemetry):
+    """Keep full burn responsiveness without repeating idle topology work."""
+    for key in ("krpc.throttle", "v.thrust"):
+        try:
+            if float(telemetry.get(key, 0.0)) > 0.001:
+                return RES_POLL_SECONDS
+        except (TypeError, ValueError):
+            pass
+    return RES_IDLE_POLL_SECONDS
 
 
 # ---------------------------------------------------------------------------
@@ -1157,8 +1453,9 @@ def _gather_target(conn, vessel):
 #                     = index + (current_ksp - (count - 1))
 #
 # atmo (current-pressure) and vac are both emitted per row; the dashboard picks.
-# The custom service pumps MechJeb's async sim on every read. Prime it, allow
-# MechJeb's 100 ms flight refresh window to complete, then take one snapshot.
+# StageStats 0.2.10+ returns the complete Flight table in one RPC and opens a
+# short server-side demand lease so MechJeb's async job finishes for the next
+# poll. Older services retain the prime/settle/per-field compatibility path.
 # ---------------------------------------------------------------------------
 _EDITOR_STAGE_SNAPSHOT_HEADER_WIDTHS = {1: 11, 2: 12}
 _EDITOR_STAGE_SNAPSHOT_ROW_WIDTH = 7
@@ -1305,6 +1602,7 @@ def _gather_stages(
     editor_rebuild_verified=False,
     prefer_atomic_editor_snapshot=False,
     atomic_editor_completion_proven=False,
+    flight_context=None,
 ):
     try:
         ss = conn.stage_stats
@@ -1312,6 +1610,40 @@ def _gather_stages(
         _stage_trace("service_missing", source=source,
                      error=type(exc).__name__, message=str(exc))
         return {}  # service DLL not installed this session
+
+    if source == "flight":
+        try:
+            result = decode_flight_stage_snapshot(
+                ss.flight_stage_snapshot()
+            )
+            result = enrich_stage_result(None, result)
+            context = (
+                flight_context
+                if isinstance(flight_context, dict)
+                else {}
+            )
+            result.update(flight_conditions(conn, **context))
+            _stage_trace(
+                "atomic_flight_sample",
+                source=source,
+                count=result.get("stage.count"),
+                currentKsp=result.get("stage.currentKsp"),
+                complete=True,
+            )
+            return result
+        except AttributeError:
+            # StageStats 0.2.8 and older retain the existing per-field path.
+            pass
+        except Exception as exc:
+            # A new but incomplete or malformed response gets the same-poll
+            # compatibility path. The first request after a vessel/scene change
+            # may legitimately be priming MechJeb's asynchronous simulation.
+            _stage_trace(
+                "atomic_flight_sample_error",
+                source=source,
+                error=type(exc).__name__,
+                message=str(exc),
+            )
 
     try:
         if not ss.available:
@@ -1467,7 +1799,8 @@ def _gather_stages(
 
     enrich_stage_result(ss, out)
     if source == "flight":
-        out.update(flight_conditions(conn))
+        context = flight_context if isinstance(flight_context, dict) else {}
+        out.update(flight_conditions(conn, **context))
     return out
 
 
@@ -2167,7 +2500,7 @@ def _apply_telemetry_command(conn, command):
         return
 
     try:
-        scene = conn.krpc.current_game_scene
+        scene = conn.krpc.game_scene
         if scene not in (
             conn.krpc.GameScene.editor_vab,
             conn.krpc.GameScene.editor_sph,
@@ -2754,27 +3087,138 @@ def _gather_science(conn, vessel):
 # ---------------------------------------------------------------------------
 # Telemetry gathering
 # ---------------------------------------------------------------------------
-def _gather_sas(conn, vessel):
-    """Return stock SAS and Smart A.S.S. state without coupling either source."""
-    result = {}
+def _clear_smart_ass_api_ready_cache():
+    global _smart_ass_negative_ready_connection
+    global _smart_ass_negative_ready_vessel
+    global _smart_ass_negative_ready_last_poll
+    _smart_ass_negative_ready_connection = None
+    _smart_ass_negative_ready_vessel = None
+    _smart_ass_negative_ready_last_poll = 0.0
+
+
+def _smart_ass_vessel_key(vessel):
     try:
-        control = vessel.control
-        result["krpc.sas"] = bool(control.sas)
+        object_id = getattr(vessel, "_object_id", None)
+    except Exception:
+        object_id = None
+    return object_id if object_id is not None else id(vessel)
+
+
+def _clear_remote_tech_binding_cache():
+    global _remote_tech_binding_connection
+    global _remote_tech_binding_vessel
+    global _remote_tech_binding_comms
+    global _remote_tech_binding_last_refresh
+    _remote_tech_binding_connection = None
+    _remote_tech_binding_vessel = None
+    _remote_tech_binding_comms = None
+    _remote_tech_binding_last_refresh = 0.0
+
+
+def _remote_tech_vessel_key(vessel):
+    try:
+        object_id = getattr(vessel, "_object_id", None)
+    except Exception:
+        object_id = None
+    return object_id if object_id is not None else id(vessel)
+
+
+def _gather_sas(conn, vessel, control=None, known=None, now=None):
+    """Return stock SAS and Smart A.S.S. state without coupling either source."""
+    global _smart_ass_negative_ready_connection
+    global _smart_ass_negative_ready_vessel
+    global _smart_ass_negative_ready_last_poll
+    result = dict(known) if isinstance(known, dict) else {}
+    if "krpc.sas" not in result:
         try:
-            result["krpc.sasMode"] = str(control.sas_mode)
+            selected_control = control if control is not None else vessel.control
+            try:
+                result["krpc.sas"] = bool(selected_control.sas)
+            except Exception:
+                if control is None:
+                    raise
+                selected_control = vessel.control
+                result["krpc.sas"] = bool(selected_control.sas)
+            try:
+                result["krpc.sasMode"] = str(selected_control.sas_mode)
+            except Exception:
+                pass
         except Exception:
             pass
-    except Exception:
-        pass
+
+    current_time = time.time() if now is None else now
+    vessel_key = _smart_ass_vessel_key(vessel)
+    negative_ready_age = current_time - _smart_ass_negative_ready_last_poll
+    if (
+        conn is _smart_ass_negative_ready_connection
+        and vessel_key == _smart_ass_negative_ready_vessel
+        and 0.0 <= negative_ready_age < SMART_ASS_NEGATIVE_READY_POLL_SECONDS
+    ):
+        return result
 
     try:
         mj = conn.mech_jeb
-        if mj.api_ready:
-            smart_ass_mode = str(mj.smart_ass.autopilot_mode)
-            result["mj.sasMode"] = smart_ass_mode
-            result["mj.sasActive"] = smart_ass_mode.split(".")[-1].lower() != "off"
+        if not mj.api_ready:
+            _smart_ass_negative_ready_connection = conn
+            _smart_ass_negative_ready_vessel = vessel_key
+            _smart_ass_negative_ready_last_poll = current_time
+            return result
+        # A positive result is deliberately never cached: Smart A.S.S. mode is
+        # live control state and must remain visible every telemetry cycle.
+        _clear_smart_ass_api_ready_cache()
+        smart_ass_mode = str(mj.smart_ass.autopilot_mode)
+        result["mj.sasMode"] = smart_ass_mode
+        result["mj.sasActive"] = smart_ass_mode.split(".")[-1].lower() != "off"
     except Exception:
-        pass
+        # Service/proxy failures are not negative availability. Fail closed in
+        # this frame and retry on the next one instead of caching the error.
+        _clear_smart_ass_api_ready_cache()
+    return result
+
+
+def _gather_remote_tech(conn, vessel, now=None):
+    """Return live RemoteTech fields while reusing its stable vessel binding."""
+    global _remote_tech_binding_connection
+    global _remote_tech_binding_vessel
+    global _remote_tech_binding_comms
+    global _remote_tech_binding_last_refresh
+    result = {}
+    current_time = time.time() if now is None else now
+    vessel_key = _remote_tech_vessel_key(vessel)
+    binding_age = current_time - _remote_tech_binding_last_refresh
+    binding_valid = (
+        conn is _remote_tech_binding_connection
+        and vessel_key == _remote_tech_binding_vessel
+        and _remote_tech_binding_comms is not None
+        and 0.0 <= binding_age < REMOTE_TECH_BINDING_REFRESH_SECONDS
+    )
+    try:
+        if binding_valid:
+            comms = _remote_tech_binding_comms
+            result["rt.available"] = True
+        else:
+            _clear_remote_tech_binding_cache()
+            rt = conn.remote_tech
+            available = bool(rt.available)
+            result["rt.available"] = available
+            if not available:
+                return result
+            comms = rt.comms(vessel)
+            if comms is None:
+                raise RuntimeError("RemoteTech returned no vessel binding")
+            _remote_tech_binding_connection = conn
+            _remote_tech_binding_vessel = vessel_key
+            _remote_tech_binding_comms = comms
+            _remote_tech_binding_last_refresh = current_time
+
+        has_connection = comms.has_connection
+        result["rt.hasConnection"] = has_connection
+        result["rt.signalDelay"] = (
+            comms.signal_delay if has_connection else None
+        )
+    except Exception:
+        _clear_remote_tech_binding_cache()
+        pass  # RemoteTech service not present this session
     return result
 
 
@@ -2804,6 +3248,17 @@ def _gather_system_heat(conn):
         "heat.loops": loops,
     }
     return enrich_system_heat_result(sh, result)
+
+
+def _gather_heat_electricity_preferred(conn, vessel_id):
+    """Use one strict SystemHeat 0.2.11 call, or signal same-poll fallback."""
+    try:
+        return decode_heat_electricity_snapshot(
+            conn.system_heat.telemetry_snapshot(),
+            expected_vessel_id=vessel_id,
+        )
+    except Exception:
+        return None
 
 
 def _gather_stock_heat(conn):
@@ -3044,7 +3499,7 @@ def _apply_target_clear_command(conn, command):
     expected_target_name = expected_target_name.strip()
 
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+        if conn.krpc.game_scene != conn.krpc.GameScene.flight:
             return reject("Targets can be cleared only in flight.")
 
         current_identity = _mission_planning.current_craft_identity(conn, "flight")
@@ -3145,7 +3600,7 @@ def _apply_heat_loop_control_command(conn, command):
         return reject("Valid expected radiator identities are required.")
 
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+        if conn.krpc.game_scene != conn.krpc.GameScene.flight:
             return reject("Heat-loop controls are available only in flight.")
 
         current_identity = _mission_planning.current_craft_identity(
@@ -3245,7 +3700,7 @@ def _apply_overview_vessel_switch_command(conn, command):
         return reject("The selected vessel identity is invalid.")
 
     try:
-        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        scene_name = _overview_label(conn.krpc.game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
             return reject(
                 "Vessels can only be switched from the Space Center "
@@ -3366,7 +3821,7 @@ def _apply_overview_vessel_edit_command(conn, command):
         return reject("Change the vessel name or type before saving.")
 
     try:
-        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        scene_name = _overview_label(conn.krpc.game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
             return reject(
                 "Vessels can only be edited from the Space Center "
@@ -3514,7 +3969,7 @@ def _apply_overview_vessel_lifecycle_command(conn, command):
         return reject("The selected vessel crew list is unavailable.")
 
     try:
-        scene_name = _overview_label(conn.krpc.current_game_scene).casefold()
+        scene_name = _overview_label(conn.krpc.game_scene).casefold()
         if scene_name not in {"space center", "tracking station"}:
             return reject(
                 "Vessels can only be recovered or terminated from the "
@@ -4084,7 +4539,7 @@ def _apply_reactor_control_command(conn, command):
         return reject("A valid expected vessel ID is required.")
 
     try:
-        if conn.krpc.current_game_scene != conn.krpc.GameScene.flight:
+        if conn.krpc.game_scene != conn.krpc.GameScene.flight:
             return reject("Reactor controls are available only in flight.")
 
         current_identity = _mission_planning.current_craft_identity(conn, "flight")
@@ -4249,11 +4704,17 @@ def _gather_reactor_telemetry(conn):
         return {"elec.reactorsStatus": "unknown"}
 
 
-def _gather_throttle_state(vessel):
+def _gather_throttle_state(vessel, control=None):
     """Return commanded throttle plus limiter-adjusted vessel thrust."""
     out = {}
     try:
-        out["krpc.throttle"] = vessel.control.throttle
+        selected_control = control if control is not None else vessel.control
+        try:
+            out["krpc.throttle"] = selected_control.throttle
+        except Exception:
+            if control is None:
+                raise
+            out["krpc.throttle"] = vessel.control.throttle
     except Exception:
         pass
     try:
@@ -4264,16 +4725,78 @@ def _gather_throttle_state(vessel):
     return out
 
 
+def _gather_flight_core_preferred(conn, vessel, expected_vessel_id=None):
+    """Return one strict custom Flight snapshot, or ``None`` for stock reads."""
+    try:
+        packed = conn.vessel_flight_core.packed_snapshot()
+        result = decode_flight_core_snapshot(
+            packed,
+            expected_vessel_id=expected_vessel_id,
+        )
+        if expected_vessel_id is None:
+            # Stock kRPC 0.6 omits KSP's vessel GUID. The service stamps the
+            # active vessel's canonical Guid and checks its reference after the
+            # capture; this one post-call proxy check closes the client-side
+            # transition window before any packed values are published.
+            if conn.space_center.active_vessel != vessel:
+                raise RuntimeError("active vessel changed during Flight snapshot")
+        return result
+    except Exception:
+        return None
+
+
+def _stage_flight_context(vessel, control, body, flight, telemetry):
+    """Share core Flight reads with the slower StageStats enrichment poll."""
+    known = {}
+    try:
+        body_name = telemetry["v.body"]
+        if body_name is not None:
+            known["stage.body"] = str(body_name)
+    except (KeyError, TypeError, ValueError):
+        pass
+    for source, target, digits in (
+        ("v.altitude", "stage.altitude", 1),
+        ("krpc.throttle", "stage.throttle", 4),
+        ("stage.staticPressureAtm", "stage.staticPressureAtm", 4),
+    ):
+        try:
+            value = telemetry[source]
+            if (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+            ):
+                known[target] = round(float(value), digits)
+        except (KeyError, TypeError, ValueError):
+            pass
+    try:
+        situation = telemetry["stage.situation"]
+        if situation is not None:
+            known["stage.situation"] = str(situation)
+    except (KeyError, TypeError, ValueError):
+        pass
+    return {
+        "vessel": vessel,
+        "control": control,
+        "body": body,
+        "flight": flight,
+        "known": known,
+    }
+
+
 def gather_telemetry(conn):
     global _stage_cache, _stage_current_authority
     global _stage_last_poll, _stage_last_ut
     global _telemetry_mode, _editor_bodies_cache, _stage_trace_last_published
+    global _damage_cache, _damage_last_poll, _damage_cache_key, _damage_last_ut
+    global _damage_loss_cache, _damage_loss_revision
+    global _res_cache, _res_last_poll, _res_cache_key
     d = {}
 
     # The game scene is the authoritative signal. A vessel handle may remain
     # available briefly during editor and scene transitions.
     try:
-        scene = conn.krpc.current_game_scene
+        scene = conn.krpc.game_scene
         if scene == conn.krpc.GameScene.editor_vab:
             mode = "editor_vab"
         elif scene == conn.krpc.GameScene.editor_sph:
@@ -4285,6 +4808,8 @@ def gather_telemetry(conn):
 
         if mode != _telemetry_mode:
             previous_mode = _telemetry_mode
+            _clear_smart_ass_api_ready_cache()
+            _clear_remote_tech_binding_cache()
             _stage_trace("mode_transition", previous=previous_mode, current=mode)
             if mode == "flight":
                 _stage_trace("cache_clear", reason="enter_flight",
@@ -4293,6 +4818,16 @@ def gather_telemetry(conn):
                 _stage_current_authority = {}
                 _stage_last_poll = 0.0
                 _stage_last_ut = None
+                _damage_cache = {"damage.status": "unknown"}
+                _damage_last_poll = 0.0
+                _damage_cache_key = None
+                _damage_last_ut = None
+                _damage_loss_cache = None
+                _damage_loss_revision = None
+                _res_cache = {}
+                _res_last_poll = 0.0
+                _res_cache_key = None
+                _clear_resource_topology_cache()
             _telemetry_mode = mode
             _stage_trace_last_published = None
             _editor_bodies_cache = []
@@ -4322,6 +4857,7 @@ def gather_telemetry(conn):
         sc = conn.space_center
         vessel = sc.active_vessel
     except Exception:
+        _clear_remote_tech_binding_cache()
         # Connected to kRPC, but no active vessel in a supported context (for
         # example, the tracking station, space center, main menu, or a scene
         # load). The dashboard uses this mode to show its inactive-scene overlay
@@ -4337,14 +4873,10 @@ def gather_telemetry(conn):
     d["flight.active"] = True
     d["editor.active"] = False
     now = time.time()
-
-    # ---- clocks (every tick) ----
+    control = None
     universal_time = None
-    try:
-        d["v.name"] = vessel.name
-    except Exception:
-        d["v.name"] = ""
-
+    body = None
+    fbody = None
     try:
         vessel_guid = str(_overview_value(vessel, "id", "")).strip()
         if vessel_guid and len(vessel_guid) <= MAX_ACTION_ID_LENGTH:
@@ -4352,44 +4884,60 @@ def gather_telemetry(conn):
     except Exception:
         pass
 
-    try:
-        universal_time = sc.ut
-        d["t.universalTime"] = universal_time
-        d["v.missionTime"] = vessel.met
-    except Exception:
-        pass
+    # ---- clocks + thrust + navball + Flight/orbit stock core ----
+    # WCS 0.2.16 performs the same official SpaceCenter wrapper reads behind
+    # one demand-only RPC. Absence, invalid data, or a vessel transition falls
+    # through to the complete pre-feature stock path in this same cycle.
+    flight_core = _gather_flight_core_preferred(
+        conn,
+        vessel,
+        expected_vessel_id=d.get("v.guid"),
+    )
+    if flight_core is not None:
+        d.update(flight_core)
+        universal_time = d.get("t.universalTime")
+    else:
+        try:
+            control = vessel.control
+        except Exception:
+            # Individual consumers retain their original retry behavior.
+            pass
+        try:
+            d["v.name"] = vessel.name
+        except Exception:
+            d["v.name"] = ""
+        try:
+            universal_time = sc.ut
+            d["t.universalTime"] = universal_time
+            d["v.missionTime"] = vessel.met
+        except Exception:
+            pass
 
-    # ---- throttle + active-engine thrust ----
-    d.update(_gather_throttle_state(vessel))
+        d.update(_gather_throttle_state(vessel, control=control))
+        try:
+            orbit = vessel.orbit
+            body = orbit.body
+            srf = vessel.flight(vessel.surface_reference_frame)
+            fbody = vessel.flight(body.reference_frame)
 
-    # ---- navball + flight + orbit (every tick; all cheap) ----
-    try:
-        body = vessel.orbit.body
-        srf = vessel.flight(vessel.surface_reference_frame)   # navball attitude
-        fbody = vessel.flight(body.reference_frame)           # surface-relative motion
-        orbit = vessel.orbit
-
-        d["n.heading"] = srf.heading
-        d["n.pitch"] = srf.pitch
-        d["n.roll"] = srf.roll
-
-        d["v.altitude"] = fbody.mean_altitude
-        d["v.verticalSpeed"] = fbody.vertical_speed
-        d["v.surfaceSpeed"] = fbody.speed
-        d["v.geeForce"] = fbody.g_force
-        d["v.orbitalVelocity"] = orbit.speed
-
-        d["o.ApA"] = orbit.apoapsis_altitude
-        d["o.PeA"] = orbit.periapsis_altitude
-        d["o.timeToAp"] = orbit.time_to_apoapsis
-        d["o.timeToPe"] = orbit.time_to_periapsis
-        d["o.inclination"] = math.degrees(orbit.inclination)  # kRPC: radians
-        d["o.eccentricity"] = orbit.eccentricity
-        d["o.period"] = orbit.period
-
-        d["v.body"] = body.name
-    except Exception:
-        pass
+            d["n.heading"] = srf.heading
+            d["n.pitch"] = srf.pitch
+            d["n.roll"] = srf.roll
+            d["v.altitude"] = fbody.mean_altitude
+            d["v.verticalSpeed"] = fbody.vertical_speed
+            d["v.surfaceSpeed"] = fbody.speed
+            d["v.geeForce"] = fbody.g_force
+            d["v.orbitalVelocity"] = orbit.speed
+            d["o.ApA"] = orbit.apoapsis_altitude
+            d["o.PeA"] = orbit.periapsis_altitude
+            d["o.timeToAp"] = orbit.time_to_apoapsis
+            d["o.timeToPe"] = orbit.time_to_periapsis
+            d["o.inclination"] = math.degrees(orbit.inclination)
+            d["o.eccentricity"] = orbit.eccentricity
+            d["o.period"] = orbit.period
+            d["v.body"] = body.name
+        except Exception:
+            pass
 
     # ---- per-stage delta-V (KRPC.StageStats / MechJeb) ----
     # Revert-to-launch rewinds universal time while the process and kRPC
@@ -4399,6 +4947,8 @@ def gather_telemetry(conn):
     # kRPC omits it.
     if universal_time is not None:
         if _stage_last_ut is not None and universal_time < _stage_last_ut:
+            _clear_smart_ass_api_ready_cache()
+            _clear_remote_tech_binding_cache()
             _stage_trace(
                 "ut_rewind", previousUt=_stage_last_ut,
                 currentUt=universal_time,
@@ -4407,13 +4957,22 @@ def gather_telemetry(conn):
             _stage_cache = {}
             _stage_current_authority = {}
             _stage_last_poll = 0.0
+            _res_cache = {}
+            _res_last_poll = 0.0
+            _res_cache_key = None
+            _clear_resource_topology_cache()
         _stage_last_ut = universal_time
 
     if now - _stage_last_poll >= STAGE_POLL_SECONDS:
         _stage_last_poll = now
         result = {}
         try:
-            result = _gather_stages(conn)
+            result = _gather_stages(
+                conn,
+                flight_context=_stage_flight_context(
+                    vessel, control, body, fbody, d
+                ),
+            )
             if result:
                 previous_stage_cache = _stage_summary(_stage_cache)
                 _stage_cache = result
@@ -4432,41 +4991,129 @@ def gather_telemetry(conn):
     _trace_stage_publish(d, "flight")
 
     # ---- current stage index ----
-    cs = _current_stage(vessel, _stage_current_authority)
+    cs = d.get("krpc.currentStage") if flight_core is not None else None
+    if cs is None:
+        cs = _current_stage(
+            vessel, _stage_current_authority, control=control
+        )
     if cs is not None:
         d["krpc.currentStage"] = cs
 
     # ---- comms: RemoteTech is authoritative here; stock CommNet is the fallback ----
-    try:
-        rt = conn.remote_tech
-        d["rt.available"] = rt.available
-        if rt.available:
-            comms = rt.comms(vessel)
-            d["rt.hasConnection"] = comms.has_connection
-            d["rt.signalDelay"] = comms.signal_delay if comms.has_connection else None
-    except Exception:
-        pass  # RemoteTech service not present this session
+    d.update(_gather_remote_tech(conn, vessel, now=now))
 
-    try:
-        c = vessel.comms
-        d["comm.krpc.canCommunicate"] = c.can_communicate
-        d["comm.krpc.signalStrength"] = c.signal_strength
-    except Exception:
-        pass  # no antenna / no CommNet
+    if not {
+        "comm.krpc.canCommunicate", "comm.krpc.signalStrength"
+    }.issubset(d):
+        try:
+            c = vessel.comms
+            d["comm.krpc.canCommunicate"] = c.can_communicate
+            d["comm.krpc.signalStrength"] = c.signal_strength
+        except Exception:
+            pass  # no antenna / no CommNet
+
+    # ---- Authoritative broken craft parts ---------------------------------
+    # Bind the cache to the active vessel and UT lifecycle so a vessel switch
+    # or revert can never publish the previous craft's damage for one poll.
+    damage_key = str(d.get("v.guid") or d.get("v.name") or "").strip()
+    damage_reverted = (
+        _damage_last_ut is not None
+        and universal_time is not None
+        and universal_time < _damage_last_ut
+    )
+    if damage_key != _damage_cache_key or damage_reverted:
+        _damage_cache = {"damage.status": "unknown"}
+        _damage_last_poll = 0.0
+        _damage_cache_key = damage_key
+        _damage_loss_cache = None
+        _damage_loss_revision = None
+    _damage_last_ut = universal_time
+    if now - _damage_last_poll >= DAMAGE_POLL_SECONDS:
+        _damage_last_poll = now
+        try:
+            loss_fields = None
+            packed_damage = False
+            try:
+                damage_service = conn.vessel_damage
+                try:
+                    damage_service.packed_snapshot
+                    packed_damage = True
+                except AttributeError:
+                    loss_revision = damage_service.loss_revision
+                    if (
+                        isinstance(loss_revision, int)
+                        and not isinstance(loss_revision, bool)
+                        and loss_revision >= 0
+                    ):
+                        if (
+                            _damage_loss_cache is None
+                            or loss_revision != _damage_loss_revision
+                        ):
+                            candidate = read_loss_fields(damage_service)
+                            if candidate[0] != "incomplete":
+                                _damage_loss_cache = candidate
+                                _damage_loss_revision = loss_revision
+                            loss_fields = candidate
+                        else:
+                            loss_fields = _damage_loss_cache
+            except AttributeError:
+                pass
+            if packed_damage or loss_fields is None:
+                _damage_cache = gather_part_damage(
+                    vessel,
+                    connection=conn,
+                    remote_tech_active=d.get("rt.available") is True,
+                )
+            else:
+                _damage_cache = gather_part_damage(
+                    vessel,
+                    connection=conn,
+                    remote_tech_active=d.get("rt.available") is True,
+                    loss_fields=loss_fields,
+                )
+        except Exception:
+            _damage_cache = {"damage.status": "unknown"}
+    d.update(_damage_cache)
 
     # ---- stock SAS + MechJeb SmartASS mode ----
     # Smart A.S.S. and stock SAS are mutually exclusive in normal operation,
     # but stock SAS can pulse on briefly before MechJeb turns it back off. Send
     # both sources so the dashboard can keep Smart A.S.S. authoritative during
     # that handoff instead of flashing a stock mode.
-    d.update(_gather_sas(conn, vessel))
+    sas_known = {
+        key: d[key]
+        for key in ("krpc.sas", "krpc.sasMode")
+        if key in d
+    }
+    d.update(_gather_sas(
+        conn,
+        vessel,
+        control=control,
+        known=sas_known,
+        now=now,
+    ))
 
     # ---- resources ----
-    global _res_cache, _res_last_poll
-    if now - _res_last_poll >= RES_POLL_SECONDS:
+    resource_context = (
+        damage_key or getattr(vessel, "_object_id", id(vessel)),
+        cs,
+    )
+    if damage_reverted or resource_context != _res_cache_key:
+        _res_cache = {}
+        _res_last_poll = 0.0
+        _res_cache_key = resource_context
+        _clear_resource_topology_cache()
+    if now - _res_last_poll >= _resource_poll_interval(d):
         _res_last_poll = now
         try:
-            _res_cache = _gather_resources(vessel, current_stage=cs)
+            _res_cache = _gather_resources_preferred(
+                conn,
+                vessel,
+                current_stage=cs,
+                resource_identity=damage_key,
+                now=now,
+                expected_vessel_id=d.get("v.guid"),
+            )
         except Exception:
             _res_cache = {"res.status": "unknown"}
     d.update(_res_cache)
@@ -4507,86 +5154,107 @@ def gather_telemetry(conn):
     # ---- Heat management: System Heat loops, with stock thermal fallback ----
     # System Heat retains its native kW display. Stock part flux is explicitly
     # reported in W so the two backends never silently change scale.
-    global _heat_cache, _heat_last_poll
-    if now - _heat_last_poll >= HEAT_POLL_SECONDS:
+    global _heat_cache, _heat_last_poll, _elec_cache, _elec_last_poll
+    heat_due = now - _heat_last_poll >= HEAT_POLL_SECONDS
+    elec_due = now - _elec_last_poll >= ELEC_POLL_SECONDS
+    packed_heat_electricity = None
+    if heat_due or elec_due:
+        packed_heat_electricity = _gather_heat_electricity_preferred(
+            conn, d.get("v.guid")
+        )
+
+    if heat_due:
         _heat_last_poll = now
-        _heat_cache = _gather_heat(conn) or {}
+        packed_heat = (
+            packed_heat_electricity.get("heat")
+            if packed_heat_electricity is not None
+            else None
+        )
+        _heat_cache = packed_heat or _gather_heat(conn) or {}
     d.update(_heat_cache)
 
     # ---- Electricity by source: reactors (custom service) + RTGs + solar ----
-    global _elec_cache, _elec_last_poll
-    if now - _elec_last_poll >= ELEC_POLL_SECONDS:
+    if elec_due:
         _elec_last_poll = now
-        elec = {}
+        elec = (
+            dict(packed_heat_electricity["electricity"])
+            if packed_heat_electricity is not None
+            else {}
+        )
 
-        # Bracket the sequential per-reactor reads with total-generation
-        # samples. Reactor output can change while the RPCs below are in flight;
-        # a residual that exists at only one endpoint is timing skew, not an
-        # `Other` generator family.
-        service_total_before = None
-        try:
-            service_total_before = conn.system_heat.total_electrical_generation()
-        except Exception:
-            pass
-
-        elec.update(_gather_reactor_telemetry(conn))
-
-        try:
-            sh = conn.system_heat
-            elec["rtg.count"] = sh.rtg_count()
-            elec["rtg.outputEcPerSec"] = round(sh.rtg_total_output(), 2)
-        except Exception:
-            pass
-
-        solar_ec = 0.0
-        try:
-            panels = vessel.parts.solar_panels
-            readings = [
-                (sp.energy_flow, sp.sun_exposure) for sp in panels
-            ]
-            readings.extend(curved_solar_readings(vessel.parts))
-            panel_count, total_flow, average_exposure = solar_summary(readings)
-            solar_ec = total_flow
-            elec["solar.count"] = panel_count
-            elec["solar.outputEcPerSec"] = round(total_flow, 2)
-            elec["solar.efficiency"] = round(average_exposure, 3)
-        except Exception:
-            pass
-
-        # ---- Total generation + "all other" ----------------------------------
-        # The service's TotalElectricalGeneration covers reactors + RTGs + fuel
-        # cells + alternators (NOT solar -- we read solar natively above). So the
-        # true vessel total = service total + native solar. "All other" is then
-        # whatever isn't itemized in the reactor/solar/RTG cards: fuel cells,
-        # alternators, and any modded producer the service could read.
-        try:
-            sh = conn.system_heat
-            service_total_after = service_total_before
+        if packed_heat_electricity is None:
+            # Bracket the sequential legacy per-reactor reads with generation
+            # samples. The packed path is already one atomic service capture.
+            service_total_before = None
             try:
-                service_total_after = sh.total_electrical_generation()  # excludes solar
+                service_total_before = (
+                    conn.system_heat.total_electrical_generation()
+                )
             except Exception:
                 pass
-            service_total = latest_generation_total(
-                service_total_before,
-                service_total_after,
-            )
-            if service_total is None:
-                raise RuntimeError("SystemHeat generation total unavailable")
-            total_gen = service_total + solar_ec
 
-            reactor_sum = sum(r["ecPerSec"] for r in elec.get("elec.reactors", []))
-            rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
-            other = bracketed_generation_remainder(
-                service_total_before,
-                service_total_after,
-                reactor_sum,
-                rtg_ec,
-            )
+            elec.update(_gather_reactor_telemetry(conn))
 
-            elec["elec.totalGenEcPerSec"] = round(total_gen, 2)
-            elec["elec.otherEcPerSec"] = round(other or 0.0, 2)
-        except Exception:
-            pass  # service absent -> dashboard just won't show total/other
+            try:
+                sh = conn.system_heat
+                elec["rtg.count"] = sh.rtg_count()
+                elec["rtg.outputEcPerSec"] = round(sh.rtg_total_output(), 2)
+            except Exception:
+                pass
+
+            solar_ec = 0.0
+            try:
+                panels = vessel.parts.solar_panels
+                readings = [
+                    (sp.energy_flow, sp.sun_exposure) for sp in panels
+                ]
+                readings.extend(curved_solar_readings(vessel.parts))
+                panel_count, total_flow, average_exposure = solar_summary(
+                    readings
+                )
+                solar_ec = total_flow
+                elec["solar.count"] = panel_count
+                elec["solar.outputEcPerSec"] = round(total_flow, 2)
+                elec["solar.efficiency"] = round(average_exposure, 3)
+            except Exception:
+                pass
+
+            # ---- Total generation + "all other" --------------------------
+            # Legacy SystemHeat excludes solar; add the stock/custom readings.
+            try:
+                sh = conn.system_heat
+                service_total_after = service_total_before
+                try:
+                    service_total_after = (
+                        sh.total_electrical_generation()
+                    )  # excludes solar
+                except Exception:
+                    pass
+                service_total = latest_generation_total(
+                    service_total_before,
+                    service_total_after,
+                )
+                if service_total is None:
+                    raise RuntimeError(
+                        "SystemHeat generation total unavailable"
+                    )
+                total_gen = service_total + solar_ec
+
+                reactor_sum = sum(
+                    r["ecPerSec"] for r in elec.get("elec.reactors", [])
+                )
+                rtg_ec = elec.get("rtg.outputEcPerSec", 0.0) or 0.0
+                other = bracketed_generation_remainder(
+                    service_total_before,
+                    service_total_after,
+                    reactor_sum,
+                    rtg_ec,
+                )
+
+                elec["elec.totalGenEcPerSec"] = round(total_gen, 2)
+                elec["elec.otherEcPerSec"] = round(other or 0.0, 2)
+            except Exception:
+                pass  # service absent -> omit total/other
 
         if elec:
             _elec_cache = elec

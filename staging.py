@@ -96,39 +96,83 @@ def enrich_stage_result(service, result):
     return result
 
 
-def flight_conditions(conn):
-    conditions = {}
-    try:
-        vessel = conn.space_center.active_vessel
-    except Exception:
-        return conditions
+def flight_conditions(
+        conn, *, vessel=None, body=None, flight=None, control=None,
+        known=None):
+    """Return stage context while reusing an optional cycle-scoped snapshot.
+
+    ``known`` contains values already read for the core Flight payload. Missing
+    proxies or values retain the original independent kRPC lookup path, which
+    keeps scene-transition and older-server behavior conservative.
+    """
+    conditions = dict(known) if isinstance(known, dict) else {}
+    if vessel is None:
+        try:
+            vessel = conn.space_center.active_vessel
+        except Exception:
+            return conditions
     if vessel is None:
         return conditions
 
-    try:
-        body = vessel.orbit.body
-        conditions["stage.body"] = str(body.name)
-        flight = vessel.flight(body.reference_frame)
-        altitude = _finite_number(flight.mean_altitude)
-        pressure_pa = _finite_number(flight.static_pressure)
+    def update_body_conditions(candidate_body, candidate_flight):
+        needs_body = "stage.body" not in conditions
+        needs_altitude = "stage.altitude" not in conditions
+        needs_pressure = "stage.staticPressureAtm" not in conditions
+        if not (needs_body or needs_altitude or needs_pressure):
+            return
+        if candidate_body is None:
+            candidate_body = vessel.orbit.body
+        if needs_body:
+            conditions["stage.body"] = str(candidate_body.name)
+        if candidate_flight is None and (needs_altitude or needs_pressure):
+            candidate_flight = vessel.flight(candidate_body.reference_frame)
+        altitude = (
+            None
+            if not needs_altitude
+            else _finite_number(candidate_flight.mean_altitude)
+        )
+        pressure_pa = (
+            _finite_number(candidate_flight.static_pressure)
+            if needs_pressure
+            else None
+        )
         if altitude is not None:
             conditions["stage.altitude"] = round(altitude, 1)
         if pressure_pa is not None:
             conditions["stage.staticPressureAtm"] = round(
                 pressure_pa / 101_325.0, 4
             )
-    except Exception:
-        pass
 
     try:
-        situation = str(vessel.situation).split(".")[-1].replace("_", " ").title()
-        conditions["stage.situation"] = situation
+        update_body_conditions(body, flight)
     except Exception:
-        pass
-    try:
-        throttle = _finite_number(vessel.control.throttle)
+        if body is not None or flight is not None:
+            try:
+                update_body_conditions(None, None)
+            except Exception:
+                pass
+
+    if "stage.situation" not in conditions:
+        try:
+            situation = str(vessel.situation).split(".")[-1].replace("_", " ").title()
+            conditions["stage.situation"] = situation
+        except Exception:
+            pass
+    def update_throttle(candidate_control):
+        if "stage.throttle" in conditions:
+            return
+        if candidate_control is None:
+            candidate_control = vessel.control
+        throttle = _finite_number(candidate_control.throttle)
         if throttle is not None:
             conditions["stage.throttle"] = round(throttle, 4)
+
+    try:
+        update_throttle(control)
     except Exception:
-        pass
+        if control is not None:
+            try:
+                update_throttle(None)
+            except Exception:
+                pass
     return conditions

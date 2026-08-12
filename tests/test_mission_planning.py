@@ -143,6 +143,74 @@ class FakeConnection:
         )()
 
 
+class CountingPlanner:
+    def __init__(self, planner=None):
+        self.planner = planner or FakePlanner()
+        self.reads = {
+            "available": 0,
+            "detected_version": 0,
+            "compatibility_target": 0,
+        }
+        self.fail_available_reads = 0
+
+    @property
+    def available(self):
+        self.reads["available"] += 1
+        if self.fail_available_reads > 0:
+            self.fail_available_reads -= 1
+            raise RuntimeError("transient capability failure")
+        return self.planner.available
+
+    @property
+    def detected_mech_jeb_version(self):
+        self.reads["detected_version"] += 1
+        return self.planner.detected_mech_jeb_version
+
+    @property
+    def compatibility_target(self):
+        self.reads["compatibility_target"] += 1
+        return self.planner.compatibility_target
+
+    def __getattr__(self, name):
+        return getattr(self.planner, name)
+
+
+class CountingMechJeb:
+    def __init__(self, planner=None, *, compatibility_ready=True):
+        self.planner = CountingPlanner(planner)
+        self.compatibility_ready = compatibility_ready
+        self.planner_reads = 0
+        self.compatibility_reads = 0
+
+    @property
+    def transfer_planner(self):
+        self.planner_reads += 1
+        return self.planner
+
+    @property
+    def type_compatibility_ready(self):
+        self.compatibility_reads += 1
+        return self.compatibility_ready
+
+
+def counting_connection(planner=None, *, compatibility_ready=True):
+    mech_jeb = CountingMechJeb(
+        planner,
+        compatibility_ready=compatibility_ready,
+    )
+    connection = SimpleNamespace(
+        mech_jeb=mech_jeb,
+        space_center=SimpleNamespace(
+            bodies={},
+            ut=12345.0,
+            active_vessel=SimpleNamespace(
+                control=SimpleNamespace(nodes=mech_jeb.planner.planner.nodes)
+            ),
+        ),
+    )
+    return connection, mech_jeb
+
+
 def start_command(request_id="request-1"):
     return {
         "type": "mechjeb.transfer.start",
@@ -331,6 +399,108 @@ class TransferCommandTests(unittest.TestCase):
         self.assertEqual(payload["mj.transfer.state"], "failed")
         self.assertIn("unavailable", payload["mj.transfer.error"].lower())
         self.assertEqual(payload["mj.transfer.requestId"], "request-1")
+
+    def test_idle_capabilities_refresh_at_one_hz(self):
+        controller = planning.MissionPlanningController()
+        conn, service = counting_connection()
+
+        with patch.object(planning.time, "time", side_effect=[100.0, 100.25, 101.0]):
+            first = controller.gather(conn, "flight", 12345.0)
+            service.planner.planner.available = False
+            service.planner.planner.detected_mech_jeb_version = "changed"
+            cached = controller.gather(conn, "flight", 12345.25)
+            refreshed = controller.gather(conn, "flight", 12346.0)
+
+        self.assertTrue(first["mj.transfer.available"])
+        self.assertTrue(cached["mj.transfer.available"])
+        self.assertEqual(cached["mj.transfer.detectedVersion"], "2.15.3.0")
+        self.assertFalse(refreshed["mj.transfer.available"])
+        self.assertEqual(refreshed["mj.transfer.detectedVersion"], "changed")
+        self.assertEqual(service.planner_reads, 2)
+        self.assertEqual(service.compatibility_reads, 2)
+        self.assertEqual(service.planner.reads, {
+            "available": 2,
+            "detected_version": 2,
+            "compatibility_target": 2,
+        })
+
+    def test_mode_and_connection_changes_refresh_inside_ttl(self):
+        controller = planning.MissionPlanningController()
+        first_conn, first_service = counting_connection()
+        second_conn, second_service = counting_connection(
+            FakePlanner(available=False)
+        )
+
+        with patch.object(
+            planning.time,
+            "time",
+            side_effect=[100.0, 100.25, 100.5],
+        ):
+            controller.gather(first_conn, "flight", 12345.0)
+            controller.gather(first_conn, "inactive", 12345.25)
+            changed = controller.gather(second_conn, "inactive", 12345.5)
+
+        self.assertEqual(first_service.planner_reads, 2)
+        self.assertEqual(second_service.planner_reads, 1)
+        self.assertFalse(changed["mj.transfer.available"])
+
+    def test_ut_rewind_refreshes_capabilities_inside_ttl(self):
+        controller = planning.MissionPlanningController()
+        conn, service = counting_connection()
+
+        with patch.object(planning.time, "time", side_effect=[100.0, 100.25]):
+            controller.gather(conn, "flight", 1000.0)
+            controller.gather(conn, "flight", 900.0)
+
+        self.assertEqual(service.planner_reads, 2)
+        self.assertEqual(service.compatibility_reads, 2)
+
+    def test_capability_failure_retries_next_frame_and_clears_descriptions(self):
+        controller = planning.MissionPlanningController()
+        conn, service = counting_connection()
+        service.planner.fail_available_reads = 1
+
+        with patch.object(planning.time, "time", side_effect=[100.0, 100.25]):
+            failed = controller.gather(conn, "flight", 12345.0)
+            recovered = controller.gather(conn, "flight", 12345.25)
+
+        self.assertFalse(failed["mj.transfer.available"])
+        self.assertFalse(failed["mj.transfer.compatibilityReady"])
+        self.assertEqual(failed["mj.transfer.detectedVersion"], "")
+        self.assertEqual(failed["mj.transfer.compatibilityTarget"], "")
+        self.assertTrue(recovered["mj.transfer.available"])
+        self.assertEqual(service.planner_reads, 2)
+
+    def test_command_bypasses_idle_capability_cache(self):
+        controller = planning.MissionPlanningController()
+        conn, service = counting_connection()
+
+        with patch.object(
+            planning.time,
+            "time",
+            side_effect=[100.0, 100.25, 100.5],
+        ):
+            controller.gather(conn, "flight", 12345.0)
+            service.planner.planner.available = False
+            controller.apply_command(conn, start_command())
+            payload = controller.gather(conn, "flight", 12345.5)
+
+        self.assertEqual(service.planner.planner.started, [])
+        self.assertFalse(payload["mj.transfer.available"])
+        self.assertEqual(payload["mj.transfer.state"], "failed")
+
+    def test_active_worker_keeps_live_capability_and_progress_reads(self):
+        controller = planning.MissionPlanningController()
+        conn, service = counting_connection()
+
+        with patch.object(planning.time, "time", return_value=100.0):
+            controller.apply_command(conn, start_command())
+            controller.gather(conn, "flight", 12345.0)
+            service.planner.planner.progress = 47
+            payload = controller.gather(conn, "flight", 12345.25)
+
+        self.assertEqual(payload["mj.transfer.progress"], 47)
+        self.assertGreaterEqual(service.planner_reads, 3)
 
     def test_incompatible_service_reports_failure_for_request(self):
         conn = FakeConnection(compatibility_ready=False)

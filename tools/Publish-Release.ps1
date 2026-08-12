@@ -96,6 +96,13 @@ $frontendDist = Join-Path $frontendRoot 'dist'
 Assert-RequiredFile $manifestPath
 Assert-RequiredFile $frontendBuildScript
 $manifest = Import-PowerShellDataFile -LiteralPath $manifestPath
+if ($manifest.ContainsKey('ReleaseState') -and
+    $manifest.ReleaseState -eq 'Unreleased') {
+    throw (
+        'Release-Manifest.psd1 is an Unreleased development selection. ' +
+        'Choose and align the product release version before packaging.'
+    )
+}
 if ($manifest.ProductVersion -ne $Version) {
     throw "Release-Manifest.psd1 targets $($manifest.ProductVersion), not requested v$Version."
 }
@@ -168,10 +175,15 @@ $sourceFiles = @(
     @{ Source = 'Select Mission Control Setup.ps1'; Destination = 'Dashboard/Select Mission Control Setup.ps1' },
     @{ Source = 'ksp_dashboard_app.py'; Destination = 'Dashboard/ksp_dashboard_app.py' },
     @{ Source = 'panel_bridge.py'; Destination = 'Dashboard/panel_bridge.py' },
+    @{ Source = 'damage.py'; Destination = 'Dashboard/damage.py' },
     @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
+    @{ Source = 'flight_core_snapshot.py'; Destination = 'Dashboard/flight_core_snapshot.py' },
     @{ Source = 'heat.py'; Destination = 'Dashboard/heat.py' },
+    @{ Source = 'heat_electricity_snapshot.py'; Destination = 'Dashboard/heat_electricity_snapshot.py' },
     @{ Source = 'mission_planning.py'; Destination = 'Dashboard/mission_planning.py' },
     @{ Source = 'planner_persistence.py'; Destination = 'Dashboard/planner_persistence.py' },
+    @{ Source = 'resource_snapshot.py'; Destination = 'Dashboard/resource_snapshot.py' },
+    @{ Source = 'stage_snapshot.py'; Destination = 'Dashboard/stage_snapshot.py' },
     @{ Source = 'staging.py'; Destination = 'Dashboard/staging.py' },
     @{ Source = 'telemetry_runtime.py'; Destination = 'Dashboard/telemetry_runtime.py' },
     @{ Source = 'requirements-dashboard.txt'; Destination = 'Dashboard/requirements-dashboard.txt' },

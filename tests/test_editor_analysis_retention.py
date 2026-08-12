@@ -582,7 +582,7 @@ class EditorConditionCommandTests(unittest.TestCase):
         return types.SimpleNamespace(
             stage_stats=service,
             krpc=types.SimpleNamespace(
-                current_game_scene="editor_vab",
+                game_scene="editor_vab",
                 GameScene=game_scene,
             ),
         )
