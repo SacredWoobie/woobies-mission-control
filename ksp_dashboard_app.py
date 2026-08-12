@@ -3812,6 +3812,16 @@ class App:
             except tk.TclError:
                 self.update_install_dialog = None
 
+        # The update decision owns the launcher while it is visible.  In
+        # particular, do not leave a changelog grab/focus chain behind if a
+        # staged update becomes ready while that secondary window is open.
+        if self.changelog_dialog is not None:
+            try:
+                if self.changelog_dialog.winfo_exists():
+                    self._close_changelog()
+            except tk.TclError:
+                self.changelog_dialog = None
+
         dialog = tk.Toplevel(self.root)
         self.update_install_dialog = dialog
         dialog.title(f"Install {staged['release']['tag_name']} - {APP_NAME}")
@@ -3896,14 +3906,21 @@ class App:
             footer, text="Cancel", width=10, command=self._cancel_staged_update
         )
         self.update_cancel_button.pack(side="right")
+        self.update_cancel_button.bind(
+            "<Return>", lambda _event: self._cancel_staged_update()
+        )
         self.update_confirm_button = ttk.Button(
             footer,
             text="Install and restart",
             command=self._install_staged_update,
         )
         self.update_confirm_button.pack(side="right", padx=(0, 8))
+        self.update_confirm_button.bind(
+            "<Return>", lambda _event: self._install_staged_update()
+        )
 
         dialog.protocol("WM_DELETE_WINDOW", self._cancel_staged_update)
+        dialog.bind("<Escape>", lambda _event: self._cancel_staged_update())
         dialog.update_idletasks()
         x = self.root.winfo_rootx() + max(
             0, (self.root.winfo_width() - dialog.winfo_width()) // 2
@@ -3913,6 +3930,7 @@ class App:
         )
         dialog.geometry(f"{dialog.winfo_width()}x{dialog.winfo_height()}+{x}+{y}")
         dialog.grab_set()
+        dialog.lift()
         self.update_confirm_button.focus_set()
 
     def _cancel_staged_update(self):
@@ -4072,6 +4090,12 @@ class App:
             self._enqueue("updates", f"couldn't save update preferences: {exc}")
 
     def _maybe_show_changelog(self):
+        # Never allow the delayed startup changelog to steal the modal grab or
+        # keyboard focus from a verified update decision.  If the user cancels,
+        # the changelog can still be opened from its launcher button; if the
+        # update proceeds, the successor's changelog is the relevant one.
+        if self.staged_update is not None or self.update_install_dialog is not None:
+            return
         changelog = load_changelog(self.changelog_path)
         current_notes = extract_version_changelog(changelog, APP_VERSION)
         if should_show_changelog(

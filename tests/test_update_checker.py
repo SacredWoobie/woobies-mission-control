@@ -36,6 +36,15 @@ class FakeResponse:
 
 
 class UpdateCheckerTests(unittest.TestCase):
+    def test_delayed_changelog_does_not_steal_an_update_decision(self):
+        class Probe:
+            staged_update = {"transaction_id": "synthetic"}
+            update_install_dialog = None
+
+        # This deliberately supplies none of the changelog attributes. Reaching
+        # past the modal guard would therefore fail the test immediately.
+        self.assertIsNone(ksp_dashboard_app.App._maybe_show_changelog(Probe()))
+
     def test_parse_version_tag_accepts_release_versions(self):
         self.assertEqual(ksp_dashboard_app.parse_version_tag("v1.2.3"), (1, 2, 3))
         self.assertEqual(ksp_dashboard_app.parse_version_tag("1.2.3"), (1, 2, 3))
