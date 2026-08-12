@@ -57,6 +57,20 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
         bad[0] = bad[0].replace("\t1\t1\t", "\t2\t1\t", 1)
         with self.assertRaises(ValueError):
             decode_editor_electrical_snapshot(bad)
+
+    def test_rejects_declared_and_encoded_bounds(self):
+        bad = snapshot()
+        fields = bad[0].split("\t")
+        fields[12] = "4097"
+        bad[0] = "\t".join(fields)
+        with self.assertRaises(ValueError):
+            decode_editor_electrical_snapshot(bad)
+        bad = snapshot()
+        fields = bad[1].split("\t")
+        fields[3] = b("x" * 4097)
+        bad[1] = "\t".join(fields)
+        with self.assertRaises(ValueError):
+            decode_editor_electrical_snapshot(bad)
         bad = snapshot()
         bad[1] = bad[1].replace("\tconsumer\t0", "\tbad-role\t0")
         with self.assertRaises(ValueError):

@@ -10,11 +10,17 @@ _BODY_WIDTH = 11
 _STATES = frozenset({"ready", "warming", "degraded", "empty", "unavailable"})
 _BACKENDS = frozenset({"dynamic_battery_storage", "stock"})
 _ROLES = frozenset({"producer", "consumer"})
+_MAX_COMPONENTS = 4096
+_MAX_BODIES = 512
+_MAX_TEXT_BYTES = 4096
+_MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
 
 
 def _text(value, label):
     try:
         decoded = base64.b64decode(value.encode("ascii"), validate=True)
+        if len(decoded) > _MAX_TEXT_BYTES:
+            raise ValueError("EditorElectrical %s exceeds text bound" % label)
         return decoded.decode("utf-8")
     except Exception as exc:
         raise ValueError("Invalid EditorElectrical %s" % label) from exc
@@ -53,6 +59,8 @@ def _flag(value, label):
 
 def _rows(payload):
     if isinstance(payload, str):
+        if len(payload.encode("utf-8")) > _MAX_SNAPSHOT_BYTES:
+            raise ValueError("EditorElectrical snapshot exceeds byte bound")
         rows = payload.splitlines()
     else:
         try:
@@ -81,6 +89,8 @@ def decode_editor_electrical_snapshot(payload):
         raise ValueError("EditorElectrical current EC exceeds maximum")
     component_count = _integer(header[12], "component count")
     body_count = _integer(header[13], "body count")
+    if component_count > _MAX_COMPONENTS or body_count > _MAX_BODIES:
+        raise ValueError("EditorElectrical snapshot exceeds row bounds")
     if len(rows) != 1 + component_count + body_count:
         raise ValueError("EditorElectrical snapshot count does not match rows")
     if header[2] == "ready" and header[14]:
