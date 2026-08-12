@@ -34,14 +34,14 @@
 .resonant-save-fields { display: grid; min-width: min(520px,70vw); grid-template-columns: minmax(220px,1fr) auto; align-items: end; gap: 10px; }
 .resonant-save-fields label { display: grid; gap: 4px; }
 .resonant-save-fields label > span { color: var(--slate); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.resonant-save-fields input { min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 10px var(--mono); }
+.resonant-save-fields input { min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 10px var(--mono); }
 .resonant-save-fields input:focus { border-color: var(--cyan); }
 .resonant-save-fields small { padding-bottom: 10px; color: var(--green); font-size: 9px; }
 
 .resonant-controls { display: grid; grid-template-columns: minmax(150px,1.2fr) 88px minmax(155px,1fr) minmax(210px,1.25fr); gap: 10px; align-items: end; padding: 14px 16px; border-bottom: 1px solid var(--surface-seam); background: var(--surface-plate); }
 .resonant-controls label, .resonant-advanced label { display: grid; gap: 6px; min-width: 0; }
 .resonant-controls label > span, .resonant-controls legend, .resonant-advanced label > span { color: var(--slate); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.resonant-controls input, .resonant-controls select, .resonant-advanced input { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 11px var(--mono); }
+.resonant-controls input, .resonant-controls select, .resonant-advanced input { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 11px var(--mono); }
 .resonant-controls input:focus, .resonant-controls select:focus, .resonant-advanced input:focus { border-color: var(--cyan); }
 .resonant-controls fieldset { margin: 0; padding: 0; border: 0; }
 .resonant-controls legend { margin-bottom: 6px; }
@@ -151,7 +151,7 @@
 .delta-v-field-heading small.delta-v-input-error { color: var(--error-text); }
 .delta-v-controls legend { margin-bottom: 5px; }
 .delta-v-transfer-mode + small { display: block; margin-top: 3px; }
-.delta-v-controls select, .delta-v-controls input[type="number"] { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 11px var(--mono); }
+.delta-v-controls select, .delta-v-controls input[type="number"] { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 11px var(--mono); }
 .delta-v-controls select:focus, .delta-v-controls input[type="number"]:focus { border-color: var(--cyan); }
 .delta-v-controls input[aria-invalid="true"] { border-color: var(--warn); }
 .delta-v-controls small { min-height: 11px; color: var(--slate-muted-text); font-size: 9px; line-height: 1.25; }
@@ -166,8 +166,8 @@
 .delta-v-add-stop-row button:hover, .delta-v-add-stop-row button:focus-visible { border-color: var(--cyan); background: #102633; }
 .delta-v-add-stop-row button.secondary { border-color: var(--rule-bright); color: var(--slate); background: #0c141e; }
 .delta-v-add-stop-row button:disabled { opacity: .4; cursor: not-allowed; }
-.delta-v-add-stop-row button, .delta-v-plan-library-actions button, .delta-v-save-bar button, .delta-v-route-window-actions button, .delta-v-porkchop-button, .delta-v-add-step button, .delta-v-stay-control button, .delta-v-reset-button, .delta-v-saved-plans-button, .delta-v-assumptions-button { border-radius: var(--surface-radius-face); background: var(--surface-raised-face); box-shadow: var(--surface-depth-raised); }
-.delta-v-plan-library-actions button.delete, .delta-v-route-stop-actions button:last-child, .delta-v-custom-actions button { box-shadow: var(--surface-depth-raised); }
+.delta-v-add-stop-row button, .delta-v-plan-library-actions button, .delta-v-save-bar button, .delta-v-route-window-actions button, .delta-v-porkchop-button, .delta-v-add-step button, .delta-v-stay-control button, .delta-v-reset-button, .delta-v-saved-plans-button, .delta-v-assumptions-button { border-radius: var(--surface-radius-face); background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); }
+.delta-v-plan-library-actions button.delete, .delta-v-route-stop-actions button:last-child, .delta-v-custom-actions button { box-shadow: var(--surface-depth-control); }
 .delta-v-endpoint-segments input:disabled + span { opacity: .35; cursor: not-allowed; }
 .delta-v-plan-library-empty { padding: 7px 9px; border: 1px dashed #294657; color: var(--slate-muted-text); font-size: 9px; }
 .delta-v-plan-library-list { display: grid; gap: 4px; }
@@ -192,14 +192,14 @@
 .delta-v-save-bar { display: grid; grid-area: budget-save; grid-template-columns: minmax(180px,1fr) auto auto; align-items: end; gap: 6px; }
 .delta-v-save-bar label { display: grid; gap: 3px; }
 .delta-v-save-bar label > span { color: var(--slate); font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.delta-v-save-bar input { width: 100%; min-height: 29px; padding: 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: var(--text-primary); background: #060c12; font: 9px var(--mono); }
+.delta-v-save-bar input { width: 100%; min-height: 29px; padding: 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); }
 .delta-v-save-bar input:focus { border-color: var(--cyan); }
 .delta-v-save-bar button { min-height: 29px; padding: 5px 9px; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 9px var(--mono); }
 .delta-v-save-actions { display: flex; min-width: 0; gap: 6px; }
 .delta-v-save-actions button { flex: 1 1 auto; }
 .delta-v-save-bar small { grid-column: 1 / -1; align-self: center; color: var(--green); font-size: 9px; }
 .delta-v-save-bar small.error { color: var(--error-text); }
-.delta-v-total { grid-area: budget-total; padding: 12px 15px; border: 1px solid var(--amber-accent); border-left: 3px solid var(--amber); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
+.delta-v-total { grid-area: budget-total; padding: 12px 15px; border: 1px solid var(--amber-accent); border-left: 3px solid var(--amber); background: linear-gradient(100deg,rgba(255,180,84,.09),rgba(15,21,31,.78)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), inset 0 -1px 3px rgba(0,0,0,.5); }
 .delta-v-total > span, .delta-v-stat-grid span { display: block; color: var(--slate); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .delta-v-total > strong { display: block; margin-top: 6px; color: var(--amber); font-size: clamp(24px,3vw,34px); letter-spacing: -.035em; }
 .delta-v-total > small, .delta-v-stat-grid small { display: block; margin-top: 5px; color: var(--slate-muted-text); font-size: 9px; }
@@ -239,7 +239,7 @@
 .delta-v-landing-options { align-items: end; }
 .delta-v-leg-options .delta-v-inline-reserve { display: grid; grid-template-columns: minmax(115px,auto) 125px; align-items: center; gap: 7px; cursor: default; }
 .delta-v-inline-reserve > span { color: var(--slate); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.delta-v-inline-reserve .resonant-input-unit input { width: 100%; min-height: 27px; padding: 4px 47px 4px 7px; border: 1px solid var(--rule-bright); color: var(--text-primary); background: #060c12; font: 9px var(--mono); }
+.delta-v-inline-reserve .resonant-input-unit input { width: 100%; min-height: 27px; padding: 4px 47px 4px 7px; border: 1px solid var(--rule-bright); color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); }
 .delta-v-inline-reserve .resonant-input-unit > span { top: 7px; right: 29px; font-size: 9px; }
 .delta-v-leg:has(.delta-v-leg-options) { min-height: 72px; }
 .delta-v-leg.editing-stop { box-shadow: inset 2px 0 var(--amber); background: rgba(255,180,84,.035); }
@@ -270,10 +270,10 @@
 .delta-v-leg.ascent .delta-v-leg-side > b, .delta-v-leg.deorbit .delta-v-leg-side > b, .delta-v-leg.landing .delta-v-leg-side > b { color: var(--amber); }
 .delta-v-leg.transfer .delta-v-leg-side > b { color: var(--slate); }
 .delta-v-leg.custom { background: rgba(255,180,84,.035); box-shadow: inset 2px 0 rgba(255,180,84,.55); }
-.delta-v-custom-label input { width: 100%; min-height: 31px; padding: 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: #f2d3a2; background: #0b0d10; box-sizing: border-box; font: 10px var(--mono); }
+.delta-v-custom-label input { width: 100%; min-height: 31px; padding: 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: #f2d3a2; background: var(--surface-well); box-shadow: var(--surface-depth-deep); box-sizing: border-box; font: 10px var(--mono); }
 .delta-v-custom-label input:focus, .delta-v-custom-actions input:focus { border-color: var(--amber); }
 .delta-v-custom-actions { display: grid; grid-template-columns: 140px 28px; align-items: center; gap: 6px; }
-.delta-v-custom-actions .resonant-input-unit input { width: 100%; min-height: 31px; padding: 5px 48px 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: var(--amber); background: #0b0d10; box-sizing: border-box; font: 10px var(--mono); }
+.delta-v-custom-actions .resonant-input-unit input { width: 100%; min-height: 31px; padding: 5px 48px 5px 8px; border: 1px solid var(--rule-bright); outline: 0; color: var(--amber); background: var(--surface-well); box-shadow: var(--surface-depth-deep); box-sizing: border-box; font: 10px var(--mono); }
 .delta-v-custom-actions .resonant-input-unit > span { top: 9px; right: 29px; font-size: 9px; }
 .delta-v-custom-actions button { width: 28px; height: 28px; border: 1px solid #6c3e3e; color: #e59898; background: #1c1010; cursor: pointer; font-size: 15px; }
 .delta-v-add-step { position: relative; z-index: 3; height: 0; }
@@ -287,7 +287,7 @@
 .delta-v-stay-control button { display: grid; width: 27px; height: 27px; padding: 0; place-items: center; border: 1px solid var(--accent-border); color: var(--cyan); background: var(--control-surface); cursor: pointer; font: 13px var(--mono); }
 .delta-v-stay-control button:disabled { opacity: .35; cursor: default; }
 .delta-v-stay-control label { display: flex; align-items: center; gap: 5px; color: var(--slate); font-size: 9px; }
-.delta-v-stay-control input { width: 54px; min-height: 27px; padding: 3px 5px; border: 1px solid #294657; color: var(--text-primary); background: #0a141c; font: 9px var(--mono); text-align: right; }
+.delta-v-stay-control input { width: 54px; min-height: 27px; padding: 3px 5px; border: 1px solid #294657; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); text-align: right; }
 .delta-v-calculated-stay { display: grid; width: 100%; max-width: 420px; min-height: 48px; align-content: center; gap: 3px; padding: 7px 10px; border: 1px solid rgba(255,180,84,.38); background: rgba(255,180,84,.045); }
 .delta-v-calculated-stay > span { color: var(--amber); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .delta-v-calculated-stay > strong { color: #e3edf2; font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -333,7 +333,7 @@
 .porkchop-filter-grid > label, .porkchop-range-filter { display: grid; min-width: 0; gap: 4px; }
 .porkchop-filter-grid span { color: var(--slate); font-size: 8px; letter-spacing: .07em; }
 .porkchop-cost-filter > div { display: flex; align-items: center; gap: 5px; }
-.porkchop-cost-filter input { width: 82px; min-height: 27px; border: 1px solid #294657; color: var(--text-primary); background: #070d13; font: 9px var(--mono); text-align: right; }
+.porkchop-cost-filter input { width: 82px; min-height: 27px; border: 1px solid #294657; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 9px var(--mono); text-align: right; }
 .porkchop-cost-filter b { color: var(--slate); font: 8px var(--mono); }
 .porkchop-range-filter { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .porkchop-range-filter > span { grid-column: 1 / -1; }
@@ -1505,7 +1505,8 @@
   border: 1px solid var(--rule-bright);
   outline: 0;
   color: var(--text-primary);
-  background: #060c12;
+  background: var(--surface-well);
+  box-shadow: var(--surface-depth-deep);
   font: 12px var(--mono);
 }
 .resonant-header-save-bar input:focus {
