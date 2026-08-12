@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import time
 import tempfile
@@ -38,6 +39,27 @@ class FakeResponse:
 
 
 class UpdateCheckerTests(unittest.TestCase):
+    def test_update_buttons_follow_the_check_review_reference_workflow(self):
+        source = Path(ksp_dashboard_app.__file__).read_text(encoding="utf-8")
+        start = source.index('update_actions = ttk.Frame')
+        end = source.index('self.main_panes = tk.PanedWindow', start)
+        update_bar = source[start:end]
+
+        self.assertEqual(
+            re.findall(
+                r'text="(Check now|Review & install|Changelog|View release)"',
+                update_bar,
+            ),
+            ["Check now", "Review & install", "Changelog", "View release"],
+        )
+        for attribute in (
+            "check_updates_button",
+            "install_update_button",
+            "changelog_button",
+            "view_release_button",
+        ):
+            self.assertIn(f'{attribute}.pack(side="left"', update_bar)
+
     def test_delayed_changelog_does_not_steal_an_update_decision(self):
         class Probe:
             staged_update = {"transaction_id": "synthetic"}

@@ -2542,43 +2542,45 @@ class App:
             style="Shell.TLabel",
         )
         self.update_status.pack(side="left", fill="x", expand=True)
-        self.view_release_button = ttk.Button(
-            update_bar,
-            text="View release",
-            state="disabled",
-            command=self._open_latest_release,
-        )
-        self.view_release_button.pack(side="right", padx=(4, 0))
-        self.install_update_button = ttk.Button(
-            update_bar,
-            text="Review & install",
-            state="disabled",
-            command=self._stage_available_update,
-        )
-        self.install_update_button.pack(side="right", padx=(4, 0))
-        self.changelog_button = ttk.Button(
-            update_bar,
-            text="Changelog",
-            state="normal" if self.changelog_path is not None else "disabled",
-            command=lambda: self._show_changelog(current_version_only=False),
-        )
-        self.changelog_button.pack(side="right", padx=(4, 0))
-        self.check_updates_button = ttk.Button(
-            update_bar,
-            text="Check now",
-            command=lambda: self._start_update_check(use_cache=False),
-        )
-        self.check_updates_button.pack(side="right", padx=(4, 0))
+        update_actions = ttk.Frame(update_bar, style="Shell.TFrame")
+        update_actions.pack(side="right")
         self.check_updates_var = tk.BooleanVar(
             value=self.update_state.get("check_enabled", True) is not False
         )
         self.check_updates_control = CheckXControl(
-            update_bar,
+            update_actions,
             self.check_updates_var,
             "AUTOMATIC UPDATE CHECKS",
             self._toggle_automatic_updates,
         )
-        self.check_updates_control.pack(side="right", padx=(6, 0))
+        self.check_updates_control.pack(side="left", padx=(6, 0))
+        self.check_updates_button = ttk.Button(
+            update_actions,
+            text="Check now",
+            command=lambda: self._start_update_check(use_cache=False),
+        )
+        self.check_updates_button.pack(side="left", padx=(4, 0))
+        self.install_update_button = ttk.Button(
+            update_actions,
+            text="Review & install",
+            state="disabled",
+            command=self._stage_available_update,
+        )
+        self.install_update_button.pack(side="left", padx=(4, 0))
+        self.changelog_button = ttk.Button(
+            update_actions,
+            text="Changelog",
+            state="normal" if self.changelog_path is not None else "disabled",
+            command=lambda: self._show_changelog(current_version_only=False),
+        )
+        self.changelog_button.pack(side="left", padx=(4, 0))
+        self.view_release_button = ttk.Button(
+            update_actions,
+            text="View release",
+            state="disabled",
+            command=self._open_latest_release,
+        )
+        self.view_release_button.pack(side="left", padx=(4, 0))
 
         self.main_panes = tk.PanedWindow(
             root,
