@@ -186,6 +186,13 @@ density.
 - Without a pinned planning companion, Craft Analysis spans the workspace and
   Staging plus Resource Inventory share the row beneath it. Pinned plans retain
   a compact secondary planning column without starving the primary analysis.
+- The editor-only Electricity Planner spans the primary analysis column above
+  Staging and Resource Inventory. Its scenario and component toggles are
+  session-only read-only calculations; they never share flight controls or
+  mutate the craft.
+- Electricity generation and consumption use two adjacent disclosure ledgers.
+  Battery depletion, conservative eclipse time, and selected-body solar
+  efficiency remain visible together without opening either ledger.
 - Eight powered stages fit before staging begins internal scrolling. Dense
   layouts keep the active stage visible and explain grouped or omitted stages.
 - Pinned Resonant Orbit and Mission Plan panels are operational briefings, not

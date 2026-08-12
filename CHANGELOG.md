@@ -10,6 +10,16 @@ All notable public changes will be recorded here.
 - Expanded Mock Mission Control's Flight scene with a repeating altitude
   stress cycle spanning short values and km, Mm, and Gm rollover boundaries so
   display-width regressions remain visible during routine UI checks.
+- Added a read-only VAB/SPH electricity planner with mod-aware and stock
+  producer/consumer inventories, battery endurance, conservative circular-orbit
+  eclipse sizing, recharge and recurring-orbit checks, and session-only
+  component/scenario controls. Separate generated/consumed ledgers and a compact
+  endurance comparison expose depletion time, eclipse time, and body-relative
+  solar efficiency together. The editor electrical snapshot is event-driven:
+  stable dashboard frames reuse the last confirmed craft model instead of
+  repeatedly polling kRPC, while craft changes and bounded compatibility
+  retries refresh it. WoobiesControlStats 0.2.18 supplies the optional
+  Dynamic Battery Storage-backed and stock-fallback editor service.
 
 ## v0.6.1 - Managed runtime updates
 

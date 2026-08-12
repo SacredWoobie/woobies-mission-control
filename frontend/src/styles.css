@@ -259,6 +259,38 @@ button { font: inherit; }
 .editor-mode .dashboard-slice { display: block; width: min(900px, 100%); margin: 0 auto; }
 .editor-mode #editorContext, .editor-mode #editorSummary { display: block; width: min(900px, 100%); margin: 0 auto; }
 .editor-workspace, .editor-workspace-content, .editor-workspace-column { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.editor-analysis-pair { display: contents; }
+.editor-electricity-panel .body { gap: 10px; }
+.editor-electricity-metrics, .editor-electricity-operational, .editor-electricity-assessment { display: grid; grid-template-columns: repeat(auto-fit,minmax(115px,1fr)); gap: 6px; }
+.editor-electricity-operational .editor-electricity-metric { border-color: var(--rule-bright); background: color-mix(in srgb,var(--cyan) 4%,var(--instrument-surface)); }
+.editor-electricity-metric { display: grid; min-width: 0; gap: 2px; padding: 6px 7px; border: 1px solid var(--slate-dim); background: var(--instrument-surface); }
+.editor-electricity-metric > span, .editor-electricity-assumption, .editor-electricity-component small { color: var(--slate-muted-text); font-size: 10px; letter-spacing: .04em; }
+.editor-electricity-metric > strong { overflow-wrap: anywhere; font-size: 13px; }
+.editor-electricity-metric.ok > strong { color: var(--green); }
+.editor-electricity-metric.bad > strong, .editor-electricity-state.bad { color: var(--warn); }
+.editor-electricity-state { margin: 0; color: var(--slate-muted-text); font-size: 11px; }
+.editor-electricity-state.wait { color: var(--amber); }
+.editor-electricity-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 7px; }
+.editor-electricity-controls label { display: grid; min-width: 122px; gap: 3px; color: var(--slate-muted-text); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.editor-electricity-controls input, .editor-electricity-controls select { min-width: 0; height: 30px; }
+.editor-electricity-controls small { margin-top: -20px; margin-left: 6px; pointer-events: none; }
+.editor-electricity-presets { display: flex; flex: 1 1 300px; flex-wrap: wrap; gap: 5px; }
+.editor-electricity-presets button { min-height: 30px; font-size: 10px; }
+.editor-electricity-assumption { margin: 0; line-height: 1.45; }
+.editor-electricity-ledgers { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.editor-electricity-ledger { min-width: 0; border: 1px solid var(--slate-dim); background: var(--instrument-surface); }
+.editor-electricity-ledger > summary { display: grid; min-height: 38px; padding: 6px 8px; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 2px 8px; cursor: pointer; color: var(--slate); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.editor-electricity-ledger > summary::marker { color: var(--cyan); }
+.editor-electricity-ledger > summary strong { color: var(--text-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
+.editor-electricity-ledger > summary small { grid-column: 1 / -1; color: var(--slate-muted-text); font-size: 9px; }
+.editor-electricity-ledger-body { display: grid; max-height: 220px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-top: 1px solid var(--slate-dim); }
+.editor-electricity-ledger-body > p { margin: 8px; color: var(--slate-muted-text); font-size: 10px; }
+.editor-electricity-ledger-group { display: grid; gap: 3px; padding: 6px 8px 8px; border-bottom: 1px solid var(--slate-dim); }
+.editor-electricity-ledger-group:last-child { border-bottom: 0; }
+.editor-electricity-ledger-group h3 { margin: 0 0 2px; color: var(--cyan); font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.editor-electricity-component { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: 6px; font-size: 11px; }
+.editor-electricity-component span { display: grid; min-width: 0; gap: 1px; }
+.editor-electricity-component strong { overflow-wrap: anywhere; }
 
 .panel {
   position: relative;
@@ -2159,6 +2191,15 @@ button { font: inherit; }
   .editor-mode .editor-staging-slice .stage-table.editor { max-height: clamp(210px,31vh,285px); overflow: auto; scrollbar-width: thin; }
   .editor-mode .editor-staging-slice .stage-table.editor .st-head { position: sticky; z-index: 1; top: 0; }
   .editor-mode .editor-orbit-plan-slice, .editor-mode .editor-delta-v-plan-slice { width: 100%; align-self: start; }
+  .editor-mode .editor-electricity-panel .body { gap: 6px; padding: 7px; }
+  .editor-mode .editor-electricity-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .editor-mode .editor-electricity-operational { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .editor-mode .editor-electricity-assessment { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .editor-mode .editor-electricity-metric { padding: 4px 6px; }
+  .editor-mode .editor-electricity-controls { display: grid; grid-template-columns: minmax(110px,125px) minmax(135px,160px) minmax(0,1fr); align-items: end; }
+  .editor-mode .editor-electricity-presets { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); min-width: 0; }
+  .editor-mode .editor-electricity-presets button { min-width: 0; padding-inline: 4px; white-space: nowrap; }
+  .editor-mode .editor-electricity-ledger-body { max-height: 104px; }
 }
 
 @media (orientation: landscape) and (min-width: 1220px) {
@@ -2175,6 +2216,8 @@ button { font: inherit; }
     grid-template-columns: minmax(600px,1.25fr) minmax(500px,.95fr);
     align-items: start;
   }
+  .editor-mode .editor-workspace.no-planning-companion .editor-electricity-panel { grid-column: 1 / -1; }
+  .editor-mode .editor-workspace.no-planning-companion .editor-analysis-pair { display: contents; }
   .editor-mode .editor-workspace.no-planning-companion .editor-staging-slice { grid-column: 1; }
   .editor-mode .editor-workspace.no-planning-companion #editorSummary { grid-column: 2; }
 }
@@ -2187,6 +2230,7 @@ button { font: inherit; }
     grid-template-columns: minmax(600px,1.45fr) minmax(400px,.9fr);
     align-items: start;
   }
+  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-panel { grid-column: 1 / -1; }
   .editor-mode .editor-workspace.has-planning-companion .editor-staging-slice { grid-column: 1; }
   .editor-mode .editor-workspace.has-planning-companion #editorSummary { grid-column: 2; }
   .editor-mode .editor-workspace.has-planning-companion #editorSummary .editor-resource-list { grid-template-columns: minmax(0,1fr); }
@@ -2215,8 +2259,15 @@ button { font: inherit; }
 
 @media (max-width: 900px) {
   .dashboard-slice { grid-template-columns: 1fr; }
+  .editor-electricity-ledgers { grid-template-columns: minmax(0,1fr); }
   .overview-primary-grid, .overview-secondary-grid, .overview-data-grid { grid-template-columns: 1fr; }
   .overview-controls, .overview-controls.compact, .overview-controls.fleet-controls { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+
+@media (max-width: 700px) {
+  .editor-electricity-controls label { flex: 1 1 145px; }
+  .editor-electricity-presets { flex-basis: 100%; }
+  .editor-electricity-presets button { flex: 1 1 120px; }
 }
 
 @media (max-width: 1220px) {
