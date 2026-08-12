@@ -443,9 +443,9 @@ button { font: inherit; }
 .empty-state { margin: 18px 0; color: var(--slate); text-align: center; }
 
 /* Editor overview keeps craft identity, headline totals, and simulation inputs in one full-width rail. */
-.editor-overview { min-width: 0; overflow: hidden; border: 1px solid var(--rule); border-radius: 4px; background: linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%); }
-.editor-overview-summary { display: grid; min-width: 0; grid-template-columns: minmax(340px,500px) 240px 220px minmax(0,1fr); border-bottom: 1px solid var(--rule); }
-.editor-overview-craft, .editor-overview-metric { display: flex; min-width: 0; min-height: 68px; padding: 9px 12px; justify-content: center; flex-direction: column; gap: 4px; border-right: 1px solid var(--rule); }
+.editor-overview { min-width: 0; overflow: hidden; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-bezel); box-shadow: var(--surface-depth-engraved); }
+.editor-overview-summary { display: grid; min-width: 0; grid-template-columns: minmax(340px,500px) 240px 220px minmax(0,1fr); border-bottom: 1px solid var(--surface-seam); background: var(--surface-seam); }
+.editor-overview-craft, .editor-overview-metric { display: flex; min-width: 0; min-height: 68px; padding: 9px 12px; justify-content: center; flex-direction: column; gap: 4px; border-right: 1px solid var(--surface-seam); background: var(--surface-plate); box-shadow: var(--surface-depth-engraved); }
 .editor-overview .label { font-size: 9px; }
 .editor-craft { overflow: hidden; margin: 0; color: var(--cyan); font-size: 18px; font-weight: 500; letter-spacing: .03em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .editor-craft-meta, .editor-overview-metric small { overflow: hidden; color: var(--slate); font-size: 10px; font-weight: 500; letter-spacing: .025em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
@@ -454,7 +454,7 @@ button { font: inherit; }
 .editor-sim-conditions { display: grid; min-width: 0; min-height: 38px; padding: 5px 10px; align-items: center; grid-template-columns: auto auto auto auto auto minmax(210px,1fr) auto; gap: 7px 10px; }
 .editor-sim-title { color: var(--slate); font-size: 9px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
 .editor-sim-control { display: grid; min-width: 0; align-items: center; grid-auto-flow: column; grid-auto-columns: max-content; gap: 5px; color: var(--slate); font-size: 9px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
-.editor-sim-control select, .editor-sim-control input { width: 100%; min-width: 0; height: 28px; padding: 3px 7px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--cyan); background: #060a0f; font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+.editor-sim-control select, .editor-sim-control input { width: 100%; min-width: 0; height: 28px; padding: 3px 7px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--cyan); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); font: 11px var(--mono); font-variant-numeric: tabular-nums; }
 .editor-sim-control input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 .editor-sim-control input[type="number"]::-webkit-inner-spin-button,
 .editor-sim-control input[type="number"]::-webkit-outer-spin-button { margin: 0; appearance: none; -webkit-appearance: none; }
@@ -463,9 +463,9 @@ button { font: inherit; }
 .editor-sim-control.mach input { width: 64px; text-align: right; }
 .editor-sim-control small { color: var(--slate); font-size: 9px; }
 .editor-altitude-presets { display: flex; min-width: 0; gap: 4px; }
-.editor-altitude-presets button, .editor-recalculate { height: 28px; min-height: 28px; padding: 3px 8px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--slate); background: #09111a; cursor: pointer; font: 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
-.editor-altitude-presets button[aria-pressed="true"] { border-color: #225f75; color: var(--cyan); background: #102b39; }
-.editor-altitude-presets button:hover:not(:disabled), .editor-recalculate:hover:not(:disabled) { border-color: var(--accent-border-hover); color: var(--cyan); background: #173040; }
+.editor-altitude-presets button, .editor-recalculate { height: 28px; min-height: 28px; padding: 3px 8px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate); background: var(--surface-raised-face); box-shadow: var(--surface-depth-raised); cursor: pointer; font: 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.editor-altitude-presets button[aria-pressed="true"] { border-color: #225f75; color: var(--cyan); background: #102b39; box-shadow: var(--surface-depth-recessed); }
+.editor-altitude-presets button:hover:not(:disabled), .editor-recalculate:hover:not(:disabled) { border-color: var(--accent-border-hover); color: var(--cyan); background: var(--control-surface-hover); }
 .editor-altitude-presets button:disabled, .editor-recalculate:disabled { cursor: not-allowed; opacity: .45; }
 .editor-sim-feedback { display: flex; min-width: 0; align-items: flex-end; justify-content: center; flex-direction: column; gap: 2px; overflow: hidden; }
 .editor-sim-feedback .editor-state { font-size: 9px; }
@@ -474,7 +474,7 @@ button { font: inherit; }
 .editor-state.ok { color: var(--green); }
 .editor-state.bad { color: var(--warn); }
 .editor-recalculation-note { overflow: hidden; color: var(--slate); font-size: 9px; font-weight: 500; letter-spacing: .015em; text-overflow: ellipsis; white-space: nowrap; }
-.editor-recalculate { border-color: #24485a; color: var(--cyan); background: var(--control-surface-hover); }
+.editor-recalculate { border-color: #24485a; color: var(--cyan); }
 #editorSummary .body { display: flex; padding: 8px; flex-direction: column; gap: 7px; }
 .editor-summary-content-shell, .editor-summary-content { display: flex; min-width: 0; flex-direction: column; gap: inherit; }
 .editor-summary-state { margin: 12px 0; color: var(--slate); font-size: 10px; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
@@ -497,10 +497,10 @@ button { font: inherit; }
   opacity: .58;
 }
 .editor-resource-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--slate-muted-text); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.editor-resource-list { display: flex; flex-direction: column; gap: 1px; overflow: hidden; border: 1px solid var(--rule); border-radius: 3px; background: var(--rule); }
-.editor-resource-row { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(110px, 1.5fr) minmax(125px, .7fr); gap: 10px; min-height: 30px; padding: 6px 9px; align-items: center; color: var(--slate); background: var(--panel-2); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+.editor-resource-list { display: flex; flex-direction: column; gap: 1px; overflow: hidden; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-seam); box-shadow: var(--surface-depth-recessed); }
+.editor-resource-row { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(110px, 1.5fr) minmax(125px, .7fr); gap: 10px; min-height: 30px; padding: 6px 9px; align-items: center; color: var(--slate); background: var(--surface-plate); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
 .editor-resource-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.editor-resource-meter { height: 8px; overflow: hidden; border: 1px solid var(--rule-bright); border-radius: 2px; background: var(--instrument-surface); }
+.editor-resource-meter { height: 8px; overflow: hidden; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); }
 .editor-resource-meter > span { display: block; height: 100%; }
 .editor-resource-amount { color: #d5dde7; font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .editor-resource-amount small { color: var(--slate-muted-text); font: inherit; }
@@ -548,6 +548,10 @@ button { font: inherit; }
 .stage-table.editor .st-row { grid-template-columns: 72px 1.35fr 1.35fr .85fr .85fr 1fr; }
 .stage-table.editor .st-row > span { padding-block: 6px; font-size: 13px; }
 .stage-table.editor .st-head > span { font-size: 11px; }
+.stage-table.editor { border-color: var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-seam); box-shadow: var(--surface-depth-recessed); }
+.stage-table.editor .st-row { background: var(--surface-seam); }
+.stage-table.editor .st-row > span { background: var(--surface-plate); box-shadow: var(--surface-depth-engraved); }
+.stage-table.editor .st-row.cur > span { background: color-mix(in srgb, var(--cyan) 7%, var(--surface-plate)); }
 .editor-stage-total-dv { display: inline-flex; align-items: baseline; gap: 11px; }
 .editor-stage-total-label { color: var(--slate-muted-text); }
 .editor-stage-total-value { display: inline-flex; align-items: baseline; gap: 4px; }
