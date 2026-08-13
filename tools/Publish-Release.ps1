@@ -102,6 +102,25 @@ function Write-Utf8Json {
     )
 }
 
+function Sort-CanonicalManifestPaths {
+    param([string[]]$Paths)
+
+    # The public Python updater validates paths with str.casefold(). Package
+    # paths are ASCII, so lowercase-then-ordinal is the exact compatible order.
+    # OrdinalIgnoreCase is not equivalent: it compares uppercase code points
+    # and can place letters before underscores in hashed asset names.
+    $comparer = [System.Collections.Generic.Comparer[string]]::Create(
+        [System.Comparison[string]]{
+            param([string]$Left, [string]$Right)
+            return [System.StringComparer]::Ordinal.Compare(
+                $Left.ToLowerInvariant(),
+                $Right.ToLowerInvariant()
+            )
+        }
+    )
+    [System.Array]::Sort($Paths, $comparer)
+}
+
 function Get-PackageFileRecord {
     param(
         [string]$StageRoot,
@@ -544,10 +563,7 @@ $managedPaths = [string[]]@(
         } |
         Where-Object { Test-ManagedRuntimePath $_ }
 )
-[System.Array]::Sort(
-    $managedPaths,
-    [System.StringComparer]::OrdinalIgnoreCase
-)
+Sort-CanonicalManifestPaths $managedPaths
 if ($managedPaths.Count -eq 0) {
     throw 'The managed runtime file set is empty.'
 }
@@ -590,10 +606,7 @@ $payloadPaths = [string[]]@(
             $_.FullName.Substring($updateStageRoot.Length).TrimStart('\').Replace('\', '/')
         }
 )
-[System.Array]::Sort(
-    $payloadPaths,
-    [System.StringComparer]::OrdinalIgnoreCase
-)
+Sort-CanonicalManifestPaths $payloadPaths
 $payloadRecords = @(
     $payloadPaths |
         ForEach-Object { Get-PackageFileRecord -StageRoot $updateStageRoot -RelativePath $_ }

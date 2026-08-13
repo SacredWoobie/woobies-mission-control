@@ -521,10 +521,15 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("WMC-INSTALL-MANIFEST.json", publish_script)
         self.assertIn("$packageName.zz-90-runtime-update.zip", publish_script)
         self.assertIn("compatible_updater_protocols = @(1)", publish_script)
-        self.assertGreaterEqual(
-            publish_script.count("[System.StringComparer]::OrdinalIgnoreCase"),
+        self.assertIn("function Sort-CanonicalManifestPaths", publish_script)
+        self.assertEqual(
+            publish_script.count("Sort-CanonicalManifestPaths $"),
             2,
         )
+        self.assertIn("$Left.ToLowerInvariant()", publish_script)
+        self.assertIn("$Right.ToLowerInvariant()", publish_script)
+        self.assertIn("[System.StringComparer]::Ordinal.Compare", publish_script)
+        self.assertEqual(publish_script.count("[System.Array]::Sort("), 1)
         self.assertIn("ZipFileExtensions]::CreateEntryFromFile", publish_script)
         self.assertIn("$entryName = $relativePath.Replace('\\', '/')", publish_script)
         self.assertIn("Runtime-update ZIP entries do not exactly match", publish_script)
