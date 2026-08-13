@@ -114,7 +114,7 @@ describe("StagingPanel", () => {
   it("keeps the Editor staging table and full-duration formatting", () => {
     const { container } = render(<StagingPanel snapshot={editorTelemetryFixture} />);
 
-    expect(screen.getByText("Editor staging analysis")).toBeTruthy();
+    expect(screen.getByText("Staging analysis")).toBeTruthy();
     expect(screen.getByText("Δv Atmo")).toBeTruthy();
     expect(screen.getByText("Δv Vac")).toBeTruthy();
     expect(screen.getByText("00:00:42")).toBeTruthy();

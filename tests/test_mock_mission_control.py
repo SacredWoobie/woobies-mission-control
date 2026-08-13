@@ -39,6 +39,25 @@ class MockMissionControlTests(unittest.TestCase):
         self.assertGreater(len(mission["overview.roster"]), 0)
         self.assertGreater(len(mission["overview.alarms"]), 0)
 
+    def test_flight_altitude_cycles_through_layout_stress_values(self):
+        hold = mock_server.FLIGHT_ALTITUDE_STRESS_SECONDS
+        values = mock_server.FLIGHT_ALTITUDE_STRESS_VALUES
+        sampled = [
+            mock_server.flight_altitude_for_elapsed(index * hold)
+            for index in range(len(values))
+        ]
+
+        self.assertEqual(sampled, list(values))
+        self.assertEqual(mock_server.flight_altitude_for_elapsed(-1), values[0])
+        self.assertEqual(
+            mock_server.flight_altitude_for_elapsed(len(values) * hold),
+            values[0],
+        )
+        self.assertTrue(any(value < 1_000 for value in values))
+        self.assertIn(99_999.6, values)
+        self.assertIn(999_996.0, values)
+        self.assertTrue(any(value >= 1_000_000_000 for value in values))
+
     def test_http_assets_are_bounded_to_web_root(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

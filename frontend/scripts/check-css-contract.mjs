@@ -27,9 +27,60 @@ const canonicalLiteralTokens = new Set([
   "--error-text",
   "--error-text-muted",
   "--instrument-surface",
+  "--surface-amber-face-bottom",
+  "--surface-amber-face-edge",
+  "--surface-amber-face-text",
+  "--surface-amber-face-top",
+  "--surface-bezel-color",
+  "--surface-bezel-lit",
+  "--surface-cyan-face-bottom",
+  "--surface-cyan-face-edge",
+  "--surface-cyan-face-top",
+  "--surface-grout",
+  "--surface-panel-bottom",
+  "--surface-panel-top",
+  "--surface-plate-bottom",
+  "--surface-plate-edge",
+  "--surface-plate-top",
+  "--surface-progress-bottom",
+  "--surface-progress-top",
+  "--surface-raised-top",
+  "--surface-rail-bottom",
+  "--surface-rail-top",
+  "--surface-status-cell-top",
+  "--surface-status-frame",
+  "--surface-track",
+  "--surface-well-bottom",
+  "--surface-well-top",
   "--success-border",
   "--text-primary",
   "--text-value",
+]);
+
+// Surface gradients must be composed from inspectable, opaque stops. Keeping
+// this separate from literal migration lets a stop participate in a gradient
+// without making every intentional screw, lens, or illustration literal fail.
+const opaqueSurfaceBackgroundTokens = new Set([
+  "--surface-panel-top",
+  "--surface-panel-bottom",
+  "--surface-plate-top",
+  "--surface-plate-bottom",
+  "--surface-well-top",
+  "--surface-well-bottom",
+  "--surface-rail-top",
+  "--surface-rail-bottom",
+  "--surface-raised-top",
+  "--surface-raised-bottom",
+  "--surface-amber-face-top",
+  "--surface-amber-face-bottom",
+  "--surface-cyan-face-top",
+  "--surface-cyan-face-bottom",
+  "--surface-status-frame",
+  "--surface-status-cell-top",
+  "--surface-status-cell-bottom",
+  "--surface-track",
+  "--surface-progress-top",
+  "--surface-progress-bottom",
 ]);
 
 const contrastContracts = [
@@ -43,6 +94,13 @@ const contrastContracts = [
   { foreground: "--danger", background: "--panel", minimum: 4.5 },
   { foreground: "--error-text", background: "--panel", minimum: 4.5 },
   { foreground: "--error-text-muted", background: "--panel", minimum: 4.5 },
+  { foreground: "--text-primary", background: "--surface-panel-top", minimum: 4.5 },
+  { foreground: "--text-primary", background: "--surface-plate-top", minimum: 4.5 },
+  { foreground: "--text-value", background: "--surface-well-bottom", minimum: 4.5 },
+  { foreground: "--slate", background: "--surface-rail-top", minimum: 4.5 },
+  { foreground: "--slate-muted-text", background: "--surface-status-cell-top", minimum: 4.5 },
+  { foreground: "--cyan", background: "--surface-cyan-face-top", minimum: 4.5 },
+  { foreground: "--surface-amber-face-text", background: "--surface-amber-face-top", minimum: 4.5 },
 ];
 
 const minimumPixelFontSize = 8;
@@ -172,6 +230,9 @@ export function checkCssContract(sources) {
     for (const match of masked.matchAll(/(?:^|[;{])\s*color\s*:\s*var\(\s*--slate-dim\s*\)/gim)) {
       failures.push(`${source.file}:${lineNumberAt(source.text, match.index)} uses low-contrast --slate-dim for text; use --slate-muted-text or a stronger semantic text token.`);
     }
+    for (const match of masked.matchAll(/\bbackground(?:-color)?\s*:\s*var\(\s*--rule\s*\)/gi)) {
+      failures.push(`${source.file}:${lineNumberAt(source.text, match.index)} paints grid grout with --rule; use --surface-grout and reserve --rule for borders.`);
+    }
   }
 
   const rootSource = sources.find((source) => source.file === "src/styles.css");
@@ -185,6 +246,12 @@ export function checkCssContract(sources) {
       }]),
   );
   const rootColors = new Map([...rootColorDefinitions].map(([name, definition]) => [name, definition.literal]));
+
+  for (const token of opaqueSurfaceBackgroundTokens) {
+    if (!rootColors.has(token)) {
+      failures.push(`Surface background stop ${token} must be defined as an opaque hex color in :root.`);
+    }
+  }
 
   for (const token of canonicalLiteralTokens) {
     const literal = rootColors.get(token);

@@ -4,6 +4,7 @@ import { AscensionPanel } from "./components/AscensionPanel";
 import { ConsumablesPanel } from "./components/ConsumablesPanel";
 import { ElectricityPanel } from "./components/ElectricityPanel";
 import { EditorContextPanel } from "./components/EditorContextPanel";
+import { EditorElectricityPanel } from "./components/EditorElectricityPanel";
 import { EditorSummaryPanel } from "./components/EditorSummaryPanel";
 import { FlightDashboard } from "./components/FlightDashboard";
 import { ClockPanel } from "./components/FlightStatusPanels";
@@ -38,6 +39,7 @@ import {
   clockSnapshotsEqual,
   consumablesSnapshotsEqual,
   editorSnapshotsEqual,
+  editorElectricitySnapshotsEqual,
   editorSummarySnapshotsEqual,
   electricitySnapshotsEqual,
   flightAvailabilitySnapshotsEqual,
@@ -196,7 +198,7 @@ export function DashboardSurface({
   );
 }
 
-export function EditorWorkspace({ context, snapshot, staging, summary }: { context: ReactNode; snapshot?: TelemetrySnapshot; staging: ReactNode; summary: ReactNode }) {
+export function EditorWorkspace({ context, electricity, snapshot, staging, summary }: { context: ReactNode; electricity: ReactNode; snapshot?: TelemetrySnapshot; staging: ReactNode; summary: ReactNode }) {
   const { pinnedForTelemetry: pinnedOrbitForTelemetry } = useResonantOrbitState();
   const { pinnedForTelemetry } = useDeltaVDraft();
   const pinnedOrbit = pinnedOrbitForTelemetry(snapshot);
@@ -210,8 +212,8 @@ export function EditorWorkspace({ context, snapshot, staging, summary }: { conte
         {context}
         <div className="editor-workspace-content">
           <div className="editor-workspace-column editor-workspace-primary">
-            <div className="dashboard-slice editor-staging-slice">{staging}</div>
-            {summary}
+            {electricity}
+            <div className="editor-analysis-pair"><div className="dashboard-slice editor-staging-slice">{staging}</div>{summary}</div>
           </div>
           <div className="editor-workspace-column editor-workspace-secondary">
             {pinnedOrbit && <div className="dashboard-slice editor-orbit-plan-slice"><PinnedResonantOrbitPanel scene="editor" snapshot={snapshot} /></div>}
@@ -228,7 +230,7 @@ function useLiveFlightSnapshot(equality: (left: TelemetrySnapshot | null, right:
 }
 
 function LiveAscensionPanel() { const snapshot = useLiveFlightSnapshot(ascensionSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <AscensionPanel snapshot={snapshot} /> : null; }
-function LiveClockPanel({ annunciator }: { annunciator: FlightAnnunciatorController }) { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel annunciator={<FlightAnnunciator controller={annunciator} />} snapshot={snapshot} /> : null; }
+function LiveClockPanel() { const snapshot = useLiveFlightSnapshot(clockSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ClockPanel snapshot={snapshot} /> : null; }
 function LiveConsumablesPanel() { const snapshot = useLiveFlightSnapshot(consumablesSnapshotsEqual); return snapshot?.["context.mode"] === "flight" ? <ConsumablesPanel snapshot={snapshot} /> : null; }
 function LiveElectricityPanel() {
   const liveState = useLiveTelemetrySelector(
@@ -308,8 +310,9 @@ function LiveFlightDashboard({ annunciator }: { annunciator: FlightAnnunciatorCo
   return (
     <FlightDashboard
       ascension={<LiveAscensionPanel />}
+      annunciator={<FlightAnnunciator controller={annunciator} />}
       availablePanels={available}
-      clock={<LiveClockPanel annunciator={annunciator} />}
+      clock={<LiveClockPanel />}
       consumables={<LiveConsumablesPanel />}
       electricity={<LiveElectricityPanel />}
       heat={<LiveHeatPanel />}
@@ -332,6 +335,11 @@ function LiveEditorContextPanel() {
 function LiveEditorSummaryPanel() {
   const snapshot = useLiveTelemetrySelector((state) => state.snapshot, editorSummarySnapshotsEqual);
   return snapshot?.["context.mode"] === "editor" ? <EditorSummaryPanel snapshot={snapshot} /> : null;
+}
+
+function LiveEditorElectricityPanel() {
+  const snapshot = useLiveTelemetrySelector((state) => state.snapshot, editorElectricitySnapshotsEqual);
+  return snapshot?.["context.mode"] === "editor" ? <EditorElectricityPanel snapshot={snapshot} /> : null;
 }
 
 interface LiveDashboardProps {
@@ -437,7 +445,7 @@ export function LiveDashboard({
       {mode === "flight"
         ? <LiveFlightDashboard annunciator={annunciator} />
         : mode === "editor"
-          ? <EditorWorkspace context={<LiveEditorContextPanel />} snapshot={headerSnapshot ?? undefined} staging={<LiveStagingPanel />} summary={<LiveEditorSummaryPanel />} />
+          ? <EditorWorkspace context={<LiveEditorContextPanel />} electricity={<LiveEditorElectricityPanel />} snapshot={headerSnapshot ?? undefined} staging={<LiveStagingPanel />} summary={<LiveEditorSummaryPanel />} />
           : <LiveMissionOverview />}
     </DashboardSurface>
   );

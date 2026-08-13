@@ -1,4 +1,29 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+
+async function expectVisibleFontFloor(
+  locator: Locator,
+  minimum: number,
+  label: string,
+) {
+  const result = await locator.evaluateAll((elements, floor) => {
+    const visible = elements.filter((element) => {
+      const style = getComputedStyle(element);
+      return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+    });
+    return {
+      checked: visible.length,
+      violations: visible
+        .map((element) => ({
+          fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+          text: element.textContent?.trim().replace(/\s+/g, " ").slice(0, 80) ?? "",
+        }))
+        .filter((entry) => entry.fontSize < floor),
+    };
+  }, minimum);
+
+  expect(result.checked, `${label} should render at least one element`).toBeGreaterThan(0);
+  expect(result.violations, `${label} should render at ${minimum}px or larger`).toEqual([]);
+}
 
 test("developer controls stay out of screenshots until the corner is engaged", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -52,9 +77,388 @@ test("planner drawers do not force horizontal overflow near the landscape breakp
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 });
 
+test("saved Delta-v plan feedback reserves visible header space", async ({ page }) => {
+  await page.setViewportSize({ width: 1176, height: 720 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const drawer = page.getByRole("dialog", { name: "Delta-v planner" });
+  const profile = drawer.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+  if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+  if (await drawer.getByRole("combobox", { name: "Start" }).count()) {
+    await drawer.getByRole("button", { name: /Add next stop/ }).click();
+  }
+  await drawer.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await drawer.getByRole("button", { name: /Add next stop/ }).click();
+  await drawer.getByRole("textbox", { name: "Delta-v plan name" }).fill("Duna layout check");
+  await drawer.getByRole("button", { name: "Save plan", exact: true }).click();
+  await drawer.getByRole("button", { name: "Update plan", exact: true }).click();
+
+  const feedback = drawer.getByRole("status");
+  await expect(feedback).toHaveText("Updated Duna layout check");
+  const layout = await drawer.evaluate((element) => {
+    const header = element.querySelector<HTMLElement>(":scope > header")!.getBoundingClientRect();
+    const body = element.querySelector<HTMLElement>(":scope > .delta-v-drawer-body")!.getBoundingClientRect();
+    const message = element.querySelector<HTMLElement>(".delta-v-save-feedback")!.getBoundingClientRect();
+    return {
+      containedByHeader: message.top >= header.top && message.bottom <= header.bottom + 1,
+      clearOfBody: message.bottom <= body.top + 1,
+      visibleHeight: message.height,
+      drawerClientWidth: element.clientWidth,
+      drawerScrollWidth: element.scrollWidth,
+    };
+  });
+  expect(layout.containedByHeader).toBe(true);
+  expect(layout.clearOfBody).toBe(true);
+  expect(layout.visibleHeight).toBeGreaterThanOrEqual(18);
+  expect(layout.drawerScrollWidth).toBeLessThanOrEqual(layout.drawerClientWidth + 1);
+});
+
+test("Delta-v density keeps the route primary on fine and coarse pointers", async ({ page, browser, baseURL }) => {
+  async function buildDunaRoute(target: typeof page) {
+    await target.getByRole("button", { name: "Delta-v planner" }).click();
+    const profile = target.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+    if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+    if (await target.getByRole("combobox", { name: "Start" }).count()) {
+      await target.getByRole("button", { name: /Add next stop/ }).click();
+    }
+    await target.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+    await target.getByRole("button", { name: /Add next stop/ }).click();
+  }
+
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await buildDunaRoute(page);
+
+  const desktop = await page.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
+    const bounds = (selector: string) => drawer.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const controls = Array.from(drawer.querySelectorAll<HTMLElement>(":scope > header input, :scope > header button"));
+    const overlaps: string[][] = [];
+    for (let left = 0; left < controls.length; left += 1) {
+      for (let right = left + 1; right < controls.length; right += 1) {
+        const a = controls[left].getBoundingClientRect();
+        const b = controls[right].getBoundingClientRect();
+        if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) {
+          overlaps.push([
+            controls[left].getAttribute("aria-label") ?? controls[left].textContent?.trim() ?? "",
+            controls[right].getAttribute("aria-label") ?? controls[right].textContent?.trim() ?? "",
+          ]);
+        }
+      }
+    }
+    return {
+      configurationHeight: bounds(".delta-v-configuration").height,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      drawerClientWidth: drawer.clientWidth,
+      drawerScrollWidth: drawer.scrollWidth,
+      footerHeight: bounds(".delta-v-footer").height,
+      headerHeight: bounds(":scope > header").height,
+      legHeights: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-leg")).map((leg) => leg.getBoundingClientRect().height),
+      marginControlHeights: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-controls button, .delta-v-margin-controls input")).map((control) => control.getBoundingClientRect().height),
+      marginPresetColors: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-preset")).map((control) => getComputedStyle(control).color),
+      overlaps,
+      routeRailOffsets: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-add-step button")).map((button, index) => {
+        const marker = drawer.querySelectorAll<HTMLElement>(".delta-v-leg-marker span")[index];
+        const nextMarker = drawer.querySelectorAll<HTMLElement>(".delta-v-leg-marker span")[index + 1];
+        const buttonBounds = button.getBoundingClientRect();
+        const markerBounds = marker.getBoundingClientRect();
+        const nextMarkerBounds = nextMarker?.getBoundingClientRect();
+        return {
+          x: (buttonBounds.left + buttonBounds.width / 2) - (markerBounds.left + markerBounds.width / 2),
+          y: nextMarkerBounds
+            ? (buttonBounds.top + buttonBounds.height / 2) - ((markerBounds.top + markerBounds.height / 2 + nextMarkerBounds.top + nextMarkerBounds.height / 2) / 2)
+            : 0,
+        };
+      }),
+      routeHeaderHeight: bounds(".delta-v-route > header").height,
+      routeListHeight: bounds(".delta-v-route-list").height,
+      summaryHeight: bounds(".delta-v-summary").height,
+    };
+  });
+
+  expect(desktop.headerHeight).toBeLessThanOrEqual(50);
+  expect(desktop.configurationHeight).toBeLessThanOrEqual(115);
+  expect(desktop.summaryHeight).toBeLessThanOrEqual(115);
+  expect(desktop.routeHeaderHeight).toBeLessThanOrEqual(36);
+  expect(desktop.routeListHeight).toBeGreaterThanOrEqual(500);
+  expect(desktop.footerHeight).toBeLessThanOrEqual(27);
+  expect(desktop.legHeights.slice(0, 3).every((height) => height <= 67)).toBe(true);
+  expect(desktop.marginControlHeights).toEqual([22, 22, 22, 22, 22, 22]);
+  expect(desktop.marginPresetColors).toEqual(["rgb(255, 143, 128)", "rgb(255, 180, 84)", "rgb(126, 231, 135)"]);
+  expect(desktop.routeRailOffsets.slice(0, 2).every((offset) => Math.abs(offset.x) <= 1 && Math.abs(offset.y) <= 1)).toBe(true);
+  expect(desktop.overlaps).toEqual([]);
+  expect(desktop.drawerScrollWidth).toBeLessThanOrEqual(desktop.drawerClientWidth + 1);
+  expect(desktop.documentScrollWidth).toBeLessThanOrEqual(desktop.documentClientWidth);
+
+  const margin = page.getByRole("spinbutton", { name: "Planning margin percent" });
+  const lowMargin = page.getByRole("button", { name: "Set planning margin to 10 percent (low)" });
+  await lowMargin.click();
+  await expect(margin).toHaveValue("10");
+  await expect(lowMargin).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Increase margin by 1 percent" }).click();
+  await expect(margin).toHaveValue("11");
+  await expect(lowMargin).toHaveAttribute("aria-pressed", "false");
+
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await page.getByRole("radio", { name: "Parking orbit" }).check({ force: true });
+  await expect(page.getByRole("spinbutton", { name: "Planned altitude" })).toBeVisible();
+  await expect(page.getByText(/ATMO Ends at 50.0/)).toBeVisible();
+  await expect(page.getByText("Simple: ideal dates")).toBeVisible();
+  await expect(page.getByText("Advanced: per-leg porkchops")).toHaveCount(0);
+  const portraitMargin = await page.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
+    const card = drawer.querySelector<HTMLElement>(".delta-v-margin-card")!.getBoundingClientRect();
+    const controls = drawer.querySelector<HTMLElement>(".delta-v-margin-controls")!.getBoundingClientRect();
+    return {
+      contained: controls.left >= card.left - 1 && controls.right <= card.right + 1,
+      controlsWidth: controls.width,
+      drawerOverflow: drawer.scrollWidth - drawer.clientWidth,
+    };
+  });
+  expect(portraitMargin.contained).toBe(true);
+  expect(portraitMargin.controlsWidth).toBeGreaterThanOrEqual(190);
+  expect(portraitMargin.drawerOverflow).toBeLessThanOrEqual(1);
+
+  for (const viewport of [{ width: 760, height: 900 }, { width: 390, height: 844 }]) {
+    const touchContext = await browser.newContext({ baseURL, hasTouch: true, viewport });
+    const touchPage = await touchContext.newPage();
+    await touchPage.goto("/");
+    await buildDunaRoute(touchPage);
+    const touch = await touchPage.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
+      const marginCard = drawer.querySelector<HTMLElement>(".delta-v-margin-card")!.getBoundingClientRect();
+      const marginControls = Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-controls button, .delta-v-margin-controls input"));
+      const routeList = drawer.querySelector<HTMLElement>(".delta-v-route-list")!;
+      const summary = drawer.querySelector<HTMLElement>(".delta-v-summary")!;
+      const iconControls = Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-assumptions-button, .delta-v-header-actions > button:last-child"));
+      return {
+        coarsePointer: matchMedia("(pointer: coarse)").matches,
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        drawerClientWidth: drawer.clientWidth,
+        drawerScrollWidth: drawer.scrollWidth,
+        iconControlsMeetTarget: iconControls.every((control) => {
+          const bounds = control.getBoundingClientRect();
+          return bounds.width >= 44 && bounds.height >= 44;
+        }),
+        marginControlsContained: marginControls.every((control) => {
+          const bounds = control.getBoundingClientRect();
+          return bounds.left >= marginCard.left - 1
+            && bounds.right <= marginCard.right + 1
+            && bounds.top >= marginCard.top - 1
+            && bounds.bottom <= marginCard.bottom + 1;
+        }),
+        marginControlsMeetTarget: marginControls.every((control) => control.getBoundingClientRect().height >= 44),
+        routeListHeight: routeList.clientHeight,
+        routeListScrollHeight: routeList.scrollHeight,
+        summaryClientHeight: summary.clientHeight,
+        summaryScrollHeight: summary.scrollHeight,
+      };
+    });
+    expect(touch.coarsePointer).toBe(true);
+    expect(touch.marginControlsMeetTarget).toBe(true);
+    expect(touch.marginControlsContained).toBe(true);
+    expect(touch.iconControlsMeetTarget).toBe(true);
+    expect(touch.routeListHeight).toBeGreaterThanOrEqual(64);
+    expect(touch.routeListScrollHeight).toBeGreaterThan(touch.routeListHeight);
+    expect(touch.summaryScrollHeight).toBeGreaterThan(touch.summaryClientHeight);
+    expect(touch.drawerScrollWidth).toBeLessThanOrEqual(touch.drawerClientWidth + 1);
+    expect(touch.documentScrollWidth).toBeLessThanOrEqual(touch.documentClientWidth);
+    await touchContext.close();
+  }
+});
+
 test("native controls opt into the dark system color scheme", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
+});
+
+test("operational typography keeps its semantic floor across scenes", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  await expectVisibleFontFloor(page.locator([
+    ".annunciator-indicator",
+    ".flight-stage-group button",
+    ".target-clear-button",
+    ".heat-loop-control",
+    ".sci-research-toggle",
+    ".sci-transmit-science",
+    ".sci-alarm-controls button",
+  ].join(",")), 10, "Flight operational controls");
+  await expectVisibleFontFloor(page.locator([
+    ".flight-stage-total > span",
+    ".flight-stage-conditions > span",
+    ".flight-workspace-label",
+    ".attitude-strip .label",
+    ".ec-label",
+    ".sci-label",
+  ].join(",")), 9, "Flight compact operational labels");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectVisibleFontFloor(page.locator(".meter .cap"), 9, "compact consumable values");
+  await expectVisibleFontFloor(
+    page.locator(".heat-temperature-value, .heat-net-flux, .heat-ratio-value"),
+    9,
+    "compact heat values",
+  );
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+  await expectVisibleFontFloor(page.locator([
+    ".editor-sim-title",
+    ".editor-sim-control",
+    ".editor-altitude-presets button",
+    ".editor-recalculate",
+    ".editor-sim-feedback .editor-state",
+  ].join(",")), 10, "Editor simulation controls");
+
+  await page.setViewportSize({ width: 800, height: 1280 });
+  const editorPortraitOverflow = await page.locator(".editor-workspace").evaluate((element) => ({
+    documentClientWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    workspaceClientWidth: element.clientWidth,
+    workspaceScrollWidth: element.scrollWidth,
+  }));
+  expect(editorPortraitOverflow.documentScrollWidth).toBeLessThanOrEqual(editorPortraitOverflow.documentClientWidth);
+  expect(editorPortraitOverflow.workspaceScrollWidth).toBeLessThanOrEqual(editorPortraitOverflow.workspaceClientWidth + 1);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const planner = page.getByRole("dialog", { name: "Delta-v planner" });
+  await expectVisibleFontFloor(planner.locator([
+    ".delta-v-configuration-toggle b",
+    ".delta-v-configuration-toggle > strong",
+    ".delta-v-add-stop-row button",
+    ".delta-v-route-timing span",
+    ".delta-v-route-window-actions button",
+    ":scope > header .delta-v-reset-button",
+    ":scope > header .delta-v-saved-plans-button",
+    ":scope > header .delta-v-assumptions-button",
+  ].join(",")), 10, "planner controls and operational timing");
+  await planner.getByRole("button", { name: "Close delta-v planner" }).click();
+
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "inactive", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+  await expectVisibleFontFloor(page.locator([
+    ".overview-vessel-actions button",
+    ".overview-source",
+    ".overview-alarm-type",
+    ".transfer-window-status",
+  ].join(",")), 10, "Mission Control actions and statuses");
+  await expectVisibleFontFloor(page.locator([
+    ".overview-roster-summary-chip > span",
+    ".overview-contract-focus-overview > div > span",
+  ].join(",")), 9, "Mission Control compact operational labels");
+});
+
+test("Editor electricity planning keeps a readable bounded instrument hierarchy", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const panel = page.locator("#editorElectricity");
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("details")).toHaveCount(0);
+
+  const generatedLedger = panel.locator("section.editor-electricity-ledger", { has: page.getByRole("heading", { name: "Power generated" }) });
+  const consumedLedger = panel.locator("section.editor-electricity-ledger", { has: page.getByRole("heading", { name: "Power consumed" }) });
+  await expect(panel.locator("section.editor-electricity-ledger")).toHaveCount(2);
+  await expect(generatedLedger).toBeVisible();
+  await expect(consumedLedger).toBeVisible();
+  await expect(panel.getByRole("meter", { name: /Battery charge/ })).toBeVisible();
+  await expect(generatedLedger.getByRole("group", { name: "Power generated inclusion controls" }).getByRole("button", { name: "All", exact: true })).toBeVisible();
+  await expect(generatedLedger.getByRole("group", { name: "Power generated inclusion controls" }).getByRole("button", { name: "None", exact: true })).toBeVisible();
+  await expect(consumedLedger.getByRole("group", { name: "Power consumed inclusion controls" }).getByRole("button", { name: "All", exact: true })).toBeVisible();
+  await expect(consumedLedger.getByRole("group", { name: "Power consumed inclusion controls" }).getByRole("button", { name: "None", exact: true })).toBeVisible();
+
+  for (const viewport of [
+    { width: 1920, height: 889 },
+    { width: 1280, height: 800 },
+    { width: 1080, height: 1920 },
+    { width: 800, height: 1280 },
+  ]) {
+    await page.setViewportSize(viewport);
+
+    const layout = await panel.evaluate((element) => {
+      const scenario = element.querySelector<HTMLElement>(".editor-electricity-scenario-rail");
+      const scenarioChildren = scenario
+        ? Array.from(scenario.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.getClientRects().length > 0)
+        : [];
+      let scenarioOverlaps = 0;
+      for (let left = 0; left < scenarioChildren.length; left += 1) {
+        for (let right = left + 1; right < scenarioChildren.length; right += 1) {
+          const a = scenarioChildren[left].getBoundingClientRect();
+          const b = scenarioChildren[right].getBoundingClientRect();
+          if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) scenarioOverlaps += 1;
+        }
+      }
+      const altitude = element.querySelector<HTMLElement>(".editor-electricity-input-unit");
+      const altitudeInput = altitude?.querySelector<HTMLElement>("input");
+      const altitudeUnit = altitude?.querySelector<HTMLElement>("small");
+      const altitudeRect = altitude?.getBoundingClientRect();
+      const inputRect = altitudeInput?.getBoundingClientRect();
+      const unitRect = altitudeUnit?.getBoundingClientRect();
+      const plannerZones = element.querySelector<HTMLElement>(".editor-electricity-planner-zones");
+      const readout = element.querySelector<HTMLElement>(".editor-electricity-readout-well");
+      const ledgers = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-ledger"));
+      const ledgerBodies = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-ledger-body"));
+      return {
+        altitudeContained: Boolean(
+          altitudeRect && inputRect && unitRect
+          && inputRect.left >= altitudeRect.left - 1
+          && unitRect.right <= altitudeRect.right + 1
+          && inputRect.right <= unitRect.left + 1
+        ),
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        ledgerHorizontalOverflow: [...ledgers, ...ledgerBodies]
+          .filter((ledger) => ledger.scrollWidth > ledger.clientWidth + 1).length,
+        panelClientWidth: element.clientWidth,
+        panelScrollWidth: element.scrollWidth,
+        plannerHierarchy: Boolean(plannerZones && scenario && readout
+          && plannerZones.contains(scenario) && plannerZones.contains(readout)),
+        scenarioOverlaps,
+      };
+    });
+
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+    expect(layout.panelScrollWidth).toBeLessThanOrEqual(layout.panelClientWidth + 1);
+    expect(layout.ledgerHorizontalOverflow).toBe(0);
+    expect(layout.plannerHierarchy).toBe(true);
+    expect(layout.scenarioOverlaps).toBe(0);
+    expect(layout.altitudeContained).toBe(true);
+    await expectVisibleFontFloor(panel.locator([
+      ".editor-electricity-scenario-rail h3",
+      ".editor-electricity-body-control",
+      ".editor-electricity-altitude-control",
+      ".editor-electricity-input-unit small",
+      ".editor-electricity-scenario-derived dt",
+      ".editor-electricity-scenario-derived dd",
+      ".editor-electricity-readout-well h3",
+      ".editor-electricity-net-headline",
+      ".editor-electricity-charge-copy",
+      ".editor-electricity-rate-bar > span",
+      ".editor-electricity-storage > span",
+      ".editor-electricity-shadow-assessment h3",
+      ".editor-electricity-shadow-assessment dt",
+      ".editor-electricity-recurring-orbit",
+      ".editor-electricity-ledger header h3",
+      ".editor-electricity-ledger header small",
+      ".editor-electricity-ledger-actions button",
+      ".editor-electricity-component strong",
+      ".editor-electricity-component output",
+    ].join(",")), 10, `Editor electricity operational text at ${viewport.width}x${viewport.height}`);
+    await expectVisibleFontFloor(
+      panel.locator(".editor-electricity-component small"),
+      9,
+      `Editor electricity module metadata at ${viewport.width}x${viewport.height}`,
+    );
+  }
 });
 
 test("dense Editor analysis uses the empty planning width and reveals the active stage", async ({ page }) => {
@@ -73,8 +477,48 @@ test("dense Editor analysis uses the empty planning width and reveals the active
     const workspaceBounds = workspace.getBoundingClientRect();
     const content = bounds(".editor-workspace-content");
     const context = bounds("#editorContext");
+    const analysis = bounds(".editor-analysis-pair");
+    const electricity = bounds("#editorElectricity");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const stageHeader = bounds("#stage > h2");
+    const stageTitle = bounds("#stage > h2 .panel-title");
+    const stageTag = workspace.querySelector<HTMLElement>("#stage > h2 .tag")!;
+    const stageTagBounds = stageTag.getBoundingClientRect();
+    const stageTotals = bounds("#stage .editor-stage-total-dv");
+    const scenarioBody = bounds(".editor-electricity-body-control");
+    const scenarioAltitude = bounds(".editor-electricity-altitude-control");
+    const scenarioDerived = bounds(".editor-electricity-scenario-derived");
+    const derivedCells = Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-scenario-derived > div"))
+      .map((cell) => cell.getBoundingClientRect());
+    const inspectLedgerFlow = (selector: string, forcedRows = 0) => {
+      const body = workspace.querySelector<HTMLElement>(`${selector} .editor-electricity-ledger-body`)!;
+      const originals = Array.from(body.querySelectorAll<HTMLElement>(".editor-electricity-component"));
+      const clones = Array.from({ length: forcedRows }, (_, index) => originals[index % originals.length].cloneNode(true) as HTMLElement);
+      clones.forEach((clone) => body.append(clone));
+      body.scrollTop = body.scrollHeight;
+      const rows = Array.from(body.querySelectorAll<HTMLElement>(".editor-electricity-component"));
+      const boundsByRow = rows.map((row) => row.getBoundingClientRect());
+      const result = {
+        clippedLabels: rows.filter((row) => {
+          const rowBounds = row.getBoundingClientRect();
+          const labelBounds = row.querySelector<HTMLElement>("label")!.getBoundingClientRect();
+          return labelBounds.bottom > rowBounds.bottom + 1
+            || labelBounds.left < rowBounds.left - 1
+            || labelBounds.right > rowBounds.right + 1;
+        }).length,
+        scrolls: body.scrollHeight > body.clientHeight + 1,
+        verticalOverlaps: boundsByRow.filter((rowBounds, index) => {
+          const next = boundsByRow[index + 1];
+          return next ? rowBounds.bottom > next.top + 1 : false;
+        }).length,
+      };
+      clones.forEach((clone) => clone.remove());
+      body.scrollTop = 0;
+      return result;
+    };
+    const producerLedgerFlow = inspectLedgerFlow(".editor-electricity-ledger.is-producer", 3);
+    const consumerLedgerFlow = inspectLedgerFlow(".editor-electricity-ledger.is-consumer");
     const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
     const tableBounds = table.getBoundingClientRect();
     const activeBounds = workspace.querySelector<HTMLElement>('.stage-table.editor [aria-current="step"]')!.getBoundingClientRect();
@@ -89,17 +533,50 @@ test("dense Editor analysis uses the empty planning width and reveals the active
         && activeBounds.bottom <= tableBounds.bottom + 1,
       contextContentGap: content.top - context.bottom,
       contextMatchesWorkspace: Math.abs(context.width - workspaceBounds.width),
+      centeredSideDifference: Math.abs((analysis.left - content.left) - (content.right - electricity.right)),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: electricity.height,
+      electricityWidth: electricity.width,
+      analysisElectricityGap: electricity.left - analysis.right,
+      analysisTopDifference: Math.abs(analysis.top - electricity.top),
+      analysisWidth: analysis.width,
+      componentRowsUseTwoLines: Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-component label"))
+        .every((label) => {
+          const name = label.querySelector<HTMLElement>("strong")!.getBoundingClientRect();
+          const category = label.querySelector<HTMLElement>("small")!.getBoundingClientRect();
+          const rate = label.querySelector<HTMLElement>("output")!.getBoundingClientRect();
+          return category.top > name.top + 1 && rate.top > name.top + 1;
+        }),
+      derivedColumnGap: scenarioDerived.left - scenarioBody.right,
+      derivedFirstColumnDifference: Math.abs(derivedCells[0].left - derivedCells[2].left),
+      derivedRightColumnDifference: Math.abs(derivedCells[1].left - derivedCells[3].left),
+      derivedTopRowDifference: Math.abs(derivedCells[0].top - derivedCells[1].top),
+      derivedBottomRowDifference: Math.abs(derivedCells[2].top - derivedCells[3].top),
       ninthRowScrolls,
+      overflowingElectricityRows: Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-component :is(strong,small,output)"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingHeaderValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorContext h1, #editorContext .editor-overview-metric strong, #editorContext .editor-overview-metric small"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       poweredRows: workspace.querySelectorAll('.stage-table.editor [role="row"][data-stage-ksp]').length,
+      producerLedgerFlow,
+      consumerLedgerFlow,
       secondaryChildren: workspace.querySelector(".editor-workspace-secondary")!.children.length,
-      stageSummaryGap: summary.left - stage.right,
-      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      scenarioControlGap: scenarioAltitude.top - scenarioBody.bottom,
+      scenarioControlLeftDifference: Math.abs(scenarioBody.left - scenarioAltitude.left),
+      scenarioControlWidthDifference: Math.abs(scenarioBody.width - scenarioAltitude.width),
+      stageHeaderTitle: workspace.querySelector<HTMLElement>("#stage > h2 .panel-title")!.textContent,
+      stageTagOverflow: stageTag.scrollWidth - stageTag.clientWidth,
+      stageTitleTotalsGap: stageTagBounds.left - stageTitle.right,
+      stageTotalsContained: stageTotals.left >= stageTagBounds.left - 1
+        && stageTotals.right <= stageHeader.right - 1,
+      stageTotalValueOverflows: Array.from(workspace.querySelectorAll<HTMLElement>("#stage .editor-stage-total-value"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      stageSummaryGap: summary.top - stage.bottom,
+      stageSummaryLeftDifference: Math.abs(stage.left - summary.left),
+      stageSummaryRightDifference: Math.abs(stage.right - summary.right),
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
     };
@@ -108,15 +585,65 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.secondaryChildren).toBe(0);
   expect(layout.contextMatchesWorkspace).toBeLessThanOrEqual(1);
   expect(layout.contextContentGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisWidth).toBeGreaterThanOrEqual(500);
+  expect(layout.analysisWidth).toBeLessThanOrEqual(515);
+  expect(layout.electricityWidth).toBeGreaterThanOrEqual(570);
+  expect(layout.electricityWidth).toBeLessThanOrEqual(605);
+  expect(layout.analysisElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.centeredSideDifference).toBeLessThanOrEqual(1);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
-  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryRightDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlWidthDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlGap).toBeGreaterThanOrEqual(5);
+  expect(layout.stageHeaderTitle).toBe("Staging analysis");
+  expect(layout.stageTagOverflow).toBeLessThanOrEqual(1);
+  expect(layout.stageTitleTotalsGap).toBeGreaterThanOrEqual(5);
+  expect(layout.stageTotalsContained).toBe(true);
+  expect(layout.stageTotalValueOverflows).toBe(0);
+  expect(layout.derivedColumnGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedFirstColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedRightColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedTopRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.componentRowsUseTwoLines).toBe(true);
+  expect(layout.overflowingElectricityRows).toBe(0);
+  expect(layout.producerLedgerFlow.scrolls).toBe(true);
+  expect(layout.producerLedgerFlow.verticalOverlaps).toBe(0);
+  expect(layout.producerLedgerFlow.clippedLabels).toBe(0);
+  expect(layout.consumerLedgerFlow.scrolls).toBe(true);
+  expect(layout.consumerLedgerFlow.verticalOverlaps).toBe(0);
+  expect(layout.consumerLedgerFlow.clippedLabels).toBe(0);
   expect(layout.poweredRows).toBe(8);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.ninthRowScrolls).toBe(true);
   expect(layout.activeFullyVisible).toBe(true);
   expect(layout.overflowingHeaderValues).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
-  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight + layout.electricityHeight);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const narrower = await page.locator(".editor-workspace").evaluate((workspace) => {
+    const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const electricity = bounds("#editorElectricity");
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    return {
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      electricityStageLeftDifference: Math.abs(electricity.left - stage.left),
+      electricitySummaryRightDifference: Math.abs(electricity.right - summary.right),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+    };
+  });
+  expect(narrower.electricityStageLeftDifference).toBeLessThanOrEqual(1);
+  expect(narrower.electricitySummaryRightDifference).toBeLessThanOrEqual(1);
+  expect(narrower.stageSummaryGap).toBeGreaterThanOrEqual(5);
+  expect(narrower.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(narrower.documentScrollWidth).toBeLessThanOrEqual(narrower.documentClientWidth);
 });
 
 test("Editor planning companions preserve the dense workspace alone and together", async ({ page }) => {
@@ -153,12 +680,19 @@ test("Editor planning companions preserve the dense workspace alone and together
   const orbitOnly = await workspace.evaluate((element) => {
     const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
     const context = bounds("#editorContext");
+    const analysis = bounds(".editor-analysis-pair");
+    const electricity = bounds("#editorElectricity");
     const orbit = bounds("#editorOrbitPlan");
     return {
+      analysisElectricityGap: electricity.left - analysis.right,
+      analysisTopDifference: Math.abs(analysis.top - electricity.top),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: bounds("#editorElectricity").height,
+      orbitElectricityGap: orbit.left - electricity.right,
+      orbitTopDifference: Math.abs(orbit.top - electricity.top),
       orbitContextGap: orbit.top - context.bottom,
       orbitHeight: orbit.height,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
@@ -166,9 +700,13 @@ test("Editor planning companions preserve the dense workspace alone and together
   });
   expect(orbitOnly.secondaryChildren).toBe(1);
   expect(orbitOnly.orbitContextGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.analysisElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.orbitElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.analysisTopDifference).toBeLessThanOrEqual(1);
+  expect(orbitOnly.orbitTopDifference).toBeLessThanOrEqual(1);
   expect(orbitOnly.orbitHeight).toBeLessThanOrEqual(220);
   expect(orbitOnly.documentScrollWidth).toBeLessThanOrEqual(orbitOnly.documentClientWidth);
-  expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight);
+  expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight + orbitOnly.electricityHeight);
 
   await page.getByRole("button", { name: "Delta-v planner" }).click();
   await page.getByRole("button", { name: "+ Add next stop" }).click();
@@ -202,10 +740,18 @@ test("Editor planning companions preserve the dense workspace alone and together
     const workspaceBounds = element.getBoundingClientRect();
     const content = bounds(".editor-workspace-content");
     const context = bounds("#editorContext");
+    const analysis = bounds(".editor-analysis-pair");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const electricity = bounds("#editorElectricity");
+    const secondary = bounds(".editor-workspace-secondary");
     const orbit = bounds("#editorOrbitPlan");
     const deltaV = bounds("#editorDeltaVPlan");
+    const scenarioBody = bounds(".editor-electricity-body-control");
+    const scenarioAltitude = bounds(".editor-electricity-altitude-control");
+    const scenarioDerived = bounds(".editor-electricity-scenario-derived");
+    const derivedCells = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-scenario-derived > div"))
+      .map((cell) => cell.getBoundingClientRect());
     const orbitHeader = element.querySelector<HTMLElement>("#editorOrbitPlan > h2")!.getBoundingClientRect();
     const deltaVHeader = element.querySelector<HTMLElement>("#editorDeltaVPlan > h2")!.getBoundingClientRect();
     const orbitEdit = element.querySelector<HTMLElement>("#editorOrbitPlan .resonant-edit-plan")!.getBoundingClientRect();
@@ -223,12 +769,20 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: electricity.height,
+      electricityWidth: electricity.width,
       deltaVHeaderHeight: deltaVHeader.height,
       deltaVEditHeight: deltaVEdit.height,
       deltaVHeight: deltaV.height,
       deltaVUnpinHeight: deltaVUnpin.height,
       coverageFooterFontSize: Number.parseFloat(getComputedStyle(element.querySelector<HTMLElement>("#editorDeltaVPlan .delta-v-editor-coverage footer")!).fontSize),
       overflowingMissionValues: Array.from(element.querySelectorAll<HTMLElement>("#editorDeltaVPlan strong, #editorDeltaVPlan .delta-v-pinned-step-copy"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingElectricityRows: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-component :is(strong,small,output)"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingElectricityRegions: Array.from(element.querySelectorAll<HTMLElement>("#editorElectricity, .editor-electricity-ledger, .editor-electricity-ledger-body"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingStageValues: Array.from(element.querySelectorAll<HTMLElement>("#stage .st-row > span, #stage .editor-stage-total-dv"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
@@ -240,9 +794,28 @@ test("Editor planning companions preserve the dense workspace alone and together
       orbitEditHeight: orbitEdit.height,
       orbitHeaderHeight: orbitHeader.height,
       orbitUnpinHeight: orbitUnpin.height,
+      analysisElectricityGap: electricity.left - analysis.right,
+      analysisTopDifference: Math.abs(analysis.top - electricity.top),
+      companionElectricityGap: secondary.left - electricity.right,
+      companionTopDifference: Math.abs(secondary.top - electricity.top),
+      analysisWidth: analysis.width,
+      companionWidth: secondary.width,
+      derivedColumnGap: scenarioDerived.left - scenarioBody.right,
+      derivedFirstColumnDifference: Math.abs(derivedCells[0].left - derivedCells[2].left),
+      derivedRightColumnDifference: Math.abs(derivedCells[1].left - derivedCells[3].left),
+      derivedTopRowDifference: Math.abs(derivedCells[0].top - derivedCells[1].top),
+      derivedBottomRowDifference: Math.abs(derivedCells[2].top - derivedCells[3].top),
+      scenarioControlLeftDifference: Math.abs(scenarioBody.left - scenarioAltitude.left),
+      scenarioControlWidthDifference: Math.abs(scenarioBody.width - scenarioAltitude.width),
+      scenarioControlGap: scenarioAltitude.top - scenarioBody.bottom,
+      producerRows: element.querySelectorAll(".editor-electricity-ledger.is-producer .editor-electricity-component").length,
+      consumerRows: element.querySelectorAll(".editor-electricity-ledger.is-consumer .editor-electricity-component").length,
+      resourceRows: element.querySelectorAll("#editorSummary .editor-resource-row").length,
+      stageRows: element.querySelectorAll(".stage-table.editor .st-row:not(.st-head)").length,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
-      stageSummaryGap: summary.left - stage.right,
-      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      stageSummaryGap: summary.top - stage.bottom,
+      stageSummaryLeftDifference: Math.abs(stage.left - summary.left),
+      stageSummaryRightDifference: Math.abs(stage.right - summary.right),
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
     };
@@ -262,15 +835,41 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(layout.contextMatchesWorkspace).toBeLessThanOrEqual(1);
   expect(layout.contextContentGap).toBeGreaterThanOrEqual(10);
   expect(layout.orbitContextGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisWidth).toBeGreaterThanOrEqual(500);
+  expect(layout.analysisWidth).toBeLessThanOrEqual(525);
+  expect(layout.electricityWidth).toBeGreaterThanOrEqual(570);
+  expect(layout.electricityWidth).toBeLessThanOrEqual(620);
+  expect(layout.companionWidth).toBeGreaterThanOrEqual(620);
+  expect(layout.companionWidth).toBeLessThanOrEqual(640);
+  expect(layout.analysisElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.companionElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.companionTopDifference).toBeLessThanOrEqual(1);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
-  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryRightDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlWidthDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedColumnGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedFirstColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedRightColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedTopRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageRows).toBe(8);
+  expect(layout.resourceRows).toBe(4);
+  expect(layout.producerRows).toBe(4);
+  expect(layout.consumerRows).toBe(7);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.overflowingHeaderValues).toBe(0);
   expect(layout.overflowingMissionValues).toBe(0);
+  expect(layout.overflowingElectricityRows).toBe(0);
+  expect(layout.overflowingElectricityRegions).toBe(0);
+  expect(layout.overflowingStageValues).toBe(0);
   expect(layout.overflowingOrbitValues).toBe(0);
   expect(layout.overflowingResourceNames).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
-  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight + layout.electricityHeight);
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.reload();
@@ -297,7 +896,10 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: bounds("#editorElectricity").height,
       overflowingOrbitValues: Array.from(element.querySelectorAll<HTMLElement>("#editorOrbitPlan .resonant-editor-plan-details strong, #editorOrbitPlan .resonant-editor-plan-details > header > span"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
       tableClientHeight: table.clientHeight,
@@ -310,10 +912,11 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(medium.columnGap).toBeGreaterThanOrEqual(10);
   expect(medium.companionGap).toBeGreaterThanOrEqual(6);
   expect(medium.overflowingOrbitValues).toBe(0);
+  expect(medium.overflowingResourceNames).toBe(0);
   expect(medium.topDifference).toBeLessThanOrEqual(1);
   expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
   expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);
-  expect(medium.documentScrollHeight).toBeLessThanOrEqual(medium.documentClientHeight);
+  expect(medium.documentScrollHeight).toBeLessThanOrEqual(medium.documentClientHeight + medium.electricityHeight);
 
   await page.setViewportSize({ width: 1080, height: 1920 });
   const portrait = await workspace.evaluate((element) => {
@@ -344,7 +947,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(portrait.documentScrollHeight).toBeLessThanOrEqual(portrait.documentClientHeight);
 });
 
-test("the wide Flight context and annunciator fit long mission times in one compact row", async ({ page }) => {
+test("the wide Flight context and control plate fit long mission times in one compact header", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
 
@@ -353,27 +956,52 @@ test("the wide Flight context and annunciator fit long mission times in one comp
     element.textContent = "T+ 999999d 05:59:59";
   });
 
-  const layout = await page.locator(".status-strip").evaluate((element) => {
-    const cells = Array.from(element.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell, .flight-annunciator"));
+  const layout = await page.locator(".flight-workspace-shell").evaluate((element) => {
+    const status = element.querySelector<HTMLElement>(".status-strip")!;
+    const plate = element.querySelector<HTMLElement>(".flight-control-plate")!;
+    const cells = Array.from(status.querySelectorAll(".flight-context-identity, .clockcell, .cs-cell"));
     const tops = cells.map((cell) => cell.getBoundingClientRect().top);
-    const elapsed = element.querySelector<HTMLElement>(".met-cell .big")!;
+    const elapsed = status.querySelector<HTMLElement>(".met-cell .big")!;
+    const statusBounds = status.getBoundingClientRect();
+    const plateBounds = plate.getBoundingClientRect();
+    const comms = status.querySelector<HTMLElement>(".cs-cell")!;
+    const delayLabel = comms.querySelector<HTMLElement>(".cs-delay .label")!;
+    const delayValue = comms.querySelector<HTMLElement>(".cs-delay .cs-val")!;
     return {
-      height: element.getBoundingClientRect().height,
+      cellCount: cells.length,
+      commsText: comms.textContent,
+      delayLabelFontSize: Number.parseFloat(getComputedStyle(delayLabel).fontSize),
+      delayValueFontSize: Number.parseFloat(getComputedStyle(delayValue).fontSize),
+      height: statusBounds.height,
       maxTopDifference: Math.max(...tops) - Math.min(...tops),
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth,
+      clientWidth: status.clientWidth,
+      scrollWidth: status.scrollWidth,
       elapsedClientWidth: elapsed.clientWidth,
       elapsedScrollWidth: elapsed.scrollWidth,
       elapsedWhiteSpace: getComputedStyle(elapsed).whiteSpace,
+      plateBottom: plateBounds.bottom,
+      plateLeft: plateBounds.left,
+      plateTop: plateBounds.top,
+      statusBottom: statusBounds.bottom,
+      statusRight: statusBounds.right,
+      statusTop: statusBounds.top,
     };
   });
 
+  expect(layout.cellCount).toBe(4);
+  expect(layout.commsText).toContain("CONNECTED");
+  expect(layout.commsText).toContain("Signal delay");
+  expect(layout.delayLabelFontSize).toBeGreaterThanOrEqual(9);
+  expect(layout.delayValueFontSize).toBeGreaterThanOrEqual(11);
   expect(layout.height).toBeLessThan(100);
   expect(layout.maxTopDifference).toBeLessThanOrEqual(1);
   expect(layout.clientWidth).toBeLessThan(1600);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
   expect(layout.elapsedWhiteSpace).toBe("nowrap");
   expect(layout.elapsedScrollWidth).toBeLessThanOrEqual(layout.elapsedClientWidth + 1);
+  expect(layout.plateLeft - layout.statusRight).toBeGreaterThanOrEqual(10);
+  expect(layout.plateTop).toBeGreaterThanOrEqual(layout.statusTop);
+  expect(layout.plateBottom).toBeLessThanOrEqual(layout.statusBottom);
 });
 
 test("the Flight annunciator uses fixed acknowledgement-state indicators", async ({ page }) => {
@@ -381,10 +1009,19 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await page.goto("/");
 
   const lamp = page.locator(".annunciator-lamp");
+  const plate = page.getByRole("group", { name: "Flight caution and workspace controls" });
+  await expect(plate).toBeVisible();
   await expect(lamp).toBeVisible();
   await expect(lamp).toHaveAttribute("aria-label", /Master warning, unacknowledged/);
   const indicators = page.getByRole("group", { name: "Flight alert indicators" });
   await expect(indicators.getByRole("button")).toHaveCount(5);
+  await expect(indicators.locator(":scope > *")).toHaveCount(6);
+  const reserved = indicators.locator(".annunciator-reserved-space");
+  await expect(reserved).toHaveAttribute("aria-hidden", "true");
+  await expect(reserved).toHaveText("");
+  expect((await reserved.boundingBox())?.width).toBeGreaterThan(0);
+  await expect(plate.getByRole("tablist", { name: "Flight workspace" }).getByRole("tab")).toHaveCount(2);
+  await expect(plate.getByText("Lamp Test", { exact: true })).toHaveCount(0);
   const heat = indicators.getByRole("button", { name: "HEAT new warning. Acknowledge." });
   await expect(heat).toHaveClass(/new/);
   expect(await lamp.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
@@ -415,9 +1052,42 @@ test("the Flight annunciator uses fixed acknowledgement-state indicators", async
   await expect(lamp).toBeFocused();
 });
 
-test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", async ({ page }) => {
+test("the Flight control plate reflows all five indicators and its reserved slot on compact screens", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  for (const viewport of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }]) {
+
+  const layout = await page.locator(".flight-control-plate").evaluate((plate) => {
+    const indicators = Array.from(plate.querySelectorAll<HTMLElement>(".annunciator-indicator"));
+    const reserved = plate.querySelector<HTMLElement>(".annunciator-reserved-space")!;
+    const allSlots = [...indicators, reserved];
+    return {
+      columns: new Set(allSlots.map((slot) => Math.round(slot.getBoundingClientRect().left))).size,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      indicatorCount: indicators.length,
+      reservedText: reserved.textContent,
+      rows: new Set(allSlots.map((slot) => Math.round(slot.getBoundingClientRect().top))).size,
+      slotWidths: allSlots.map((slot) => slot.getBoundingClientRect().width),
+      workspaceLabelDisplay: getComputedStyle(plate.querySelector<HTMLElement>(".flight-workspace-label")!).display,
+    };
+  });
+
+  expect(layout.indicatorCount).toBe(5);
+  expect(layout.columns).toBe(3);
+  expect(layout.rows).toBe(2);
+  expect(layout.reservedText).toBe("");
+  expect(Math.max(...layout.slotWidths) - Math.min(...layout.slotWidths)).toBeLessThanOrEqual(1);
+  expect(layout.workspaceLabelDisplay).toBe("none");
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+});
+
+test("Flight MONITOR and PLAN remain overlap-free at proposal targets", async ({ page }) => {
+  await page.goto("/");
+  for (const viewport of [
+    { width: 1920, height: 1080, allowsVerticalScroll: false },
+    { width: 1080, height: 1920, allowsVerticalScroll: false },
+    { width: 800, height: 1280, allowsVerticalScroll: true },
+  ]) {
     await page.setViewportSize(viewport);
     for (const view of ["MONITOR", "PLAN"]) {
       await page.getByRole("tab", { name: view, exact: true }).click();
@@ -441,7 +1111,9 @@ test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", asy
         };
       });
       expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
-      expect(layout.shellBottom).toBeLessThanOrEqual(layout.viewportHeight);
+      if (!viewport.allowsVerticalScroll) {
+        expect(layout.shellBottom).toBeLessThanOrEqual(layout.viewportHeight);
+      }
       expect(layout.overlaps).toBe(0);
     }
   }
@@ -450,6 +1122,29 @@ test("Flight MONITOR and PLAN remain overlap-free at both proposal targets", asy
 test("the Ascension orbit rail reflows before telemetry values truncate", async ({ page }) => {
   await page.setViewportSize({ width: 969, height: 900 });
   await page.goto("/");
+
+  const targetNameLayout = async () => page.locator("#asc .target-metric").evaluate((metric) => {
+    const subtitle = metric.querySelector<HTMLElement>(".asc-flight-subtitle")!;
+    const metricRect = metric.getBoundingClientRect();
+    const subtitleRect = subtitle.getBoundingClientRect();
+    return {
+      clientHeight: subtitle.clientHeight,
+      clientWidth: subtitle.clientWidth,
+      contained: subtitleRect.left >= metricRect.left - 1
+        && subtitleRect.right <= metricRect.right + 1
+        && subtitleRect.top >= metricRect.top - 1
+        && subtitleRect.bottom <= metricRect.bottom + 1,
+      scrollHeight: subtitle.scrollHeight,
+      scrollWidth: subtitle.scrollWidth,
+      text: subtitle.textContent,
+    };
+  });
+  const expectTargetNameToFit = (layout: Awaited<ReturnType<typeof targetNameLayout>>) => {
+    expect(layout.text).toBe("Odyssey Station Docking Port");
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+    expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
+    expect(layout.contained).toBe(true);
+  };
 
   const narrow = await page.locator("#asc .orbit-rail").evaluate((rail) => {
     const stats = Array.from(rail.querySelectorAll<HTMLElement>(".stat"));
@@ -461,6 +1156,7 @@ test("the Ascension orbit rail reflows before telemetry values truncate", async 
   });
   expect(narrow.rows).toBe(2);
   expect(narrow.overflowingReadouts).toBe(0);
+  expectTargetNameToFit(await targetNameLayout());
 
   await page.setViewportSize({ width: 1080, height: 1920 });
   const portraitTarget = await page.locator("#asc .orbit-rail").evaluate((rail) => {
@@ -475,6 +1171,10 @@ test("the Ascension orbit rail reflows before telemetry values truncate", async 
     return new Set(stats.map((stat) => Math.round(stat.getBoundingClientRect().top))).size;
   });
   expect(wideTarget).toBe(1);
+  expectTargetNameToFit(await targetNameLayout());
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expectTargetNameToFit(await targetNameLayout());
 });
 
 test("the navball clips every projected world layer to the globe", async ({ page }) => {
@@ -554,7 +1254,7 @@ test("Flight header, Science detail, and PLAN fit a maximized 1080p Chrome conte
   expect(plan.shellBottom).toBeLessThanOrEqual(plan.documentClientHeight);
 });
 
-test("fixed Flight headers, utility rail, and Heat rows use the compact aligned treatment", async ({ page }) => {
+test("fixed Flight headers, utility rail, and meter tracks use the compact aligned treatment", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
 
@@ -577,6 +1277,15 @@ test("fixed Flight headers, utility rail, and Heat rows use the compact aligned 
   expect(bars.length).toBeGreaterThanOrEqual(2);
   expect(Math.max(...bars.map((bar) => bar.left)) - Math.min(...bars.map((bar) => bar.left))).toBeLessThanOrEqual(1);
   expect(Math.max(...bars.map((bar) => bar.right)) - Math.min(...bars.map((bar) => bar.right))).toBeLessThanOrEqual(1);
+
+  const meterRadii = await page.locator("#cons .meter .track, #elec .ec-meter-track, #heat .heat-temperature-track, #sci .sci-meter-track").evaluateAll((tracks) => (
+    tracks.map((track) => getComputedStyle(track).borderRadius)
+  ));
+  expect(new Set(meterRadii)).toEqual(new Set(["4px"]));
+  const consumableFillRadii = await page.locator("#cons .meter .fill").evaluateAll((fills) => (
+    fills.map((fill) => getComputedStyle(fill).borderRadius)
+  ));
+  expect(new Set(consumableFillRadii)).toEqual(new Set(["4px"]));
 });
 
 test("reactor detail uses extra runway before internal scrolling", async ({ page }) => {
@@ -696,6 +1405,7 @@ test("Mission Control contract focus preserves keyboard, scroll, and responsive 
   for (const viewport of [
     { width: 1280, height: 800 },
     { width: 1080, height: 1920 },
+    { width: 800, height: 1280 },
   ]) {
     await page.setViewportSize(viewport);
     const overflow = await page.evaluate(() => ({

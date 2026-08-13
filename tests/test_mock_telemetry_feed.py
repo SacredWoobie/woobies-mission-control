@@ -56,8 +56,43 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual(self.editor["stage.totalBurnSeconds"], 335)
         self.assertTrue(self.editor["identity.available"])
         self.assertEqual(self.editor["game.saveFolder"], "WMC Fixture Save")
+        self.assertEqual(self.editor["editor.elec.saveFolder"], "WMC Fixture Save")
         self.assertEqual(self.editor["editor.craftPersistentId"], "9001")
         self.assertEqual(self.editor["editor.rootPartPersistentId"], "1001")
+
+    def test_editor_fixture_has_electrical_planner_snapshot(self):
+        components = self.editor["editor.elec.components"]
+        producers = [component for component in components if component["role"] == "producer"]
+        consumers = [component for component in components if component["role"] == "consumer"]
+        enabled_producers = [component for component in producers if component["defaultIncluded"]]
+        enabled_consumers = [component for component in consumers if component["defaultIncluded"]]
+
+        self.assertEqual(self.editor["editor.elec.status"], "ready")
+        self.assertEqual(self.editor["editor.elec.backend"], "stock")
+        self.assertFalse(self.editor["editor.elec.pending"])
+        self.assertEqual(self.editor["editor.elec.currentEc"], 1200)
+        self.assertEqual(self.editor["editor.elec.maxEc"], 1200)
+        self.assertEqual((len(producers), len(consumers)), (4, 7))
+        self.assertEqual((len(enabled_producers), len(enabled_consumers)), (3, 5))
+        self.assertEqual(len({component["stableId"] for component in components}), len(components))
+        self.assertTrue(all(isinstance(component["partId"], str) for component in components))
+        self.assertEqual(
+            round(sum(component["referenceEcPerSec"] * 0.962 for component in enabled_producers if component["solarScaled"])
+                  + sum(component["referenceEcPerSec"] for component in enabled_producers if not component["solarScaled"]), 2),
+            3.90,
+        )
+        self.assertEqual(round(sum(component["referenceEcPerSec"] for component in enabled_consumers), 2), 1.31)
+        self.assertEqual(
+            {component["partTitle"] for component in components if not component["defaultIncluded"]},
+            {"Fuel Cell Array", "IX-6315 Ion Engine ×2", "Communotron HG-55 (transmitting)"},
+        )
+        self.assertTrue(all(component["solarScaled"] and not component["continuous"] for component in producers[:2]))
+        self.assertTrue(producers[2]["continuous"])
+        self.assertFalse(producers[2]["solarScaled"])
+        self.assertTrue(self.editor["editor.elec.bodies"][0]["authoritative"])
+        self.assertIn("gravitationalParameter", self.editor["editor.elec.bodies"][0])
+        self.assertIn("atmosphereDepth", self.editor["editor.elec.bodies"][0])
+        self.assertIn("sphereOfInfluence", self.editor["editor.elec.bodies"][0])
 
     def test_reactor_inventory_has_two_fission_and_one_fusion_reactor(self):
         reactors = self.flight["elec.reactors"]

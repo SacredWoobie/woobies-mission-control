@@ -4,6 +4,36 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Kept live altitude and distance readouts within their intended width when a
+  rounded value crosses a precision or unit boundary, such as 99,999.6 m
+  becoming 100.00 km instead of 100.000 km.
+- Expanded Mock Mission Control's Flight scene with a repeating altitude
+  stress cycle spanning short values and km, Mm, and Gm rollover boundaries so
+  display-width regressions remain visible during routine UI checks.
+- Kept Delta-V saved-plan confirmation and error messages in a reserved header
+  row so Update and Save as new actions cannot cover planner feedback.
+- Redesigned the Editor Electricity Planner around a clear scenario rail and
+  live electrical readout, with continuously visible generated and consumed
+  ledgers, a battery meter, eclipse-hold status, and separate recurring-orbit
+  sustainability. Wide Editor layouts now center Staging and Resource Inventory
+  beside Electricity as a stable two-column core, adding a dedicated third
+  column when a planning companion is pinned.
+- Added a read-only VAB/SPH electricity planner with mod-aware and stock
+  producer/consumer inventories, battery endurance, conservative circular-orbit
+  eclipse sizing, recharge and recurring-orbit checks, and session-only
+  component/scenario controls. Separate generated/consumed ledgers and a compact
+  endurance comparison expose depletion time, eclipse time, and body-relative
+  solar efficiency together. The editor electrical snapshot uses immediate
+  event-driven refreshes plus a bounded one-second compatibility refresh so
+  New Craft and third-party editor actions that omit KSP's normal change event
+  cannot retain the prior craft or stale module rates. A `warming` snapshot
+  continues to retry until it settles. WoobiesControlStats 0.2.21 is the
+  unselected next-release candidate for the optional
+  Dynamic Battery Storage-backed and stock-fallback editor service and treats
+  engine modules explicitly linked by KSP's multi-mode controller as one
+  conservative load, preventing alternate fuel modes from being double-counted
+  without merging separate parts or independently active modules.
+
 ## v0.6.1 - Managed runtime updates
 
 - Added an explicitly confirmed in-app updater for updater-capable release
@@ -77,6 +107,10 @@ All notable public changes will be recorded here.
   focused report identifying the affected part groups. The new VesselDamage
   service performs a cached in-game PartModule scan, while older service sets
   retain the narrower stock kRPC fallback.
+- Integrated Flight's Master Warning, five actionable annunciators, MONITOR / PLAN
+  selector, and workspace rebalance control into one responsive instrument plate.
+  RemoteTech signal delay now stays inside the four-cell context strip's Comms
+  cell, and a deliberately empty sixth annunciator position reserves future growth.
 - Updated the dashboard feed and panel bridge runtime contract to kRPC 0.6.0
   with its required protobuf 7.35.1 Python runtime, coherent server-core
   preflight checks, and rebuilt custom-service compatibility versions.

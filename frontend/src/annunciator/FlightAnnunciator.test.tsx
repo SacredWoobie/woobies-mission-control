@@ -140,6 +140,8 @@ describe("Flight annunciator surface", () => {
     expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual([
       "HEAT", "REACTOR", "COMMS", "POWER", "DAMAGE",
     ]);
+    expect(group.children).toHaveLength(6);
+    expect(group.querySelector(".annunciator-reserved-space")?.getAttribute("aria-hidden")).toBe("true");
     expect(within(group).getByRole("button", { name: "REACTOR clear" }).hasAttribute("disabled")).toBe(true);
     expect(within(group).getByRole("button", { name: "COMMS clear" }).className).toContain("clear");
 

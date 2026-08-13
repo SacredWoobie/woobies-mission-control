@@ -30,6 +30,20 @@ SCENE_ALIASES = {
     "mission": "inactive",
     "mission-control": "inactive",
 }
+FLIGHT_ALTITUDE_STRESS_SECONDS = 3.0
+FLIGHT_ALTITUDE_STRESS_VALUES = (
+    950.0,
+    12_345.6,
+    82_415.6,
+    99_999.6,
+    123_456.0,
+    999_996.0,
+    1_234_567.0,
+    9_999_960.0,
+    123_456_789.0,
+    999_960_000.0,
+    1_234_567_890.0,
+)
 
 
 def load_fixture_module():
@@ -152,6 +166,12 @@ def initial_note_state():
     }
 
 
+def flight_altitude_for_elapsed(elapsed):
+    """Hold representative altitude widths long enough for visual inspection."""
+    phase = int(max(0.0, elapsed) / FLIGHT_ALTITUDE_STRESS_SECONDS)
+    return FLIGHT_ALTITUDE_STRESS_VALUES[phase % len(FLIGHT_ALTITUDE_STRESS_VALUES)]
+
+
 def build_payload(
     scene,
     frame,
@@ -194,7 +214,7 @@ def build_payload(
         payload.update({
             "t.universalTime": base["t.universalTime"] + elapsed,
             "v.missionTime": base["v.missionTime"] + elapsed,
-            "v.altitude": base["v.altitude"] + math.sin(frame / 12.0) * 1400.0,
+            "v.altitude": flight_altitude_for_elapsed(elapsed),
             "v.verticalSpeed": base["v.verticalSpeed"] + math.cos(frame / 12.0) * 18.0,
             "n.heading": (base["n.heading"] + frame * 0.18) % 360.0,
             "heat.backend": "system_heat",

@@ -397,6 +397,39 @@ export interface CelestialBodyTelemetry {
   atmosphereDensities?: number[];
 }
 
+export type EditorElectricityStatus = "ready" | "warming" | "degraded" | "empty" | "unavailable";
+export type EditorElectricityBackend = "dynamic_battery_storage" | "stock";
+export type EditorElectricityComponentRole = "producer" | "consumer";
+
+/** A stable editor-side electrical module, independent of staging simulation. */
+export interface EditorElectricityComponentTelemetry {
+  stableId: string;
+  partId: string;
+  partTitle: string;
+  moduleName: string;
+  category: string;
+  role: EditorElectricityComponentRole;
+  referenceEcPerSec?: number;
+  defaultIncluded: boolean;
+  continuous: boolean;
+  solarScaled: boolean;
+  valueKnown: boolean;
+}
+
+/** Body constants captured with the editor electrical snapshot, not stage conditions. */
+export interface EditorElectricityBodyTelemetry {
+  bodyName: string;
+  starName?: string;
+  gravitationalParameter?: number;
+  radius?: number;
+  rotationPeriod?: number;
+  atmosphereDepth?: number;
+  sphereOfInfluence?: number;
+  solarDistance?: number;
+  solarEfficiency?: number;
+  authoritative: boolean;
+}
+
 /**
  * Dashboard telemetry contract. The index signature also accepts additive
  * fields published by optional integrations and newer runtime builds.
@@ -665,6 +698,21 @@ export interface TelemetrySnapshot {
   "editor.dryCost"?: number;
   "editor.resourceCost"?: number;
   "editor.res.names"?: string[];
+  "editor.elec.status"?: EditorElectricityStatus;
+  "editor.elec.backend"?: EditorElectricityBackend;
+  "editor.elec.backendVersion"?: string;
+  "editor.elec.degradedReason"?: string;
+  "editor.elec.revision"?: number;
+  "editor.elec.fingerprint"?: string;
+  "editor.elec.saveFolder"?: string;
+  "editor.elec.craftPersistentId"?: string;
+  "editor.elec.rootPartPersistentId"?: string;
+  "editor.elec.currentEc"?: number;
+  "editor.elec.maxEc"?: number;
+  "editor.elec.components"?: EditorElectricityComponentTelemetry[];
+  "editor.elec.bodies"?: EditorElectricityBodyTelemetry[];
+  "editor.elec.pending"?: boolean;
+  "editor.elec.retained"?: boolean;
   "catalog.bodies"?: CelestialBodyTelemetry[];
   "notes.available"?: boolean;
   "notes.activeFound"?: boolean;

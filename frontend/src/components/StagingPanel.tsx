@@ -151,7 +151,7 @@ export function StagingPanel({ snapshot }: StagingPanelProps) {
     <Panel
       compact={!editorMode}
       id="stage"
-      title={editorMode ? "Editor staging analysis" : "Staging analysis"}
+      title="Staging analysis"
       tag={editorMode ? (
         <span
           aria-label="Total delta-v"

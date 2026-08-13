@@ -214,6 +214,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-Frontend.p
 For repeatable UI work without KSP, `tools\Mock Mission Control.bat` serves the
 same production dashboard with populated Flight, VAB/SPH, and Mission Control
 telemetry. Stop the real Dashboard feed first because both use port `8090`.
+The fixed Flight scene holds each value in a repeating altitude-width stress
+cycle for three seconds, covering short readouts and km, Mm, and Gm rollover
+boundaries that are easy to miss with a single nominal orbit fixture.
 
 Release assembly is handled by `tools/Publish-Release.ps1`. It builds and tests
 the frontend, selects the exact archived service DLLs, verifies licenses and

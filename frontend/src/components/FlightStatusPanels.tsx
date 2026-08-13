@@ -5,12 +5,11 @@ import {
   formatUniversalTime,
   isFiniteNumber,
 } from "../telemetry/formatters";
-import type { ReactNode } from "react";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
 import { Panel } from "./Panel";
 
-export function ClockPanel({ annunciator, snapshot }: { annunciator?: ReactNode; snapshot: TelemetrySnapshot }) {
+export function ClockPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const { system, toggleSystem } = useTimeSystem();
   const kerbin = isKerbinTime(system);
   const ut = formatUniversalTime(snapshot["t.universalTime"], kerbin);
@@ -54,13 +53,12 @@ export function ClockPanel({ annunciator, snapshot }: { annunciator?: ReactNode;
           <div className="cs-cell">
             <span className="label">Comms link</span>
             <span className="cs-status"><span className={`led2 ${connected === true ? "ok" : connected === false ? "bad" : ""}`} />{commText}</span>
+            {remoteTech && <span className="cs-delay">
+              <span className="label">Signal delay</span>
+              <span className="cs-val">{delay}</span>
+            </span>}
           </div>
-          {remoteTech && <div className="cs-cell">
-            <span className="label">Signal delay</span>
-            <span className="cs-val">{delay}</span>
-          </div>}
         </div>
-        {annunciator}
       </div>
     </Panel>
   );

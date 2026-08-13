@@ -60,6 +60,16 @@ describe("CSS contract checker", () => {
     expect(result.failures.some((failure) => failure.includes("src/styles.css:3"))).toBe(false);
   });
 
+  it("keeps rule lines out of painted grid grout", () => {
+    const result = checkCssContract([{
+      file: "src/styles.css",
+      text: `:root { --panel: #0f151f; --danger: #f87171; --rule: #1c2735; --surface-grout: #070b10; }\n.grid { gap: 1px; background: var(--rule); }\n.border { border: 1px solid var(--rule); }`,
+    }]);
+
+    expect(result.failures).toContain("src/styles.css:2 paints grid grout with --rule; use --surface-grout and reserve --rule for borders.");
+    expect(result.failures.some((failure) => failure.includes("src/styles.css:3"))).toBe(false);
+  });
+
   it("passes the complete production stylesheet contract", () => {
     expect(checkCssContract(productionSources).failures).toEqual([]);
   });

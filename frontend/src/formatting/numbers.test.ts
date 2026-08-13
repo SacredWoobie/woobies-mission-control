@@ -91,6 +91,36 @@ describe("distance presets", () => {
     expect(formatDistance(-581_090, "live")).toBe(`-581.09${thin}km`);
     expect(formatDistance(-581_090, "context")).toBe(`-581.1${thin}km`);
   });
+
+  it.each([
+    [999.4, `999${thin}m`],
+    [999.6, `1.000${thin}km`],
+    [99_999.4, `99.999${thin}km`],
+    [99_999.6, `100.00${thin}km`],
+    [999_994, `999.99${thin}km`],
+    [999_996, `1.0000${thin}Mm`],
+    [9_999_940, `9.9999${thin}Mm`],
+    [9_999_960, `10.00${thin}Mm`],
+    [99_994_000, `99.99${thin}Mm`],
+    [99_996_000, `100.0${thin}Mm`],
+    [999_940_000, `999.9${thin}Mm`],
+    [999_960_000, `1.000${thin}Gm`],
+    [9_999_400_000, `9.999${thin}Gm`],
+    [9_999_600_000, `10.00${thin}Gm`],
+    [99_994_000_000, `99.99${thin}Gm`],
+    [99_996_000_000, `100.0${thin}Gm`],
+  ])("rolls live distance bands over after rounding: %s", (value, expected) => {
+    expect(formatDistance(value, "live")).toBe(expected);
+  });
+
+  it("uses rollover-aware bands for compact distance presets and negative values", () => {
+    expect(formatDistance(999.6, "context")).toBe(`1.00${thin}km`);
+    expect(formatDistance(99_996, "context")).toBe(`100.0${thin}km`);
+    expect(formatDistance(999_960, "context")).toBe(`1.000${thin}Mm`);
+    expect(formatDistance(99_960, "plan")).toBe(`100${thin}km`);
+    expect(formatDistance(999_600, "plan")).toBe(`1.00${thin}Mm`);
+    expect(formatDistance(-999.6, "live")).toBe(`-1.000${thin}km`);
+  });
 });
 
 describe("fixed column quantities", () => {

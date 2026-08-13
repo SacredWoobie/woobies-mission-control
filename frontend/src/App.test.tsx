@@ -154,12 +154,23 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("tab", { name: "PLAN" }).getAttribute("aria-selected")).toBe("false");
     const monitorTab = screen.getByRole("tab", { name: "MONITOR" });
     const planTab = screen.getByRole("tab", { name: "PLAN" });
+    const controlPlate = screen.getByRole("group", { name: "Flight caution and workspace controls" });
+    const workspaceSelector = screen.getByRole("tablist", { name: "Flight workspace" });
+    const rebalance = screen.getByRole("button", { name: "Rebalance MONITOR workspace" });
+    expect(controlPlate.contains(workspaceSelector)).toBe(true);
+    expect(workspaceSelector.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(workspaceSelector.contains(rebalance)).toBe(false);
+    expect(workspaceSelector.getAttribute("data-active-view")).toBe("monitor");
+    expect(firstView.container.querySelector(".status-strip .flight-annunciator")).toBeNull();
+    expect(controlPlate.querySelector(".flight-annunciator")).toBeTruthy();
     monitorTab.focus();
     fireEvent.keyDown(monitorTab, { key: "ArrowRight" });
     expect(planTab.getAttribute("aria-selected")).toBe("true");
+    expect(workspaceSelector.getAttribute("data-active-view")).toBe("plan");
     expect(document.activeElement).toBe(planTab);
     fireEvent.keyDown(planTab, { key: "Home" });
     expect(monitorTab.getAttribute("aria-selected")).toBe("true");
+    expect(workspaceSelector.getAttribute("data-active-view")).toBe("monitor");
     expect(document.activeElement).toBe(monitorTab);
     const flightContext = firstView.container.querySelector("#clock");
     expect(flightContext?.textContent).toContain("Odyssey");
@@ -368,8 +379,11 @@ describe("Dashboard lifecycle", () => {
     expect(editorWorkspace?.classList.contains("no-planning-companion")).toBe(true);
     expect(editorWorkspace?.firstElementChild?.id).toBe("editorContext");
     expect(editorContent?.firstElementChild).toBe(editorPrimary);
-    expect(editorPrimary?.firstElementChild?.classList.contains("editor-staging-slice")).toBe(true);
-    expect(editorPrimary?.lastElementChild?.id).toBe("editorSummary");
+    expect(editorPrimary?.firstElementChild?.id).toBe("editorElectricity");
+    const editorAnalysisPair = editorPrimary?.lastElementChild;
+    expect(editorAnalysisPair?.classList.contains("editor-analysis-pair")).toBe(true);
+    expect(editorAnalysisPair?.firstElementChild?.classList.contains("editor-staging-slice")).toBe(true);
+    expect(editorAnalysisPair?.lastElementChild?.id).toBe("editorSummary");
     expect(editorSecondary?.querySelector("#editorSummary")).toBeNull();
     expect(screen.getByLabelText("Reference body")).toBeTruthy();
 

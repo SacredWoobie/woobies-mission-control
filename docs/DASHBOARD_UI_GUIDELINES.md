@@ -159,8 +159,18 @@ density.
 - Lane assignment and responsive arrangement preserve panel DOM identity,
   component state, focus, and internal scroll. Inactive views suspend panel
   telemetry work and resume from the current snapshot.
-- The fixed Master Caution surface reports vessel-wide actionable conditions.
-  Feed diagnostics remain in history without masquerading as a vessel warning.
+- The fixed Master Caution surface and MONITOR / PLAN controls share one
+  responsive instrument plate. It uses inset selector rails, lensed lamps,
+  restrained active-state glow, and a circular rebalance control so the group
+  reads as durable dashboard hardware rather than unrelated buttons.
+- The annunciator bank contains the five actionable HEAT, REACTOR, COMMS,
+  POWER, and DAMAGE positions plus one visually empty reserved grid position.
+  The reserved position has no label or interactive semantics, and mock-only
+  controls such as Lamp Test do not ship. Feed diagnostics remain in history
+  without masquerading as a vessel warning.
+- The Flight context strip has four logical cells: vessel, universal time,
+  mission elapsed time, and Comms. RemoteTech signal delay nests inside Comms
+  instead of consuming a separate cell.
 - Long staging inventories group distant powered stages before introducing
   internal scrolling, while keeping the current and nearest stages visible.
   Electricity, Heat, and Science details remain bounded and use one-at-a-time
@@ -173,9 +183,33 @@ density.
   redundant Editor Link strip.
 - Reference body, altitude, Mach, and presets remain directly editable and
   legible; numeric inputs do not need native spinner buttons.
-- Without a pinned planning companion, Craft Analysis spans the workspace and
-  Staging plus Resource Inventory share the row beneath it. Pinned plans retain
-  a compact secondary planning column without starving the primary analysis.
+- At 1800px and wider, the Editor centers a stable two-column core: Staging
+  above Resource Inventory on the left and the Electricity Planner on the
+  right. Pinning a planning companion adds its briefing as a third column while
+  preserving those first two tracks. Without a companion below 1800px, Craft
+  Analysis spans the workspace and Staging plus Resource Inventory share the
+  row beneath it. Narrower landscape and portrait layouts keep their established
+  primary/secondary or stacked flow.
+- The editor-only Electricity Planner spans the primary analysis width except
+  in that wide two- or three-column composition. Its scenario rail establishes
+  the selected body and orbital altitude; when its column width is constrained those
+  controls stack beside a 2x2 block of derived scenario facts. Body-to-star
+  distance is a read-only scenario fact, not a control.
+- Generation and consumption use two always-open ledgers: adjacent on wide
+  layouts and stacked on narrow layouts. In the wide Electricity column their
+  rows use a two-line name/category/rate treatment so the actual component data
+  remains readable. Each ledger owns its own All and None inclusion controls;
+  bounded internal overflow must never create horizontal scrolling.
+- Because those ledgers are intentionally always visible, short landscape
+  Editor workspaces may use one bounded page scroll instead of hiding the
+  electricity scenario or reducing the established eight-stage table. The
+  active stage remains visible inside its own bounded table, and horizontal
+  page scrolling remains prohibited.
+- The readout uses a continuous accessible battery meter. `HOLDS` specifically
+  means the current reported charge survives the next longest eclipse; recurring
+  orbit sustainability is a separate assessment. Scenario and ledger choices
+  are session-only read-only calculations that never share flight controls or
+  mutate the craft or module state.
 - Eight powered stages fit before staging begins internal scrolling. Dense
   layouts keep the active stage visible and explain grouped or omitted stages.
 - Pinned Resonant Orbit and Mission Plan panels are operational briefings, not
