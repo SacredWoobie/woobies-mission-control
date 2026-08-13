@@ -283,6 +283,7 @@ $sourceFiles = @(
     @{ Source = 'panel_bridge.py'; Destination = 'Dashboard/panel_bridge.py' },
     @{ Source = 'damage.py'; Destination = 'Dashboard/damage.py' },
     @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
+    @{ Source = 'editor_electrical_snapshot.py'; Destination = 'Dashboard/editor_electrical_snapshot.py' },
     @{ Source = 'flight_core_snapshot.py'; Destination = 'Dashboard/flight_core_snapshot.py' },
     @{ Source = 'heat.py'; Destination = 'Dashboard/heat.py' },
     @{ Source = 'heat_electricity_snapshot.py'; Destination = 'Dashboard/heat_electricity_snapshot.py' },
