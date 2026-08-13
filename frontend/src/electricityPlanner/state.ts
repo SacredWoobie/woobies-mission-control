@@ -2,6 +2,7 @@ import type { EditorElectricityComponentTelemetry, TelemetrySnapshot } from "../
 import { defaultElectricityScenario, type ElectricityScenario } from "./model";
 
 export type ElectricityPlannerPreset = "backend-defaults" | "all-included" | "producers-off" | "reset";
+export type ElectricityPlannerRoleInclusion = "all" | "none";
 
 export interface ElectricityPlannerSession {
   craftKey?: string;
@@ -57,4 +58,21 @@ export function applyElectricityPlannerPreset(
     includedByStableId,
     scenario: preset === "reset" ? defaultElectricityScenario(snapshot) : state.scenario,
   };
+}
+
+/**
+ * Changes only the selected role's current stable IDs. This deliberately leaves
+ * the opposite role and scenario untouched so the two ledger controls compose.
+ */
+export function applyElectricityPlannerRoleInclusion(
+  state: ElectricityPlannerSession,
+  components: readonly EditorElectricityComponentTelemetry[],
+  role: "producer" | "consumer",
+  inclusion: ElectricityPlannerRoleInclusion,
+): ElectricityPlannerSession {
+  const includedByStableId = { ...state.includedByStableId };
+  for (const component of components) {
+    if (component.role === role) includedByStableId[component.stableId] = inclusion === "all";
+  }
+  return { ...state, includedByStableId };
 }
