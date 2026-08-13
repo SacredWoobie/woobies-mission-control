@@ -1806,7 +1806,9 @@
   .resonant-drawer.delta-v-drawer > header p { display: none; }
   .delta-v-header-controls { display: grid; width: min(500px,100%); max-width: none; grid-template-columns: minmax(0,1fr) max-content; flex: 0 0 auto; align-items: center; gap: 7px; }
   .delta-v-header-actions, .delta-v-save-slot .delta-v-save-bar, .delta-v-save-slot .delta-v-save-actions { display: flex; min-width: 0; align-items: center; gap: 0; }
-  .delta-v-save-slot { min-width: 0; }
+  .delta-v-header-actions, .delta-v-save-slot { grid-column: auto; grid-row: auto; }
+  .delta-v-header-actions > button { width: auto; }
+  .delta-v-save-slot { display: block; min-width: 0; }
   .delta-v-save-slot .delta-v-save-bar { width: 100%; grid-template-columns: none; }
   .delta-v-save-slot .delta-v-save-bar label { display: block; min-width: 0; flex: 1 1 auto; }
   .delta-v-save-slot .delta-v-save-bar label > span { display: none; }
