@@ -5000,7 +5000,7 @@ def gather_telemetry(conn):
         pass
 
     # ---- clocks + thrust + navball + Flight/orbit stock core ----
-    # WCS 0.2.16 performs the same official SpaceCenter wrapper reads behind
+    # WCS 0.2.21 performs the same official SpaceCenter wrapper reads behind
     # one demand-only RPC. Absence, invalid data, or a vessel transition falls
     # through to the complete pre-feature stock path in this same cycle.
     flight_core = _gather_flight_core_preferred(

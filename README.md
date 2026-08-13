@@ -1,17 +1,17 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.6.1](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.6.1)**
+Current public release: **[v0.7.0](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.0)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.6.1 adds an explicitly confirmed managed-runtime updater for future
-releases. This first updater-capable build still requires one normal full-ZIP
-install; later releases can replace only verified package-managed files while
-preserving local state, retaining a complete rollback, and never writing the
-selected live KSP `GameData` folder.
+Version 0.7.0 adds a hardware-style Flight instrument plate and a read-only
+VAB/SPH electricity planner with Dynamic Battery Storage and stock fallbacks.
+It also becomes the first public successor that v0.6.1's explicitly confirmed
+managed updater can install while preserving local state, retaining a complete
+rollback, and never writing the selected live KSP `GameData` folder.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -70,10 +70,13 @@ custom allowances, and craft assignment.
 </p>
 
 The editor view places craft identity, mass, cost, build counts, and simulation
-conditions in one overview above MechJeb staging analysis and the resource
-inventory. Reference body, altitude, and Mach can be changed directly before
-launch. Pinned Mission and Resonant Orbit plans remain compact operational
-briefings beside the vehicle, with exact-plan editing when assumptions change.
+conditions in one overview above MechJeb staging analysis, resource inventory,
+and a read-only electricity planner. The electrical surface inventories
+generation and consumption, shows battery endurance and eclipse survival, and
+supports session-only scenario choices without mutating the craft. Reference
+body, altitude, and Mach can be changed directly before launch. Pinned Mission
+and Resonant Orbit plans remain compact operational briefings beside the
+vehicle, with exact-plan editing when assumptions change.
 
 ### Flight
 
@@ -84,9 +87,11 @@ briefings beside the vehicle, with exact-plan editing when assumptions change.
 </p>
 
 Flight keeps Ascension, Consumables, and Staging Analysis in a persistent
-vessel-state region beside switchable MONITOR and PLAN workspaces. Electricity,
-heat, science, and target monitoring remain separate from mission and reference
-plans, while the software Master Caution surface reports vessel-wide conditions.
+vessel-state region beside switchable MONITOR and PLAN workspaces. A shared
+instrument plate combines those selectors with Master Warning, five actionable
+annunciators, and a workspace rebalance control. Electricity, heat, science,
+and target monitoring remain separate from mission and reference plans while
+the warning surface reports vessel-wide conditions.
 Workspace panels collapse in place without losing their state; utility drawers
 for Datalink, Notes, and planning tools remain available from the instrument
 rail.
@@ -112,12 +117,12 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The v0.6.1 public release selects four independently versioned kRPC extensions.
+The v0.7.0 public release selects four independently versioned kRPC extensions.
 Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
 | --- | --- | --- |
-| WoobiesControlStats | 0.2.16 | Roster, science, stock thermal data, contract deadlines, vessel damage and persistent part-loss history, packed Flight/resources telemetry, KAC recovery, and guarded vessel termination |
+| WoobiesControlStats | 0.2.21 | Roster, science, stock thermal data, contract deadlines, vessel damage and persistent part-loss history, packed Flight/resources telemetry, guarded vessel actions, and the Editor electrical snapshot |
 | KRPC.StageStats | 0.2.10 | Flight/editor staging, TWR ranges, VAB/SPH craft totals, and bounded packed Flight stage snapshots |
 | KRPC.SystemHeat | 0.2.11 | System Heat loops, components, electrical sources, reactor/radiator controls, and packed heat/electricity telemetry |
 | KRPC.WoobiesMechJeb | 0.8.10 | MechJeb 2.15.3 staging and transfer-planning bridge |
