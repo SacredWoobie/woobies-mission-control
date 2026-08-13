@@ -194,6 +194,11 @@ density.
   layouts and stacked on narrow layouts. Each ledger owns its own All and None
   inclusion controls; bounded internal overflow must never create horizontal
   scrolling.
+- Because those ledgers are intentionally always visible, short landscape
+  Editor workspaces may use one bounded page scroll instead of hiding the
+  electricity scenario or reducing the established eight-stage table. The
+  active stage remains visible inside its own bounded table, and horizontal
+  page scrolling remains prohibited.
 - The readout uses a continuous accessible battery meter. `HOLDS` specifically
   means the current reported charge survives the next longest eclipse; recurring
   orbit sustainability is a separate assessment. Scenario and ledger choices

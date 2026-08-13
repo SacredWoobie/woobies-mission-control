@@ -461,6 +461,7 @@ test("dense Editor analysis uses the empty planning width and reveals the active
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: bounds("#editorElectricity").height,
       ninthRowScrolls,
       overflowingHeaderValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorContext h1, #editorContext .editor-overview-metric strong, #editorContext .editor-overview-metric small"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
@@ -484,7 +485,7 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.activeFullyVisible).toBe(true);
   expect(layout.overflowingHeaderValues).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
-  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight + layout.electricityHeight);
 });
 
 test("Editor planning companions preserve the dense workspace alone and together", async ({ page }) => {
@@ -527,6 +528,7 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: bounds("#editorElectricity").height,
       orbitContextGap: orbit.top - context.bottom,
       orbitHeight: orbit.height,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
@@ -536,7 +538,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(orbitOnly.orbitContextGap).toBeGreaterThanOrEqual(10);
   expect(orbitOnly.orbitHeight).toBeLessThanOrEqual(220);
   expect(orbitOnly.documentScrollWidth).toBeLessThanOrEqual(orbitOnly.documentClientWidth);
-  expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight);
+  expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight + orbitOnly.electricityHeight);
 
   await page.getByRole("button", { name: "Delta-v planner" }).click();
   await page.getByRole("button", { name: "+ Add next stop" }).click();
@@ -591,6 +593,7 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: bounds("#editorElectricity").height,
       deltaVHeaderHeight: deltaVHeader.height,
       deltaVEditHeight: deltaVEdit.height,
       deltaVHeight: deltaV.height,
@@ -638,7 +641,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(layout.overflowingOrbitValues).toBe(0);
   expect(layout.overflowingResourceNames).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
-  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight + layout.electricityHeight);
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.reload();
@@ -665,6 +668,7 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
+      electricityHeight: bounds("#editorElectricity").height,
       overflowingOrbitValues: Array.from(element.querySelectorAll<HTMLElement>("#editorOrbitPlan .resonant-editor-plan-details strong, #editorOrbitPlan .resonant-editor-plan-details > header > span"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingPresetLabels: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-presets button"))
@@ -687,7 +691,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(medium.topDifference).toBeLessThanOrEqual(1);
   expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
   expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);
-  expect(medium.documentScrollHeight).toBeLessThanOrEqual(medium.documentClientHeight);
+  expect(medium.documentScrollHeight).toBeLessThanOrEqual(medium.documentClientHeight + medium.electricityHeight);
 
   await page.setViewportSize({ width: 1080, height: 1920 });
   const portrait = await workspace.evaluate((element) => {

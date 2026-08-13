@@ -2871,3 +2871,6 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 @media (orientation: landscape) and (min-width: 1800px) and (min-height: 801px) {
   .editor-mode .editor-electricity-ledger-body { max-height: 142px; }
 }
+@media (orientation: portrait) and (min-width: 901px) and (max-width: 1100px) {
+  .editor-mode .editor-electricity-ledger-body { max-height: 109px; }
+}
