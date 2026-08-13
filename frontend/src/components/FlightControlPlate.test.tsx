@@ -38,12 +38,12 @@ describe("FlightControlPlate", () => {
     expect(screen.getByRole("group", { name: "Flight caution and workspace controls" })).toBeTruthy();
     expect(screen.getByRole("tablist", { name: "Flight workspace" })).toBeTruthy();
     expect(screen.getByText("Workspace", { exact: true })).toBeTruthy();
-    expect(tab("monitor")).toHaveAttribute("aria-controls", "flight-workspace-panel-monitor");
-    expect(tab("monitor")).toHaveAttribute("aria-selected", "true");
-    expect(tab("monitor")).toHaveAttribute("tabindex", "0");
-    expect(tab("plan")).toHaveAttribute("aria-controls", "flight-workspace-panel-plan");
-    expect(tab("plan")).toHaveAttribute("aria-selected", "false");
-    expect(tab("plan")).toHaveAttribute("tabindex", "-1");
+    expect(tab("monitor").getAttribute("aria-controls")).toBe("flight-workspace-panel-monitor");
+    expect(tab("monitor").getAttribute("aria-selected")).toBe("true");
+    expect(tab("monitor").tabIndex).toBe(0);
+    expect(tab("plan").getAttribute("aria-controls")).toBe("flight-workspace-panel-plan");
+    expect(tab("plan").getAttribute("aria-selected")).toBe("false");
+    expect(tab("plan").tabIndex).toBe(-1);
   });
 
   it("selects PLAN when its tab is clicked", () => {
@@ -59,19 +59,19 @@ describe("FlightControlPlate", () => {
 
     tab("monitor").focus();
     key(tab("monitor"), "ArrowRight");
-    expect(tab("plan")).toHaveAttribute("aria-selected", "true");
+    expect(tab("plan").getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab("plan"));
 
     key(tab("plan"), "ArrowLeft");
-    expect(tab("monitor")).toHaveAttribute("aria-selected", "true");
+    expect(tab("monitor").getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab("monitor"));
 
     key(tab("monitor"), "End");
-    expect(tab("plan")).toHaveAttribute("aria-selected", "true");
+    expect(tab("plan").getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab("plan"));
 
     key(tab("plan"), "Home");
-    expect(tab("monitor")).toHaveAttribute("aria-selected", "true");
+    expect(tab("monitor").getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tab("monitor"));
   });
 
@@ -79,7 +79,7 @@ describe("FlightControlPlate", () => {
     const { onRebalance } = renderControlledPlate("plan");
     const rebalance = screen.getByRole("button", { name: "Rebalance PLAN workspace" });
 
-    expect(rebalance).toHaveAttribute("title", "Rebalance PLAN panels");
+    expect(rebalance.getAttribute("title")).toBe("Rebalance PLAN panels");
     fireEvent.click(rebalance);
     expect(onRebalance).toHaveBeenCalledOnce();
   });
