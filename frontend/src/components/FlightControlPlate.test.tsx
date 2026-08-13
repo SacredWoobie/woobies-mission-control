@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FlightWorkspaceView } from "../flight/layout";
 import { FlightControlPlate } from "./FlightControlPlate";
+
+afterEach(cleanup);
 
 function renderControlledPlate(initialView: FlightWorkspaceView = "monitor") {
   const onRebalance = vi.fn();
