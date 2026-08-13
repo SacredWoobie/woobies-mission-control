@@ -1,17 +1,17 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.7.0](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.0)**
+Current public release: **[v0.7.1](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.1)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.7.0 adds a hardware-style Flight instrument plate and a read-only
-VAB/SPH electricity planner with Dynamic Battery Storage and stock fallbacks.
-It also becomes the first public successor that v0.6.1's explicitly confirmed
-managed updater can install while preserving local state, retaining a complete
-rollback, and never writing the selected live KSP `GameData` folder.
+Version 0.7.1 repairs the v0.7.0 release package by restoring the Editor
+electrical snapshot decoder required at telemetry startup and adds a release
+check for omitted local Python imports. It retains v0.7.0's hardware-style
+Flight instrument plate, read-only VAB/SPH electricity planner, and managed
+update path from v0.6.1 without changing KSP `GameData` or service DLLs.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -117,7 +117,7 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Packaged KSP services
 
-The v0.7.0 public release selects four independently versioned kRPC extensions.
+The v0.7.1 public release selects four independently versioned kRPC extensions.
 Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |

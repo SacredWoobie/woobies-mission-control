@@ -107,9 +107,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Managed runtime updates", section)
-        self.assertIn("explicitly confirmed in-app updater", section)
-        self.assertIn("never writes the user's selected live KSP", section)
+        self.assertIn("Release packaging repair", section)
+        self.assertIn("Editor electrical snapshot", section)
+        self.assertIn("repository-local", section)
 
 
 if __name__ == "__main__":
