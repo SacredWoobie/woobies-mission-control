@@ -1827,7 +1827,7 @@
   .delta-v-header-actions, .delta-v-save-slot { grid-column: auto; grid-row: auto; }
   .delta-v-header-actions > button { width: auto; }
   .delta-v-save-slot { display: block; min-width: 0; }
-  .delta-v-save-slot .delta-v-save-bar { width: 100%; grid-template-columns: none; }
+  .delta-v-save-slot .delta-v-save-bar { position: relative; width: 100%; grid-template-columns: none; }
   .delta-v-save-slot .delta-v-save-bar label { display: block; min-width: 0; flex: 1 1 auto; }
   .delta-v-save-slot .delta-v-save-bar label > span { display: none; }
   .resonant-drawer.delta-v-drawer > header :is(.delta-v-save-bar input, .delta-v-save-actions button, .delta-v-header-actions > button) { height: 30px; min-height: 30px !important; box-sizing: border-box; }
