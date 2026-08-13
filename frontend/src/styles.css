@@ -2970,11 +2970,19 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   }
 
   .editor-mode .editor-workspace .editor-electricity-component label {
+    width: 100%;
+    min-height: 0;
+    padding-block: 1px;
     grid-template-areas:
       "check name name"
       "check category rate";
     grid-template-columns: auto minmax(0,1fr) auto;
-    row-gap: 2px;
+    row-gap: 1px;
+  }
+  .editor-mode .editor-workspace .editor-electricity-ledger-body { display: block; }
+  .editor-mode .editor-workspace .editor-electricity-component {
+    display: block;
+    min-height: 0;
   }
   .editor-mode .editor-workspace .editor-electricity-component input { grid-area: check; }
   .editor-mode .editor-workspace .editor-electricity-component strong { grid-area: name; }

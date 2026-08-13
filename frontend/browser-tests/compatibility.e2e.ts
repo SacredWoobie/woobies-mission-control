@@ -450,6 +450,34 @@ test("dense Editor analysis uses the empty planning width and reveals the active
     const scenarioDerived = bounds(".editor-electricity-scenario-derived");
     const derivedCells = Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-scenario-derived > div"))
       .map((cell) => cell.getBoundingClientRect());
+    const inspectLedgerFlow = (selector: string, forcedRows = 0) => {
+      const body = workspace.querySelector<HTMLElement>(`${selector} .editor-electricity-ledger-body`)!;
+      const originals = Array.from(body.querySelectorAll<HTMLElement>(".editor-electricity-component"));
+      const clones = Array.from({ length: forcedRows }, (_, index) => originals[index % originals.length].cloneNode(true) as HTMLElement);
+      clones.forEach((clone) => body.append(clone));
+      body.scrollTop = body.scrollHeight;
+      const rows = Array.from(body.querySelectorAll<HTMLElement>(".editor-electricity-component"));
+      const boundsByRow = rows.map((row) => row.getBoundingClientRect());
+      const result = {
+        clippedLabels: rows.filter((row) => {
+          const rowBounds = row.getBoundingClientRect();
+          const labelBounds = row.querySelector<HTMLElement>("label")!.getBoundingClientRect();
+          return labelBounds.bottom > rowBounds.bottom + 1
+            || labelBounds.left < rowBounds.left - 1
+            || labelBounds.right > rowBounds.right + 1;
+        }).length,
+        scrolls: body.scrollHeight > body.clientHeight + 1,
+        verticalOverlaps: boundsByRow.filter((rowBounds, index) => {
+          const next = boundsByRow[index + 1];
+          return next ? rowBounds.bottom > next.top + 1 : false;
+        }).length,
+      };
+      clones.forEach((clone) => clone.remove());
+      body.scrollTop = 0;
+      return result;
+    };
+    const producerLedgerFlow = inspectLedgerFlow(".editor-electricity-ledger.is-producer", 3);
+    const consumerLedgerFlow = inspectLedgerFlow(".editor-electricity-ledger.is-consumer");
     const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
     const tableBounds = table.getBoundingClientRect();
     const activeBounds = workspace.querySelector<HTMLElement>('.stage-table.editor [aria-current="step"]')!.getBoundingClientRect();
@@ -492,6 +520,8 @@ test("dense Editor analysis uses the empty planning width and reveals the active
       overflowingHeaderValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorContext h1, #editorContext .editor-overview-metric strong, #editorContext .editor-overview-metric small"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       poweredRows: workspace.querySelectorAll('.stage-table.editor [role="row"][data-stage-ksp]').length,
+      producerLedgerFlow,
+      consumerLedgerFlow,
       secondaryChildren: workspace.querySelector(".editor-workspace-secondary")!.children.length,
       scenarioControlGap: scenarioAltitude.top - scenarioBody.bottom,
       scenarioControlLeftDifference: Math.abs(scenarioBody.left - scenarioAltitude.left),
@@ -527,6 +557,12 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
   expect(layout.componentRowsUseTwoLines).toBe(true);
   expect(layout.overflowingElectricityRows).toBe(0);
+  expect(layout.producerLedgerFlow.scrolls).toBe(true);
+  expect(layout.producerLedgerFlow.verticalOverlaps).toBe(0);
+  expect(layout.producerLedgerFlow.clippedLabels).toBe(0);
+  expect(layout.consumerLedgerFlow.scrolls).toBe(true);
+  expect(layout.consumerLedgerFlow.verticalOverlaps).toBe(0);
+  expect(layout.consumerLedgerFlow.clippedLabels).toBe(0);
   expect(layout.poweredRows).toBe(8);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.ninthRowScrolls).toBe(true);
