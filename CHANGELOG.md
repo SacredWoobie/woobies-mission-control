@@ -21,11 +21,11 @@ All notable public changes will be recorded here.
   eclipse sizing, recharge and recurring-orbit checks, and session-only
   component/scenario controls. Separate generated/consumed ledgers and a compact
   endurance comparison expose depletion time, eclipse time, and body-relative
-  solar efficiency together. The editor electrical snapshot is event-driven:
-  stable dashboard frames reuse the last confirmed craft model instead of
-  repeatedly polling kRPC; only a `warming` snapshot retries at a bounded
-  one-second cadence until it settles, while craft changes and bounded
-  compatibility retries refresh it. WoobiesControlStats 0.2.20 is the
+  solar efficiency together. The editor electrical snapshot uses immediate
+  event-driven refreshes plus a bounded one-second compatibility refresh so
+  New Craft and third-party editor actions that omit KSP's normal change event
+  cannot retain the prior craft or stale module rates. A `warming` snapshot
+  continues to retry until it settles. WoobiesControlStats 0.2.21 is the
   unselected next-release candidate for the optional
   Dynamic Battery Storage-backed and stock-fallback editor service and treats
   engine modules explicitly linked by KSP's multi-mode controller as one

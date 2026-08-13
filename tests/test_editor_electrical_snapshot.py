@@ -10,14 +10,18 @@ def b(value):
     return base64.b64encode(value.encode()).decode()
 
 
-def snapshot(*, craft="craft-1", revision=1, status="ready"):
+def snapshot(*, craft="craft-1", root="root-1", revision=1,
+             status="ready", rate="0"):
+    components = [] if status == "empty" else [
+        "\t".join(["C", b("part:module"), "42", b("Battery"),
+                   b("ModuleBattery"), b("storage"), "consumer", rate,
+                   "1", "1", "0", "1"]),
+    ]
     return [
         "\t".join(["WEE1", "1", status, "stock", b("1.0"),
-                   b("Save"), craft, "root-1", str(revision), "fp",
-                   "10", "20", "1", "1", b("")]),
-        "\t".join(["C", b("part:module"), "42", b("Battery"),
-                   b("ModuleBattery"), b("storage"), "consumer", "0",
-                   "1", "1", "0", "1"]),
+                   b("Save"), craft, root, str(revision), "fp",
+                   "10", "20", str(len(components)), "1", b("")]),
+        *components,
         "\t".join(["B", b("Kerbin"), b("Kerbol"), "3.5", "600000",
                    "21600", "70000", "84159286", "13599840256", "1", "1"]),
     ]
@@ -130,7 +134,7 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
         self.assertEqual(cached_ready["editor.elec.status"], "ready")
         self.assertFalse(cached_ready["editor.elec.retained"])
 
-    def test_terminal_electrical_states_remain_event_driven(self):
+    def test_terminal_electrical_states_receive_bounded_refresh(self):
         for status in ("ready", "empty", "degraded", "unavailable"):
             with self.subTest(status=status):
                 telemetry_server._reset_editor_electrical_state()
@@ -141,9 +145,62 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
                 with mock.patch.object(telemetry_server.time, "time", side_effect=[1.0, 2.5]):
                     first = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
                     cached = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
-                self.assertEqual(service.calls, 1)
+                self.assertEqual(service.calls, 2)
                 self.assertEqual(first["editor.elec.status"], status)
                 self.assertEqual(cached["editor.elec.status"], status)
+
+    def test_same_identity_rate_change_refreshes_without_editor_event(self):
+        service = Service()
+        conn = Connection(service)
+        telemetry_server._editor_identity = ("Save", "craft-1", "root-1")
+        with mock.patch.object(telemetry_server.time, "time",
+                               side_effect=[1.0, 1.5, 2.0]):
+            inactive = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 1}
+            )
+            cached = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 1}
+            )
+            service.payload = snapshot(revision=2, rate="1.25")
+            active = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 1}
+            )
+        self.assertEqual(service.calls, 2)
+        self.assertEqual(
+            inactive["editor.elec.components"][0]["referenceEcPerSec"], 0
+        )
+        self.assertEqual(
+            cached["editor.elec.components"][0]["referenceEcPerSec"], 0
+        )
+        self.assertEqual(
+            active["editor.elec.components"][0]["referenceEcPerSec"], 1.25
+        )
+
+    def test_missing_stage_identity_clears_rooted_snapshot_for_new_craft(self):
+        service = Service()
+        conn = Connection(service)
+        telemetry_server._editor_identity = ("Save", "craft-1", "root-1")
+        with mock.patch.object(telemetry_server.time, "time",
+                               side_effect=[1.0, 1.1, 2.2]):
+            prior = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 1}
+            )
+            telemetry_server._editor_identity = None
+            missing = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 2}
+            )
+            service.payload = snapshot(
+                craft="craft-2", root="", revision=2, status="empty"
+            )
+            empty = telemetry_server._attach_editor_electrical(
+                conn, {"editor.revision": 2}
+            )
+        self.assertEqual(prior["editor.elec.status"], "ready")
+        self.assertEqual(missing["editor.elec.status"], "unavailable")
+        self.assertFalse(missing["editor.elec.retained"])
+        self.assertEqual(empty["editor.elec.status"], "empty")
+        self.assertEqual(empty["editor.elec.rootPartPersistentId"], "")
+        self.assertEqual(empty["editor.elec.components"], [])
 
 
 if __name__ == "__main__":

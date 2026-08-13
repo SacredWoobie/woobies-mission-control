@@ -76,6 +76,7 @@ SMART_ASS_NEGATIVE_READY_POLL_SECONDS = 1.0
 REMOTE_TECH_BINDING_REFRESH_SECONDS = 5.0
 EDITOR_SUMMARY_RETRY_SECONDS = 1
 EDITOR_ELECTRICAL_RETRY_SECONDS = 1.0
+EDITOR_ELECTRICAL_REFRESH_SECONDS = 1.0
 NOTES_POLL_SECONDS = 2.0
 NOTES_MAX_BYTES = 32 * 1024
 NOTES_MAX_CATALOG = 500
@@ -2105,6 +2106,17 @@ def _attach_editor_electrical(conn, data):
         _editor_electrical_cache = {}
         _editor_electrical_identity = None
         _editor_electrical_source_token = None
+    # An empty New Craft has no StageStats root identity. Never replay a
+    # previous rooted craft through that fail-closed boundary; the service may
+    # still publish an authoritative empty snapshot with a blank root.
+    if (
+        stage_identity is None and
+        _editor_electrical_identity is not None and
+        _editor_electrical_identity[2]
+    ):
+        _editor_electrical_cache = {}
+        _editor_electrical_identity = None
+        _editor_electrical_source_token = None
     if now < _editor_electrical_retry_after:
         if _editor_electrical_cache:
             data.update(_editor_electrical_cache)
@@ -2114,17 +2126,14 @@ def _attach_editor_electrical(conn, data):
                          "editor.elec.pending": False,
                          "editor.elec.retained": False})
         return data
-    # Settled snapshots remain event-driven instead of issuing a 4 Hz custom-
-    # service RPC. Warming snapshots and missing StageStats provenance use
-    # bounded 1 Hz probes; identity/revision/topology transitions remain
-    # immediate demand triggers.
+    # Identity/revision/topology transitions remain immediate demand triggers.
+    # Warming, missing provenance, and settled editor snapshots also receive a
+    # bounded 1 Hz compatibility refresh because New Craft and third-party PAW
+    # actions do not consistently emit KSP's editor ship-modified event.
     due = (
         not _editor_electrical_cache or
         (source_token is not None and source_token != _editor_electrical_source_token) or
-        (_editor_electrical_cache.get("editor.elec.status") == "warming" and
-         now - _editor_electrical_last_poll >= EDITOR_ELECTRICAL_RETRY_SECONDS) or
-        (source_token is None and
-         now - _editor_electrical_last_poll >= EDITOR_ELECTRICAL_RETRY_SECONDS)
+        now - _editor_electrical_last_poll >= EDITOR_ELECTRICAL_REFRESH_SECONDS
     )
     retained = False
     if due:
@@ -2138,6 +2147,8 @@ def _attach_editor_electrical(conn, data):
                         snapshot["editor.elec.rootPartPersistentId"])
             if stage_identity is not None and identity != stage_identity:
                 raise ValueError("EditorElectrical identity disagrees with editor")
+            if stage_identity is None and identity[2]:
+                raise ValueError("EditorElectrical identity is not yet authoritative")
             # A new identity must never receive previous-craft data, even for
             # the failed/unstable service state that may follow a load.
             if _editor_electrical_identity not in (None, identity):
