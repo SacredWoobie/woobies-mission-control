@@ -68,6 +68,8 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
   const components = snapshot["editor.elec.components"] ?? [];
   const status = snapshot["editor.elec.status"];
   const pending = snapshot["editor.elec.pending"] === true;
+  const currentEc = snapshot["editor.elec.currentEc"];
+  const maxEc = snapshot["editor.elec.maxEc"];
 
   useEffect(() => setSession((current) => reconcileElectricityPlannerSession(current, snapshot)), [snapshot]);
 
@@ -75,21 +77,19 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
   const plannerScenario = scenario ?? { bodyName: snapshot["editor.body"] };
   const body = findPlannerBody(snapshot["editor.elec.bodies"], plannerScenario.bodyName);
   const plan = useMemo(() => calculateElectricityPlan({
-    components, included: session?.includedByStableId ?? {}, currentEc: snapshot["editor.elec.currentEc"],
-    maxEc: snapshot["editor.elec.maxEc"], body, scenario: plannerScenario,
-  }), [body, components, plannerScenario, session?.includedByStableId, snapshot]);
+    components, included: session?.includedByStableId ?? {}, currentEc, maxEc, body, scenario: plannerScenario,
+  }), [body, components, currentEc, maxEc, plannerScenario, session?.includedByStableId]);
   const unavailable = status === "unavailable";
   const retained = snapshot["editor.elec.retained"] === true;
   const incomplete = components.some((component) => !component.valueKnown);
   const scale = plan.generationEcPerSec === undefined || plan.drawEcPerSec === undefined
     ? undefined : Math.max(plan.generationEcPerSec, plan.drawEcPerSec);
-  const full = snapshot["editor.elec.currentEc"] !== undefined && snapshot["editor.elec.maxEc"] !== undefined
-    && snapshot["editor.elec.currentEc"] >= snapshot["editor.elec.maxEc"];
-  const chargeCopy = full ? "Fully charged"
-    : plan.netEcPerSec === undefined ? "Charge outlook unavailable"
-      : plan.netEcPerSec < 0 ? `Depletes in ${duration(plan.batteryEnduranceSeconds)}`
-        : plan.netEcPerSec > 0 ? `Recharges in ${duration(plan.rechargeSeconds)}`
-          : "No depletion or recharge";
+  const storageKnown = currentEc !== undefined && maxEc !== undefined && maxEc > 0;
+  const full = storageKnown && currentEc >= maxEc;
+  const chargeCopy = plan.netEcPerSec === undefined || !storageKnown ? "Charge outlook unavailable"
+    : plan.netEcPerSec < 0 ? `Depletes in ${duration(plan.batteryEnduranceSeconds)}`
+      : plan.netEcPerSec > 0 ? full ? "Fully charged" : `Recharges in ${duration(plan.rechargeSeconds)}`
+        : full ? "Fully charged" : "Holding charge";
   const verdict = plan.netEcPerSec === undefined ? "Balance unavailable"
     : plan.netEcPerSec < 0 ? "Deficit" : plan.netEcPerSec > 0 ? "Surplus" : "Break-even";
   const balanceTone = plan.netEcPerSec === undefined ? "is-unknown"
@@ -131,8 +131,8 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
                   <p className={`editor-electricity-net-headline ${balanceTone}`}><span>{verdict}</span><strong>{signedRate(plan.netEcPerSec)}</strong></p>
                   <p className="editor-electricity-charge-copy">{chargeCopy}</p>
                   <div className="editor-electricity-rate-bars" aria-label="Generation and consumption compared on a shared scale"><RateBar label="Generated" rate={plan.generationEcPerSec} scale={scale} /><RateBar label="Consumed" rate={plan.drawEcPerSec} scale={scale} /></div>
-                  <div className="editor-electricity-storage"><span>Battery</span><Meter current={snapshot["editor.elec.currentEc"]} maximum={snapshot["editor.elec.maxEc"]} /><strong>{number(snapshot["editor.elec.currentEc"], 0)} / {number(snapshot["editor.elec.maxEc"], 0)} EC</strong></div>
-                  <ShadowAssessment currentEc={snapshot["editor.elec.currentEc"]} plan={plan} />
+                  <div className="editor-electricity-storage"><span>Battery</span><Meter current={currentEc} maximum={maxEc} /><strong>{number(currentEc, 0)} / {number(maxEc, 0)} EC</strong></div>
+                  <ShadowAssessment currentEc={currentEc} plan={plan} />
                   <p className={`editor-electricity-recurring-orbit ${plan.recurringOrbitSustainable === false ? "is-deficit" : plan.recurringOrbitSustainable === true ? "is-sustainable" : "is-unknown"}`}>Recurring orbit: <strong>{plan.recurringOrbitSustainable === undefined ? "Unavailable" : plan.recurringOrbitSustainable ? "Sustainable" : "Deficit"}</strong></p>
                 </section>
               </div>

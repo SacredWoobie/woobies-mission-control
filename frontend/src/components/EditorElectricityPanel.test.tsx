@@ -63,6 +63,37 @@ describe("EditorElectricityPanel", () => {
     expect(screen.getByText(/Recurring orbit:/)).toBeTruthy();
   });
 
+  it("reports partial recharge and exposes descriptive component checkbox names", () => {
+    renderPanel({ ...representativeElectricityFixture, "editor.elec.currentEc": 600 });
+    expect(screen.getByText(/Recharges in/)).toBeTruthy();
+    expect(screen.getByRole("meter", { name: "Battery charge 600 of 1,200 EC" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /IX-6315 Ion Engine ×2.*PROPULSION.*8.74 EC\/s/ })).toBeTruthy();
+  });
+
+  it("switches to a deficit and next-eclipse failure when a high-draw load is enabled", () => {
+    const { container } = renderPanel();
+    fireEvent.click(screen.getByRole("checkbox", { name: /IX-6315 Ion Engine ×2/ }));
+    expect(container.querySelector(".editor-electricity-net-headline")?.textContent).toContain("Deficit");
+    expect(screen.getByText(/Depletes in/)).toBeTruthy();
+    expect(screen.getByText("WON'T HOLD")).toBeTruthy();
+    expect(screen.getByText("Dark before sunlight")).toBeTruthy();
+  });
+
+  it("keeps zero-capacity and unknown component values unavailable", () => {
+    const unknownComponents = representativeElectricityFixture["editor.elec.components"]!.map((component, index) =>
+      index === 0 ? { ...component, valueKnown: false } : component);
+    renderPanel({
+      ...representativeElectricityFixture,
+      "editor.elec.currentEc": 0,
+      "editor.elec.maxEc": 0,
+      "editor.elec.components": unknownComponents,
+    });
+    expect(screen.queryByText("Fully charged")).toBeNull();
+    expect(screen.getByText("Charge outlook unavailable")).toBeTruthy();
+    expect(screen.getByRole("meter", { name: "Battery charge unavailable" })).toBeTruthy();
+    expect(screen.getByText("Rate unavailable")).toBeTruthy();
+  });
+
   it("keeps warming, degraded, retained, and unavailable branches explicit", () => {
     const { rerender } = renderPanel(missingElectricityFixture);
     expect(screen.getByText(/Reading craft electrical modules/)).toBeTruthy();
