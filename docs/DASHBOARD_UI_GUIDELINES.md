@@ -187,12 +187,18 @@ density.
   Staging plus Resource Inventory share the row beneath it. Pinned plans retain
   a compact secondary planning column without starving the primary analysis.
 - The editor-only Electricity Planner spans the primary analysis column above
-  Staging and Resource Inventory. Its scenario and component toggles are
-  session-only read-only calculations; they never share flight controls or
-  mutate the craft.
-- Electricity generation and consumption use two adjacent disclosure ledgers.
-  Battery depletion, conservative eclipse time, and selected-body solar
-  efficiency remain visible together without opening either ledger.
+  Staging and Resource Inventory. Its scenario rail establishes the selected
+  body and orbital altitude; the adjacent readout well carries the electrical
+  plan. Body-to-star distance is a read-only scenario fact, not a control.
+- Generation and consumption use two always-open ledgers: adjacent on wide
+  layouts and stacked on narrow layouts. Each ledger owns its own All and None
+  inclusion controls; bounded internal overflow must never create horizontal
+  scrolling.
+- The readout uses a continuous accessible battery meter. `HOLDS` specifically
+  means the current reported charge survives the next longest eclipse; recurring
+  orbit sustainability is a separate assessment. Scenario and ledger choices
+  are session-only read-only calculations that never share flight controls or
+  mutate the craft or module state.
 - Eight powered stages fit before staging begins internal scrolling. Dense
   layouts keep the active stage visible and explain grouped or omitted stages.
 - Pinned Resonant Orbit and Mission Plan panels are operational briefings, not

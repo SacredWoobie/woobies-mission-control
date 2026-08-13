@@ -10,6 +10,10 @@ All notable public changes will be recorded here.
 - Expanded Mock Mission Control's Flight scene with a repeating altitude
   stress cycle spanning short values and km, Mm, and Gm rollover boundaries so
   display-width regressions remain visible during routine UI checks.
+- Redesigned the Editor Electricity Planner around a clear scenario rail and
+  live electrical readout, with continuously visible generated and consumed
+  ledgers, a battery meter, eclipse-hold status, and separate recurring-orbit
+  sustainability.
 - Added a read-only VAB/SPH electricity planner with mod-aware and stock
   producer/consumer inventories, battery endurance, conservative circular-orbit
   eclipse sizing, recharge and recurring-orbit checks, and session-only

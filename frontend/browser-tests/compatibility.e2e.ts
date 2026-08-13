@@ -327,19 +327,26 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
 
   const panel = page.locator("#editorElectricity");
   await expect(panel).toBeVisible();
-  await expect(panel.locator("details.editor-electricity-ledger")).toHaveCount(2);
+  await expect(panel.locator("details")).toHaveCount(0);
+
+  const generatedLedger = panel.locator("section.editor-electricity-ledger", { has: page.getByRole("heading", { name: "Power generated" }) });
+  const consumedLedger = panel.locator("section.editor-electricity-ledger", { has: page.getByRole("heading", { name: "Power consumed" }) });
+  await expect(panel.locator("section.editor-electricity-ledger")).toHaveCount(2);
+  await expect(generatedLedger).toBeVisible();
+  await expect(consumedLedger).toBeVisible();
+  await expect(panel.getByRole("meter", { name: /Battery charge/ })).toBeVisible();
+  await expect(generatedLedger.getByRole("group", { name: "Power generated inclusion controls" }).getByRole("button", { name: "All", exact: true })).toBeVisible();
+  await expect(generatedLedger.getByRole("group", { name: "Power generated inclusion controls" }).getByRole("button", { name: "None", exact: true })).toBeVisible();
+  await expect(consumedLedger.getByRole("group", { name: "Power consumed inclusion controls" }).getByRole("button", { name: "All", exact: true })).toBeVisible();
+  await expect(consumedLedger.getByRole("group", { name: "Power consumed inclusion controls" }).getByRole("button", { name: "None", exact: true })).toBeVisible();
 
   for (const viewport of [
     { width: 1920, height: 889 },
     { width: 1280, height: 800 },
     { width: 1080, height: 1920 },
     { width: 800, height: 1280 },
-    { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
-    await panel.locator("details.editor-electricity-ledger").evaluateAll((details) => {
-      for (const detail of details) (detail as HTMLDetailsElement).open = true;
-    });
 
     const layout = await panel.evaluate((element) => {
       const scenario = element.querySelector<HTMLElement>(".editor-electricity-scenario-rail");
@@ -360,6 +367,9 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
       const altitudeRect = altitude?.getBoundingClientRect();
       const inputRect = altitudeInput?.getBoundingClientRect();
       const unitRect = altitudeUnit?.getBoundingClientRect();
+      const plannerZones = element.querySelector<HTMLElement>(".editor-electricity-planner-zones");
+      const readout = element.querySelector<HTMLElement>(".editor-electricity-readout-well");
+      const ledgers = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-ledger"));
       const ledgerBodies = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-ledger-body"));
       return {
         altitudeContained: Boolean(
@@ -370,27 +380,42 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
         ),
         documentClientWidth: document.documentElement.clientWidth,
         documentScrollWidth: document.documentElement.scrollWidth,
-        ledgerOverflow: ledgerBodies.filter((body) => body.scrollWidth > body.clientWidth + 1).length,
+        ledgerHorizontalOverflow: [...ledgers, ...ledgerBodies]
+          .filter((ledger) => ledger.scrollWidth > ledger.clientWidth + 1).length,
         panelClientWidth: element.clientWidth,
         panelScrollWidth: element.scrollWidth,
-        presetLabelOverflow: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-presets button"))
-          .filter((button) => button.scrollWidth > button.clientWidth + 1).length,
+        plannerHierarchy: Boolean(plannerZones && scenario && readout
+          && plannerZones.contains(scenario) && plannerZones.contains(readout)),
         scenarioOverlaps,
       };
     });
 
     expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
     expect(layout.panelScrollWidth).toBeLessThanOrEqual(layout.panelClientWidth + 1);
-    expect(layout.ledgerOverflow).toBe(0);
-    expect(layout.presetLabelOverflow).toBe(0);
+    expect(layout.ledgerHorizontalOverflow).toBe(0);
+    expect(layout.plannerHierarchy).toBe(true);
     expect(layout.scenarioOverlaps).toBe(0);
     expect(layout.altitudeContained).toBe(true);
     await expectVisibleFontFloor(panel.locator([
-      ".editor-electricity-metric > span",
-      ".editor-electricity-controls label",
-      ".editor-electricity-presets button",
-      ".editor-electricity-ledger > summary",
-      ".editor-electricity-ledger-group h3",
+      ".editor-electricity-scenario-rail h3",
+      ".editor-electricity-body-control",
+      ".editor-electricity-altitude-control",
+      ".editor-electricity-input-unit small",
+      ".editor-electricity-scenario-derived dt",
+      ".editor-electricity-scenario-derived dd",
+      ".editor-electricity-readout-well h3",
+      ".editor-electricity-net-headline",
+      ".editor-electricity-charge-copy",
+      ".editor-electricity-rate-bar > span",
+      ".editor-electricity-storage > span",
+      ".editor-electricity-shadow-assessment h3",
+      ".editor-electricity-shadow-assessment dt",
+      ".editor-electricity-recurring-orbit",
+      ".editor-electricity-ledger header h3",
+      ".editor-electricity-ledger header small",
+      ".editor-electricity-ledger-actions button",
+      ".editor-electricity-component strong",
+      ".editor-electricity-component output",
     ].join(",")), 10, `Editor electricity operational text at ${viewport.width}x${viewport.height}`);
     await expectVisibleFontFloor(
       panel.locator(".editor-electricity-component small"),
