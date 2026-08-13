@@ -2840,6 +2840,20 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .editor-electricity-planner-zones { grid-template-columns: minmax(0,1fr); }
   .editor-electricity-scenario-rail { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: end; }
   .editor-electricity-scenario-rail h3, .editor-electricity-scenario-derived { grid-column: 1 / -1; }
+}
+@container (max-width: 650px) and (min-width: 521px) {
+  .editor-electricity-scenario-rail > h3, .editor-electricity-readout-well > h3 { display: none; }
+  .editor-electricity-readout-well { grid-template-columns: minmax(150px,.8fr) minmax(0,1.2fr); }
+  .editor-electricity-net-headline { grid-row: 1; grid-column: 1; }
+  .editor-electricity-charge-copy { grid-row: 2; grid-column: 1; }
+  .editor-electricity-rate-bars { grid-row: 1; grid-column: 2; }
+  .editor-electricity-storage { grid-row: 2; grid-column: 2; }
+  .editor-electricity-shadow-assessment { grid-row: 3; grid-column: 1 / -1; }
+  .editor-electricity-recurring-orbit { grid-row: 4; grid-column: 1 / -1; }
+  .editor-electricity-ledger > header { grid-template-columns: minmax(0,1fr) auto auto; }
+  .editor-electricity-ledger-actions { grid-row: 2; grid-column: 1; justify-self: start; }
+}
+@container (max-width: 520px) {
   .editor-electricity-ledgers { grid-template-columns: minmax(0,1fr); }
 }
 @container (max-width: 880px) and (min-width: 651px) {

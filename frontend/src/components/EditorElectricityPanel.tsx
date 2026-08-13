@@ -140,7 +140,7 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
                 <PowerLedger components={components.filter((component) => component.role === "producer")} included={session?.includedByStableId ?? {}} label="Power generated" onSetRole={setRole} onToggle={toggleComponent} scale={scale} scenario={plannerScenario} />
                 <PowerLedger components={components.filter((component) => component.role === "consumer")} included={session?.includedByStableId ?? {}} label="Power consumed" onSetRole={setRole} onToggle={toggleComponent} scale={scale} scenario={plannerScenario} />
               </div>
-              <p className="editor-electricity-assumption editor-electricity-assumption-note">Endurance assumes the checked set runs continuously from reported charge. Eclipse uses the conservative maximum central shadow for a circular orbit. This planner never changes KSP or module state.</p>
+              <p className="editor-electricity-assumption editor-electricity-assumption-note">Endurance: checked set runs continuously from reported charge. Eclipse: conservative maximum central shadow for a circular orbit. This planner never changes KSP or module state.</p>
             </>}
   </Panel>;
 }
