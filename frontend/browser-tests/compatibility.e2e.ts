@@ -522,13 +522,19 @@ test("Editor planning companions preserve the dense workspace alone and together
   const orbitOnly = await workspace.evaluate((element) => {
     const bounds = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
     const context = bounds("#editorContext");
+    const analysis = bounds(".editor-analysis-pair");
+    const electricity = bounds("#editorElectricity");
     const orbit = bounds("#editorOrbitPlan");
     return {
+      analysisElectricityGap: electricity.left - analysis.right,
+      analysisTopDifference: Math.abs(analysis.top - electricity.top),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
       electricityHeight: bounds("#editorElectricity").height,
+      orbitElectricityGap: orbit.left - electricity.right,
+      orbitTopDifference: Math.abs(orbit.top - electricity.top),
       orbitContextGap: orbit.top - context.bottom,
       orbitHeight: orbit.height,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
@@ -536,6 +542,10 @@ test("Editor planning companions preserve the dense workspace alone and together
   });
   expect(orbitOnly.secondaryChildren).toBe(1);
   expect(orbitOnly.orbitContextGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.analysisElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.orbitElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(orbitOnly.analysisTopDifference).toBeLessThanOrEqual(1);
+  expect(orbitOnly.orbitTopDifference).toBeLessThanOrEqual(1);
   expect(orbitOnly.orbitHeight).toBeLessThanOrEqual(220);
   expect(orbitOnly.documentScrollWidth).toBeLessThanOrEqual(orbitOnly.documentClientWidth);
   expect(orbitOnly.documentScrollHeight).toBeLessThanOrEqual(orbitOnly.documentClientHeight + orbitOnly.electricityHeight);
@@ -572,10 +582,18 @@ test("Editor planning companions preserve the dense workspace alone and together
     const workspaceBounds = element.getBoundingClientRect();
     const content = bounds(".editor-workspace-content");
     const context = bounds("#editorContext");
+    const analysis = bounds(".editor-analysis-pair");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const electricity = bounds("#editorElectricity");
+    const secondary = bounds(".editor-workspace-secondary");
     const orbit = bounds("#editorOrbitPlan");
     const deltaV = bounds("#editorDeltaVPlan");
+    const scenarioBody = bounds(".editor-electricity-body-control");
+    const scenarioAltitude = bounds(".editor-electricity-altitude-control");
+    const scenarioDerived = bounds(".editor-electricity-scenario-derived");
+    const derivedCells = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-scenario-derived > div"))
+      .map((cell) => cell.getBoundingClientRect());
     const orbitHeader = element.querySelector<HTMLElement>("#editorOrbitPlan > h2")!.getBoundingClientRect();
     const deltaVHeader = element.querySelector<HTMLElement>("#editorDeltaVPlan > h2")!.getBoundingClientRect();
     const orbitEdit = element.querySelector<HTMLElement>("#editorOrbitPlan .resonant-edit-plan")!.getBoundingClientRect();
@@ -593,13 +611,20 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
-      electricityHeight: bounds("#editorElectricity").height,
+      electricityHeight: electricity.height,
+      electricityWidth: electricity.width,
       deltaVHeaderHeight: deltaVHeader.height,
       deltaVEditHeight: deltaVEdit.height,
       deltaVHeight: deltaV.height,
       deltaVUnpinHeight: deltaVUnpin.height,
       coverageFooterFontSize: Number.parseFloat(getComputedStyle(element.querySelector<HTMLElement>("#editorDeltaVPlan .delta-v-editor-coverage footer")!).fontSize),
       overflowingMissionValues: Array.from(element.querySelectorAll<HTMLElement>("#editorDeltaVPlan strong, #editorDeltaVPlan .delta-v-pinned-step-copy"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingElectricityRows: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-component :is(strong,small,output)"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingElectricityRegions: Array.from(element.querySelectorAll<HTMLElement>("#editorElectricity, .editor-electricity-ledger, .editor-electricity-ledger-body"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingStageValues: Array.from(element.querySelectorAll<HTMLElement>("#stage .st-row > span, #stage .editor-stage-total-dv"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
@@ -611,9 +636,28 @@ test("Editor planning companions preserve the dense workspace alone and together
       orbitEditHeight: orbitEdit.height,
       orbitHeaderHeight: orbitHeader.height,
       orbitUnpinHeight: orbitUnpin.height,
+      analysisElectricityGap: electricity.left - analysis.right,
+      analysisTopDifference: Math.abs(analysis.top - electricity.top),
+      companionElectricityGap: secondary.left - electricity.right,
+      companionTopDifference: Math.abs(secondary.top - electricity.top),
+      analysisWidth: analysis.width,
+      companionWidth: secondary.width,
+      derivedColumnGap: scenarioDerived.left - scenarioBody.right,
+      derivedFirstColumnDifference: Math.abs(derivedCells[0].left - derivedCells[2].left),
+      derivedRightColumnDifference: Math.abs(derivedCells[1].left - derivedCells[3].left),
+      derivedTopRowDifference: Math.abs(derivedCells[0].top - derivedCells[1].top),
+      derivedBottomRowDifference: Math.abs(derivedCells[2].top - derivedCells[3].top),
+      scenarioControlLeftDifference: Math.abs(scenarioBody.left - scenarioAltitude.left),
+      scenarioControlWidthDifference: Math.abs(scenarioBody.width - scenarioAltitude.width),
+      scenarioControlGap: scenarioAltitude.top - scenarioBody.bottom,
+      producerRows: element.querySelectorAll(".editor-electricity-ledger.is-producer .editor-electricity-component").length,
+      consumerRows: element.querySelectorAll(".editor-electricity-ledger.is-consumer .editor-electricity-component").length,
+      resourceRows: element.querySelectorAll("#editorSummary .editor-resource-row").length,
+      stageRows: element.querySelectorAll(".stage-table.editor .st-row:not(.st-head)").length,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
-      stageSummaryGap: summary.left - stage.right,
-      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      stageSummaryGap: summary.top - stage.bottom,
+      stageSummaryLeftDifference: Math.abs(stage.left - summary.left),
+      stageSummaryRightDifference: Math.abs(stage.right - summary.right),
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
     };
@@ -633,11 +677,37 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(layout.contextMatchesWorkspace).toBeLessThanOrEqual(1);
   expect(layout.contextContentGap).toBeGreaterThanOrEqual(10);
   expect(layout.orbitContextGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisWidth).toBeGreaterThanOrEqual(500);
+  expect(layout.analysisWidth).toBeLessThanOrEqual(525);
+  expect(layout.electricityWidth).toBeGreaterThanOrEqual(570);
+  expect(layout.electricityWidth).toBeLessThanOrEqual(620);
+  expect(layout.companionWidth).toBeGreaterThanOrEqual(620);
+  expect(layout.companionWidth).toBeLessThanOrEqual(640);
+  expect(layout.analysisElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.companionElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.companionTopDifference).toBeLessThanOrEqual(1);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
-  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryRightDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlWidthDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedColumnGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedFirstColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedRightColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedTopRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageRows).toBe(8);
+  expect(layout.resourceRows).toBe(4);
+  expect(layout.producerRows).toBe(4);
+  expect(layout.consumerRows).toBe(7);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.overflowingHeaderValues).toBe(0);
   expect(layout.overflowingMissionValues).toBe(0);
+  expect(layout.overflowingElectricityRows).toBe(0);
+  expect(layout.overflowingElectricityRegions).toBe(0);
+  expect(layout.overflowingStageValues).toBe(0);
   expect(layout.overflowingOrbitValues).toBe(0);
   expect(layout.overflowingResourceNames).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);

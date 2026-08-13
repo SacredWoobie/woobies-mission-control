@@ -184,16 +184,21 @@ density.
 - Reference body, altitude, Mach, and presets remain directly editable and
   legible; numeric inputs do not need native spinner buttons.
 - Without a pinned planning companion, Craft Analysis spans the workspace and
-  Staging plus Resource Inventory share the row beneath it. Pinned plans retain
-  a compact secondary planning column without starving the primary analysis.
-- The editor-only Electricity Planner spans the primary analysis column above
-  Staging and Resource Inventory. Its scenario rail establishes the selected
-  body and orbital altitude; the adjacent readout well carries the electrical
-  plan. Body-to-star distance is a read-only scenario fact, not a control.
+  Staging plus Resource Inventory share the row beneath it. At 1800px and wider,
+  a pinned planning companion instead uses three columns: Staging above Resource
+  Inventory on the left, the Electricity Planner in the center, and pinned
+  planning briefings on the right. Narrower landscape and portrait layouts keep
+  their established primary/secondary or stacked flow.
+- The editor-only Electricity Planner spans the primary analysis width except
+  in that wide pinned composition. Its scenario rail establishes the selected
+  body and orbital altitude; when center-column width is constrained those
+  controls stack beside a 2x2 block of derived scenario facts. Body-to-star
+  distance is a read-only scenario fact, not a control.
 - Generation and consumption use two always-open ledgers: adjacent on wide
-  layouts and stacked on narrow layouts. Each ledger owns its own All and None
-  inclusion controls; bounded internal overflow must never create horizontal
-  scrolling.
+  layouts and stacked on narrow layouts. In the wide pinned center column their
+  rows use a two-line name/category/rate treatment so the actual component data
+  remains readable. Each ledger owns its own All and None inclusion controls;
+  bounded internal overflow must never create horizontal scrolling.
 - Because those ledgers are intentionally always visible, short landscape
   Editor workspaces may use one bounded page scroll instead of hiding the
   electricity scenario or reducing the established eight-stage table. The
