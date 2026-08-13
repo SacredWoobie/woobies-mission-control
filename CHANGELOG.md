@@ -10,6 +10,8 @@ All notable public changes will be recorded here.
 - Expanded Mock Mission Control's Flight scene with a repeating altitude
   stress cycle spanning short values and km, Mm, and Gm rollover boundaries so
   display-width regressions remain visible during routine UI checks.
+- Kept Delta-V saved-plan confirmation and error messages in a reserved header
+  row so Update and Save as new actions cannot cover planner feedback.
 - Redesigned the Editor Electricity Planner around a clear scenario rail and
   live electrical readout, with continuously visible generated and consumed
   ledgers, a battery meter, eclipse-hold status, and separate recurring-orbit

@@ -858,7 +858,7 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
       <button disabled={advancedPlanIncomplete} onClick={() => saveCurrentPlan(false)} type="button">{activeSavedPlanId ? "Update plan" : "Save plan"}</button>
       {activeSavedPlanId && <button className="secondary" disabled={advancedPlanIncomplete} onClick={() => saveCurrentPlan(true)} type="button">Save as new</button>}
     </div>
-    {savedNotice && <small className={saveError ? "error" : undefined} role={saveError ? "alert" : "status"}>{savedNotice}</small>}
+    {savedNotice && <small className={`delta-v-save-feedback${saveError ? " error" : ""}`} role={saveError ? "alert" : "status"}>{savedNotice}</small>}
   </div> : null;
   const renderSavedPlan = (record: SavedDeltaVPlanRecord) => {
     const isPinned = pinned?.id === record.id;

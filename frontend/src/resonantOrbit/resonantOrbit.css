@@ -1830,14 +1830,14 @@
   .delta-v-header-actions, .delta-v-save-slot { grid-column: auto; grid-row: auto; }
   .delta-v-header-actions > button { width: auto; }
   .delta-v-save-slot { display: block; min-width: 0; }
-  .delta-v-save-slot .delta-v-save-bar { position: relative; width: 100%; grid-template-columns: none; }
+  .delta-v-save-slot .delta-v-save-bar { position: relative; width: 100%; flex-wrap: wrap; grid-template-columns: none; }
   .delta-v-save-slot .delta-v-save-bar label { display: block; min-width: 0; flex: 1 1 auto; }
   .delta-v-save-slot .delta-v-save-bar label > span { display: none; }
   .resonant-drawer.delta-v-drawer > header :is(.delta-v-save-bar input, .delta-v-save-actions button, .delta-v-header-actions > button) { height: 34px; min-height: 34px !important; box-sizing: border-box; }
   .delta-v-save-slot .delta-v-save-bar input { border-radius: var(--surface-radius-face) 0 0 var(--surface-radius-face); }
   .delta-v-save-slot .delta-v-save-actions button { border-left: 0; border-radius: 0; }
   .delta-v-save-slot .delta-v-save-actions button:last-child { border-radius: 0 var(--surface-radius-face) var(--surface-radius-face) 0; }
-  .delta-v-save-slot .delta-v-save-bar small { position: absolute; top: 100%; right: 0; z-index: 2; max-width: 300px; padding: 3px 5px; border: 1px solid var(--surface-seam); background: var(--surface-rail); }
+  .delta-v-save-slot .delta-v-save-feedback { position: static; box-sizing: border-box; flex: 1 0 100%; max-width: none; margin-top: 4px; padding: 3px 5px; border: 1px solid var(--surface-seam); background: var(--surface-well); line-height: 1.25; }
   .delta-v-header-actions { gap: 5px; }
   .resonant-drawer > header .delta-v-reset-button,
   .resonant-drawer > header .delta-v-saved-plans-button,

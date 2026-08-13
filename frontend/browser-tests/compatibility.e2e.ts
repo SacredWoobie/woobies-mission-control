@@ -77,6 +77,42 @@ test("planner drawers do not force horizontal overflow near the landscape breakp
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 });
 
+test("saved Delta-v plan feedback reserves visible header space", async ({ page }) => {
+  await page.setViewportSize({ width: 1176, height: 720 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const drawer = page.getByRole("dialog", { name: "Delta-v planner" });
+  const profile = drawer.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+  if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+  if (await drawer.getByRole("combobox", { name: "Start" }).count()) {
+    await drawer.getByRole("button", { name: /Add next stop/ }).click();
+  }
+  await drawer.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await drawer.getByRole("button", { name: /Add next stop/ }).click();
+  await drawer.getByRole("textbox", { name: "Delta-v plan name" }).fill("Duna layout check");
+  await drawer.getByRole("button", { name: "Save plan", exact: true }).click();
+  await drawer.getByRole("button", { name: "Update plan", exact: true }).click();
+
+  const feedback = drawer.getByRole("status");
+  await expect(feedback).toHaveText("Updated Duna layout check");
+  const layout = await drawer.evaluate((element) => {
+    const header = element.querySelector<HTMLElement>(":scope > header")!.getBoundingClientRect();
+    const body = element.querySelector<HTMLElement>(":scope > .delta-v-drawer-body")!.getBoundingClientRect();
+    const message = element.querySelector<HTMLElement>(".delta-v-save-feedback")!.getBoundingClientRect();
+    return {
+      containedByHeader: message.top >= header.top && message.bottom <= header.bottom + 1,
+      clearOfBody: message.bottom <= body.top + 1,
+      visibleHeight: message.height,
+      drawerClientWidth: element.clientWidth,
+      drawerScrollWidth: element.scrollWidth,
+    };
+  });
+  expect(layout.containedByHeader).toBe(true);
+  expect(layout.clearOfBody).toBe(true);
+  expect(layout.visibleHeight).toBeGreaterThanOrEqual(18);
+  expect(layout.drawerScrollWidth).toBeLessThanOrEqual(layout.drawerClientWidth + 1);
+});
+
 test("Delta-v density keeps the route primary on fine and coarse pointers", async ({ page, browser, baseURL }) => {
   async function buildDunaRoute(target: typeof page) {
     await target.getByRole("button", { name: "Delta-v planner" }).click();
