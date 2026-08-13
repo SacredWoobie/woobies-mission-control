@@ -1798,13 +1798,31 @@
   .resonant-progress span { transition: none; }
 }
 
+/* The planning margin stays a single semantic control across pointer modes. */
+.delta-v-margin-card { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto 1fr; column-gap: 7px; }
+.delta-v-margin-card > strong { align-self: start; }
+.delta-v-margin-controls { display: grid; grid-column: 2; grid-row: 1 / span 2; grid-template-columns: minmax(68px,1fr) 42px; grid-template-rows: repeat(3,22px); min-width: 116px; border: 1px solid var(--surface-seam); }
+.delta-v-drawer .delta-v-margin-card .delta-v-margin-preset { display: flex; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 5px; align-items: center; justify-content: space-between; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: transparent; cursor: pointer; font: 10px var(--mono); }
+.delta-v-margin-preset b { font-weight: 600; }
+.delta-v-margin-preset small { margin: 0; font-size: 10px !important; }
+.delta-v-margin-preset.preset-10 { color: var(--warn); }
+.delta-v-margin-preset.preset-15 { color: var(--amber); }
+.delta-v-margin-preset.preset-20 { color: var(--green); }
+.delta-v-margin-preset[aria-pressed="true"] { background: color-mix(in srgb,currentColor 12%,transparent); box-shadow: inset 2px 0 currentColor; }
+.delta-v-margin-stepper { display: grid; grid-column: 2; grid-row: 1 / span 3; grid-template-rows: repeat(3,22px); border-left: 1px solid var(--surface-seam); }
+.delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button { height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0; border: 0; color: var(--cyan); background: var(--surface-raised-face); cursor: pointer; font: 13px var(--mono); }
+.delta-v-margin-stepper label { position: relative; display: block; }
+.delta-v-margin-stepper label > .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { width: 100%; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 12px 0 3px; border: 0; border-block: 1px solid var(--surface-seam); color: var(--text-primary); background: var(--surface-well); font: 10px var(--mono); text-align: right; }
+.delta-v-margin-stepper label > span:last-child { position: absolute; top: 50%; right: 3px; color: var(--cyan); font-size: 9px; pointer-events: none; transform: translateY(-50%); }
+
 /* Delta-V drawer density pass: keep route detail visible on a mouse-driven desk. */
 @media (pointer: fine) and (min-width: 761px) {
   .resonant-drawer.delta-v-drawer > header { grid-template-columns: minmax(0,1fr) minmax(0,500px); align-items: center; padding: 7px 12px; gap: 12px; }
   .resonant-drawer.delta-v-drawer > header > div:first-child { display: flex; min-width: 0; max-width: none; align-items: baseline; gap: 8px; }
   .resonant-drawer.delta-v-drawer > header h2 { margin: 0; font-size: 14px; white-space: nowrap; }
   .resonant-drawer.delta-v-drawer > header p { display: none; }
-  .delta-v-header-controls { display: grid; width: min(500px,100%); max-width: none; grid-template-columns: minmax(0,1fr) max-content; flex: 0 0 auto; align-items: center; gap: 7px; }
+  .delta-v-header-controls { display: grid; width: min(500px,100%); max-width: none; grid-template-columns: minmax(0,1fr) max-content; grid-template-rows: auto; flex: 0 0 auto; align-items: center; gap: 0 7px; }
   .delta-v-header-actions, .delta-v-save-slot .delta-v-save-bar, .delta-v-save-slot .delta-v-save-actions { display: flex; min-width: 0; align-items: center; gap: 0; }
   .delta-v-header-actions, .delta-v-save-slot { grid-column: auto; grid-row: auto; }
   .delta-v-header-actions > button { width: auto; }
@@ -1855,23 +1873,6 @@
   .delta-v-stat-grid article { min-height: 76px; padding: 6px 7px; }
   .delta-v-stat-grid strong { margin-top: 3px; font-size: 15px; font-variant-numeric: tabular-nums; }
   .delta-v-stat-grid small, .delta-v-total > small { margin-top: 3px; line-height: 1.2; }
-  .delta-v-margin-card { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto 1fr; column-gap: 7px; }
-  .delta-v-margin-card > strong { align-self: start; }
-  .delta-v-margin-controls { display: grid; grid-column: 2; grid-row: 1 / span 2; grid-template-columns: minmax(68px,1fr) 42px; grid-template-rows: repeat(3,22px); min-width: 116px; border: 1px solid var(--surface-seam); }
-  .delta-v-drawer .delta-v-margin-card .delta-v-margin-preset { display: flex; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 5px; align-items: center; justify-content: space-between; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: transparent; cursor: pointer; font: 10px var(--mono); }
-  .delta-v-margin-preset b { font-weight: 600; }
-  .delta-v-margin-preset small { margin: 0; font-size: 10px !important; }
-  .delta-v-margin-preset.preset-10 { color: var(--warn); }
-  .delta-v-margin-preset.preset-15 { color: var(--amber); }
-  .delta-v-margin-preset.preset-20 { color: var(--green); }
-  .delta-v-margin-preset[aria-pressed="true"] { background: color-mix(in srgb, currentColor 12%, transparent); box-shadow: inset 2px 0 currentColor; }
-  .delta-v-margin-stepper { display: grid; grid-column: 2; grid-row: 1 / span 3; grid-template-rows: 22px 22px 22px; border-left: 1px solid var(--surface-seam); }
-  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button { height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0; border: 0; color: var(--cyan); background: var(--surface-raised-face); cursor: pointer; font: 13px var(--mono); }
-  .delta-v-margin-stepper label { position: relative; display: block; }
-  .delta-v-margin-stepper label > .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { width: 100%; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 12px 0 3px; border: 0; border-block: 1px solid var(--surface-seam); color: var(--text-primary); background: var(--surface-well); font: 10px var(--mono); text-align: right; }
-  .delta-v-margin-stepper label > span:last-child { position: absolute; top: 50%; right: 3px; color: var(--cyan); font-size: 9px; pointer-events: none; transform: translateY(-50%); }
-
   .delta-v-route > header { grid-template-columns: max-content minmax(0,1fr) auto; gap: 8px; padding: 4px 10px; }
   .delta-v-route-timing { display: flex; width: auto; justify-self: start; border: 0; }
   .delta-v-route-timing > div { display: flex; min-width: 0; padding: 0 7px; align-items: baseline; gap: 4px; border-right: 0; }
@@ -1915,6 +1916,7 @@
   .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button,
   .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { height: 44px; min-height: 44px !important; }
   .delta-v-margin-controls, .delta-v-margin-stepper { grid-template-rows: repeat(3,44px); }
+  .resonant-drawer > header .delta-v-assumptions-button { min-width: 44px; }
 }
 
 @container (max-width: 760px) {
@@ -1925,11 +1927,19 @@
   .delta-v-controls { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-location-row, .delta-v-mission-row, .delta-v-mission-row.one-way { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-location-row > :last-child, .delta-v-mission-row > :last-child { grid-column: 1 / -1; }
-  .delta-v-summary { grid-template-columns: minmax(0,1fr); grid-template-areas: "budget-head" "budget-total" "budget-stats"; }
+  .delta-v-output { min-height: 0; grid-template-rows: minmax(96px,.7fr) minmax(200px,1.3fr); }
+  .delta-v-summary { min-height: 0; grid-template-columns: minmax(0,1fr); grid-template-areas: "budget-head" "budget-total" "budget-stats"; align-content: start; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
   .delta-v-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .delta-v-route > header { grid-template-columns: 1fr; }
-  .delta-v-route-timing { flex-wrap: wrap; justify-self: start; }
-  .delta-v-route-window-actions { justify-content: flex-start; }
+  .delta-v-margin-card { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto auto; row-gap: 5px; }
+  .delta-v-margin-controls { width: 100%; min-width: 0; grid-column: 1; grid-row: 3; grid-template-columns: repeat(3,minmax(0,1fr)); grid-template-rows: repeat(2,44px); }
+  .delta-v-margin-preset { border-right: 1px solid var(--rule); }
+  .delta-v-margin-preset:nth-child(3) { border-right: 0; }
+  .delta-v-margin-stepper { grid-column: 1 / -1; grid-row: 2; grid-template-columns: 44px minmax(0,1fr) 44px; grid-template-rows: 44px; border-top: 1px solid var(--surface-seam); border-left: 0; }
+  .delta-v-route > header { grid-template-columns: minmax(0,1fr) auto; }
+  .delta-v-route > header > span { grid-column: 1; grid-row: 1; }
+  .delta-v-route-timing { width: 100%; grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(3,minmax(0,1fr)); justify-self: stretch; }
+  .delta-v-route-timing > div { padding-inline: 5px; }
+  .delta-v-route-window-actions { grid-column: 2; grid-row: 1; justify-content: flex-end; }
   .delta-v-leg-copy.with-stay, .delta-v-leg-copy.with-calculated-stay { grid-template-columns: minmax(0,1fr); }
   .delta-v-stay-control, .delta-v-calculated-stay { width: fit-content; margin-top: 4px; }
   .delta-v-drawer button,
@@ -1938,5 +1948,9 @@
   .delta-v-drawer .delta-v-margin-card .delta-v-margin-preset,
   .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button,
   .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { height: 44px; min-height: 44px !important; }
-  .delta-v-margin-controls, .delta-v-margin-stepper { grid-template-rows: repeat(3,44px); }
+}
+
+@media (max-width: 760px) {
+  .resonant-drawer.delta-v-drawer > header { padding: 10px 12px; }
+  .resonant-drawer.delta-v-drawer > header p { display: none; }
 }

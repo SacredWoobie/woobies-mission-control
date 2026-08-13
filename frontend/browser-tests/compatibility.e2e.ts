@@ -77,6 +77,124 @@ test("planner drawers do not force horizontal overflow near the landscape breakp
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 });
 
+test("Delta-v density keeps the route primary on fine and coarse pointers", async ({ page, browser, baseURL }) => {
+  async function buildDunaRoute(target: typeof page) {
+    await target.getByRole("button", { name: "Delta-v planner" }).click();
+    const profile = target.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+    if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+    if (await target.getByRole("combobox", { name: "Start" }).count()) {
+      await target.getByRole("button", { name: /Add next stop/ }).click();
+    }
+    await target.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+    await target.getByRole("button", { name: /Add next stop/ }).click();
+  }
+
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await buildDunaRoute(page);
+
+  const desktop = await page.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
+    const bounds = (selector: string) => drawer.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const controls = Array.from(drawer.querySelectorAll<HTMLElement>(":scope > header input, :scope > header button"));
+    const overlaps: string[][] = [];
+    for (let left = 0; left < controls.length; left += 1) {
+      for (let right = left + 1; right < controls.length; right += 1) {
+        const a = controls[left].getBoundingClientRect();
+        const b = controls[right].getBoundingClientRect();
+        if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) {
+          overlaps.push([
+            controls[left].getAttribute("aria-label") ?? controls[left].textContent?.trim() ?? "",
+            controls[right].getAttribute("aria-label") ?? controls[right].textContent?.trim() ?? "",
+          ]);
+        }
+      }
+    }
+    return {
+      configurationHeight: bounds(".delta-v-configuration").height,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      drawerClientWidth: drawer.clientWidth,
+      drawerScrollWidth: drawer.scrollWidth,
+      footerHeight: bounds(".delta-v-footer").height,
+      headerHeight: bounds(":scope > header").height,
+      legHeights: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-leg")).map((leg) => leg.getBoundingClientRect().height),
+      marginControlHeights: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-controls button, .delta-v-margin-controls input")).map((control) => control.getBoundingClientRect().height),
+      overlaps,
+      routeHeaderHeight: bounds(".delta-v-route > header").height,
+      routeListHeight: bounds(".delta-v-route-list").height,
+      summaryHeight: bounds(".delta-v-summary").height,
+    };
+  });
+
+  expect(desktop.headerHeight).toBeLessThanOrEqual(46);
+  expect(desktop.configurationHeight).toBeLessThanOrEqual(105);
+  expect(desktop.summaryHeight).toBeLessThanOrEqual(115);
+  expect(desktop.routeHeaderHeight).toBeLessThanOrEqual(36);
+  expect(desktop.routeListHeight).toBeGreaterThanOrEqual(500);
+  expect(desktop.footerHeight).toBeLessThanOrEqual(27);
+  expect(desktop.legHeights.slice(0, 3).every((height) => height <= 56)).toBe(true);
+  expect(desktop.marginControlHeights).toEqual([22, 22, 22, 22, 22, 22]);
+  expect(desktop.overlaps).toEqual([]);
+  expect(desktop.drawerScrollWidth).toBeLessThanOrEqual(desktop.drawerClientWidth + 1);
+  expect(desktop.documentScrollWidth).toBeLessThanOrEqual(desktop.documentClientWidth);
+
+  const margin = page.getByRole("spinbutton", { name: "Planning margin percent" });
+  const lowMargin = page.getByRole("button", { name: "Set planning margin to 10 percent (low)" });
+  await lowMargin.click();
+  await expect(margin).toHaveValue("10");
+  await expect(lowMargin).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Increase margin by 1 percent" }).click();
+  await expect(margin).toHaveValue("11");
+  await expect(lowMargin).toHaveAttribute("aria-pressed", "false");
+
+  for (const viewport of [{ width: 760, height: 900 }, { width: 390, height: 844 }]) {
+    const touchContext = await browser.newContext({ baseURL, hasTouch: true, viewport });
+    const touchPage = await touchContext.newPage();
+    await touchPage.goto("/");
+    await buildDunaRoute(touchPage);
+    const touch = await touchPage.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
+      const marginCard = drawer.querySelector<HTMLElement>(".delta-v-margin-card")!.getBoundingClientRect();
+      const marginControls = Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-controls button, .delta-v-margin-controls input"));
+      const routeList = drawer.querySelector<HTMLElement>(".delta-v-route-list")!;
+      const summary = drawer.querySelector<HTMLElement>(".delta-v-summary")!;
+      const iconControls = Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-assumptions-button, .delta-v-header-actions > button:last-child"));
+      return {
+        coarsePointer: matchMedia("(pointer: coarse)").matches,
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        drawerClientWidth: drawer.clientWidth,
+        drawerScrollWidth: drawer.scrollWidth,
+        iconControlsMeetTarget: iconControls.every((control) => {
+          const bounds = control.getBoundingClientRect();
+          return bounds.width >= 44 && bounds.height >= 44;
+        }),
+        marginControlsContained: marginControls.every((control) => {
+          const bounds = control.getBoundingClientRect();
+          return bounds.left >= marginCard.left - 1
+            && bounds.right <= marginCard.right + 1
+            && bounds.top >= marginCard.top - 1
+            && bounds.bottom <= marginCard.bottom + 1;
+        }),
+        marginControlsMeetTarget: marginControls.every((control) => control.getBoundingClientRect().height >= 44),
+        routeListHeight: routeList.clientHeight,
+        routeListScrollHeight: routeList.scrollHeight,
+        summaryClientHeight: summary.clientHeight,
+        summaryScrollHeight: summary.scrollHeight,
+      };
+    });
+    expect(touch.coarsePointer).toBe(true);
+    expect(touch.marginControlsMeetTarget).toBe(true);
+    expect(touch.marginControlsContained).toBe(true);
+    expect(touch.iconControlsMeetTarget).toBe(true);
+    expect(touch.routeListHeight).toBeGreaterThanOrEqual(64);
+    expect(touch.routeListScrollHeight).toBeGreaterThan(touch.routeListHeight);
+    expect(touch.summaryScrollHeight).toBeGreaterThan(touch.summaryClientHeight);
+    expect(touch.drawerScrollWidth).toBeLessThanOrEqual(touch.drawerClientWidth + 1);
+    expect(touch.documentScrollWidth).toBeLessThanOrEqual(touch.documentClientWidth);
+    await touchContext.close();
+  }
+});
+
 test("native controls opt into the dark system color scheme", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
