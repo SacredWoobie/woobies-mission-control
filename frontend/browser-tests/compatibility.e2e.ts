@@ -164,6 +164,85 @@ test("operational typography keeps its semantic floor across scenes", async ({ p
   ].join(",")), 9, "Mission Control compact operational labels");
 });
 
+test("Editor electricity planning keeps a readable bounded instrument hierarchy", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const panel = page.locator("#editorElectricity");
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("details.editor-electricity-ledger")).toHaveCount(2);
+
+  for (const viewport of [
+    { width: 1920, height: 889 },
+    { width: 1280, height: 800 },
+    { width: 1080, height: 1920 },
+    { width: 800, height: 1280 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await panel.locator("details.editor-electricity-ledger").evaluateAll((details) => {
+      for (const detail of details) (detail as HTMLDetailsElement).open = true;
+    });
+
+    const layout = await panel.evaluate((element) => {
+      const scenario = element.querySelector<HTMLElement>(".editor-electricity-scenario-rail");
+      const scenarioChildren = scenario
+        ? Array.from(scenario.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.getClientRects().length > 0)
+        : [];
+      let scenarioOverlaps = 0;
+      for (let left = 0; left < scenarioChildren.length; left += 1) {
+        for (let right = left + 1; right < scenarioChildren.length; right += 1) {
+          const a = scenarioChildren[left].getBoundingClientRect();
+          const b = scenarioChildren[right].getBoundingClientRect();
+          if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) scenarioOverlaps += 1;
+        }
+      }
+      const altitude = element.querySelector<HTMLElement>(".editor-electricity-input-unit");
+      const altitudeInput = altitude?.querySelector<HTMLElement>("input");
+      const altitudeUnit = altitude?.querySelector<HTMLElement>("small");
+      const altitudeRect = altitude?.getBoundingClientRect();
+      const inputRect = altitudeInput?.getBoundingClientRect();
+      const unitRect = altitudeUnit?.getBoundingClientRect();
+      const ledgerBodies = Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-ledger-body"));
+      return {
+        altitudeContained: Boolean(
+          altitudeRect && inputRect && unitRect
+          && inputRect.left >= altitudeRect.left - 1
+          && unitRect.right <= altitudeRect.right + 1
+          && inputRect.right <= unitRect.left + 1
+        ),
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        ledgerOverflow: ledgerBodies.filter((body) => body.scrollWidth > body.clientWidth + 1).length,
+        panelClientWidth: element.clientWidth,
+        panelScrollWidth: element.scrollWidth,
+        scenarioOverlaps,
+      };
+    });
+
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+    expect(layout.panelScrollWidth).toBeLessThanOrEqual(layout.panelClientWidth + 1);
+    expect(layout.ledgerOverflow).toBe(0);
+    expect(layout.scenarioOverlaps).toBe(0);
+    expect(layout.altitudeContained).toBe(true);
+    await expectVisibleFontFloor(panel.locator([
+      ".editor-electricity-metric > span",
+      ".editor-electricity-controls label",
+      ".editor-electricity-presets button",
+      ".editor-electricity-ledger > summary",
+      ".editor-electricity-ledger-group h3",
+    ].join(",")), 10, `Editor electricity operational text at ${viewport.width}x${viewport.height}`);
+    await expectVisibleFontFloor(
+      panel.locator(".editor-electricity-component small"),
+      9,
+      `Editor electricity module metadata at ${viewport.width}x${viewport.height}`,
+    );
+  }
+});
+
 test("dense Editor analysis uses the empty planning width and reveals the active stage", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
