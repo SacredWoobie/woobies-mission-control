@@ -92,6 +92,8 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
           : "No depletion or recharge";
   const verdict = plan.netEcPerSec === undefined ? "Balance unavailable"
     : plan.netEcPerSec < 0 ? "Deficit" : plan.netEcPerSec > 0 ? "Surplus" : "Break-even";
+  const balanceTone = plan.netEcPerSec === undefined ? "is-unknown"
+    : plan.netEcPerSec < 0 ? "is-deficit" : plan.netEcPerSec > 0 ? "is-surplus" : "is-balanced";
 
   const setScenario = (change: Partial<NonNullable<ElectricityPlannerSession["scenario"]>>) => {
     setSession((current) => current ? { ...current, scenario: { ...current.scenario, ...change } } : current);
@@ -126,12 +128,12 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
                 </section>
                 <section className="editor-electricity-readout-well" aria-label="Electrical plan readout">
                   <h3>Electrical plan</h3>
-                  <p className="editor-electricity-net-headline"><span>{verdict}</span><strong>{signedRate(plan.netEcPerSec)}</strong></p>
+                  <p className={`editor-electricity-net-headline ${balanceTone}`}><span>{verdict}</span><strong>{signedRate(plan.netEcPerSec)}</strong></p>
                   <p className="editor-electricity-charge-copy">{chargeCopy}</p>
                   <div className="editor-electricity-rate-bars" aria-label="Generation and consumption compared on a shared scale"><RateBar label="Generated" rate={plan.generationEcPerSec} scale={scale} /><RateBar label="Consumed" rate={plan.drawEcPerSec} scale={scale} /></div>
                   <div className="editor-electricity-storage"><span>Battery</span><Meter current={snapshot["editor.elec.currentEc"]} maximum={snapshot["editor.elec.maxEc"]} /><strong>{number(snapshot["editor.elec.currentEc"], 0)} / {number(snapshot["editor.elec.maxEc"], 0)} EC</strong></div>
                   <ShadowAssessment currentEc={snapshot["editor.elec.currentEc"]} plan={plan} />
-                  <p className="editor-electricity-recurring-orbit">Recurring orbit: <strong>{plan.recurringOrbitSustainable === undefined ? "Unavailable" : plan.recurringOrbitSustainable ? "Sustainable" : "Deficit"}</strong></p>
+                  <p className={`editor-electricity-recurring-orbit ${plan.recurringOrbitSustainable === false ? "is-deficit" : plan.recurringOrbitSustainable === true ? "is-sustainable" : "is-unknown"}`}>Recurring orbit: <strong>{plan.recurringOrbitSustainable === undefined ? "Unavailable" : plan.recurringOrbitSustainable ? "Sustainable" : "Deficit"}</strong></p>
                 </section>
               </div>
               <div className="editor-electricity-ledgers" aria-label="Electrical producer and consumer ledgers">
