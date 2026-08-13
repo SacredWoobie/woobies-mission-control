@@ -2770,7 +2770,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-electricity-rate-bar { --electricity-rate-percent: 0%; display: grid; min-width: 0; align-items: center; grid-template-columns: 63px minmax(0,1fr) auto; gap: 7px; color: var(--slate-muted-text); font-size: 10px; }
 .editor-electricity-rate-bar strong { color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .editor-electricity-rate-bar > strong { grid-column: 3; }
-.editor-electricity-rate-bar i { grid-row: 2; grid-column: 1 / -1; display: block; height: 5px; overflow: hidden; border-radius: var(--surface-radius-meter); background: var(--surface-track); }
+.editor-electricity-rate-bar i { grid-row: 2; grid-column: 1 / -1; display: block; height: 8px; overflow: hidden; border-radius: var(--surface-radius-meter); background: var(--surface-track); }
 .editor-electricity-rate-bar i::before { display: block; width: var(--electricity-rate-percent); height: 100%; content: ""; background: var(--green); }
 .editor-electricity-rate-bar:nth-child(2) i::before { background: var(--amber); }
 .editor-electricity-storage { display: grid; min-width: 0; align-items: center; grid-template-columns: 52px minmax(0,1fr) auto; gap: 7px; color: var(--slate-muted-text); font-size: 10px; }
@@ -2822,10 +2822,12 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .editor-electricity-scenario-rail { grid-template-columns: minmax(120px,1fr) minmax(150px,1fr) minmax(0,2.3fr); align-items: end; }
   .editor-electricity-scenario-rail > h3, .editor-electricity-readout-well > h3 { display: none; }
   .editor-electricity-scenario-derived { grid-template-columns: repeat(4,minmax(0,1fr)); }
-  .editor-electricity-readout-well { grid-template-columns: minmax(120px,.7fr) minmax(210px,1fr) minmax(280px,1.15fr); align-items: start; }
-  .editor-electricity-net-headline, .editor-electricity-charge-copy { grid-column: 1; }
-  .editor-electricity-rate-bars, .editor-electricity-storage { grid-column: 2; }
-  .editor-electricity-shadow-assessment { grid-row: 1 / span 2; grid-column: 3; padding: 0 0 0 8px; border-top: 0; border-left: 1px solid var(--surface-grout); }
+  .editor-electricity-readout-well { grid-template-columns: minmax(230px,300px) minmax(210px,1fr) minmax(280px,320px); align-items: start; }
+  .editor-electricity-net-headline { grid-row: 1; grid-column: 1; }
+  .editor-electricity-charge-copy { grid-row: 2; grid-column: 1; }
+  .editor-electricity-rate-bars { grid-row: 1; grid-column: 2; }
+  .editor-electricity-storage { grid-row: 2; grid-column: 2; }
+  .editor-electricity-shadow-assessment { grid-row: 1 / span 2; grid-column: 3; padding: 7px 8px; border: 1px solid var(--surface-plate-edge); border-radius: var(--surface-radius-face); background: var(--surface-plate); }
   .editor-electricity-recurring-orbit { grid-row: 3; grid-column: 1 / -1; }
 }
 .editor-electricity-ledger { max-height: none; overflow: hidden; }
@@ -2842,7 +2844,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 }
 @container (max-width: 880px) and (min-width: 651px) {
   .editor-electricity-readout-well { grid-template-columns: minmax(150px,.8fr) minmax(220px,1.2fr); }
-  .editor-electricity-shadow-assessment { grid-row: 3; grid-column: 1 / -1; padding: 7px 0 0; border-top: 1px solid var(--surface-grout); border-left: 0; }
+  .editor-electricity-shadow-assessment { grid-row: 3; grid-column: 1 / -1; padding: 7px 0 0; border: 0; border-top: 1px solid var(--surface-grout); border-radius: 0; background: transparent; }
   .editor-electricity-recurring-orbit { grid-row: 4; }
   .editor-electricity-ledger > header { grid-template-columns: minmax(0,1fr) auto auto; }
   .editor-electricity-ledger-actions { grid-row: 2; grid-column: 1; justify-self: start; }
