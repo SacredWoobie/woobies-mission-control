@@ -219,6 +219,8 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
         ledgerOverflow: ledgerBodies.filter((body) => body.scrollWidth > body.clientWidth + 1).length,
         panelClientWidth: element.clientWidth,
         panelScrollWidth: element.scrollWidth,
+        presetLabelOverflow: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-presets button"))
+          .filter((button) => button.scrollWidth > button.clientWidth + 1).length,
         scenarioOverlaps,
       };
     });
@@ -226,6 +228,7 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
     expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
     expect(layout.panelScrollWidth).toBeLessThanOrEqual(layout.panelClientWidth + 1);
     expect(layout.ledgerOverflow).toBe(0);
+    expect(layout.presetLabelOverflow).toBe(0);
     expect(layout.scenarioOverlaps).toBe(0);
     expect(layout.altitudeContained).toBe(true);
     await expectVisibleFontFloor(panel.locator([
@@ -485,6 +488,10 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentScrollWidth: document.documentElement.scrollWidth,
       overflowingOrbitValues: Array.from(element.querySelectorAll<HTMLElement>("#editorOrbitPlan .resonant-editor-plan-details strong, #editorOrbitPlan .resonant-editor-plan-details > header > span"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingPresetLabels: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-presets button"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
+      overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
@@ -496,6 +503,8 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(medium.columnGap).toBeGreaterThanOrEqual(10);
   expect(medium.companionGap).toBeGreaterThanOrEqual(6);
   expect(medium.overflowingOrbitValues).toBe(0);
+  expect(medium.overflowingPresetLabels).toBe(0);
+  expect(medium.overflowingResourceNames).toBe(0);
   expect(medium.topDifference).toBeLessThanOrEqual(1);
   expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
   expect(medium.documentScrollWidth).toBeLessThanOrEqual(medium.documentClientWidth);
