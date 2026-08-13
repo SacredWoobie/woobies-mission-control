@@ -2114,10 +2114,10 @@ def _attach_editor_electrical(conn, data):
                          "editor.elec.pending": False,
                          "editor.elec.retained": False})
         return data
-    # A settled editor has no need for a 4 Hz custom-service RPC. The initial
-    # call and confirmed StageStats identity/revision/topology transitions are
-    # the only normal demand triggers. Missing StageStats provenance falls back
-    # to the bounded 1 Hz compatibility probe.
+    # Settled snapshots remain event-driven instead of issuing a 4 Hz custom-
+    # service RPC. Warming snapshots and missing StageStats provenance use
+    # bounded 1 Hz probes; identity/revision/topology transitions remain
+    # immediate demand triggers.
     due = (
         not _editor_electrical_cache or
         (source_token is not None and source_token != _editor_electrical_source_token) or
