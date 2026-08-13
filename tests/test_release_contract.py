@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import json
 import re
@@ -628,6 +629,7 @@ class ReleaseContractTests(unittest.TestCase):
         for module in (
             "damage.py",
             "electricity.py",
+            "editor_electrical_snapshot.py",
             "flight_core_snapshot.py",
             "heat.py",
             "heat_electricity_snapshot.py",
@@ -649,6 +651,45 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("RequiredPackageFiles", publish_script)
         self.assertIn("SourceArchiveSha256", publish_script)
         self.assertIn('Destination = "SOURCE/', publish_script)
+
+    def test_packaged_python_runtime_closes_over_local_imports(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        packaged_sources = re.findall(
+            r"@\{ Source = '([^']+\.py)'; Destination = "
+            r"'Dashboard/([^']+\.py)' \}",
+            publish_script,
+        )
+        self.assertIn(
+            ("telemetry_server.py", "telemetry_server.py"), packaged_sources
+        )
+        packaged_modules = {
+            Path(destination).stem for _, destination in packaged_sources
+        }
+        local_modules = {path.stem for path in ROOT.glob("*.py")}
+        missing_imports = {}
+
+        for source, destination in packaged_sources:
+            tree = ast.parse((ROOT / source).read_text(encoding="utf-8"), source)
+            imported_modules = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imported_modules.update(
+                        alias.name.split(".", 1)[0] for alias in node.names
+                    )
+                elif (
+                    isinstance(node, ast.ImportFrom)
+                    and node.level == 0
+                    and node.module
+                ):
+                    imported_modules.add(node.module.split(".", 1)[0])
+
+            missing = sorted(imported_modules & local_modules - packaged_modules)
+            if missing:
+                missing_imports[destination] = missing
+
+        self.assertEqual(missing_imports, {})
 
 
 if __name__ == "__main__":

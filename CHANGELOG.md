@@ -2,6 +2,13 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Fixed full and managed-update packaging so the Editor electrical snapshot
+  decoder required by the telemetry server is included. Release-contract tests
+  now verify that every packaged Python runtime closes over its repository-local
+  imports before an archive can ship.
+
 ## v0.7.0 - Flight instruments and Editor electricity
 
 - Extended Managed runtime updates to the first public successor: v0.6.1 can
