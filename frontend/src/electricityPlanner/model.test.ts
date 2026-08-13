@@ -4,6 +4,8 @@ import { denseElectricityFixture, degradedElectricityFixture, missingElectricity
 import { applyElectricityPlannerPreset, applyElectricityPlannerRoleInclusion, plannerCraftKey, reconcileElectricityPlannerSession } from "./state";
 
 const components = representativeElectricityFixture["editor.elec.components"]!;
+const panelId = components.find((component) => component.solarScaled)!.stableId;
+const rtgId = components.find((component) => component.category === "RTG")!.stableId;
 
 describe("editor electricity planner model", () => {
   const body = representativeElectricityFixture["editor.elec.bodies"]![0];
@@ -18,20 +20,20 @@ describe("editor electricity planner model", () => {
   });
 
   it("calculates power, battery, eclipse and recurring-orbit values with a declared solar assumption", () => {
-    const plan = calculateElectricityPlan({ components, included: {}, currentEc: 300, maxEc: 500, body, scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 } });
-    expect(plan.generationEcPerSec).toBeCloseTo(2.8);
-    expect(plan.drawEcPerSec).toBe(0.5);
-    expect(plan.netEcPerSec).toBeCloseTo(2.3);
+    const plan = calculateElectricityPlan({ components, included: {}, currentEc: 1_000, maxEc: 1_200, body, scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 0.962 } });
+    expect(plan.generationEcPerSec).toBeCloseTo(3.9);
+    expect(plan.drawEcPerSec).toBeCloseTo(1.31);
+    expect(plan.netEcPerSec).toBeCloseTo(2.59);
     expect(plan.orbitPeriodSeconds).toBeCloseTo(1_875, -1);
-    expect(plan.rechargeSeconds).toBeCloseTo(200 / 2.3);
-    expect(plan.eclipseRequiredEc).toBe(0);
-    expect(plan.continuousNonSolarGenerationEcPerSec).toBe(0.8);
-    expect(plan.shadowNetEcPerSec).toBeCloseTo(0.3);
-    expect(plan.nextEclipseShadowEnduranceSeconds).toBeUndefined();
+    expect(plan.rechargeSeconds).toBeCloseTo(200 / 2.59);
+    expect(plan.eclipseRequiredEc).toBeCloseTo(0.56 * plan.eclipseDurationSeconds!);
+    expect(plan.continuousNonSolarGenerationEcPerSec).toBe(0.75);
+    expect(plan.shadowNetEcPerSec).toBeCloseTo(-0.56);
+    expect(plan.nextEclipseShadowEnduranceSeconds).toBeCloseTo(1_000 / 0.56);
     expect(plan.nextEclipseHolds).toBe(true);
     expect(plan.darkBeforeSunlightSeconds).toBeUndefined();
-    expect(plan.recurringOrbitSustainable).toBe(true);
-    expect(plan.solarScaleAssumption).toBe(1);
+    expect(plan.recurringOrbitSustainable).toBe(false);
+    expect(plan.solarScaleAssumption).toBe(0.962);
   });
 
   it("credits non-solar generation during eclipse battery sizing", () => {
@@ -44,12 +46,12 @@ describe("editor electricity planner model", () => {
       scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
     });
     expect(plan.eclipseRequiredEc).toBeCloseTo(
-      Math.max(0, 0.5 - 0.8) * plan.eclipseDurationSeconds!,
+      Math.max(0, 1.31 - 0.75) * plan.eclipseDurationSeconds!,
     );
   });
 
   it("does not credit conditional non-solar producers during eclipse", () => {
-    const conditional = components.map((component) => component.stableId === "rtg-a"
+    const conditional = components.map((component) => component.stableId === rtgId
       ? { ...component, continuous: false }
       : component);
     const plan = calculateElectricityPlan({
@@ -60,29 +62,29 @@ describe("editor electricity planner model", () => {
       body,
       scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
     });
-    expect(plan.eclipseRequiredEc).toBeCloseTo(0.5 * plan.eclipseDurationSeconds!);
+    expect(plan.eclipseRequiredEc).toBeCloseTo(1.31 * plan.eclipseDurationSeconds!);
     expect(plan.continuousNonSolarGenerationEcPerSec).toBe(0);
-    expect(plan.shadowNetEcPerSec).toBe(-0.5);
+    expect(plan.shadowNetEcPerSec).toBeCloseTo(-1.31);
   });
 
   it("reports next-eclipse endurance and failure time from current reported charge", () => {
     const plan = calculateElectricityPlan({
       components,
-      included: { "rtg-a": false },
+      included: { [rtgId]: false },
       currentEc: 10,
       body,
       scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
     });
-    expect(plan.shadowNetEcPerSec).toBe(-0.5);
-    expect(plan.nextEclipseShadowEnduranceSeconds).toBe(20);
+    expect(plan.shadowNetEcPerSec).toBeCloseTo(-1.31);
+    expect(plan.nextEclipseShadowEnduranceSeconds).toBeCloseTo(10 / 1.31);
     expect(plan.eclipseRequiredEc).toBeGreaterThan(10);
     expect(plan.nextEclipseHolds).toBe(false);
-    expect(plan.darkBeforeSunlightSeconds).toBeCloseTo(plan.eclipseDurationSeconds! - 20);
+    expect(plan.darkBeforeSunlightSeconds).toBeCloseTo(plan.eclipseDurationSeconds! - (10 / 1.31));
   });
 
   it("treats a zero shadow deficit as holding without inventing a finite endurance", () => {
-    const balanced = components.map((component) => component.stableId === "rtg-a"
-      ? { ...component, referenceEcPerSec: 0.5 }
+    const balanced = components.map((component) => component.stableId === rtgId
+      ? { ...component, referenceEcPerSec: 1.31 }
       : component);
     const plan = calculateElectricityPlan({
       components: balanced,
@@ -100,7 +102,7 @@ describe("editor electricity planner model", () => {
 
   it("recognizes continuous shadow surplus without requiring a current-charge report", () => {
     const plan = calculateElectricityPlan({
-      components,
+      components: components.map((component) => component.stableId === rtgId ? { ...component, referenceEcPerSec: 2 } : component),
       included: {},
       body,
       scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
@@ -119,7 +121,7 @@ describe("editor electricity planner model", () => {
     expect(unknownSolar.generationEcPerSec).toBeUndefined();
     expect(unknownSolar.netEcPerSec).toBeUndefined();
     expect(effectiveComponentRate(components[0], {})).toBeUndefined();
-    expect(effectiveComponentRate(components[1], {})).toBe(0.8);
+    expect(effectiveComponentRate(components.find((component) => component.stableId === rtgId)!, {})).toBe(0.75);
   });
 
   it("defaults from authoritative body atmosphere rather than staging altitude", () => {
@@ -151,18 +153,18 @@ describe("editor electricity planner model", () => {
 describe("editor electricity planner session state", () => {
   it("keys state to save and craft, reconciles stable components, and clears cross-craft toggles", () => {
     const first = reconcileElectricityPlannerSession(undefined, representativeElectricityFixture);
-    const changed = { ...first, includedByStableId: { ...first.includedByStableId, "panel-a": false } };
+    const changed = { ...first, includedByStableId: { ...first.includedByStableId, [panelId]: false } };
     const revised = reconcileElectricityPlannerSession(changed, { ...representativeElectricityFixture, "editor.elec.revision": 9, "editor.elec.components": [...representativeElectricityFixture["editor.elec.components"]!, { ...representativeElectricityFixture["editor.elec.components"]![0], stableId: "panel-b", defaultIncluded: true }] });
-    expect(revised.includedByStableId).toMatchObject({ "panel-a": false, "panel-b": true });
+    expect(revised.includedByStableId).toMatchObject({ [panelId]: false, "panel-b": true });
     const otherCraft = reconcileElectricityPlannerSession(revised, { ...representativeElectricityFixture, "editor.elec.craftPersistentId": "craft-2" });
-    expect(otherCraft.includedByStableId["panel-a"]).toBe(true);
+    expect(otherCraft.includedByStableId[panelId]).toBe(true);
     expect(plannerCraftKey(representativeElectricityFixture)).toBe("Planner fixture save:craft-1");
   });
 
   it("applies backend defaults, all included, producers off, and reset without persistence", () => {
     const state = reconcileElectricityPlannerSession(undefined, representativeElectricityFixture);
-    expect(applyElectricityPlannerPreset(state, components, "all-included", representativeElectricityFixture).includedByStableId).toEqual({ "panel-a": true, "rtg-a": true, "probe-a": true });
-    expect(applyElectricityPlannerPreset(state, components, "producers-off", representativeElectricityFixture).includedByStableId).toEqual({ "panel-a": false, "rtg-a": false, "probe-a": true });
+    expect(Object.values(applyElectricityPlannerPreset(state, components, "all-included", representativeElectricityFixture).includedByStableId)).toEqual(components.map(() => true));
+    expect(applyElectricityPlannerPreset(state, components, "producers-off", representativeElectricityFixture).includedByStableId).toEqual(Object.fromEntries(components.map((component) => [component.stableId, component.role === "producer" ? false : component.defaultIncluded])));
     expect(applyElectricityPlannerPreset(state, components, "backend-defaults", representativeElectricityFixture).includedByStableId).toEqual(state.includedByStableId);
     expect(applyElectricityPlannerPreset({ ...state, scenario: { altitudeMeters: 1 } }, components, "reset", representativeElectricityFixture).scenario.altitudeMeters).toBe(80_000);
   });
@@ -170,14 +172,14 @@ describe("editor electricity planner session state", () => {
   it("scopes ALL and NONE to one role while preserving the other role and scenario", () => {
     const state = {
       ...reconcileElectricityPlannerSession(undefined, representativeElectricityFixture),
-      includedByStableId: { "panel-a": false, "rtg-a": true, "probe-a": true },
+      includedByStableId: { ...reconcileElectricityPlannerSession(undefined, representativeElectricityFixture).includedByStableId, [panelId]: false },
       scenario: { bodyName: "Kerbin", altitudeMeters: 123_456, solarScale: 0.9 },
     };
     const producersAll = applyElectricityPlannerRoleInclusion(state, components, "producer", "all");
-    expect(producersAll.includedByStableId).toEqual({ "panel-a": true, "rtg-a": true, "probe-a": true });
+    expect(producersAll.includedByStableId).toEqual(Object.fromEntries(components.map((component) => [component.stableId, component.role === "producer" ? true : component.defaultIncluded])));
     expect(producersAll.scenario).toEqual(state.scenario);
     const consumersNone = applyElectricityPlannerRoleInclusion(producersAll, components, "consumer", "none");
-    expect(consumersNone.includedByStableId).toEqual({ "panel-a": true, "rtg-a": true, "probe-a": false });
+    expect(consumersNone.includedByStableId).toEqual(Object.fromEntries(components.map((component) => [component.stableId, component.role === "producer"])));
     expect(consumersNone.scenario).toEqual(state.scenario);
   });
 });
