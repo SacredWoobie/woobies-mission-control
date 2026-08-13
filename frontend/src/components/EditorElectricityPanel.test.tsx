@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { representativeElectricityFixture } from "../electricityPlanner/fixtures";
+import { denseElectricityFixture, representativeElectricityFixture } from "../electricityPlanner/fixtures";
 import { PanelVisibilityProvider } from "./PanelVisibility";
 import { EditorElectricityPanel } from "./EditorElectricityPanel";
 import type { TelemetrySnapshot } from "../telemetry/types";
@@ -25,6 +25,29 @@ describe("EditorElectricityPanel", () => {
     expect(screen.getByText("Power Consumed")).toBeTruthy();
     expect(screen.getByText(/Conservative maximum central eclipse/)).toBeTruthy();
     expect(screen.getByText(/This planner never changes KSP/)).toBeTruthy();
+  });
+
+  it("exposes semantic presentation hooks while keeping dense planner controls and ledgers available", () => {
+    const { container } = renderPanel(denseElectricityFixture);
+    expect(container.querySelector(".editor-electricity-summary")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-scenario-rail")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-body-control")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-altitude-control .editor-electricity-input-unit")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-preset-actions")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-endurance")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-assessment")).toBeTruthy();
+    expect(container.querySelector(".editor-electricity-assumption-note")).toBeTruthy();
+    expect(container.querySelectorAll(".editor-electricity-ledger-summary-label")).toHaveLength(2);
+    expect(container.querySelectorAll(".editor-electricity-ledger-summary-total")).toHaveLength(2);
+    expect(container.querySelectorAll(".editor-electricity-ledger-summary-count")).toHaveLength(2);
+
+    fireEvent.click(screen.getByText("Power Generated"));
+    fireEvent.click(screen.getByText("Power Consumed"));
+    expect(screen.getByRole("combobox", { name: "Electricity planner body" })).toBeTruthy();
+    expect(screen.getByRole("spinbutton", { name: "Electricity planner orbital altitude (m)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Backend defaults" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /Dense component 1ModuleGenerator/ })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /Dense component 2ModuleCommand/ })).toBeTruthy();
   });
 
   it("supports presets and separate generated/consumed drill-downs without persistence", () => {

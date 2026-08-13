@@ -77,23 +77,23 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
             : (
               <>
                 {(status === "degraded" || retained || incomplete) && <p className="editor-electricity-state wait">{status === "degraded" ? snapshot["editor.elec.degradedReason"] || "Stock fallback is incomplete." : retained ? "Retained analysis; waiting for the current craft." : "Some component output is unknown; totals remain conservative."}</p>}
-                <div className="editor-electricity-metrics" aria-label="Electrical plan summary">
+                <div className="editor-electricity-metrics editor-electricity-summary" aria-label="Electrical plan summary">
                   <Metric label="Generation" value={`${number(plan.generationEcPerSec)} EC/s`} />
                   <Metric label="Draw" value={`${number(plan.drawEcPerSec)} EC/s`} />
                   <Metric label="Net" value={`${number(plan.netEcPerSec)} EC/s`} tone={plan.netEcPerSec !== undefined && plan.netEcPerSec < 0 ? "bad" : "ok"} />
                   <Metric label="Storage" value={`${number(snapshot["editor.elec.currentEc"], 0)} / ${number(snapshot["editor.elec.maxEc"], 0)} EC`} />
                 </div>
-                <div className="editor-electricity-controls">
-                  <label>Body<select aria-label="Electricity planner body" onChange={(event) => {
+                <div className="editor-electricity-controls editor-electricity-scenario-rail">
+                  <label className="editor-electricity-body-control">Body<select aria-label="Electricity planner body" onChange={(event) => {
                     const selectedBody = findPlannerBody(snapshot["editor.elec.bodies"], event.target.value);
                     setScenario({ bodyName: event.target.value, solarScale: selectedBody?.solarEfficiency });
                   }} value={plannerScenario.bodyName ?? ""}>{(snapshot["editor.elec.bodies"] ?? []).map((candidate) => <option key={candidate.bodyName} value={candidate.bodyName}>{candidate.bodyName}</option>)}</select></label>
-                  <label>Orbit altitude<input aria-label="Electricity planner orbital altitude (m)" min={0} onChange={(event) => setScenario({ altitudeMeters: event.target.value === "" ? undefined : Number(event.target.value) })} step={1000} type="number" value={plannerScenario.altitudeMeters ?? ""} /><small>m ASL</small></label>
-                  <div className="editor-electricity-presets" aria-label="Planner presets" role="group">
+                  <label className="editor-electricity-altitude-control">Orbit altitude<span className="editor-electricity-input-unit"><input aria-label="Electricity planner orbital altitude (m)" min={0} onChange={(event) => setScenario({ altitudeMeters: event.target.value === "" ? undefined : Number(event.target.value) })} step={1000} type="number" value={plannerScenario.altitudeMeters ?? ""} /><small>m ASL</small></span></label>
+                  <div className="editor-electricity-presets editor-electricity-preset-actions" aria-label="Planner presets" role="group">
                     <button onClick={() => preset("backend-defaults")} type="button">Backend defaults</button><button onClick={() => preset("all-included")} type="button">All included</button><button onClick={() => preset("producers-off")} type="button">Producers off</button><button onClick={() => preset("reset")} type="button">Reset</button>
                   </div>
                 </div>
-                <div className="editor-electricity-operational" aria-label="Electrical endurance comparison">
+                <div className="editor-electricity-operational editor-electricity-endurance" aria-label="Electrical endurance comparison">
                   <Metric label="Battery depletion" value={depletion} tone={plan.netEcPerSec !== undefined && plan.netEcPerSec < 0 ? "bad" : "ok"} />
                   <Metric label="Time in eclipse" value={duration(plan.eclipseDurationSeconds)} />
                   <Metric label="Solar efficiency" value={plan.solarScaleAssumption === undefined ? "Unavailable" : `${number(plan.solarScaleAssumption * 100, 1)}%`} />
@@ -104,7 +104,7 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
                   <Metric label="Recharge" value={duration(plan.rechargeSeconds)} />
                   <Metric label="Recurring orbit" value={plan.recurringOrbitSustainable === undefined ? "Unavailable" : plan.recurringOrbitSustainable ? "Sustainable" : "Deficit"} tone={plan.recurringOrbitSustainable === false ? "bad" : "ok"} />
                 </div>
-                <p className="editor-electricity-assumption">Conservative maximum central eclipse · circular orbit · solar output scaled to {plan.solarScaleAssumption === undefined ? "unknown illumination" : `${number(plan.solarScaleAssumption * 100, 1)}% efficiency at ${plannerScenario.bodyName ?? "the selected body"}`}. This planner never changes KSP or module state.</p>
+                <p className="editor-electricity-assumption editor-electricity-assumption-note">Conservative maximum central eclipse · circular orbit · solar output scaled to {plan.solarScaleAssumption === undefined ? "unknown illumination" : `${number(plan.solarScaleAssumption * 100, 1)}% efficiency at ${plannerScenario.bodyName ?? "the selected body"}`}. This planner never changes KSP or module state.</p>
                 <div className="editor-electricity-ledgers" aria-label="Electrical producers and consumers">
                   <PowerLedger components={components.filter((component) => component.role === "producer")} included={session?.includedByStableId ?? {}} label="Power Generated" onToggle={toggleComponent} rate={plan.generationEcPerSec} />
                   <PowerLedger components={components.filter((component) => component.role === "consumer")} included={session?.includedByStableId ?? {}} label="Power Consumed" onToggle={toggleComponent} rate={plan.drawEcPerSec} />
@@ -125,7 +125,7 @@ function PowerLedger({ components, included, label, onToggle, rate }: {
   const enabled = components.filter((component) => included[component.stableId] ?? component.defaultIncluded).length;
   return (
     <details className="editor-electricity-ledger">
-      <summary><span>{label}</span><strong>{number(rate)} EC/s</strong><small>{enabled}/{components.length} included</small></summary>
+      <summary><span className="editor-electricity-ledger-summary-label">{label}</span><strong className="editor-electricity-ledger-summary-total">{number(rate)} EC/s</strong><small className="editor-electricity-ledger-summary-count">{enabled}/{components.length} included</small></summary>
       <div className="editor-electricity-ledger-body">
         {components.length === 0 ? <p>No components reported.</p> : groupedComponents(components).map(([category, categoryComponents]) => (
           <section className="editor-electricity-ledger-group" key={category}>
