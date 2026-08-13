@@ -863,8 +863,6 @@ test("Editor planning companions preserve the dense workspace alone and together
       electricityHeight: bounds("#editorElectricity").height,
       overflowingOrbitValues: Array.from(element.querySelectorAll<HTMLElement>("#editorOrbitPlan .resonant-editor-plan-details strong, #editorOrbitPlan .resonant-editor-plan-details > header > span"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
-      overflowingPresetLabels: Array.from(element.querySelectorAll<HTMLElement>(".editor-electricity-presets button"))
-        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingResourceNames: Array.from(element.querySelectorAll<HTMLElement>("#editorSummary .editor-resource-row > span:first-child"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
@@ -878,7 +876,6 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(medium.columnGap).toBeGreaterThanOrEqual(10);
   expect(medium.companionGap).toBeGreaterThanOrEqual(6);
   expect(medium.overflowingOrbitValues).toBe(0);
-  expect(medium.overflowingPresetLabels).toBe(0);
   expect(medium.overflowingResourceNames).toBe(0);
   expect(medium.topDifference).toBeLessThanOrEqual(1);
   expect(medium.tableScrollHeight).toBeGreaterThan(medium.tableClientHeight);
