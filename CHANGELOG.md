@@ -2,7 +2,7 @@
 
 All notable public changes will be recorded here.
 
-## Unreleased
+## v0.7.1 - Release packaging repair
 
 - Fixed full and managed-update packaging so the Editor electrical snapshot
   decoder required by the telemetry server is included. Release-contract tests
