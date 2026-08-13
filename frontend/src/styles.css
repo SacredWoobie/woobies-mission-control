@@ -2760,12 +2760,15 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-electricity-scenario-derived dt, .editor-electricity-shadow-assessment dt { color: var(--slate-muted-text); font-size: 9px; line-height: 1.2; }
 .editor-electricity-scenario-derived dd, .editor-electricity-shadow-assessment dd { margin: 0; overflow-wrap: anywhere; color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; }
 .editor-electricity-net-headline { display: flex; min-width: 0; margin: 0; align-items: baseline; justify-content: space-between; gap: 8px; }
-.editor-electricity-net-headline strong { color: var(--green); font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.editor-electricity-net-headline strong { color: var(--text-value); font-size: 30px; font-weight: 650; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.editor-electricity-net-headline.is-surplus strong { color: var(--green); }
+.editor-electricity-net-headline.is-deficit strong { color: var(--warn); }
 .editor-electricity-net-headline span, .editor-electricity-charge-copy, .editor-electricity-recurring-orbit { margin: 0; color: var(--slate-muted-text); font-size: 10px; }
 .editor-electricity-charge-copy { color: var(--amber); }
 .editor-electricity-rate-bars { display: grid; gap: 5px; }
-.editor-electricity-rate-bar { display: grid; min-width: 0; align-items: center; grid-template-columns: 63px minmax(0,1fr) auto; gap: 7px; color: var(--slate-muted-text); font-size: 10px; }
+.editor-electricity-rate-bar { --electricity-rate-percent: 0%; display: grid; min-width: 0; align-items: center; grid-template-columns: 63px minmax(0,1fr) auto; gap: 7px; color: var(--slate-muted-text); font-size: 10px; }
 .editor-electricity-rate-bar strong { color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.editor-electricity-rate-bar > strong { grid-column: 3; }
 .editor-electricity-rate-bar i { grid-row: 2; grid-column: 1 / -1; display: block; height: 5px; overflow: hidden; border-radius: var(--surface-radius-meter); background: var(--surface-track); }
 .editor-electricity-rate-bar i::before { display: block; width: var(--electricity-rate-percent); height: 100%; content: ""; background: var(--green); }
 .editor-electricity-rate-bar:nth-child(2) i::before { background: var(--amber); }
@@ -2778,21 +2781,23 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-electricity-shadow-assessment p { margin: 0; color: var(--slate-muted-text); font-size: 10px; line-height: 1.35; }
 .editor-electricity-shadow-assessment p strong { color: var(--amber); font-weight: 650; }
 .editor-electricity-recurring-orbit { padding-top: 5px; border-top: 1px solid var(--surface-grout); }
-.editor-electricity-recurring-orbit strong, .editor-electricity-net-headline.deficit strong { color: var(--green); font-weight: 650; }
+.editor-electricity-recurring-orbit strong { font-weight: 650; }
+.editor-electricity-recurring-orbit.is-sustainable strong { color: var(--green); }
+.editor-electricity-recurring-orbit.is-deficit strong { color: var(--warn); }
 .editor-electricity-ledgers { display: grid; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
 .editor-electricity-ledger { display: flex; min-width: 0; max-height: min(310px,38vh); overflow: auto; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); flex-direction: column; overscroll-behavior: contain; scrollbar-width: thin; }
-.editor-electricity-ledger > header { position: sticky; z-index: 1; top: 0; display: grid; min-height: 42px; padding: 6px 8px; align-items: center; grid-template-columns: minmax(0,1fr) auto; gap: 2px 7px; border-bottom: 1px solid var(--surface-grout); background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); }
+.editor-electricity-ledger > header { display: grid; min-height: 38px; padding: 5px 8px; align-items: center; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 7px; border-bottom: 1px solid var(--surface-grout); background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); }
 .editor-electricity-ledger > header h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .editor-electricity-ledger > header small { color: var(--slate-muted-text); font-size: 9px; }
 .editor-electricity-ledger > header > strong { color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .editor-electricity-ledger.is-producer > header > strong { color: var(--green); }
 .editor-electricity-ledger.is-consumer > header > strong { color: var(--amber); }
-.editor-electricity-ledger-actions { display: inline-flex; grid-row: span 2; gap: 3px; }
+.editor-electricity-ledger-actions { display: inline-flex; gap: 3px; }
 .editor-electricity-ledger-actions button { min-width: 26px; min-height: 26px; padding: 3px 6px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate-muted-text); background: var(--surface-raised-face); box-shadow: var(--surface-depth-control); cursor: pointer; font: 10px var(--mono); text-transform: uppercase; }
 .editor-electricity-ledger-actions button:hover, .editor-electricity-ledger-actions button:focus-visible { border-color: var(--accent-border-hover); color: var(--cyan); background: var(--control-surface-hover); outline: 0; }
 .editor-electricity-ledger > p { margin: 8px; color: var(--slate-muted-text); font-size: 10px; }
 .editor-electricity-ledger-body { display: grid; min-width: 0; margin: 0; padding: 0; list-style: none; background: var(--surface-well); }
-.editor-electricity-component { position: relative; min-width: 0; overflow: hidden; border-bottom: 1px solid var(--surface-grout); }
+.editor-electricity-component { --electricity-row-percent: 0%; position: relative; min-width: 0; overflow: hidden; border-bottom: 1px solid var(--surface-grout); }
 .editor-electricity-component::before { position: absolute; z-index: 0; inset: 0 auto 0 0; width: var(--electricity-row-percent); content: ""; pointer-events: none; }
 .editor-electricity-ledger.is-producer .editor-electricity-component::before { background: color-mix(in srgb, var(--green) 11%, transparent); }
 .editor-electricity-ledger.is-consumer .editor-electricity-component::before { background: color-mix(in srgb, var(--amber) 11%, transparent); }
@@ -2810,11 +2815,10 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 
 @container (min-width: 651px) {
   .editor-electricity-planner-zones { grid-template-columns: minmax(0,1fr); }
-  .editor-electricity-scenario-rail { grid-template-columns: auto minmax(120px,1fr) minmax(150px,1fr) minmax(0,2.3fr); align-items: end; }
-  .editor-electricity-scenario-rail h3 { align-self: center; font-size: 9px; writing-mode: vertical-rl; }
+  .editor-electricity-scenario-rail { grid-template-columns: minmax(120px,1fr) minmax(150px,1fr) minmax(0,2.3fr); align-items: end; }
+  .editor-electricity-scenario-rail > h3, .editor-electricity-readout-well > h3 { display: none; }
   .editor-electricity-scenario-derived { grid-template-columns: repeat(4,minmax(0,1fr)); }
   .editor-electricity-readout-well { grid-template-columns: minmax(120px,.7fr) minmax(210px,1fr) minmax(280px,1.15fr); align-items: start; }
-  .editor-electricity-readout-well > h3 { grid-column: 1 / -1; }
   .editor-electricity-net-headline, .editor-electricity-charge-copy { grid-column: 1; }
   .editor-electricity-rate-bars, .editor-electricity-storage { grid-column: 2; }
   .editor-electricity-shadow-assessment { grid-row: 2 / span 2; grid-column: 3; padding-top: 0; border-top: 0; border-left: 1px solid var(--surface-grout); padding-left: 8px; }
@@ -2831,6 +2835,13 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .editor-electricity-scenario-rail { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: end; }
   .editor-electricity-scenario-rail h3, .editor-electricity-scenario-derived { grid-column: 1 / -1; }
   .editor-electricity-ledgers { grid-template-columns: minmax(0,1fr); }
+}
+@container (max-width: 880px) and (min-width: 651px) {
+  .editor-electricity-readout-well { grid-template-columns: minmax(150px,.8fr) minmax(220px,1.2fr); }
+  .editor-electricity-shadow-assessment { grid-row: 4; grid-column: 1 / -1; padding: 7px 0 0; border-top: 1px solid var(--surface-grout); border-left: 0; }
+  .editor-electricity-recurring-orbit { grid-row: 5; }
+  .editor-electricity-ledger > header { grid-template-columns: minmax(0,1fr) auto auto; }
+  .editor-electricity-ledger-actions { grid-row: 2; grid-column: 1; justify-self: start; }
 }
 @media (pointer: coarse) {
   .editor-electricity-ledger-actions button { min-width: 36px; min-height: 36px; }
