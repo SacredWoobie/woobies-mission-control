@@ -183,19 +183,20 @@ density.
   redundant Editor Link strip.
 - Reference body, altitude, Mach, and presets remain directly editable and
   legible; numeric inputs do not need native spinner buttons.
-- Without a pinned planning companion, Craft Analysis spans the workspace and
-  Staging plus Resource Inventory share the row beneath it. At 1800px and wider,
-  a pinned planning companion instead uses three columns: Staging above Resource
-  Inventory on the left, the Electricity Planner in the center, and pinned
-  planning briefings on the right. Narrower landscape and portrait layouts keep
-  their established primary/secondary or stacked flow.
+- At 1800px and wider, the Editor centers a stable two-column core: Staging
+  above Resource Inventory on the left and the Electricity Planner on the
+  right. Pinning a planning companion adds its briefing as a third column while
+  preserving those first two tracks. Without a companion below 1800px, Craft
+  Analysis spans the workspace and Staging plus Resource Inventory share the
+  row beneath it. Narrower landscape and portrait layouts keep their established
+  primary/secondary or stacked flow.
 - The editor-only Electricity Planner spans the primary analysis width except
-  in that wide pinned composition. Its scenario rail establishes the selected
-  body and orbital altitude; when center-column width is constrained those
+  in that wide two- or three-column composition. Its scenario rail establishes
+  the selected body and orbital altitude; when its column width is constrained those
   controls stack beside a 2x2 block of derived scenario facts. Body-to-star
   distance is a read-only scenario fact, not a control.
 - Generation and consumption use two always-open ledgers: adjacent on wide
-  layouts and stacked on narrow layouts. In the wide pinned center column their
+  layouts and stacked on narrow layouts. In the wide Electricity column their
   rows use a two-line name/category/rate treatment so the actual component data
   remains readable. Each ledger owns its own All and None inclusion controls;
   bounded internal overflow must never create horizontal scrolling.

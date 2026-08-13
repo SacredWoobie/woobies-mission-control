@@ -13,9 +13,9 @@ All notable public changes will be recorded here.
 - Redesigned the Editor Electricity Planner around a clear scenario rail and
   live electrical readout, with continuously visible generated and consumed
   ledgers, a battery meter, eclipse-hold status, and separate recurring-orbit
-  sustainability. Wide Editor layouts with a pinned planning companion now
-  keep Staging and Resource Inventory together, give Electricity its own center
-  column, and preserve the pinned mission briefing in a dedicated right column.
+  sustainability. Wide Editor layouts now center Staging and Resource Inventory
+  beside Electricity as a stable two-column core, adding a dedicated third
+  column when a planning companion is pinned.
 - Added a read-only VAB/SPH electricity planner with mod-aware and stock
   producer/consumer inventories, battery endurance, conservative circular-orbit
   eclipse sizing, recharge and recurring-orbit checks, and session-only

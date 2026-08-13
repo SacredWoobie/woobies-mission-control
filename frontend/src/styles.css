@@ -2875,9 +2875,36 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .editor-mode .editor-electricity-ledger-body { max-height: 109px; }
 }
 
-/* A wide pinned Editor keeps analysis, electricity, and the planning briefing
-   in three independent columns without changing their component content. */
+/* A wide Editor centers analysis and electricity as a stable two-column core.
+   Pinning a planning briefing adds the existing third column without changing
+   the component content or the narrower Editor layouts. */
 @media (orientation: landscape) and (min-width: 1800px) {
+  .editor-mode .editor-workspace.no-planning-companion .editor-workspace-content {
+    display: grid;
+    grid-template-columns: minmax(500px,510px) minmax(570px,600px);
+    gap: 12px;
+    align-items: start;
+    justify-content: center;
+  }
+  .editor-mode .editor-workspace.no-planning-companion .editor-workspace-primary { display: contents; }
+  .editor-mode .editor-workspace.no-planning-companion .editor-analysis-pair {
+    display: flex;
+    min-width: 0;
+    grid-row: 1;
+    grid-column: 1;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .editor-mode .editor-workspace.no-planning-companion #editorElectricity {
+    min-width: 0;
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .editor-mode .editor-workspace.no-planning-companion .editor-workspace-secondary { display: none; }
+  .editor-mode .editor-workspace.no-planning-companion #editorSummary .editor-resource-list {
+    grid-template-columns: minmax(0,1fr);
+  }
+
   .editor-mode .editor-workspace.has-planning-companion .editor-workspace-content {
     grid-template-columns: minmax(500px,.85fr) minmax(570px,1fr) minmax(520px,1.05fr);
     gap: 12px;
@@ -2901,61 +2928,61 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
     grid-row: 1;
     grid-column: 3;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-analysis-pair #stage > h2 {
+  .editor-mode .editor-workspace .editor-analysis-pair #stage > h2 {
     gap: 6px;
     letter-spacing: .14em;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-analysis-pair #stage > h2 .panel-title {
+  .editor-mode .editor-workspace .editor-analysis-pair #stage > h2 .panel-title {
     white-space: nowrap;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-stage-total-dv {
+  .editor-mode .editor-workspace .editor-stage-total-dv {
     gap: 6px;
     letter-spacing: .06em;
     white-space: nowrap;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-stage-total-value { gap: 3px; }
-  .editor-mode .editor-workspace.has-planning-companion .stage-table.editor .st-row {
+  .editor-mode .editor-workspace .editor-stage-total-value { gap: 3px; }
+  .editor-mode .editor-workspace .stage-table.editor .st-row {
     grid-template-columns: 52px minmax(66px,1.15fr) minmax(66px,1.15fr) minmax(55px,.85fr) minmax(55px,.85fr) minmax(76px,1fr);
   }
-  .editor-mode .editor-workspace.has-planning-companion .stage-table.editor .st-row > span {
+  .editor-mode .editor-workspace .stage-table.editor .st-row > span {
     padding-inline: 5px;
     font-size: 12px;
   }
-  .editor-mode .editor-workspace.has-planning-companion .stage-table.editor .st-head > span { font-size: 9px; }
+  .editor-mode .editor-workspace .stage-table.editor .st-head > span { font-size: 9px; }
 
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-scenario-rail {
+  .editor-mode .editor-workspace .editor-electricity-scenario-rail {
     grid-template-columns: repeat(2,minmax(0,1fr));
     grid-template-rows: repeat(2,auto);
     align-items: stretch;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-body-control {
+  .editor-mode .editor-workspace .editor-electricity-body-control {
     grid-row: 1;
     grid-column: 1;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-altitude-control {
+  .editor-mode .editor-workspace .editor-electricity-altitude-control {
     grid-row: 2;
     grid-column: 1;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-scenario-derived {
+  .editor-mode .editor-workspace .editor-electricity-scenario-derived {
     grid-row: 1 / span 2;
     grid-column: 2;
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
 
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-component label {
+  .editor-mode .editor-workspace .editor-electricity-component label {
     grid-template-areas:
       "check name name"
       "check category rate";
     grid-template-columns: auto minmax(0,1fr) auto;
     row-gap: 2px;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-component input { grid-area: check; }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-component strong { grid-area: name; }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-component small {
+  .editor-mode .editor-workspace .editor-electricity-component input { grid-area: check; }
+  .editor-mode .editor-workspace .editor-electricity-component strong { grid-area: name; }
+  .editor-mode .editor-workspace .editor-electricity-component small {
     grid-area: category;
     justify-self: start;
   }
-  .editor-mode .editor-workspace.has-planning-companion .editor-electricity-component output {
+  .editor-mode .editor-workspace .editor-electricity-component output {
     grid-area: rate;
     justify-self: end;
   }

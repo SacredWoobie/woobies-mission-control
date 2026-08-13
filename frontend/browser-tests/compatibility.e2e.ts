@@ -441,8 +441,15 @@ test("dense Editor analysis uses the empty planning width and reveals the active
     const workspaceBounds = workspace.getBoundingClientRect();
     const content = bounds(".editor-workspace-content");
     const context = bounds("#editorContext");
+    const analysis = bounds(".editor-analysis-pair");
+    const electricity = bounds("#editorElectricity");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const scenarioBody = bounds(".editor-electricity-body-control");
+    const scenarioAltitude = bounds(".editor-electricity-altitude-control");
+    const scenarioDerived = bounds(".editor-electricity-scenario-derived");
+    const derivedCells = Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-scenario-derived > div"))
+      .map((cell) => cell.getBoundingClientRect());
     const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
     const tableBounds = table.getBoundingClientRect();
     const activeBounds = workspace.querySelector<HTMLElement>('.stage-table.editor [aria-current="step"]')!.getBoundingClientRect();
@@ -457,18 +464,41 @@ test("dense Editor analysis uses the empty planning width and reveals the active
         && activeBounds.bottom <= tableBounds.bottom + 1,
       contextContentGap: content.top - context.bottom,
       contextMatchesWorkspace: Math.abs(context.width - workspaceBounds.width),
+      centeredSideDifference: Math.abs((analysis.left - content.left) - (content.right - electricity.right)),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
-      electricityHeight: bounds("#editorElectricity").height,
+      electricityHeight: electricity.height,
+      electricityWidth: electricity.width,
+      analysisElectricityGap: electricity.left - analysis.right,
+      analysisTopDifference: Math.abs(analysis.top - electricity.top),
+      analysisWidth: analysis.width,
+      componentRowsUseTwoLines: Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-component label"))
+        .every((label) => {
+          const name = label.querySelector<HTMLElement>("strong")!.getBoundingClientRect();
+          const category = label.querySelector<HTMLElement>("small")!.getBoundingClientRect();
+          const rate = label.querySelector<HTMLElement>("output")!.getBoundingClientRect();
+          return category.top > name.top + 1 && rate.top > name.top + 1;
+        }),
+      derivedColumnGap: scenarioDerived.left - scenarioBody.right,
+      derivedFirstColumnDifference: Math.abs(derivedCells[0].left - derivedCells[2].left),
+      derivedRightColumnDifference: Math.abs(derivedCells[1].left - derivedCells[3].left),
+      derivedTopRowDifference: Math.abs(derivedCells[0].top - derivedCells[1].top),
+      derivedBottomRowDifference: Math.abs(derivedCells[2].top - derivedCells[3].top),
       ninthRowScrolls,
+      overflowingElectricityRows: Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-component :is(strong,small,output)"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       overflowingHeaderValues: Array.from(workspace.querySelectorAll<HTMLElement>("#editorContext h1, #editorContext .editor-overview-metric strong, #editorContext .editor-overview-metric small"))
         .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       poweredRows: workspace.querySelectorAll('.stage-table.editor [role="row"][data-stage-ksp]').length,
       secondaryChildren: workspace.querySelector(".editor-workspace-secondary")!.children.length,
-      stageSummaryGap: summary.left - stage.right,
-      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      scenarioControlGap: scenarioAltitude.top - scenarioBody.bottom,
+      scenarioControlLeftDifference: Math.abs(scenarioBody.left - scenarioAltitude.left),
+      scenarioControlWidthDifference: Math.abs(scenarioBody.width - scenarioAltitude.width),
+      stageSummaryGap: summary.top - stage.bottom,
+      stageSummaryLeftDifference: Math.abs(stage.left - summary.left),
+      stageSummaryRightDifference: Math.abs(stage.right - summary.right),
       tableClientHeight: table.clientHeight,
       tableScrollHeight: table.scrollHeight,
     };
@@ -477,8 +507,26 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.secondaryChildren).toBe(0);
   expect(layout.contextMatchesWorkspace).toBeLessThanOrEqual(1);
   expect(layout.contextContentGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisWidth).toBeGreaterThanOrEqual(500);
+  expect(layout.analysisWidth).toBeLessThanOrEqual(515);
+  expect(layout.electricityWidth).toBeGreaterThanOrEqual(570);
+  expect(layout.electricityWidth).toBeLessThanOrEqual(605);
+  expect(layout.analysisElectricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.analysisTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.centeredSideDifference).toBeLessThanOrEqual(1);
   expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
-  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryRightDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlWidthDifference).toBeLessThanOrEqual(1);
+  expect(layout.scenarioControlGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedColumnGap).toBeGreaterThanOrEqual(5);
+  expect(layout.derivedFirstColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedRightColumnDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedTopRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
+  expect(layout.componentRowsUseTwoLines).toBe(true);
+  expect(layout.overflowingElectricityRows).toBe(0);
   expect(layout.poweredRows).toBe(8);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
   expect(layout.ninthRowScrolls).toBe(true);
@@ -486,6 +534,27 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.overflowingHeaderValues).toBe(0);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight + layout.electricityHeight);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const narrower = await page.locator(".editor-workspace").evaluate((workspace) => {
+    const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const electricity = bounds("#editorElectricity");
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    return {
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      electricityStageLeftDifference: Math.abs(electricity.left - stage.left),
+      electricitySummaryRightDifference: Math.abs(electricity.right - summary.right),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+    };
+  });
+  expect(narrower.electricityStageLeftDifference).toBeLessThanOrEqual(1);
+  expect(narrower.electricitySummaryRightDifference).toBeLessThanOrEqual(1);
+  expect(narrower.stageSummaryGap).toBeGreaterThanOrEqual(5);
+  expect(narrower.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(narrower.documentScrollWidth).toBeLessThanOrEqual(narrower.documentClientWidth);
 });
 
 test("Editor planning companions preserve the dense workspace alone and together", async ({ page }) => {
