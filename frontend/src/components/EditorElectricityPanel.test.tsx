@@ -36,14 +36,14 @@ describe("EditorElectricityPanel", () => {
     const generated = screen.getByRole("region", { name: "Power generated" });
     const consumed = screen.getByRole("region", { name: "Power consumed" });
     const producer = generated.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    const consumer = consumed.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const consumers = [...consumed.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    const consumerStates = consumers.map((consumer) => consumer.checked);
     expect(producer.checked).toBe(true);
-    expect(consumer.checked).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(generated.querySelectorAll("button")[1]);
     expect(producer.checked).toBe(false);
-    expect(consumer.checked).toBe(true);
-    fireEvent.click(screen.getAllByRole("button", { name: "All" })[1]);
-    expect(consumer.checked).toBe(true);
+    expect(consumers.map((consumer) => consumer.checked)).toEqual(consumerStates);
+    fireEvent.click(consumed.querySelectorAll("button")[0]);
+    expect(consumers.every((consumer) => consumer.checked)).toBe(true);
   });
 
   it("stores altitude input in metres while presenting kilometres", () => {
