@@ -102,6 +102,25 @@ function Write-Utf8Json {
     )
 }
 
+function Sort-CanonicalManifestPaths {
+    param([string[]]$Paths)
+
+    # The public Python updater validates paths with str.casefold(). Package
+    # paths are ASCII, so lowercase-then-ordinal is the exact compatible order.
+    # OrdinalIgnoreCase is not equivalent: it compares uppercase code points
+    # and can place letters before underscores in hashed asset names.
+    $comparer = [System.Collections.Generic.Comparer[string]]::Create(
+        [System.Comparison[string]]{
+            param([string]$Left, [string]$Right)
+            return [System.StringComparer]::Ordinal.Compare(
+                $Left.ToLowerInvariant(),
+                $Right.ToLowerInvariant()
+            )
+        }
+    )
+    [System.Array]::Sort($Paths, $comparer)
+}
+
 function Get-PackageFileRecord {
     param(
         [string]$StageRoot,
@@ -223,11 +242,11 @@ $updateChecksumPath = "$updateArchivePath.sha256"
 $updateStageRoot = Join-Path $OutputDirectory "$packageName-runtime-update-stage"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
-    @{ Source = 'docs/images/v0.6.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
-    @{ Source = 'docs/images/v0.6.0/active-contract-focus.png'; Name = "$packageName.zz-02-active-contract-focus.png" },
-    @{ Source = 'docs/images/v0.6.0/editor-craft-analysis.png'; Name = "$packageName.zz-03-editor-craft-analysis.png" },
-    @{ Source = 'docs/images/v0.6.0/flight-damage-monitor.png'; Name = "$packageName.zz-04-flight-damage-monitor.png" },
-    @{ Source = 'docs/images/v0.6.0/flight-plan-workspace.png'; Name = "$packageName.zz-05-flight-plan-workspace.png" }
+    @{ Source = 'docs/images/v0.7.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
+    @{ Source = 'docs/images/v0.7.0/active-contract-focus.png'; Name = "$packageName.zz-02-active-contract-focus.png" },
+    @{ Source = 'docs/images/v0.7.0/editor-craft-analysis.png'; Name = "$packageName.zz-03-editor-craft-analysis.png" },
+    @{ Source = 'docs/images/v0.7.0/flight-damage-monitor.png'; Name = "$packageName.zz-04-flight-damage-monitor.png" },
+    @{ Source = 'docs/images/v0.7.0/flight-plan-workspace.png'; Name = "$packageName.zz-05-flight-plan-workspace.png" }
 )
 $activeReleaseImages = @(
     if (-not $SkipReleaseImages) {
@@ -544,10 +563,7 @@ $managedPaths = [string[]]@(
         } |
         Where-Object { Test-ManagedRuntimePath $_ }
 )
-[System.Array]::Sort(
-    $managedPaths,
-    [System.StringComparer]::OrdinalIgnoreCase
-)
+Sort-CanonicalManifestPaths $managedPaths
 if ($managedPaths.Count -eq 0) {
     throw 'The managed runtime file set is empty.'
 }
@@ -590,10 +606,7 @@ $payloadPaths = [string[]]@(
             $_.FullName.Substring($updateStageRoot.Length).TrimStart('\').Replace('\', '/')
         }
 )
-[System.Array]::Sort(
-    $payloadPaths,
-    [System.StringComparer]::OrdinalIgnoreCase
-)
+Sort-CanonicalManifestPaths $payloadPaths
 $payloadRecords = @(
     $payloadPaths |
         ForEach-Object { Get-PackageFileRecord -StageRoot $updateStageRoot -RelativePath $_ }

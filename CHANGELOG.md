@@ -2,8 +2,12 @@
 
 All notable public changes will be recorded here.
 
-## Unreleased
+## v0.7.0 - Flight instruments and Editor electricity
 
+- Extended Managed runtime updates to the first public successor: v0.6.1 can
+  install v0.7.0 through the explicitly confirmed in-app updater while keeping
+  rollback and user-owned package state. It never writes the user's selected live KSP
+  `GameData` folder.
 - Kept live altitude and distance readouts within their intended width when a
   rounded value crosses a precision or unit boundary, such as 99,999.6 m
   becoming 100.00 km instead of 100.000 km.
@@ -27,8 +31,8 @@ All notable public changes will be recorded here.
   event-driven refreshes plus a bounded one-second compatibility refresh so
   New Craft and third-party editor actions that omit KSP's normal change event
   cannot retain the prior craft or stale module rates. A `warming` snapshot
-  continues to retry until it settles. WoobiesControlStats 0.2.21 is the
-  unselected next-release candidate for the optional
+  continues to retry until it settles. WoobiesControlStats 0.2.21 supplies the
+  selected optional
   Dynamic Battery Storage-backed and stock-fallback editor service and treats
   engine modules explicitly linked by KSP's multi-mode controller as one
   conservative load, preventing alternate fuel modes from being double-counted
