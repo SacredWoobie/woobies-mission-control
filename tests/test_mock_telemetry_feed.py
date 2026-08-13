@@ -56,6 +56,7 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual(self.editor["stage.totalBurnSeconds"], 335)
         self.assertTrue(self.editor["identity.available"])
         self.assertEqual(self.editor["game.saveFolder"], "WMC Fixture Save")
+        self.assertEqual(self.editor["editor.elec.saveFolder"], "WMC Fixture Save")
         self.assertEqual(self.editor["editor.craftPersistentId"], "9001")
         self.assertEqual(self.editor["editor.rootPartPersistentId"], "1001")
 
@@ -74,6 +75,7 @@ class FlightMockTelemetryTests(unittest.TestCase):
         self.assertEqual((len(producers), len(consumers)), (4, 7))
         self.assertEqual((len(enabled_producers), len(enabled_consumers)), (3, 5))
         self.assertEqual(len({component["stableId"] for component in components}), len(components))
+        self.assertTrue(all(isinstance(component["partId"], str) for component in components))
         self.assertEqual(
             round(sum(component["referenceEcPerSec"] * 0.962 for component in enabled_producers if component["solarScaled"])
                   + sum(component["referenceEcPerSec"] for component in enabled_producers if not component["solarScaled"]), 2),

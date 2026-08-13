@@ -172,7 +172,7 @@ export function editorElectricitySnapshotsEqual(
     "context.mode", "game.saveFolder", "editor.body", "editor.craftPersistentId",
     "editor.rootPartPersistentId", "editor.elec.status", "editor.elec.backend",
     "editor.elec.backendVersion", "editor.elec.degradedReason", "editor.elec.revision",
-    "editor.elec.fingerprint", "editor.elec.craftPersistentId", "editor.elec.rootPartPersistentId",
+    "editor.elec.fingerprint", "editor.elec.saveFolder", "editor.elec.craftPersistentId", "editor.elec.rootPartPersistentId",
     "editor.elec.currentEc", "editor.elec.maxEc", "editor.elec.components", "editor.elec.bodies",
     "editor.elec.pending", "editor.elec.retained",
   ]);

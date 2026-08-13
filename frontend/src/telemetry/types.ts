@@ -704,6 +704,7 @@ export interface TelemetrySnapshot {
   "editor.elec.degradedReason"?: string;
   "editor.elec.revision"?: number;
   "editor.elec.fingerprint"?: string;
+  "editor.elec.saveFolder"?: string;
   "editor.elec.craftPersistentId"?: string;
   "editor.elec.rootPartPersistentId"?: string;
   "editor.elec.currentEc"?: number;

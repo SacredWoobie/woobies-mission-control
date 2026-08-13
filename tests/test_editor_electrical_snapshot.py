@@ -10,9 +10,9 @@ def b(value):
     return base64.b64encode(value.encode()).decode()
 
 
-def snapshot(*, craft="craft-1", revision=1):
+def snapshot(*, craft="craft-1", revision=1, status="ready"):
     return [
-        "\t".join(["WEE1", "1", "ready", "stock", b("1.0"),
+        "\t".join(["WEE1", "1", status, "stock", b("1.0"),
                    b("Save"), craft, "root-1", str(revision), "fp",
                    "10", "20", "1", "1", b("")]),
         "\t".join(["C", b("part:module"), "42", b("Battery"),
@@ -47,6 +47,7 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
     def test_decodes_complete_snapshot(self):
         result = decode_editor_electrical_snapshot(snapshot())
         self.assertEqual(result["editor.elec.backend"], "stock")
+        self.assertEqual(result["editor.elec.saveFolder"], "Save")
         self.assertEqual(result["editor.elec.components"][0]["partId"], "42")
         self.assertTrue(result["editor.elec.bodies"][0]["authoritative"])
         self.assertIn("gravitationalParameter", result["editor.elec.bodies"][0])
@@ -107,6 +108,42 @@ class EditorElectricalSnapshotTests(unittest.TestCase):
         self.assertTrue(retained["editor.elec.retained"])
         self.assertTrue(throttled["editor.elec.retained"])
         self.assertEqual(changed["editor.elec.craftPersistentId"], "craft-2")
+
+    def test_warming_retries_once_per_second_until_ready_on_same_craft(self):
+        service = Service()
+        service.payload = snapshot(status="warming")
+        conn = Connection(service)
+        telemetry_server._editor_identity = ("Save", "craft-1", "root-1")
+        with mock.patch.object(telemetry_server.time, "time", side_effect=[1.0, 1.5, 2.0, 2.5]):
+            warming = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
+            cached_warming = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
+            service.payload = snapshot(status="ready")
+            ready = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
+            cached_ready = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
+
+        self.assertEqual(service.calls, 2)
+        self.assertEqual(warming["editor.elec.status"], "warming")
+        self.assertFalse(warming["editor.elec.retained"])
+        self.assertEqual(cached_warming["editor.elec.status"], "warming")
+        self.assertEqual(ready["editor.elec.status"], "ready")
+        self.assertFalse(ready["editor.elec.retained"])
+        self.assertEqual(cached_ready["editor.elec.status"], "ready")
+        self.assertFalse(cached_ready["editor.elec.retained"])
+
+    def test_terminal_electrical_states_remain_event_driven(self):
+        for status in ("ready", "empty", "degraded", "unavailable"):
+            with self.subTest(status=status):
+                telemetry_server._reset_editor_electrical_state()
+                service = Service()
+                service.payload = snapshot(status=status)
+                conn = Connection(service)
+                telemetry_server._editor_identity = ("Save", "craft-1", "root-1")
+                with mock.patch.object(telemetry_server.time, "time", side_effect=[1.0, 2.5]):
+                    first = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
+                    cached = telemetry_server._attach_editor_electrical(conn, {"editor.revision": 1})
+                self.assertEqual(service.calls, 1)
+                self.assertEqual(first["editor.elec.status"], status)
+                self.assertEqual(cached["editor.elec.status"], status)
 
 
 if __name__ == "__main__":

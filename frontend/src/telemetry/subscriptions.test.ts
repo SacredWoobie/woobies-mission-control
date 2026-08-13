@@ -124,10 +124,12 @@ describe("panel telemetry subscriptions", () => {
       ...editorTelemetryFixture,
       "editor.elec.status": "ready" as const,
       "editor.elec.revision": 3,
+      "editor.elec.saveFolder": "Planner fixture save",
       "editor.elec.components": [{ stableId: "panel", partId: "1", partTitle: "OX-4", moduleName: "ModuleDeployableSolarPanel", category: "Solar", role: "producer" as const, referenceEcPerSec: 2, defaultIncluded: true, continuous: false, solarScaled: true, valueKnown: true }],
     };
     expect(editorElectricitySnapshotsEqual(powered, { ...powered, "stage.totalDvVac": 999 })).toBe(true);
     expect(editorElectricitySnapshotsEqual(powered, { ...powered, "editor.elec.revision": 4 })).toBe(false);
+    expect(editorElectricitySnapshotsEqual(powered, { ...powered, "editor.elec.saveFolder": "Other save" })).toBe(false);
     expect(editorElectricitySnapshotsEqual(powered, { ...powered, "editor.body": "Duna" })).toBe(false);
   });
 

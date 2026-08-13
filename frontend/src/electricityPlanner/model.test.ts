@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { calculateElectricityPlan, circularOrbitSeconds, defaultElectricityScenario, effectiveComponentRate, maximumCentralEclipseSeconds, surfaceDarknessSeconds } from "./model";
+import { calculateElectricityPlan, circularOrbitSeconds, defaultElectricityScenario, effectiveComponentRate, maximumCentralEclipseSeconds } from "./model";
 import { denseElectricityFixture, degradedElectricityFixture, missingElectricityFixture, representativeElectricityFixture } from "./fixtures";
-import { applyElectricityPlannerPreset, applyElectricityPlannerRoleInclusion, plannerCraftKey, reconcileElectricityPlannerSession } from "./state";
+import { applyElectricityPlannerRoleInclusion, plannerCraftKey, reconcileElectricityPlannerSession } from "./state";
 
 const components = representativeElectricityFixture["editor.elec.components"]!;
 const panelId = components.find((component) => component.solarScaled)!.stableId;
@@ -14,7 +14,6 @@ describe("editor electricity planner model", () => {
     const period = circularOrbitSeconds(body, 80_000)!;
     expect(period).toBeCloseTo(1_875, -1);
     expect(maximumCentralEclipseSeconds(body, 80_000)!).toBeGreaterThan(0);
-    expect(surfaceDarknessSeconds(body)).toBe(10_800);
     expect(circularOrbitSeconds(body, Number.NaN)).toBeUndefined();
     expect(maximumCentralEclipseSeconds({ ...body, radius: 0 }, 80_000)).toBeUndefined();
   });
@@ -27,7 +26,6 @@ describe("editor electricity planner model", () => {
     expect(plan.orbitPeriodSeconds).toBeCloseTo(1_875, -1);
     expect(plan.rechargeSeconds).toBeCloseTo(200 / 2.59);
     expect(plan.eclipseRequiredEc).toBeCloseTo(0.56 * plan.eclipseDurationSeconds!);
-    expect(plan.continuousNonSolarGenerationEcPerSec).toBe(0.75);
     expect(plan.shadowNetEcPerSec).toBeCloseTo(-0.56);
     expect(plan.nextEclipseShadowEnduranceSeconds).toBeCloseTo(1_000 / 0.56);
     expect(plan.nextEclipseHolds).toBe(true);
@@ -63,7 +61,6 @@ describe("editor electricity planner model", () => {
       scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
     });
     expect(plan.eclipseRequiredEc).toBeCloseTo(1.31 * plan.eclipseDurationSeconds!);
-    expect(plan.continuousNonSolarGenerationEcPerSec).toBe(0);
     expect(plan.shadowNetEcPerSec).toBeCloseTo(-1.31);
   });
 
@@ -108,7 +105,7 @@ describe("editor electricity planner model", () => {
       scenario: { bodyName: "Kerbin", altitudeMeters: 80_000, solarScale: 1 },
     });
     expect(plan.shadowNetEcPerSec).toBeGreaterThan(0);
-    expect(plan.eclipseMarginEc).toBeUndefined();
+    expect(plan.eclipseRequiredEc).toBe(0);
     expect(plan.nextEclipseHolds).toBe(true);
   });
 
@@ -158,15 +155,11 @@ describe("editor electricity planner session state", () => {
     expect(revised.includedByStableId).toMatchObject({ [panelId]: false, "panel-b": true });
     const otherCraft = reconcileElectricityPlannerSession(revised, { ...representativeElectricityFixture, "editor.elec.craftPersistentId": "craft-2" });
     expect(otherCraft.includedByStableId[panelId]).toBe(true);
+    const otherSave = reconcileElectricityPlannerSession(revised, { ...representativeElectricityFixture, "editor.elec.saveFolder": "Different save" });
+    expect(otherSave.includedByStableId[panelId]).toBe(true);
     expect(plannerCraftKey(representativeElectricityFixture)).toBe("Planner fixture save:craft-1");
-  });
-
-  it("applies backend defaults, all included, producers off, and reset without persistence", () => {
-    const state = reconcileElectricityPlannerSession(undefined, representativeElectricityFixture);
-    expect(Object.values(applyElectricityPlannerPreset(state, components, "all-included", representativeElectricityFixture).includedByStableId)).toEqual(components.map(() => true));
-    expect(applyElectricityPlannerPreset(state, components, "producers-off", representativeElectricityFixture).includedByStableId).toEqual(Object.fromEntries(components.map((component) => [component.stableId, component.role === "producer" ? false : component.defaultIncluded])));
-    expect(applyElectricityPlannerPreset(state, components, "backend-defaults", representativeElectricityFixture).includedByStableId).toEqual(state.includedByStableId);
-    expect(applyElectricityPlannerPreset({ ...state, scenario: { altitudeMeters: 1 } }, components, "reset", representativeElectricityFixture).scenario.altitudeMeters).toBe(80_000);
+    expect(plannerCraftKey({ ...representativeElectricityFixture, "editor.elec.saveFolder": "Different save" })).toBe("Different save:craft-1");
+    expect(plannerCraftKey({ ...representativeElectricityFixture, "editor.elec.saveFolder": " " })).toBe("Planner fixture save:craft-1");
   });
 
   it("scopes ALL and NONE to one role while preserving the other role and scenario", () => {

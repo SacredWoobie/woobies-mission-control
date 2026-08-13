@@ -21,14 +21,11 @@ export interface ElectricityPlan {
   orbitPeriodSeconds: PlannerNumber;
   batteryEnduranceSeconds: PlannerNumber;
   eclipseDurationSeconds: PlannerNumber;
-  /** Checked, continuous non-solar production that remains available in shadow. */
-  continuousNonSolarGenerationEcPerSec: PlannerNumber;
   /** Production minus draw while solar generation is unavailable. */
   shadowNetEcPerSec: PlannerNumber;
   /** Time until the reported charge is exhausted during the next eclipse. */
   nextEclipseShadowEnduranceSeconds: PlannerNumber;
   eclipseRequiredEc: PlannerNumber;
-  eclipseMarginEc: PlannerNumber;
   /** Whether the currently reported charge holds through the next eclipse only. */
   nextEclipseHolds: boolean | undefined;
   /** Remaining shadow after charge depletion when the next eclipse will not hold. */
@@ -86,11 +83,6 @@ export function maximumCentralEclipseSeconds(
   const ratio = Math.max(0, Math.min(1, radius / (radius + altitude)));
   const eclipse = period * Math.asin(ratio) / Math.PI;
   return Number.isFinite(eclipse) && eclipse >= 0 ? eclipse : undefined;
-}
-
-export function surfaceDarknessSeconds(body: EditorElectricityBodyTelemetry | undefined): PlannerNumber {
-  const period = positive(body?.rotationPeriod);
-  return body?.authoritative && period !== undefined ? period / 2 : undefined;
 }
 
 function selectedComponents(
@@ -182,11 +174,9 @@ export function calculateElectricityPlan(input: {
     orbitPeriodSeconds: period,
     batteryEnduranceSeconds: endurance,
     eclipseDurationSeconds: eclipse,
-    continuousNonSolarGenerationEcPerSec: continuousNonSolarGeneration,
     shadowNetEcPerSec: shadowNet,
     nextEclipseShadowEnduranceSeconds: nextEclipseShadowEndurance,
     eclipseRequiredEc: eclipseRequired,
-    eclipseMarginEc: margin,
     nextEclipseHolds,
     darkBeforeSunlightSeconds: darkBeforeSunlight,
     rechargeSeconds: recharge,

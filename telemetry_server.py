@@ -2121,6 +2121,8 @@ def _attach_editor_electrical(conn, data):
     due = (
         not _editor_electrical_cache or
         (source_token is not None and source_token != _editor_electrical_source_token) or
+        (_editor_electrical_cache.get("editor.elec.status") == "warming" and
+         now - _editor_electrical_last_poll >= EDITOR_ELECTRICAL_RETRY_SECONDS) or
         (source_token is None and
          now - _editor_electrical_last_poll >= EDITOR_ELECTRICAL_RETRY_SECONDS)
     )

@@ -23,8 +23,10 @@ All notable public changes will be recorded here.
   endurance comparison expose depletion time, eclipse time, and body-relative
   solar efficiency together. The editor electrical snapshot is event-driven:
   stable dashboard frames reuse the last confirmed craft model instead of
-  repeatedly polling kRPC, while craft changes and bounded compatibility
-  retries refresh it. WoobiesControlStats 0.2.19 supplies the optional
+  repeatedly polling kRPC; only a `warming` snapshot retries at a bounded
+  one-second cadence until it settles, while craft changes and bounded
+  compatibility retries refresh it. WoobiesControlStats 0.2.20 is the
+  unselected next-release candidate for the optional
   Dynamic Battery Storage-backed and stock-fallback editor service and treats
   engine modules explicitly linked by KSP's multi-mode controller as one
   conservative load, preventing alternate fuel modes from being double-counted

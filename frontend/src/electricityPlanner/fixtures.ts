@@ -28,6 +28,7 @@ export const representativeElectricityFixture: TelemetrySnapshot = {
   "editor.elec.backendVersion": "2.0.0",
   "editor.elec.revision": 1,
   "editor.elec.fingerprint": "fixture-craft-1-r1",
+  "editor.elec.saveFolder": "Planner fixture save",
   "editor.elec.craftPersistentId": "craft-1",
   "editor.elec.rootPartPersistentId": "root-1",
   "editor.elec.currentEc": 1200,
