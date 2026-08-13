@@ -119,21 +119,37 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
       headerHeight: bounds(":scope > header").height,
       legHeights: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-leg")).map((leg) => leg.getBoundingClientRect().height),
       marginControlHeights: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-controls button, .delta-v-margin-controls input")).map((control) => control.getBoundingClientRect().height),
+      marginPresetColors: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-margin-preset")).map((control) => getComputedStyle(control).color),
       overlaps,
+      routeRailOffsets: Array.from(drawer.querySelectorAll<HTMLElement>(".delta-v-add-step button")).map((button, index) => {
+        const marker = drawer.querySelectorAll<HTMLElement>(".delta-v-leg-marker span")[index];
+        const nextMarker = drawer.querySelectorAll<HTMLElement>(".delta-v-leg-marker span")[index + 1];
+        const buttonBounds = button.getBoundingClientRect();
+        const markerBounds = marker.getBoundingClientRect();
+        const nextMarkerBounds = nextMarker?.getBoundingClientRect();
+        return {
+          x: (buttonBounds.left + buttonBounds.width / 2) - (markerBounds.left + markerBounds.width / 2),
+          y: nextMarkerBounds
+            ? (buttonBounds.top + buttonBounds.height / 2) - ((markerBounds.top + markerBounds.height / 2 + nextMarkerBounds.top + nextMarkerBounds.height / 2) / 2)
+            : 0,
+        };
+      }),
       routeHeaderHeight: bounds(".delta-v-route > header").height,
       routeListHeight: bounds(".delta-v-route-list").height,
       summaryHeight: bounds(".delta-v-summary").height,
     };
   });
 
-  expect(desktop.headerHeight).toBeLessThanOrEqual(46);
-  expect(desktop.configurationHeight).toBeLessThanOrEqual(105);
+  expect(desktop.headerHeight).toBeLessThanOrEqual(50);
+  expect(desktop.configurationHeight).toBeLessThanOrEqual(115);
   expect(desktop.summaryHeight).toBeLessThanOrEqual(115);
   expect(desktop.routeHeaderHeight).toBeLessThanOrEqual(36);
   expect(desktop.routeListHeight).toBeGreaterThanOrEqual(500);
   expect(desktop.footerHeight).toBeLessThanOrEqual(27);
-  expect(desktop.legHeights.slice(0, 3).every((height) => height <= 56)).toBe(true);
+  expect(desktop.legHeights.slice(0, 3).every((height) => height <= 67)).toBe(true);
   expect(desktop.marginControlHeights).toEqual([22, 22, 22, 22, 22, 22]);
+  expect(desktop.marginPresetColors).toEqual(["rgb(255, 143, 128)", "rgb(255, 180, 84)", "rgb(126, 231, 135)"]);
+  expect(desktop.routeRailOffsets.slice(0, 2).every((offset) => Math.abs(offset.x) <= 1 && Math.abs(offset.y) <= 1)).toBe(true);
   expect(desktop.overlaps).toEqual([]);
   expect(desktop.drawerScrollWidth).toBeLessThanOrEqual(desktop.drawerClientWidth + 1);
   expect(desktop.documentScrollWidth).toBeLessThanOrEqual(desktop.documentClientWidth);
@@ -146,6 +162,26 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
   await page.getByRole("button", { name: "Increase margin by 1 percent" }).click();
   await expect(margin).toHaveValue("11");
   await expect(lowMargin).toHaveAttribute("aria-pressed", "false");
+
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await page.getByRole("radio", { name: "Parking orbit" }).check({ force: true });
+  await expect(page.getByRole("spinbutton", { name: "Planned altitude" })).toBeVisible();
+  await expect(page.getByText(/ATMO Ends at 50.0/)).toBeVisible();
+  await expect(page.getByText("Simple: ideal dates")).toBeVisible();
+  await expect(page.getByText("Advanced: per-leg porkchops")).toHaveCount(0);
+  const portraitMargin = await page.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
+    const card = drawer.querySelector<HTMLElement>(".delta-v-margin-card")!.getBoundingClientRect();
+    const controls = drawer.querySelector<HTMLElement>(".delta-v-margin-controls")!.getBoundingClientRect();
+    return {
+      contained: controls.left >= card.left - 1 && controls.right <= card.right + 1,
+      controlsWidth: controls.width,
+      drawerOverflow: drawer.scrollWidth - drawer.clientWidth,
+    };
+  });
+  expect(portraitMargin.contained).toBe(true);
+  expect(portraitMargin.controlsWidth).toBeGreaterThanOrEqual(190);
+  expect(portraitMargin.drawerOverflow).toBeLessThanOrEqual(1);
 
   for (const viewport of [{ width: 760, height: 900 }, { width: 390, height: 844 }]) {
     const touchContext = await browser.newContext({ baseURL, hasTouch: true, viewport });

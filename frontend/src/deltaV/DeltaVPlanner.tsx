@@ -111,8 +111,8 @@ function ParkingAltitudeInput({ body, label, onChange, unit, value }: { body: De
   const minimum = minimumParkingAltitude(body);
   const invalid = !Number.isFinite(value) || value < minimum;
   const helpId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-help`;
-  const help = invalid ? `Minimum valid orbit is ${formatDistance(minimum, unit)}` : body.atmosphereDepth > 0 ? `Atmosphere ends at ${formatDistance(body.atmosphereDepth, unit)}` : "Vacuum body";
-  return <label className="delta-v-parking-altitude"><span className="delta-v-field-heading"><span>{label}</span>{!invalid && <small id={helpId}>{help}</small>}</span><div className="resonant-input-unit"><input
+  const help = invalid ? `Minimum valid orbit is ${formatDistance(minimum, unit)}` : body.atmosphereDepth > 0 ? `ATMO Ends at ${formatDistance(body.atmosphereDepth, unit)}` : "Vacuum body";
+  return <label className="delta-v-parking-altitude"><span className="delta-v-field-heading"><span>{label}</span></span><div className="resonant-input-unit"><input
     aria-describedby={helpId}
     aria-invalid={invalid ? "true" : undefined}
     aria-label={label}
@@ -121,7 +121,7 @@ function ParkingAltitudeInput({ body, label, onChange, unit, value }: { body: De
     type="number"
     value={Number(distanceToUnit(value, unit).toFixed(DISTANCE_UNITS[unit].inputDecimals))}
     onChange={(event) => onChange(distanceFromUnit(Number(event.target.value), unit))}
-  /><span>{unit}</span></div>{invalid && <small className="delta-v-input-error" id={helpId} role="alert">{help}</small>}</label>;
+  /><span>{unit}</span></div><small className={invalid ? "delta-v-input-error" : "delta-v-altitude-help"} id={helpId} role={invalid ? "alert" : undefined}>{help}</small></label>;
 }
 
 function ArrivalStepControls({ leg, strategy, onChange }: { leg: DeltaVLeg; strategy: ArrivalStrategy; onChange(patch: Partial<ArrivalStrategy>): void }) {
@@ -891,11 +891,11 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
         <BodySelect bodies={bodies} label={editingStopId ? "Edit stop" : "Next stop"} onChange={selectNextStop} placeholder="Choose next body…" value={nextStop.bodyName} />
         {nextStopBody ? <>
           <EndpointControl body={nextStopBody} endpoint={nextStop.endpoint} groupName="next-mission-stop" label="Arrive at" onChange={(endpoint) => setNextStop((current) => ({ ...current, endpoint }))} />
-          {nextStop.endpoint === "orbit" && <ParkingAltitudeInput body={nextStopBody} label={editingStopId ? "Edited stop parking altitude" : "Next stop parking altitude"} onChange={(parkingAltitude) => setNextStop((current) => ({ ...current, parkingAltitude }))} unit={unit} value={nextStop.parkingAltitude} />}
+          {nextStop.endpoint === "orbit" && <ParkingAltitudeInput body={nextStopBody} label="Planned altitude" onChange={(parkingAltitude) => setNextStop((current) => ({ ...current, parkingAltitude }))} unit={unit} value={nextStop.parkingAltitude} />}
         </> : <div className="delta-v-empty-stop"><span>ARRIVAL PROFILE</span><strong>Choose a body to configure the next stop.</strong></div>}
       </div>}
       <div className="delta-v-mission-row one-way">
-        <fieldset><legend className="delta-v-field-heading"><span>Transfer planning</span><small>Simple: ideal dates · Advanced: per-leg porkchops</small></legend><div className="resonant-segments delta-v-transfer-mode">
+        <fieldset><legend className="delta-v-field-heading"><span>Transfer planning</span></legend><div className="resonant-segments delta-v-transfer-mode">
           <label><input checked={transferMode === "simple"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("simple")} /><span>Simple</span></label>
           <label><input checked={transferMode === "advanced"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("advanced")} /><span>Advanced</span></label>
         </div></fieldset>
@@ -931,7 +931,7 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     {calculation.error && <div className="resonant-error delta-v-error" role="alert">{calculation.error}</div>}
     {plan && <div className="delta-v-output">
       <section className="delta-v-summary">
-        <header><div><span>PLANNING BUDGET</span><h3>{routeHeading}</h3></div><strong>{transferMode.toUpperCase()} + {marginPercent}%</strong></header>
+        <header><div><span>PLANNING BUDGET</span><h3>{routeHeading}</h3></div><div className="delta-v-summary-mode"><small>{transferMode === "simple" ? "Simple: ideal dates" : "Advanced: per-leg porkchops"}</small><strong>{transferMode.toUpperCase()} + {marginPercent}%</strong></div></header>
         <div className="delta-v-total"><span>Total mission budget</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : formatDeltaV(plan.totalDeltaV)}</strong><small>{planningStops.length} mission stop{planningStops.length === 1 ? "" : "s"} · {surfaceStopCount} surface stop{surfaceStopCount === 1 ? "" : "s"} · {plan.legs.length} modeled legs</small></div>
         <div className="delta-v-stat-grid">
           <article><span>Nominal route</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : formatDeltaV(plan.nominalDeltaV)}</strong><small>Before planning margin</small></article>

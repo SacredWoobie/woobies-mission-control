@@ -149,6 +149,7 @@
 .delta-v-controls label > .delta-v-field-heading { justify-content: space-between; gap: 8px; }
 .delta-v-field-heading small { min-width: 0; min-height: 0; overflow: hidden; color: var(--slate-muted-text); font-size: 9px; font-weight: 400; line-height: 1; letter-spacing: 0; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
 .delta-v-field-heading small.delta-v-input-error { color: var(--error-text); }
+.delta-v-drawer .delta-v-altitude-help { font-size: 10px !important; }
 .delta-v-controls legend { margin-bottom: 5px; }
 .delta-v-transfer-mode + small { display: block; margin-top: 3px; }
 .delta-v-controls select, .delta-v-controls input[type="number"] { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); outline: 0; color: var(--text-primary); background: var(--surface-well); box-shadow: var(--surface-depth-deep); font: 11px var(--mono); }
@@ -188,7 +189,9 @@
 .delta-v-summary > header { display: flex; grid-area: budget-head; align-items: center; justify-content: space-between; gap: 10px; }
 .delta-v-summary > header span, .delta-v-route > header span { color: var(--cyan); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .delta-v-summary > header h3 { margin: 3px 0 0; color: var(--text-primary); font-size: 14px; }
-.delta-v-summary > header > strong { padding: 5px 7px; border: 1px solid rgba(126,231,135,.35); color: var(--green); font-size: 9px; letter-spacing: .06em; }
+.delta-v-summary-mode { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
+.delta-v-summary-mode > small { overflow: hidden; color: var(--slate-muted-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.delta-v-summary-mode > strong { flex: 0 0 auto; padding: 5px 7px; border: 1px solid rgba(126,231,135,.35); color: var(--green); font-size: 9px; letter-spacing: .06em; }
 .delta-v-save-bar { display: grid; grid-area: budget-save; grid-template-columns: minmax(180px,1fr) auto auto; align-items: end; gap: 6px; }
 .delta-v-save-bar label { display: grid; gap: 3px; }
 .delta-v-save-bar label > span { color: var(--slate); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
@@ -1801,13 +1804,13 @@
 /* The planning margin stays a single semantic control across pointer modes. */
 .delta-v-margin-card { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto 1fr; column-gap: 7px; }
 .delta-v-margin-card > strong { align-self: start; }
-.delta-v-margin-controls { display: grid; grid-column: 2; grid-row: 1 / span 2; grid-template-columns: minmax(68px,1fr) 42px; grid-template-rows: repeat(3,22px); min-width: 116px; border: 1px solid var(--surface-seam); }
+.delta-v-margin-controls { display: grid; grid-column: 2; grid-row: 1 / span 2; grid-template-columns: minmax(86px,1fr) 50px; grid-template-rows: repeat(3,22px); min-width: 138px; align-self: start; border: 1px solid var(--surface-seam); }
 .delta-v-drawer .delta-v-margin-card .delta-v-margin-preset { display: flex; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 5px; align-items: center; justify-content: space-between; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: transparent; cursor: pointer; font: 10px var(--mono); }
-.delta-v-margin-preset b { font-weight: 600; }
-.delta-v-margin-preset small { margin: 0; font-size: 10px !important; }
-.delta-v-margin-preset.preset-10 { color: var(--warn); }
-.delta-v-margin-preset.preset-15 { color: var(--amber); }
-.delta-v-margin-preset.preset-20 { color: var(--green); }
+.delta-v-margin-preset b { font-size: 12px; font-weight: 700; }
+.delta-v-margin-preset small { margin: 0; font-size: 11px !important; letter-spacing: .04em; }
+.delta-v-drawer .delta-v-margin-card .delta-v-margin-preset.preset-10 { color: #ff8f80; }
+.delta-v-drawer .delta-v-margin-card .delta-v-margin-preset.preset-15 { color: var(--amber); }
+.delta-v-drawer .delta-v-margin-card .delta-v-margin-preset.preset-20 { color: var(--green); }
 .delta-v-margin-preset[aria-pressed="true"] { background: color-mix(in srgb,currentColor 12%,transparent); box-shadow: inset 2px 0 currentColor; }
 .delta-v-margin-stepper { display: grid; grid-column: 2; grid-row: 1 / span 3; grid-template-rows: repeat(3,22px); border-left: 1px solid var(--surface-seam); }
 .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button { height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0; border: 0; color: var(--cyan); background: var(--surface-raised-face); cursor: pointer; font: 13px var(--mono); }
@@ -1818,11 +1821,11 @@
 
 /* Delta-V drawer density pass: keep route detail visible on a mouse-driven desk. */
 @media (pointer: fine) and (min-width: 761px) {
-  .resonant-drawer.delta-v-drawer > header { grid-template-columns: minmax(0,1fr) minmax(0,500px); align-items: center; padding: 7px 12px; gap: 12px; }
+  .resonant-drawer.delta-v-drawer > header { grid-template-columns: minmax(0,1fr) minmax(0,550px); align-items: center; padding: 7px 12px; gap: 16px; }
   .resonant-drawer.delta-v-drawer > header > div:first-child { display: flex; min-width: 0; max-width: none; align-items: baseline; gap: 8px; }
   .resonant-drawer.delta-v-drawer > header h2 { margin: 0; font-size: 14px; white-space: nowrap; }
   .resonant-drawer.delta-v-drawer > header p { display: none; }
-  .delta-v-header-controls { display: grid; width: min(500px,100%); max-width: none; grid-template-columns: minmax(0,1fr) max-content; grid-template-rows: auto; flex: 0 0 auto; align-items: center; gap: 0 7px; }
+  .delta-v-header-controls { display: grid; width: min(550px,100%); max-width: none; grid-template-columns: minmax(0,1fr) max-content; grid-template-rows: auto; flex: 0 0 auto; align-items: center; gap: 0 10px; }
   .delta-v-header-actions, .delta-v-save-slot .delta-v-save-bar, .delta-v-save-slot .delta-v-save-actions { display: flex; min-width: 0; align-items: center; gap: 0; }
   .delta-v-header-actions, .delta-v-save-slot { grid-column: auto; grid-row: auto; }
   .delta-v-header-actions > button { width: auto; }
@@ -1830,7 +1833,7 @@
   .delta-v-save-slot .delta-v-save-bar { position: relative; width: 100%; grid-template-columns: none; }
   .delta-v-save-slot .delta-v-save-bar label { display: block; min-width: 0; flex: 1 1 auto; }
   .delta-v-save-slot .delta-v-save-bar label > span { display: none; }
-  .resonant-drawer.delta-v-drawer > header :is(.delta-v-save-bar input, .delta-v-save-actions button, .delta-v-header-actions > button) { height: 30px; min-height: 30px !important; box-sizing: border-box; }
+  .resonant-drawer.delta-v-drawer > header :is(.delta-v-save-bar input, .delta-v-save-actions button, .delta-v-header-actions > button) { height: 34px; min-height: 34px !important; box-sizing: border-box; }
   .delta-v-save-slot .delta-v-save-bar input { border-radius: var(--surface-radius-face) 0 0 var(--surface-radius-face); }
   .delta-v-save-slot .delta-v-save-actions button { border-left: 0; border-radius: 0; }
   .delta-v-save-slot .delta-v-save-actions button:last-child { border-radius: 0 var(--surface-radius-face) var(--surface-radius-face) 0; }
@@ -1838,33 +1841,33 @@
   .delta-v-header-actions { gap: 5px; }
   .resonant-drawer > header .delta-v-reset-button,
   .resonant-drawer > header .delta-v-saved-plans-button,
-  .resonant-drawer > header .delta-v-assumptions-button { min-height: 30px !important; padding: 4px 7px; box-sizing: border-box; }
-  .resonant-drawer > header .delta-v-assumptions-button { display: grid; width: 30px; min-width: 30px; padding: 0; place-items: center; font-size: 14px; }
-  .delta-v-header-actions > button:last-child { width: 30px; min-width: 30px; }
+  .resonant-drawer > header .delta-v-assumptions-button { min-height: 34px !important; padding: 4px 8px; box-sizing: border-box; }
+  .resonant-drawer > header .delta-v-assumptions-button { display: grid; width: 34px; min-width: 34px; padding: 0; place-items: center; font-size: 14px; }
+  .delta-v-header-actions > button:last-child { width: 34px; min-width: 34px; }
 
   .delta-v-planner:has(> .delta-v-output) > .delta-v-configuration:not(.collapsed) { max-height: calc(100% - 300px); }
-  .delta-v-configuration-toggle { min-height: 34px; padding: 4px 16px; }
+  .delta-v-configuration-toggle { min-height: 36px; padding: 5px 16px; }
   .delta-v-configuration-toggle > span { display: flex; align-items: baseline; gap: 8px; }
-  .delta-v-controls { display: grid; grid-template-columns: minmax(130px,.85fr) minmax(175px,1.05fr) minmax(150px,.9fr) minmax(190px,1.1fr) auto; align-items: start; gap: 8px; padding: 7px 16px 8px; }
+  .delta-v-controls { display: grid; grid-template-columns: minmax(130px,.85fr) minmax(175px,1.05fr) minmax(150px,.9fr) minmax(190px,1.1fr) auto; align-items: start; gap: 10px; padding: 8px 16px 10px; }
   .delta-v-location-row, .delta-v-mission-row, .delta-v-mission-row.one-way { display: contents; }
-  .delta-v-controls label { gap: 3px; }
-  .delta-v-controls label > span, .delta-v-controls legend { height: 11px; }
-  .delta-v-controls label > .delta-v-field-heading, .delta-v-controls legend.delta-v-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin: 0; }
+  .delta-v-controls label { gap: 4px; }
+  .delta-v-controls label > span, .delta-v-controls legend { height: 14px; line-height: 14px; }
+  .delta-v-controls label > .delta-v-field-heading, .delta-v-controls legend.delta-v-field-heading { display: flex; width: 100%; max-width: 100%; align-items: center; justify-content: space-between; gap: 7px; margin: 0; overflow: hidden; white-space: nowrap; }
   .delta-v-controls .delta-v-field-heading small { display: block; min-width: 0; overflow: hidden; color: var(--slate-muted-text); font-size: 10px !important; font-weight: 400; letter-spacing: 0; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
-  .delta-v-controls select, .delta-v-controls input[type="number"] { min-height: 30px !important; padding: 4px 8px; }
-  .delta-v-controls .delta-v-add-stop-row { min-height: 30px; margin-top: 14px; justify-self: start; }
-  .delta-v-controls .delta-v-add-stop-row button { min-height: 30px !important; }
+  .delta-v-controls select, .delta-v-controls input[type="number"] { min-height: 34px !important; padding: 5px 8px; }
+  .delta-v-controls .delta-v-add-stop-row { min-height: 34px; margin-top: 18px; justify-self: start; }
+  .delta-v-controls .delta-v-add-stop-row button { min-height: 34px !important; }
   .delta-v-controls .delta-v-empty-stop { grid-column: span 2; min-height: 30px; }
-  .delta-v-parking-altitude > small.delta-v-input-error { grid-column: 1 / -1; margin-top: 2px; }
+  .delta-v-parking-altitude > :is(.delta-v-altitude-help,.delta-v-input-error) { display: block; min-height: 12px; margin: 0; overflow: visible; line-height: 1.2; text-overflow: clip; white-space: normal; }
   .delta-v-transfer-mode + small { display: none; }
-  .delta-v-transfer-mode .resonant-segments label span { min-height: 30px; }
+  .delta-v-transfer-mode label span, .delta-v-endpoint-segments label span { min-height: 34px; }
 
   .delta-v-output { gap: 6px; padding: 7px 16px 8px; }
   .delta-v-summary { grid-template-columns: minmax(240px,.72fr) minmax(0,1.28fr); gap: 5px; }
   .delta-v-summary > header { min-height: 20px; }
   .delta-v-summary > header > div { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
   .delta-v-summary > header h3 { margin: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-  .delta-v-summary > header > strong { padding: 3px 6px; }
+  .delta-v-summary-mode > strong { padding: 3px 6px; }
   .delta-v-total { display: grid; align-content: center; grid-template-columns: auto 1fr; column-gap: 8px; padding: 8px 10px; }
   .delta-v-total > span { grid-column: 1; }
   .delta-v-total > strong { grid-row: 2; margin-top: 2px; font-size: 28px; }
@@ -1879,10 +1882,11 @@
   .delta-v-route-timing > div + div { border-left: 1px solid var(--rule); }
   .delta-v-route-timing span, .delta-v-route-timing strong { display: inline; margin: 0; font-size: 10px !important; }
   .delta-v-route-window-actions button { min-height: 26px !important; padding: 3px 7px; }
-  .delta-v-leg { grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; min-height: 55px; padding: 5px 10px 5px 6px; }
+  .delta-v-leg { grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; min-height: 66px; padding: 7px 10px 7px 6px; }
   .delta-v-leg-marker span { width: 26px; height: 26px; }
   .delta-v-add-step::before { left: 23px; }
-  .delta-v-drawer .delta-v-add-step button { width: 19px; min-width: 19px !important; height: 19px; min-height: 19px !important; font-size: 12px; }
+  .delta-v-drawer .delta-v-add-step button { top: 0; left: 23px; width: 19px; min-width: 19px !important; height: 19px; min-height: 19px !important; padding: 0; font-size: 12px; transform: translate(-50%,-50%); }
+  .delta-v-add-step:has(+ .delta-v-leg .delta-v-leg-advisories) button { top: 4px; }
   .delta-v-drawer .delta-v-add-step button::after { inset: -12px; }
   .delta-v-leg-copy.with-stay, .delta-v-leg-copy.with-calculated-stay { grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
   .delta-v-leg-heading { min-width: 0; gap: 6px; }
@@ -1892,7 +1896,7 @@
   .delta-v-leg-advisories > .delta-v-thermal-note { padding: 2px 5px; font-size: 10px !important; line-height: 1.2; }
   .delta-v-leg-options { gap: 2px 8px; margin-top: 3px; }
   .delta-v-leg-options label { min-height: 22px; font-size: 11px !important; }
-  .delta-v-leg:has(.delta-v-leg-options) { min-height: 55px; }
+  .delta-v-leg:has(.delta-v-leg-options) { min-height: 66px; }
   .delta-v-leg-side { min-width: 78px; gap: 3px; }
   .delta-v-leg-side > b { font-size: 13px; }
   .delta-v-drawer .delta-v-route-stop-actions button { min-height: 22px !important; padding: 1px 5px; }
@@ -1906,6 +1910,11 @@
   .delta-v-calculated-stay > strong { font-size: 11px !important; }
   .delta-v-calculated-stay > small { display: none; }
   .resonant-drawer > footer.delta-v-footer { min-height: 26px; padding: 4px 12px; font-size: 10px; }
+}
+
+@media (orientation: portrait) and (min-width: 761px) and (max-width: 1100px) {
+  .delta-v-margin-card { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto auto; row-gap: 4px; }
+  .delta-v-margin-controls { width: 100%; min-width: 0; grid-column: 1; grid-row: 3; }
 }
 
 @media (pointer: coarse), (max-width: 760px) {
