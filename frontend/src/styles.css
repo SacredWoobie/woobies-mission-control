@@ -2782,7 +2782,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .editor-mode .editor-electricity-ledger-body { max-height: 142px; }
 }
 @media (orientation: portrait) and (min-width: 901px) and (max-width: 1100px) {
-  .editor-mode .editor-electricity-ledger-body { max-height: 109px; }
+  .editor-mode .editor-electricity-ledger-body { max-height: 92px; }
 }
 
 /* A wide Editor centers analysis and electricity as a stable two-column core.
