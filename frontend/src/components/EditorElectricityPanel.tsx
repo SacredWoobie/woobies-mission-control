@@ -26,16 +26,6 @@ function duration(value: number | undefined) {
   return `${remainder}s`;
 }
 
-function groupedComponents(components: readonly EditorElectricityComponentTelemetry[]) {
-  const rows = new Map<string, EditorElectricityComponentTelemetry[]>();
-  for (const component of components) {
-    const row = rows.get(component.category) ?? [];
-    row.push(component);
-    rows.set(component.category, row);
-  }
-  return [...rows.entries()];
-}
-
 function Meter({ current, maximum }: { current?: number; maximum?: number }) {
   const known = current !== undefined && maximum !== undefined && maximum > 0;
   return <meter
@@ -54,22 +44,21 @@ function RateBar({ label, rate, scale }: { label: string; rate: number | undefin
   </div>;
 }
 
-function ShadowAssessment({ plan }: { plan: ReturnType<typeof calculateElectricityPlan> }) {
+function ShadowAssessment({ currentEc, plan }: { currentEc?: number; plan: ReturnType<typeof calculateElectricityPlan> }) {
   const holds = plan.nextEclipseHolds;
-  const outcome = holds === undefined ? "Shadow assessment unavailable"
-    : holds ? "HOLDS — Current reported charge survives the next longest eclipse."
-      : `DOES NOT HOLD — Battery runs out ${duration(plan.darkBeforeSunlightSeconds)} before sunlight.`;
+  const outcome = holds === undefined ? "UNAVAILABLE" : holds ? "HOLDS" : "WON'T HOLD";
   const endurance = plan.shadowNetEcPerSec === undefined ? "Unavailable"
     : plan.shadowNetEcPerSec >= 0 ? "No depletion in shadow"
       : duration(plan.nextEclipseShadowEnduranceSeconds);
   return <section className="editor-electricity-shadow-assessment" aria-label="Shadow assessment">
-    <h3>Shadow assessment</h3>
-    <p><strong>{outcome}</strong></p>
+    <h3>In shadow</h3>
+    <p><strong className={holds === false ? "bad" : holds === true ? "ok" : ""}>{outcome}</strong></p>
     <dl>
       <div><dt>Net without solar</dt><dd>{signedRate(plan.shadowNetEcPerSec)}</dd></div>
-      <div><dt>Shadow endurance</dt><dd>{endurance}</dd></div>
+      <div><dt>Lasts</dt><dd>{endurance}</dd></div>
+      {holds === true && <div><dt>EC through shadow</dt><dd>{number(plan.eclipseRequiredEc, 0)} of {number(currentEc, 0)} EC</dd></div>}
       {holds === false && <div><dt>Dark before sunlight</dt><dd>{duration(plan.darkBeforeSunlightSeconds)}</dd></div>}
-      {holds !== true && <div><dt>Required for eclipse</dt><dd>{number(plan.eclipseRequiredEc, 0)} EC</dd></div>}
+      {holds === undefined && <div><dt>Required for eclipse</dt><dd>{number(plan.eclipseRequiredEc, 0)} EC</dd></div>}
     </dl>
   </section>;
 }
@@ -101,8 +90,8 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
       : plan.netEcPerSec < 0 ? `Depletes in ${duration(plan.batteryEnduranceSeconds)}`
         : plan.netEcPerSec > 0 ? `Recharges in ${duration(plan.rechargeSeconds)}`
           : "No depletion or recharge";
-  const verdict = plan.netEcPerSec === undefined ? "Electrical balance unavailable"
-    : plan.netEcPerSec < 0 ? "Power deficit" : plan.netEcPerSec > 0 ? "Charging" : "Balanced";
+  const verdict = plan.netEcPerSec === undefined ? "Balance unavailable"
+    : plan.netEcPerSec < 0 ? "Deficit" : plan.netEcPerSec > 0 ? "Surplus" : "Break-even";
 
   const setScenario = (change: Partial<NonNullable<ElectricityPlannerSession["scenario"]>>) => {
     setSession((current) => current ? { ...current, scenario: { ...current.scenario, ...change } } : current);
@@ -137,35 +126,45 @@ export function EditorElectricityPanel({ snapshot }: { snapshot: TelemetrySnapsh
                 </section>
                 <section className="editor-electricity-readout-well" aria-label="Electrical plan readout">
                   <h3>Electrical plan</h3>
-                  <p className="editor-electricity-net-headline"><strong>{signedRate(plan.netEcPerSec)}</strong><span>{verdict}</span></p>
+                  <p className="editor-electricity-net-headline"><span>{verdict}</span><strong>{signedRate(plan.netEcPerSec)}</strong></p>
                   <p className="editor-electricity-charge-copy">{chargeCopy}</p>
                   <div className="editor-electricity-rate-bars" aria-label="Generation and consumption compared on a shared scale"><RateBar label="Generated" rate={plan.generationEcPerSec} scale={scale} /><RateBar label="Consumed" rate={plan.drawEcPerSec} scale={scale} /></div>
                   <div className="editor-electricity-storage"><span>Battery</span><Meter current={snapshot["editor.elec.currentEc"]} maximum={snapshot["editor.elec.maxEc"]} /><strong>{number(snapshot["editor.elec.currentEc"], 0)} / {number(snapshot["editor.elec.maxEc"], 0)} EC</strong></div>
-                  <ShadowAssessment plan={plan} />
+                  <ShadowAssessment currentEc={snapshot["editor.elec.currentEc"]} plan={plan} />
                   <p className="editor-electricity-recurring-orbit">Recurring orbit: <strong>{plan.recurringOrbitSustainable === undefined ? "Unavailable" : plan.recurringOrbitSustainable ? "Sustainable" : "Deficit"}</strong></p>
                 </section>
               </div>
               <div className="editor-electricity-ledgers" aria-label="Electrical producer and consumer ledgers">
-                <PowerLedger components={components.filter((component) => component.role === "producer")} included={session?.includedByStableId ?? {}} label="Power generated" onSetRole={setRole} onToggle={toggleComponent} scenario={plannerScenario} />
-                <PowerLedger components={components.filter((component) => component.role === "consumer")} included={session?.includedByStableId ?? {}} label="Power consumed" onSetRole={setRole} onToggle={toggleComponent} scenario={plannerScenario} />
+                <PowerLedger components={components.filter((component) => component.role === "producer")} included={session?.includedByStableId ?? {}} label="Power generated" onSetRole={setRole} onToggle={toggleComponent} scale={scale} scenario={plannerScenario} />
+                <PowerLedger components={components.filter((component) => component.role === "consumer")} included={session?.includedByStableId ?? {}} label="Power consumed" onSetRole={setRole} onToggle={toggleComponent} scale={scale} scenario={plannerScenario} />
               </div>
-              <p className="editor-electricity-assumption editor-electricity-assumption-note">Conservative maximum central eclipse · circular orbit. This planner is session-only and never changes KSP or module state.</p>
+              <p className="editor-electricity-assumption editor-electricity-assumption-note">Endurance assumes the checked set runs continuously from the charge the game reports. Eclipse uses the conservative maximum central shadow for a circular orbit. This planner never changes KSP or module state.</p>
             </>}
   </Panel>;
 }
 
-function PowerLedger({ components, included, label, onSetRole, onToggle, scenario }: {
+function PowerLedger({ components, included, label, onSetRole, onToggle, scale, scenario }: {
   components: readonly EditorElectricityComponentTelemetry[]; included: Readonly<Record<string, boolean>>; label: string;
   onSetRole(role: "producer" | "consumer", inclusion: "all" | "none"): void; onToggle(component: EditorElectricityComponentTelemetry): void;
+  scale: number | undefined;
   scenario: ElectricityPlannerSession["scenario"];
 }) {
   const role = components[0]?.role ?? (label === "Power generated" ? "producer" : "consumer");
-  const enabled = components.filter((component) => included[component.stableId] ?? component.defaultIncluded).length;
-  return <section className="editor-electricity-ledger" aria-label={label}>
-    <header><div><h3>{label}</h3><p>{enabled} enabled / {components.length} total</p></div><div className="editor-electricity-ledger-actions" role="group" aria-label={`${label} inclusion controls`}><button onClick={() => onSetRole(role, "all")} type="button">All</button><button onClick={() => onSetRole(role, "none")} type="button">None</button></div></header>
-    {components.length === 0 ? <p>No components reported.</p> : groupedComponents(components).map(([category, categoryComponents]) => <section className="editor-electricity-ledger-group" key={category}><h4>{category}</h4><ul>{categoryComponents.map((component) => {
-      const checked = included[component.stableId] ?? component.defaultIncluded;
-      const rate = effectiveComponentRate(component, scenario);
-      return <li className="editor-electricity-component" key={component.stableId}><label><input checked={checked} onChange={() => onToggle(component)} type="checkbox" /><span><strong>{component.partTitle}</strong><small>{component.moduleName}</small></span><output>{rate === undefined ? "Rate unavailable" : `${number(rate)} EC/s`}</output></label></li>;
-    })}</ul></section>)}</section>;
+  const rows = components.map((component) => ({
+    checked: included[component.stableId] ?? component.defaultIncluded,
+    component,
+    rate: effectiveComponentRate(component, scenario),
+  }));
+  const enabled = rows.filter((row) => row.checked).length;
+  const checkedRates = rows.filter((row) => row.checked).map((row) => row.rate);
+  const total = checkedRates.some((rate) => rate === undefined)
+    ? undefined : checkedRates.reduce<number>((sum, rate) => sum + (rate ?? 0), 0);
+  return <section className={`editor-electricity-ledger is-${role}`} aria-label={label}>
+    <header><h3>{label}</h3><div className="editor-electricity-ledger-actions" role="group" aria-label={`${label} inclusion controls`}><button onClick={() => onSetRole(role, "all")} type="button">All</button><button onClick={() => onSetRole(role, "none")} type="button">None</button></div><small>{enabled}/{components.length} on</small><strong>{role === "producer" ? "▲" : "▼"} {number(total)} EC/s</strong></header>
+    {components.length === 0 ? <p>No components reported.</p> : <ul className="editor-electricity-ledger-body">{rows.map(({ checked, component, rate }) => {
+      const percent = checked && rate !== undefined && scale !== undefined && scale > 0
+        ? Math.min(100, (rate / scale) * 100) : 0;
+      return <li className={`editor-electricity-component ${checked ? "is-on" : "is-off"}`} key={component.stableId} style={{ "--electricity-row-percent": `${percent}%` } as CSSProperties}><label title={component.partTitle}><input checked={checked} onChange={() => onToggle(component)} type="checkbox" /><strong>{component.partTitle}</strong><small>{component.category}</small><output>{rate === undefined ? "Rate unavailable" : `${number(rate)} EC/s`}</output></label></li>;
+    })}</ul>}
+  </section>;
 }

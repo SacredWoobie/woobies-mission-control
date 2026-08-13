@@ -57,8 +57,9 @@ describe("EditorElectricityPanel", () => {
   it("reports full charge and a shadow survival assessment in operational text", () => {
     renderPanel();
     expect(screen.getByText("Fully charged")).toBeTruthy();
-    expect(screen.getByText("Shadow assessment")).toBeTruthy();
-    expect(screen.getByText(/HOLDS — Current reported charge survives/)).toBeTruthy();
+    expect(screen.getByText("In shadow")).toBeTruthy();
+    expect(screen.getByText("HOLDS")).toBeTruthy();
+    expect(screen.getByText("EC through shadow")).toBeTruthy();
     expect(screen.getByText(/Recurring orbit:/)).toBeTruthy();
   });
 
