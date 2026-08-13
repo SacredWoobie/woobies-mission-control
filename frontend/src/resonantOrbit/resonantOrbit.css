@@ -1800,25 +1800,27 @@
 
 /* Delta-V drawer density pass: keep route detail visible on a mouse-driven desk. */
 @media (pointer: fine) and (min-width: 761px) {
-  .resonant-drawer.delta-v-drawer > header { align-items: center; padding: 7px 12px; gap: 12px; }
+  .resonant-drawer.delta-v-drawer > header { grid-template-columns: minmax(0,1fr) minmax(0,500px); align-items: center; padding: 7px 12px; gap: 12px; }
   .resonant-drawer.delta-v-drawer > header > div:first-child { display: flex; min-width: 0; max-width: none; align-items: baseline; gap: 8px; }
   .resonant-drawer.delta-v-drawer > header h2 { margin: 0; font-size: 14px; white-space: nowrap; }
   .resonant-drawer.delta-v-drawer > header p { display: none; }
-  .delta-v-header-controls { display: flex; width: auto; max-width: none; flex: 0 1 auto; align-items: center; gap: 7px; }
+  .delta-v-header-controls { display: grid; width: min(500px,100%); max-width: none; grid-template-columns: minmax(0,1fr) max-content; flex: 0 0 auto; align-items: center; gap: 7px; }
   .delta-v-header-actions, .delta-v-save-slot .delta-v-save-bar, .delta-v-save-slot .delta-v-save-actions { display: flex; min-width: 0; align-items: center; gap: 0; }
-  .delta-v-save-slot .delta-v-save-bar { grid-template-columns: none; }
-  .delta-v-save-slot .delta-v-save-bar label { display: block; min-width: min(180px,18vw); }
+  .delta-v-save-slot { min-width: 0; }
+  .delta-v-save-slot .delta-v-save-bar { width: 100%; grid-template-columns: none; }
+  .delta-v-save-slot .delta-v-save-bar label { display: block; min-width: 0; flex: 1 1 auto; }
   .delta-v-save-slot .delta-v-save-bar label > span { display: none; }
-  .delta-v-save-slot .delta-v-save-bar input { height: 30px; min-height: 30px !important; border-radius: var(--surface-radius-face) 0 0 var(--surface-radius-face); }
-  .delta-v-save-slot .delta-v-save-actions button { min-height: 30px !important; border-left: 0; border-radius: 0; }
+  .resonant-drawer.delta-v-drawer > header :is(.delta-v-save-bar input, .delta-v-save-actions button, .delta-v-header-actions > button) { height: 30px; min-height: 30px !important; box-sizing: border-box; }
+  .delta-v-save-slot .delta-v-save-bar input { border-radius: var(--surface-radius-face) 0 0 var(--surface-radius-face); }
+  .delta-v-save-slot .delta-v-save-actions button { border-left: 0; border-radius: 0; }
   .delta-v-save-slot .delta-v-save-actions button:last-child { border-radius: 0 var(--surface-radius-face) var(--surface-radius-face) 0; }
   .delta-v-save-slot .delta-v-save-bar small { position: absolute; top: 100%; right: 0; z-index: 2; max-width: 300px; padding: 3px 5px; border: 1px solid var(--surface-seam); background: var(--surface-rail); }
   .delta-v-header-actions { gap: 5px; }
   .resonant-drawer > header .delta-v-reset-button,
   .resonant-drawer > header .delta-v-saved-plans-button,
-  .resonant-drawer > header .delta-v-assumptions-button { min-height: 30px !important; padding: 4px 7px; }
-  .resonant-drawer > header .delta-v-assumptions-button { display: grid; width: 30px; min-width: 30px; height: 30px; padding: 0; place-items: center; font-size: 14px; }
-  .delta-v-header-actions > button:last-child { width: 30px; min-width: 30px; height: 30px; min-height: 30px !important; }
+  .resonant-drawer > header .delta-v-assumptions-button { min-height: 30px !important; padding: 4px 7px; box-sizing: border-box; }
+  .resonant-drawer > header .delta-v-assumptions-button { display: grid; width: 30px; min-width: 30px; padding: 0; place-items: center; font-size: 14px; }
+  .delta-v-header-actions > button:last-child { width: 30px; min-width: 30px; }
 
   .delta-v-planner:has(> .delta-v-output) > .delta-v-configuration:not(.collapsed) { max-height: calc(100% - 300px); }
   .delta-v-configuration-toggle { min-height: 34px; padding: 4px 16px; }
@@ -1830,9 +1832,9 @@
   .delta-v-controls label > .delta-v-field-heading, .delta-v-controls legend.delta-v-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin: 0; }
   .delta-v-controls .delta-v-field-heading small { display: block; min-width: 0; overflow: hidden; color: var(--slate-muted-text); font-size: 10px !important; font-weight: 400; letter-spacing: 0; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
   .delta-v-controls select, .delta-v-controls input[type="number"] { min-height: 30px !important; padding: 4px 8px; }
-  .delta-v-controls > .delta-v-add-stop-row { min-height: 30px; margin-top: 14px; justify-self: start; }
-  .delta-v-controls > .delta-v-add-stop-row button { min-height: 30px !important; }
-  .delta-v-controls > .delta-v-empty-stop { grid-column: span 2; min-height: 30px; }
+  .delta-v-controls .delta-v-add-stop-row { min-height: 30px; margin-top: 14px; justify-self: start; }
+  .delta-v-controls .delta-v-add-stop-row button { min-height: 30px !important; }
+  .delta-v-controls .delta-v-empty-stop { grid-column: span 2; min-height: 30px; }
   .delta-v-parking-altitude > small.delta-v-input-error { grid-column: 1 / -1; margin-top: 2px; }
   .delta-v-transfer-mode + small { display: none; }
   .delta-v-transfer-mode .resonant-segments label span { min-height: 30px; }
@@ -1854,7 +1856,7 @@
   .delta-v-margin-card { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto 1fr; column-gap: 7px; }
   .delta-v-margin-card > strong { align-self: start; }
   .delta-v-margin-controls { display: grid; grid-column: 2; grid-row: 1 / span 2; grid-template-columns: minmax(68px,1fr) 42px; grid-template-rows: repeat(3,22px); min-width: 116px; border: 1px solid var(--surface-seam); }
-  .delta-v-margin-preset { display: flex; min-height: 22px !important; padding: 0 5px; align-items: center; justify-content: space-between; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: transparent; cursor: pointer; font: 10px var(--mono); }
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-preset { display: flex; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 5px; align-items: center; justify-content: space-between; border: 0; border-bottom: 1px solid var(--rule); color: var(--slate); background: transparent; cursor: pointer; font: 10px var(--mono); }
   .delta-v-margin-preset b { font-weight: 600; }
   .delta-v-margin-preset small { margin: 0; font-size: 10px !important; }
   .delta-v-margin-preset.preset-10 { color: var(--warn); }
@@ -1862,10 +1864,10 @@
   .delta-v-margin-preset.preset-20 { color: var(--green); }
   .delta-v-margin-preset[aria-pressed="true"] { background: color-mix(in srgb, currentColor 12%, transparent); box-shadow: inset 2px 0 currentColor; }
   .delta-v-margin-stepper { display: grid; grid-column: 2; grid-row: 1 / span 3; grid-template-rows: 22px 22px 22px; border-left: 1px solid var(--surface-seam); }
-  .delta-v-margin-stepper button { min-height: 22px !important; padding: 0; border: 0; color: var(--cyan); background: var(--surface-raised-face); cursor: pointer; font: 13px var(--mono); }
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button { height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0; border: 0; color: var(--cyan); background: var(--surface-raised-face); cursor: pointer; font: 13px var(--mono); }
   .delta-v-margin-stepper label { position: relative; display: block; }
   .delta-v-margin-stepper label > .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .delta-v-margin-stepper input { width: 100%; height: 22px; min-height: 22px !important; padding: 0 12px 0 3px; border: 0; border-block: 1px solid var(--surface-seam); color: var(--text-primary); background: var(--surface-well); font: 10px var(--mono); text-align: right; }
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { width: 100%; height: 22px; min-height: 22px !important; box-sizing: border-box; padding: 0 12px 0 3px; border: 0; border-block: 1px solid var(--surface-seam); color: var(--text-primary); background: var(--surface-well); font: 10px var(--mono); text-align: right; }
   .delta-v-margin-stepper label > span:last-child { position: absolute; top: 50%; right: 3px; color: var(--cyan); font-size: 9px; pointer-events: none; transform: translateY(-50%); }
 
   .delta-v-route > header { grid-template-columns: max-content minmax(0,1fr) auto; gap: 8px; padding: 4px 10px; }
@@ -1907,6 +1909,10 @@
   .delta-v-drawer button,
   .delta-v-drawer input:not([type="checkbox"]):not([type="radio"]),
   .delta-v-drawer select { min-height: 44px !important; }
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-preset,
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button,
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { height: 44px; min-height: 44px !important; }
+  .delta-v-margin-controls, .delta-v-margin-stepper { grid-template-rows: repeat(3,44px); }
 }
 
 @container (max-width: 760px) {
@@ -1927,4 +1933,8 @@
   .delta-v-drawer button,
   .delta-v-drawer input:not([type="checkbox"]):not([type="radio"]),
   .delta-v-drawer select { min-height: 44px !important; }
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-preset,
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper button,
+  .delta-v-drawer .delta-v-margin-card .delta-v-margin-stepper input { height: 44px; min-height: 44px !important; }
+  .delta-v-margin-controls, .delta-v-margin-stepper { grid-template-rows: repeat(3,44px); }
 }
