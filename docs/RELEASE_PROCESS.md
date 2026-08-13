@@ -141,8 +141,8 @@ Before creating a GitHub draft:
   PID-reuse-safe launcher/helper identity, complete owned component-tree
   shutdown, preservation of `.venv`/settings/logs/unknown files, and an
   unchanged disposable live-KSP sentinel tree;
-- follow `docs/images/v0.6.0/README.md` for the deliberately reused screenshot
-  set and its source briefs.
+- follow the current release's `docs/images/<version>/README.md` for the
+  approved screenshot set, source briefs, exact dimensions, and hashes.
 
 The first updater-capable public release cannot update from an older package,
 because those packages do not contain the trusted helper or install manifest.

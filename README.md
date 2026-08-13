@@ -21,8 +21,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.6.0/space-center-overview.png">
-    <img src="docs/images/v0.6.0/space-center-overview.png" width="900" alt="Live Mission Control overview with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and an active-contract countdown">
+  <a href="docs/images/v0.7.0/space-center-overview.png">
+    <img src="docs/images/v0.7.0/space-center-overview.png" width="900" alt="Mission Control overview with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and active contracts">
   </a>
 </p>
 
@@ -64,8 +64,8 @@ custom allowances, and craft assignment.
 ### VAB and SPH
 
 <p align="center">
-  <a href="docs/images/v0.6.0/editor-craft-analysis.png">
-    <img src="docs/images/v0.6.0/editor-craft-analysis.png" width="900" alt="VAB craft analysis with consolidated craft totals, dense staging, resource inventory, and planning tools">
+  <a href="docs/images/v0.7.0/editor-craft-analysis.png">
+    <img src="docs/images/v0.7.0/editor-craft-analysis.png" width="900" alt="VAB craft analysis with staging, resources, electricity planning, and pinned mission and resonant-orbit plans">
   </a>
 </p>
 
@@ -81,8 +81,8 @@ vehicle, with exact-plan editing when assumptions change.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.6.0/flight-damage-monitor.png">
-    <img src="docs/images/v0.6.0/flight-damage-monitor.png" width="900" alt="Flight Monitor workspace with the DAMAGE annunciator and focused broken-part report visible">
+  <a href="docs/images/v0.7.0/flight-damage-monitor.png">
+    <img src="docs/images/v0.7.0/flight-damage-monitor.png" width="900" alt="Flight Monitor workspace with the DAMAGE annunciator and focused broken-part report visible">
   </a>
 </p>
 

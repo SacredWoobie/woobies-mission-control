@@ -425,7 +425,7 @@ class ReleaseContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         screenshot_brief = (
-            ROOT / "docs" / "images" / "v0.6.0" / "README.md"
+            ROOT / "docs" / "images" / "v0.7.0" / "README.md"
         ).read_text(encoding="utf-8")
         required = re.findall(
             r"\| \d \| (?:not ready|ready|captured|approved) "
@@ -434,9 +434,9 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertEqual(len(required), 5)
         for name in required:
-            self.assertIn(f"docs/images/v0.6.0/{name}", publish_script)
+            self.assertIn(f"docs/images/v0.7.0/{name}", publish_script)
             image = (
-                ROOT / "docs" / "images" / "v0.6.0" / name
+                ROOT / "docs" / "images" / "v0.7.0" / name
             ).read_bytes()
             self.assertTrue(image.startswith(b"\x89PNG\r\n\x1a\n"), name)
             self.assertEqual(struct.unpack(">II", image[16:24]), (1920, 889))

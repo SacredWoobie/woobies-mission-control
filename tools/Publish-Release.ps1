@@ -242,11 +242,11 @@ $updateChecksumPath = "$updateArchivePath.sha256"
 $updateStageRoot = Join-Path $OutputDirectory "$packageName-runtime-update-stage"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
-    @{ Source = 'docs/images/v0.6.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
-    @{ Source = 'docs/images/v0.6.0/active-contract-focus.png'; Name = "$packageName.zz-02-active-contract-focus.png" },
-    @{ Source = 'docs/images/v0.6.0/editor-craft-analysis.png'; Name = "$packageName.zz-03-editor-craft-analysis.png" },
-    @{ Source = 'docs/images/v0.6.0/flight-damage-monitor.png'; Name = "$packageName.zz-04-flight-damage-monitor.png" },
-    @{ Source = 'docs/images/v0.6.0/flight-plan-workspace.png'; Name = "$packageName.zz-05-flight-plan-workspace.png" }
+    @{ Source = 'docs/images/v0.7.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
+    @{ Source = 'docs/images/v0.7.0/active-contract-focus.png'; Name = "$packageName.zz-02-active-contract-focus.png" },
+    @{ Source = 'docs/images/v0.7.0/editor-craft-analysis.png'; Name = "$packageName.zz-03-editor-craft-analysis.png" },
+    @{ Source = 'docs/images/v0.7.0/flight-damage-monitor.png'; Name = "$packageName.zz-04-flight-damage-monitor.png" },
+    @{ Source = 'docs/images/v0.7.0/flight-plan-workspace.png'; Name = "$packageName.zz-05-flight-plan-workspace.png" }
 )
 $activeReleaseImages = @(
     if (-not $SkipReleaseImages) {
