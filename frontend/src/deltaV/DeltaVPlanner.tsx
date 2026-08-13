@@ -112,7 +112,7 @@ function ParkingAltitudeInput({ body, label, onChange, unit, value }: { body: De
   const invalid = !Number.isFinite(value) || value < minimum;
   const helpId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-help`;
   const help = invalid ? `Minimum valid orbit is ${formatDistance(minimum, unit)}` : body.atmosphereDepth > 0 ? `Atmosphere ends at ${formatDistance(body.atmosphereDepth, unit)}` : "Vacuum body";
-  return <label className="delta-v-parking-altitude"><span>{label}</span><div className="resonant-input-unit"><input
+  return <label className="delta-v-parking-altitude"><span className="delta-v-field-heading"><span>{label}</span>{!invalid && <small id={helpId}>{help}</small>}</span><div className="resonant-input-unit"><input
     aria-describedby={helpId}
     aria-invalid={invalid ? "true" : undefined}
     aria-label={label}
@@ -121,7 +121,7 @@ function ParkingAltitudeInput({ body, label, onChange, unit, value }: { body: De
     type="number"
     value={Number(distanceToUnit(value, unit).toFixed(DISTANCE_UNITS[unit].inputDecimals))}
     onChange={(event) => onChange(distanceFromUnit(Number(event.target.value), unit))}
-  /><span>{unit}</span></div><small className={invalid ? "delta-v-input-error" : undefined} id={helpId} role={invalid ? "alert" : undefined}>{help}</small></label>;
+  /><span>{unit}</span></div>{invalid && <small className="delta-v-input-error" id={helpId} role="alert">{help}</small>}</label>;
 }
 
 function ArrivalStepControls({ leg, strategy, onChange }: { leg: DeltaVLeg; strategy: ArrivalStrategy; onChange(patch: Partial<ArrivalStrategy>): void }) {
@@ -846,6 +846,9 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     ? missionArrivalUT - missionDepartureUT
     : undefined;
   const surfaceStopCount = planningStops.filter((stop) => stop.endpoint === "surface").length;
+  const setNormalizedMarginPercent = (value: number) => {
+    setMarginPercent(Math.max(0, Math.min(100, Math.round(Number.isFinite(value) ? value : 0))));
+  };
   const routeHeading = plan && plan.origin.name === plan.destination.name && planningStops.length > 1
     ? `${plan.origin.name} round trip`
     : plan ? `${plan.origin.name} → ${plan.destination.name}` : "";
@@ -892,11 +895,10 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
         </> : <div className="delta-v-empty-stop"><span>ARRIVAL PROFILE</span><strong>Choose a body to configure the next stop.</strong></div>}
       </div>}
       <div className="delta-v-mission-row one-way">
-        <fieldset><legend>Transfer planning</legend><div className="resonant-segments delta-v-transfer-mode">
+        <fieldset><legend className="delta-v-field-heading"><span>Transfer planning</span><small>Simple: ideal dates · Advanced: per-leg porkchops</small></legend><div className="resonant-segments delta-v-transfer-mode">
           <label><input checked={transferMode === "simple"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("simple")} /><span>Simple</span></label>
           <label><input checked={transferMode === "advanced"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("advanced")} /><span>Advanced</span></label>
-        </div><small>Simple: ideal dates · Advanced: per-leg porkchops</small></fieldset>
-        <label><span>Planning margin</span><div className="resonant-input-unit"><input min="0" max="100" step="1" type="number" value={marginPercent} onChange={(event) => setMarginPercent(Number(event.target.value))} /><span>%</span></div></label>
+        </div></fieldset>
         <div className="delta-v-add-stop-row">
           <button disabled={startLocked && !nextStopBody} onClick={startLocked ? addStop : lockStart} title={editingStopId ? "Update this route stop" : startLocked ? "Add this stop and keep the builder ready for the next leg" : "Lock the mission start and configure the first destination"} type="button">{editingStopId ? "Update stop" : "+ Add next stop"}</button>
           {editingStopId && <button className="secondary" onClick={cancelStopEdit} type="button">Cancel edit</button>}
@@ -933,7 +935,10 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
         <div className="delta-v-total"><span>Total mission budget</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : formatDeltaV(plan.totalDeltaV)}</strong><small>{planningStops.length} mission stop{planningStops.length === 1 ? "" : "s"} · {surfaceStopCount} surface stop{surfaceStopCount === 1 ? "" : "s"} · {plan.legs.length} modeled legs</small></div>
         <div className="delta-v-stat-grid">
           <article><span>Nominal route</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : formatDeltaV(plan.nominalDeltaV)}</strong><small>Before planning margin</small></article>
-          <article><span>Margin</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : `+${formatDeltaV(plan.marginDeltaV)}`}</strong><small>User-selected reserve</small></article>
+          <article className="delta-v-margin-card"><span>Planning margin</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : `+${formatDeltaV(plan.marginDeltaV)}`}</strong><div aria-label="Planning margin presets" className="delta-v-margin-controls" role="group">
+            {[{ value: 10, label: "LOW" }, { value: 15, label: "MED" }, { value: 20, label: "HIGH" }].map(({ value, label }) => <button aria-label={`Set planning margin to ${value} percent (${label.toLowerCase()})`} aria-pressed={marginPercent === value} className={`delta-v-margin-preset preset-${value}`} key={value} onClick={() => setNormalizedMarginPercent(value)} type="button"><b>{value}%</b><small>{label}</small></button>)}
+            <div className="delta-v-margin-stepper"><button aria-label="Increase margin by 1 percent" onClick={() => setNormalizedMarginPercent(marginPercent + 1)} title="Increase margin by 1 percent" type="button">+</button><label><span className="sr-only">Planning margin percent</span><input aria-label="Planning margin percent" max="100" min="0" step="1" type="number" value={marginPercent} onChange={(event) => setNormalizedMarginPercent(Number(event.target.value))} /><span aria-hidden="true">%</span></label><button aria-label="Decrease margin by 1 percent" onClick={() => setNormalizedMarginPercent(marginPercent - 1)} title="Decrease margin by 1 percent" type="button">−</button></div>
+          </div></article>
           <article><span>Landing</span><strong>{formatDeltaV(plan.landingDeltaV)}</strong><small>{surfaceStopCount === 0 ? "No surface stops" : plan.atmosphericAssistance ? "Selected steps assisted" : "Powered descent"}</small></article>
           <article><span>Ideal phase</span><strong>{plan.phaseAngle === null ? "n/a" : `${plan.phaseAngle.toFixed(1)}°`}</strong><small>First-transfer Hohmann reference</small></article>
         </div>
@@ -951,7 +956,7 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
             {idealSequenceActive || transferRunning ? <>
               <span>{transferState === "cancelling" ? "CANCELLING" : `CALCULATING ${Math.max(1, activeArcIndex + 1)}/${transferArcs.length} · ${Math.max(0, Math.min(100, Number(telemetry?.["mj.transfer.progress"] ?? 0)))}%`}</span>
               <button type="button" onClick={cancelLiveTransfer}>Cancel</button>
-            </> : <button disabled={!canCalculateLive} title={!serviceReady ? "WoobiesMechJeb transfer service not available." : undefined} type="button" onClick={startLiveTransfer}>{allIdealArcsResolved ? "Recalculate ideal windows" : resolvedArcCount > 0 ? "Calculate remaining ideal windows" : "Calculate ideal windows"}</button>}
+            </> : <button aria-label={allIdealArcsResolved ? "Recalculate ideal windows" : resolvedArcCount > 0 ? "Calculate remaining ideal windows" : "Calculate ideal windows"} disabled={!canCalculateLive} title={!serviceReady ? "WoobiesMechJeb transfer service not available." : undefined} type="button" onClick={startLiveTransfer}>{allIdealArcsResolved ? "Recalculate windows" : resolvedArcCount > 0 ? "Calculate remaining windows" : "Calculate windows"}</button>}
           </div>}
         </header>
         {transferMode === "simple" && (sendError || (matchingResult && transferState === "failed" && telemetry?.["mj.transfer.error"])) && <p className="delta-v-route-window-error" role="alert">{sendError || String(telemetry?.["mj.transfer.error"])}</p>}
@@ -1008,11 +1013,9 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
             </> : <>
               <div className={`delta-v-leg-copy ${stayStop ? "with-stay" : ""} ${calculatedStay ? "with-calculated-stay" : ""}`}>
                 <div className="delta-v-leg-primary">
-                  <div className="delta-v-leg-heading"><strong>{leg.label}{!incompleteAdvancedLeg && (leg.transferSource === "mechjeb" ? <em className="delta-v-live-badge">MECHJEB</em> : modeledTimeline ? <em className="delta-v-live-badge modeled">HOHMANN</em> : null)}</strong>{transferMode === "advanced" && arc && <button className="delta-v-porkchop-button" disabled={!serviceReady} onClick={() => openPorkchop(arc)} type="button">PORKCHOP</button>}</div>
-                  {!incompleteAdvancedLeg && <small className="delta-v-leg-note">{leg.note}</small>}
+                  <div className="delta-v-leg-heading"><strong>{leg.label}{!incompleteAdvancedLeg && (leg.transferSource === "mechjeb" ? <em className="delta-v-live-badge">MECHJEB</em> : modeledTimeline ? <em className="delta-v-live-badge modeled">HOHMANN</em> : null)}</strong>{!incompleteAdvancedLeg && <small className="delta-v-leg-note">{leg.note}</small>}{transferMode === "advanced" && arc && <button className="delta-v-porkchop-button" disabled={!serviceReady} onClick={() => openPorkchop(arc)} type="button">PORKCHOP</button>}</div>
                   {leg.atmosphericAssist === "aerocapture" && <div className="delta-v-leg-advisories">
-                    <small className="delta-v-craft-note">Aerobraking is craft-dependent.</small>
-                    {craftThermalProtection !== "detected" && <small className={`delta-v-thermal-note ${craftThermalProtection}`} role={craftThermalProtection === "not-detected" ? "alert" : undefined}>{craftThermalProtection === "not-detected" ? "No thermal protection detected. Aerobraking may be risky." : "Thermal Protection Recommended"}</small>}
+                    <small className={`delta-v-thermal-note ${craftThermalProtection}`} role={craftThermalProtection === "not-detected" ? "alert" : undefined}>{craftThermalProtection === "not-detected" ? "No thermal protection detected; thermal protection recommended · aerobraking is craft-dependent." : craftThermalProtection === "detected" ? "Thermal protection detected · aerobraking is craft-dependent." : "Thermal protection recommended · aerobraking is craft-dependent."}</small>
                   </div>}
                   {displayedTimeline && leg.kind !== "capture" && <small className={`delta-v-leg-timeline ${timelineConflict ? "conflict" : ""}`}>Depart {formatMissionUT(displayedTimeline.departureUT, kerbinTime)} · arrive {formatMissionUT(displayedTimeline.arrivalUT, kerbinTime)}</small>}
                   {timelineConflict && <small className="delta-v-timeline-conflict" role="alert">This transfer departs before the preceding segment arrives; choose it again.</small>}

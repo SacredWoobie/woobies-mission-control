@@ -91,7 +91,7 @@ describe("delta-v planner drawer", () => {
     expect(launchParkingAltitude.value).toBe("80");
     const addNextStop = screen.getByRole("button", { name: /Add next stop/ }) as HTMLButtonElement;
     expect(addNextStop.disabled).toBe(false);
-    expect((screen.getByRole("button", { name: "RESET PLAN" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Reset current plan" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/Offline fallback.*Kerbin surface.*80.0.*km parking orbit$/)).toBeTruthy();
     expect(screen.queryByText("Body model")).toBeNull();
     expect(screen.queryByText("Transfer time")).toBeNull();
@@ -127,7 +127,7 @@ describe("delta-v planner drawer", () => {
   it("opens model assumptions from the drawer header", () => {
     render(<ResonantOrbitProvider><DeltaVTool onOpen={() => undefined} /></ResonantOrbitProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
-    const opener = screen.getByRole("button", { name: "MODEL ASSUMPTIONS & LIMITS" });
+    const opener = screen.getByRole("button", { name: "Model assumptions and limits" });
     opener.focus();
     fireEvent.click(opener);
 
@@ -155,6 +155,42 @@ describe("delta-v planner drawer", () => {
     render(<ResonantOrbitProvider><DeltaVTool onOpen={() => undefined} /></ResonantOrbitProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
     expect(screen.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("keeps planning-margin presets, custom steps, clamps, and drawer persistence in sync", () => {
+    render(<ResonantOrbitProvider><DeltaVTool onOpen={() => undefined} /></ResonantOrbitProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
+
+    const margin = screen.getByRole("spinbutton", { name: "Planning margin percent" }) as HTMLInputElement;
+    const low = screen.getByRole("button", { name: "Set planning margin to 10 percent (low)" });
+    const medium = screen.getByRole("button", { name: "Set planning margin to 15 percent (med)" });
+    const high = screen.getByRole("button", { name: "Set planning margin to 20 percent (high)" });
+    expect(margin.value).toBe("15");
+    expect(medium.getAttribute("aria-pressed")).toBe("true");
+    expect(low.getAttribute("aria-pressed")).toBe("false");
+    expect(high.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(low);
+    expect(margin.value).toBe("10");
+    expect(low.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Increase margin by 1 percent" }));
+    expect(margin.value).toBe("11");
+    expect(low.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.change(margin, { target: { value: "15.4" } });
+    expect(margin.value).toBe("15");
+    expect(medium.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.change(margin, { target: { value: "101" } });
+    expect(margin.value).toBe("100");
+    fireEvent.click(screen.getByRole("button", { name: "Increase margin by 1 percent" }));
+    expect(margin.value).toBe("100");
+    fireEvent.change(margin, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Decrease margin by 1 percent" }));
+    expect(margin.value).toBe("0");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close delta-v planner" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
+    expect((screen.getByRole("spinbutton", { name: "Planning margin percent" }) as HTMLInputElement).value).toBe("0");
   });
 
   it("preserves the mission draft when drawers close or switch tools", () => {
@@ -203,7 +239,7 @@ describe("delta-v planner drawer", () => {
     fireEvent.change(planName, { target: { value: "Duna Reset Safety" } });
     fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
 
-    const reset = screen.getByRole("button", { name: "RESET PLAN" }) as HTMLButtonElement;
+    const reset = screen.getByRole("button", { name: "Reset current plan" }) as HTMLButtonElement;
     expect(reset.disabled).toBe(false);
     expect(screen.getByRole("button", { name: "Update plan" })).toBeTruthy();
     fireEvent.click(reset);
@@ -218,7 +254,7 @@ describe("delta-v planner drawer", () => {
     expect(screen.getByRole("combobox", { name: "Start" })).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "Next stop" })).toBeNull();
     expect(screen.queryByRole("list", { name: "Committed mission stops" })).toBeNull();
-    expect((screen.getByRole("spinbutton", { name: /Planning margin/ }) as HTMLInputElement).value).toBe("15");
+    expect(JSON.parse(localStorage.getItem("wmc-delta-v-draft-v1") ?? "{}").marginPercent).toBe(15);
     expect(reset.disabled).toBe(true);
 
     const loadPlans = screen.getByRole("button", { name: "Load saved plans" });
@@ -474,9 +510,9 @@ describe("delta-v planner drawer", () => {
     expect((screen.getAllByRole("checkbox", { name: "Aerobrake capture" }).at(-1) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByRole("spinbutton", { name: "Aerocapture circularization reserve" })).toBeNull();
     expect(screen.getByText(/Capture at Kerbin$/).closest("article")?.textContent).toMatch(/Reference aerocapture|powered-capture reserve/);
-    const aerobrakingAdvisories = screen.getByText("Aerobraking is craft-dependent.").closest(".delta-v-leg-advisories");
-    expect(aerobrakingAdvisories?.textContent).toContain("Thermal Protection Recommended");
-    expect(aerobrakingAdvisories?.querySelectorAll("small")).toHaveLength(2);
+    const aerobrakingAdvisories = screen.getByText(/thermal protection recommended.*aerobraking is craft-dependent/i).closest(".delta-v-leg-advisories");
+    expect(aerobrakingAdvisories?.textContent).toContain("Thermal protection recommended");
+    expect(aerobrakingAdvisories?.querySelectorAll("small")).toHaveLength(1);
     expect((screen.getAllByRole("checkbox", { name: "Atmospheric descent + chutes" }).at(-1) as HTMLInputElement).checked).toBe(true);
     expect((screen.getAllByRole("spinbutton", { name: "Arrival assisted landing reserve" }).at(-1) as HTMLInputElement).value).toBe("150");
   });
@@ -491,7 +527,7 @@ describe("delta-v planner drawer", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
     fireEvent.click(screen.getByRole("radio", { name: "Parking orbit" }));
 
-    expect(screen.getByText("No thermal protection detected. Aerobraking may be risky.")).toBeTruthy();
+    expect(screen.getByText(/No thermal protection detected; thermal protection recommended/)).toBeTruthy();
     expect(screen.queryByText("Thermal Protection Recommended")).toBeNull();
   });
 
@@ -510,9 +546,9 @@ describe("delta-v planner drawer", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Next stop" }), { target: { value: "Duna" } });
     fireEvent.click(screen.getByRole("radio", { name: "Parking orbit" }));
 
-    expect(screen.queryByText("No thermal protection detected. Aerobraking may be risky.")).toBeNull();
+    expect(screen.queryByText(/No thermal protection detected; thermal protection recommended/)).toBeNull();
     expect(screen.queryByText("Thermal Protection Recommended")).toBeNull();
-    expect(screen.getByText("Aerobraking is craft-dependent.")).toBeTruthy();
+    expect(screen.getByText(/Thermal protection detected.*aerobraking is craft-dependent/)).toBeTruthy();
   });
 
   it("switches from sequential ideal planning to persistent per-leg porkchops", () => {
@@ -526,7 +562,7 @@ describe("delta-v planner drawer", () => {
     expect(screen.getByRole("button", { name: "PORKCHOP" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Calculate ideal windows" })).toBeNull();
     expect(screen.getByText(/Advanced: per-leg porkchops/)).toBeTruthy();
-    expect(screen.getByText("User-selected reserve")).toBeTruthy();
+    expect(screen.getByText("Planning margin")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Close delta-v planner" }));
     fireEvent.click(screen.getByRole("button", { name: "Delta-v planner" }));
@@ -1003,7 +1039,7 @@ describe("delta-v planner drawer", () => {
     });
     expect(screen.getByText("Total mission budget").parentElement?.textContent).toContain("INCOMPLETE");
     expect(screen.getByText("Nominal route").parentElement?.textContent).toContain("INCOMPLETE");
-    expect(screen.getByText("Margin").parentElement?.textContent).toContain("INCOMPLETE");
+    expect(screen.getByText("Planning margin").parentElement?.textContent).toContain("INCOMPLETE");
     expect((screen.getByRole("button", { name: "Save plan" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
