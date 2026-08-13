@@ -2757,8 +2757,9 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-electricity-scenario-rail :is(select,input):focus-visible { border-color: var(--accent-border-hover); }
 .editor-electricity-scenario-derived, .editor-electricity-shadow-assessment dl { display: grid; margin: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; background: var(--surface-grout); }
 .editor-electricity-scenario-derived > div, .editor-electricity-shadow-assessment dl > div { display: grid; min-width: 0; padding: 5px 6px; gap: 2px; background: var(--surface-plate); }
-.editor-electricity-scenario-derived dt, .editor-electricity-shadow-assessment dt { color: var(--slate-muted-text); font-size: 9px; line-height: 1.2; }
+.editor-electricity-scenario-derived dt, .editor-electricity-shadow-assessment dt { color: var(--slate-muted-text); font-size: 10px; line-height: 1.2; }
 .editor-electricity-scenario-derived dd, .editor-electricity-shadow-assessment dd { margin: 0; overflow-wrap: anywhere; color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; }
+.editor-electricity-scenario-rail .editor-electricity-input-unit small { font-size: 10px; }
 .editor-electricity-net-headline { display: grid; min-width: 0; margin: 0; align-content: start; justify-content: start; gap: 2px; }
 .editor-electricity-net-headline strong { color: var(--text-value); font-size: 30px; font-weight: 650; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .editor-electricity-net-headline.is-surplus strong { color: var(--green); }
@@ -2792,7 +2793,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-electricity-ledger { display: flex; min-width: 0; max-height: min(310px,38vh); overflow: auto; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-bezel); background: var(--surface-well); box-shadow: var(--surface-depth-recessed); flex-direction: column; overscroll-behavior: contain; scrollbar-width: thin; }
 .editor-electricity-ledger > header { display: grid; min-height: 38px; padding: 5px 8px; align-items: center; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 7px; border-bottom: 1px solid var(--surface-grout); background: var(--surface-rail); box-shadow: var(--surface-depth-engraved); }
 .editor-electricity-ledger > header h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.editor-electricity-ledger > header small { color: var(--slate-muted-text); font-size: 9px; }
+.editor-electricity-ledger > header small { color: var(--slate-muted-text); font-size: 10px; }
 .editor-electricity-ledger > header > strong { color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .editor-electricity-ledger.is-producer > header > strong { color: var(--green); }
 .editor-electricity-ledger.is-consumer > header > strong { color: var(--amber); }
