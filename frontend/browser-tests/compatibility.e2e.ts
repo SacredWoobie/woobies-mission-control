@@ -445,6 +445,11 @@ test("dense Editor analysis uses the empty planning width and reveals the active
     const electricity = bounds("#editorElectricity");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const stageHeader = bounds("#stage > h2");
+    const stageTitle = bounds("#stage > h2 .panel-title");
+    const stageTag = workspace.querySelector<HTMLElement>("#stage > h2 .tag")!;
+    const stageTagBounds = stageTag.getBoundingClientRect();
+    const stageTotals = bounds("#stage .editor-stage-total-dv");
     const scenarioBody = bounds(".editor-electricity-body-control");
     const scenarioAltitude = bounds(".editor-electricity-altitude-control");
     const scenarioDerived = bounds(".editor-electricity-scenario-derived");
@@ -526,6 +531,13 @@ test("dense Editor analysis uses the empty planning width and reveals the active
       scenarioControlGap: scenarioAltitude.top - scenarioBody.bottom,
       scenarioControlLeftDifference: Math.abs(scenarioBody.left - scenarioAltitude.left),
       scenarioControlWidthDifference: Math.abs(scenarioBody.width - scenarioAltitude.width),
+      stageHeaderTitle: workspace.querySelector<HTMLElement>("#stage > h2 .panel-title")!.textContent,
+      stageTagOverflow: stageTag.scrollWidth - stageTag.clientWidth,
+      stageTitleTotalsGap: stageTagBounds.left - stageTitle.right,
+      stageTotalsContained: stageTotals.left >= stageTagBounds.left - 1
+        && stageTotals.right <= stageHeader.right - 1,
+      stageTotalValueOverflows: Array.from(workspace.querySelectorAll<HTMLElement>("#stage .editor-stage-total-value"))
+        .filter((value) => value.scrollWidth > value.clientWidth + 1).length,
       stageSummaryGap: summary.top - stage.bottom,
       stageSummaryLeftDifference: Math.abs(stage.left - summary.left),
       stageSummaryRightDifference: Math.abs(stage.right - summary.right),
@@ -550,6 +562,11 @@ test("dense Editor analysis uses the empty planning width and reveals the active
   expect(layout.scenarioControlLeftDifference).toBeLessThanOrEqual(1);
   expect(layout.scenarioControlWidthDifference).toBeLessThanOrEqual(1);
   expect(layout.scenarioControlGap).toBeGreaterThanOrEqual(5);
+  expect(layout.stageHeaderTitle).toBe("Staging analysis");
+  expect(layout.stageTagOverflow).toBeLessThanOrEqual(1);
+  expect(layout.stageTitleTotalsGap).toBeGreaterThanOrEqual(5);
+  expect(layout.stageTotalsContained).toBe(true);
+  expect(layout.stageTotalValueOverflows).toBe(0);
   expect(layout.derivedColumnGap).toBeGreaterThanOrEqual(5);
   expect(layout.derivedFirstColumnDifference).toBeLessThanOrEqual(1);
   expect(layout.derivedRightColumnDifference).toBeLessThanOrEqual(1);

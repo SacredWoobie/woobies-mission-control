@@ -2933,10 +2933,17 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
     letter-spacing: .14em;
   }
   .editor-mode .editor-workspace .editor-analysis-pair #stage > h2 .panel-title {
+    flex: 0 0 auto;
     white-space: nowrap;
   }
+  .editor-mode .editor-workspace .editor-analysis-pair #stage > h2 .tag {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
   .editor-mode .editor-workspace .editor-stage-total-dv {
+    width: 100%;
     gap: 6px;
+    justify-content: flex-end;
     letter-spacing: .06em;
     white-space: nowrap;
   }
