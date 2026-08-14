@@ -130,6 +130,80 @@ test("Settings applies and persists every dashboard color theme", async ({ page 
   expect(await page.locator("html").getAttribute("data-theme")).toBe("mission-control-dark");
 });
 
+test("Daylight Flight chrome keeps inactive hardware quiet and exposes light Plan state roles", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+
+  const litIndicator = page.locator(".annunciator-indicator.new").first();
+  const darkLitFace = await litIndicator.evaluate((element) => getComputedStyle(element).backgroundImage);
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+  await drawer.getByRole("radio", { name: /Daylight Console/ }).click();
+  await page.keyboard.press("Escape");
+
+  const inactiveIndicator = page.locator(".annunciator-indicator:not(.new):not(.acknowledged)").first();
+  const flightChrome = await inactiveIndicator.evaluate((element) => {
+    const root = getComputedStyle(document.documentElement);
+    const inactive = getComputedStyle(element);
+    const identity = getComputedStyle(document.querySelector<HTMLElement>(".flight-context-identity strong")!);
+    const clock = getComputedStyle(document.querySelector<HTMLElement>(".clockcell .big")!);
+    return {
+      clockShadow: clock.textShadow,
+      identityShadow: identity.textShadow,
+      inactiveBackground: inactive.backgroundImage,
+      inactiveBorder: inactive.borderColor,
+      inactiveText: inactive.color,
+      planGround: root.getPropertyValue("--plan-panel-ground").trim(),
+      planStep: root.getPropertyValue("--plan-step-face").trim(),
+      stateCyan: root.getPropertyValue("--state-wash-cyan").trim(),
+    };
+  });
+  expect(flightChrome.clockShadow).toBe("none");
+  expect(flightChrome.identityShadow).toBe("none");
+  expect(flightChrome.inactiveBackground).toContain("rgb(233, 238, 243)");
+  expect(flightChrome.inactiveBorder).toBe("rgb(167, 179, 192)");
+  expect(flightChrome.inactiveText).toBe("rgb(102, 116, 130)");
+  expect(flightChrome.planGround).toBe("#ffffff");
+  expect(flightChrome.planStep).toContain("#f1f5f9");
+  expect(flightChrome.stateCyan).toContain("rgba(255,255,255,.9)");
+  expect(await litIndicator.evaluate((element) => getComputedStyle(element).backgroundImage)).toBe(darkLitFace);
+
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const planner = page.getByRole("dialog", { name: "Delta-v planner" });
+  const profile = planner.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+  if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+  if (await planner.getByRole("combobox", { name: "Start" }).count()) {
+    await planner.getByRole("button", { name: /Add next stop/ }).click();
+  }
+  await planner.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await planner.getByRole("button", { name: /Add next stop/ }).click();
+  await planner.getByRole("textbox", { name: "Delta-v plan name" }).fill("Daylight state review");
+  await planner.getByRole("button", { name: "Save plan", exact: true }).click();
+  await planner.getByRole("button", { name: "Load saved plans" }).click();
+  const savedPlans = page.getByRole("dialog", { name: "Saved Delta-v plans" });
+  await savedPlans.getByRole("button", { name: "Pin to active vessel" }).click();
+  await savedPlans.getByRole("button", { name: "Close saved plans" }).click();
+  await planner.getByRole("button", { name: "Close delta-v planner" }).click();
+  await page.getByRole("tab", { name: "PLAN", exact: true }).click();
+  await expect(page.locator('.flight-workspace-selector[data-active-view="plan"]')).toBeVisible();
+
+  const comparison = page.locator(".delta-v-pinned-comparison");
+  const launchSuggestion = page.locator(".delta-v-progress-suggestion");
+  await expect(comparison).toBeVisible();
+  await expect(launchSuggestion).toBeVisible();
+  const planState = await comparison.evaluate((element) => ({
+    background: getComputedStyle(element).backgroundImage,
+    body: getComputedStyle(element.querySelector("p")!).color,
+    shortfall: getComputedStyle(element.querySelector("header strong")!).color,
+    suggestion: getComputedStyle(document.querySelector<HTMLElement>(".delta-v-progress-suggestion span")!).color,
+  }));
+  expect(planState.background).toContain("rgba(255, 255, 255, 0.9)");
+  expect(planState.body).toBe("rgb(43, 56, 70)");
+  expect(planState.shortfall).toBe("rgb(143, 41, 34)");
+  expect(planState.suggestion).toBe("rgb(78, 92, 108)");
+});
+
 test("Settings provides 44px targets on a coarse 390px mobile viewport", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();

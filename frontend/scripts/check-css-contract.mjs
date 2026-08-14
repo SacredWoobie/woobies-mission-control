@@ -106,7 +106,32 @@ const contrastContracts = [
 const alternateThemeIds = ["daylight-console", "warm-crt", "green-phosphor"];
 const requiredThemeColorTokens = new Set([
   "--page-background",
+  "--state-amber-text",
+  "--state-body-muted",
+  "--state-body-text",
+  "--state-red-text",
   ...contrastContracts.flatMap(({ foreground, background }) => [foreground, background]),
+]);
+const requiredThemeCompositeTokens = new Set([
+  "--flight-screw-shadow",
+  "--flight-status-border-top",
+  "--flight-label-shadow",
+  "--flight-selector-face",
+  "--flight-rebalance-face",
+  "--flight-context-face",
+  "--flight-unlit-border",
+  "--flight-unlit-text",
+  "--flight-unlit-face",
+  "--stage-current-face",
+  "--state-wash-amber",
+  "--state-wash-cyan",
+  "--state-wash-green",
+  "--state-wash-red",
+  "--state-wash-depth",
+  "--plan-panel-ground",
+  "--plan-step-face",
+  "--plan-route-wash",
+  "--plan-control-face",
 ]);
 
 const minimumPixelFontSize = 8;
@@ -315,6 +340,11 @@ export function checkCssContract(sources) {
     const themeColors = colorDefinitions(themeBlock);
     for (const token of requiredThemeColorTokens) {
       if (!themeColors.has(token)) failures.push(`Theme ${themeId} must override ${token} with an opaque hex color.`);
+    }
+    for (const token of requiredThemeCompositeTokens) {
+      if (!new RegExp(`${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`).test(themeBlock)) {
+        failures.push(`Theme ${themeId} must override composite token ${token}.`);
+      }
     }
     for (const contract of contrastContracts) {
       const foreground = themeColors.get(contract.foreground);

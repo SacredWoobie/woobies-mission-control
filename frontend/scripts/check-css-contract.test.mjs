@@ -84,6 +84,16 @@ describe("CSS contract checker", () => {
     );
   });
 
+  it("requires theme-specific Flight and Plan composite roles", () => {
+    const mutated = productionSources.map((source) => source.file === "src/styles.css"
+      ? { ...source, text: source.text.replace(/(:root\[data-theme="daylight-console"\][\s\S]*?)--flight-unlit-face:\s*[^;]+;/, "$1") }
+      : source);
+
+    expect(checkCssContract(mutated).failures).toContain(
+      "Theme daylight-console must override composite token --flight-unlit-face.",
+    );
+  });
+
   it("rejects a migrated literal reintroduced through a local alias", () => {
     const mutated = productionSources.map((source) => source.file === "src/resonantOrbit/resonantOrbit.css"
       ? { ...source, text: `${source.text}\n.regression { --local-border: #315166; border-color: var(--local-border); }` }

@@ -9,7 +9,9 @@ All notable public changes will be recorded here.
   science-alarm defaults, can restore hidden panels, and offer four persistent
   color themes: Mission Control Dark, Daylight Console, Warm CRT, and Green
   Phosphor. Theme changes apply immediately without changing dashboard layout
-  or typography.
+  or typography. Flight hardware, inactive annunciators, Plan state washes,
+  and advisory text use theme-specific contrast while lit warning lamps and
+  graphic instruments retain their operational colors.
 - Added dashboard-wide Features & Mods status based on the configured KSP
   installation rather than the current game scene: Available, Available - Stock,
   Unavailable, and Detection unavailable. Expanded rows show only the fixed,
