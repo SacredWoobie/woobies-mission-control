@@ -4,9 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
-- Rebalanced the portrait Mission Control overview so Active Vessels uses the
-  full left-column height while Astronaut Roster, Active Contracts, and Upcoming
-  Alarms form a continuous right-column stack.
+- Rebalanced portrait dashboard layouts. Mission Control now lets Active Vessels
+  use the full left-column height while Astronaut Roster, Active Contracts, and
+  Upcoming Alarms form a continuous right-column stack. The Editor now places
+  Staging Analysis beside a bounded Resource Inventory immediately below Sim
+  Conditions and above Electricity, with roomier scrollable electrical ledgers.
 
 ## v0.7.2 - Settings, themes, and planning refinements
 

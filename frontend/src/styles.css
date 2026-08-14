@@ -3292,7 +3292,90 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
   .editor-mode .editor-electricity-ledger-body { max-height: 142px; }
 }
 @media (orientation: portrait) and (min-width: 901px) and (max-width: 1100px) {
-  .editor-mode .editor-electricity-ledger-body { max-height: 92px; }
+  .editor-mode .editor-workspace-primary {
+    display: grid;
+    width: 100%;
+    align-self: stretch;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    align-items: stretch;
+  }
+  .editor-mode .editor-workspace-primary > #editorElectricity {
+    min-width: 0;
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  .editor-mode .editor-workspace-primary > .editor-analysis-pair { display: contents; }
+  .editor-mode .editor-workspace-primary .editor-staging-slice {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .editor-mode .editor-workspace-primary .editor-staging-slice > #stage { width: 100%; }
+  .editor-mode .editor-workspace-primary #editorSummary {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    grid-row: 1;
+    grid-column: 2;
+    flex-direction: column;
+  }
+  .editor-mode .editor-workspace-primary #editorSummary .body {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  .editor-mode .editor-workspace-primary #editorSummary .editor-resource-list {
+    max-height: 285px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .editor-mode .editor-workspace-primary #editorSummary .editor-resource-row {
+    grid-template-columns: minmax(0,.85fr) minmax(100px,1.35fr) minmax(105px,.8fr);
+    gap: 6px;
+  }
+  .editor-mode .editor-workspace-primary .editor-staging-slice .stage-table.editor {
+    max-height: 285px;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+  .editor-mode .editor-workspace-primary .editor-staging-slice .stage-table.editor .st-head {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+  }
+  .editor-mode .editor-workspace-primary .stage-table.editor .st-row {
+    grid-template-columns: 48px minmax(56px,1.1fr) minmax(56px,1.1fr) minmax(52px,.9fr) minmax(52px,.9fr) minmax(72px,1fr);
+  }
+  .editor-mode .editor-workspace-primary .stage-table.editor .st-row > span {
+    padding-inline: 4px;
+    font-size: 11px;
+  }
+  .editor-mode .editor-workspace-primary .stage-table.editor .st-head > span { font-size: 9px; }
+  .editor-mode .editor-workspace-primary .editor-staging-slice #stage > h2 {
+    gap: 6px;
+    letter-spacing: .1em;
+  }
+  .editor-mode .editor-workspace-primary .editor-staging-slice #stage > h2 .panel-title {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .editor-mode .editor-workspace-primary .editor-staging-slice #stage > h2 .tag {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .editor-mode .editor-workspace-primary .editor-stage-total-dv {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 5px;
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
+  .editor-mode .editor-electricity-ledger-body { max-height: 142px; }
 }
 
 /* A wide Editor centers analysis and electricity as a stable two-column core.

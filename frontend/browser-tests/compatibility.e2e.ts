@@ -739,6 +739,67 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
   }
 });
 
+test("portrait Editor keeps staging and bounded resources above electricity", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const layout = await page.locator(".editor-workspace").evaluate((workspace) => {
+    const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    const electricity = bounds("#editorElectricity");
+    const resourceList = workspace.querySelector<HTMLElement>("#editorSummary .editor-resource-list")!;
+    const resourceRows = Array.from(resourceList.querySelectorAll<HTMLElement>(".editor-resource-row"));
+    const resourceClones = Array.from({ length: 6 }, (_, index) => resourceRows[index % resourceRows.length].cloneNode(true) as HTMLElement);
+    resourceClones.forEach((clone) => resourceList.append(clone));
+    const resourceScrollsWhenDense = resourceList.scrollHeight > resourceList.clientHeight + 1;
+    resourceClones.forEach((clone) => clone.remove());
+
+    const consumerBody = workspace.querySelector<HTMLElement>(".editor-electricity-ledger.is-consumer .editor-electricity-ledger-body")!;
+    const consumerRows = Array.from(consumerBody.querySelectorAll<HTMLElement>(".editor-electricity-component"));
+    const consumerBounds = consumerRows.map((row) => row.getBoundingClientRect());
+
+    const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
+    return {
+      consumerRowsContained: consumerBounds[0].top >= consumerBody.getBoundingClientRect().top - 1
+        && consumerBounds.at(-1)!.bottom <= consumerBody.getBoundingClientRect().bottom + 1,
+      consumerOverflowY: getComputedStyle(consumerBody).overflowY,
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      electricityGap: electricity.top - Math.max(stage.bottom, summary.bottom),
+      electricityLeftDifference: Math.abs(electricity.left - stage.left),
+      electricityRightDifference: Math.abs(electricity.right - summary.right),
+      resourceListUsesNeededHeight: resourceList.getBoundingClientRect().height < summary.height - 80,
+      resourceRowsFit: resourceList.scrollHeight <= resourceList.clientHeight + 1,
+      resourceScrollsWhenDense,
+      stageSummaryBottomDifference: Math.abs(stage.bottom - summary.bottom),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      stageTableHorizontalOverflow: table.scrollWidth > table.clientWidth + 1,
+    };
+  });
+
+  expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryBottomDifference).toBeLessThanOrEqual(1);
+  expect(layout.electricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.electricityLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.electricityRightDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageTableHorizontalOverflow).toBe(false);
+  expect(layout.resourceListUsesNeededHeight).toBe(true);
+  expect(layout.resourceRowsFit).toBe(true);
+  expect(layout.resourceScrollsWhenDense).toBe(true);
+  expect(layout.consumerRowsContained).toBe(true);
+  expect(layout.consumerOverflowY).toBe("auto");
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+});
+
 test("dense Editor analysis uses the empty planning width and reveals the active stage", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
@@ -1202,6 +1263,7 @@ test("Editor planning companions preserve the dense workspace alone and together
     const context = bounds("#editorContext");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const electricity = bounds("#editorElectricity");
     const orbit = bounds("#editorOrbitPlan");
     const deltaV = bounds("#editorDeltaVPlan");
     return {
@@ -1211,14 +1273,20 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
-      stageSummaryGap: summary.top - stage.bottom,
+      electricityStageGap: electricity.top - Math.max(stage.bottom, summary.bottom),
+      stageSummaryBottomDifference: Math.abs(stage.bottom - summary.bottom),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
-      summaryPlanGap: orbit.top - summary.bottom,
+      summaryPlanGap: orbit.top - electricity.bottom,
     };
   });
   expect(portrait.secondaryChildren).toBe(2);
   expect(portrait.contextStageGap).toBeGreaterThanOrEqual(10);
   expect(portrait.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(portrait.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(portrait.stageSummaryBottomDifference).toBeLessThanOrEqual(1);
+  expect(portrait.electricityStageGap).toBeGreaterThanOrEqual(10);
   expect(portrait.summaryPlanGap).toBeGreaterThanOrEqual(10);
   expect(portrait.companionGap).toBeGreaterThanOrEqual(10);
   expect(portrait.documentScrollWidth).toBeLessThanOrEqual(portrait.documentClientWidth);
