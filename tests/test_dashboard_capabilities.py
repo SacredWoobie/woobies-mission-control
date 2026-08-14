@@ -43,11 +43,18 @@ class DashboardCapabilitiesTests(unittest.TestCase):
             root = Path(temp)
             self.make_notes(root)
             self.make_file(root, ("gAmEdAtA", "WoObIeSCoNtRoLStAtS", "wOobiEsControlStats.DLL"))
-            self.make_file(root, ("gAmEdAtA", "ReMoTeTeCh", "rEmOtEtEcH.DLL"))
+            self.make_file(root, ("gAmEdAtA", "ReMoTeTeCh", "pLuGiNs", "rEmOtEtEcH.DLL"))
+            self.make_file(root, ("gAmEdAtA", "TrIgGeRtEcH", "KeRbAlAlArMcLoCk", "PlUgInS", "kErBaLaLaRmClOcK.DLL"))
+            self.make_file(root, ("gAmEdAtA", "DyNaMiCbAtTeRyStOrAgE", "PlUgInS", "dYnAmIcBaTtErYsToRaGe.DLL"))
             scan = capabilities.scan_root_capabilities(root)
         self.assertEqual(scan["dependencies"]["notes"]["status"], "detected")
         self.assertEqual(scan["dependencies"]["wcs"]["status"], "detected")
         self.assertEqual(scan["dependencies"]["remote_tech"]["status"], "detected")
+        self.assertEqual(scan["dependencies"]["kac"]["status"], "detected")
+        self.assertEqual(
+            scan["dependencies"]["dynamic_battery_storage"]["status"],
+            "detected",
+        )
         self.assertNotIn("root", scan)
         self.assertNotIn("path", scan)
         self.assertNotIn("hash", repr(scan).casefold())
@@ -63,27 +70,18 @@ class DashboardCapabilitiesTests(unittest.TestCase):
         self.assertEqual(built["features"]["notes"]["reason"], "probe_error")
         self.assertEqual(built["features"]["notes"]["status"], "unknown")
 
-    def test_missing_optional_providers_report_stock_fallbacks(self):
+    def test_missing_scan_markers_do_not_infer_runtime_fallbacks(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "GameData").mkdir()
             result = capabilities.build_dashboard_capabilities(
                 {}, capabilities.scan_root_capabilities(root)
             )
-        self.assertEqual(result["features"]["notes"]["status"], "unavailable")
-        self.assertEqual(result["features"]["stage_analysis"]["status"], "unavailable")
-        self.assertEqual(result["features"]["live_transfer_calculations"]["status"], "unavailable")
-        self.assertEqual(result["features"]["heat_controls"]["status"], "unavailable")
-        for feature in (
-            "science_telemetry",
-            "science_alarms",
-            "communications",
-            "heat_monitoring",
-            "editor_electricity",
-            "damage_monitoring",
-        ):
-            self.assertEqual(result["features"][feature]["status"], "fallback")
-            self.assertEqual(result["features"][feature]["reason"], "fallback_active")
+        for feature in capabilities.FEATURE_IDS:
+            self.assertEqual(result["features"][feature]["status"], "unknown")
+            self.assertEqual(
+                result["features"][feature]["reason"], "dependency_missing"
+            )
 
     def test_scan_is_cached_and_reset_reprobes(self):
         with tempfile.TemporaryDirectory() as temp:

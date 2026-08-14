@@ -2981,7 +2981,9 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .settings-feature-list { display: grid; gap: 7px; }
 .settings-feature { overflow: hidden; border: 1px solid var(--surface-seam); border-left: 3px solid var(--slate-dim); border-radius: var(--surface-radius-face); background: var(--surface-plate); }
 .settings-feature-available { border-left-color: var(--green); }
+.settings-feature-installed { border-left-color: var(--cyan); }
 .settings-feature-fallback { border-left-color: var(--amber); }
+.settings-feature-not-detected { border-left-color: var(--danger); }
 .settings-feature-unavailable { border-left-color: var(--danger); }
 .settings-feature-toggle {
   display: grid;
@@ -3002,7 +3004,9 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .settings-feature-toggle > span { min-width: 0; font-size: 11px; font-weight: 700; }
 .settings-feature-toggle > strong { color: var(--slate); font-size: 8px; letter-spacing: .06em; text-align: right; }
 .settings-feature-available .settings-feature-toggle > strong { color: var(--green); }
+.settings-feature-installed .settings-feature-toggle > strong { color: var(--cyan); }
 .settings-feature-fallback .settings-feature-toggle > strong { color: var(--amber); }
+.settings-feature-not-detected .settings-feature-toggle > strong { color: var(--danger); }
 .settings-feature-unavailable .settings-feature-toggle > strong { color: var(--danger); }
 .settings-feature-evidence { padding: 0 12px 12px; border-top: 1px solid var(--rule); color: var(--slate); font-size: 9px; line-height: 1.5; }
 .settings-feature-evidence p { margin: 10px 0 7px; color: var(--text-value); }

@@ -8,11 +8,13 @@ All notable public changes will be recorded here.
   About sections. Preferences retain the dashboard time system and local
   science-alarm defaults, and can restore hidden panels. About reports the
   current Mission Control Dark palette without exposing a theme chooser yet.
-- Added capability-aware Features & Mods status copy: Available, Stock
-  fallback active, Unavailable, and Unknown. Unknown means that an authoritative
-  provider observation is not available; it is not the same as Missing. The
-  inventory is limited to known Mission Control integrations and does not scan
-  arbitrary installed mods.
+- Added capability-aware Features & Mods status copy: Available, Installed but
+  not observed here, Stock fallback active, Not detected, Unavailable, and
+  Unknown. Stock fallback is shown only from live backend evidence; finding an
+  installed provider without current-scene evidence is not mislabeled Unknown,
+  and a missing fixed marker does not imply that Stock is active. The inventory
+  is limited to known Mission Control integrations and does not scan arbitrary
+  installed mods.
 - Added a curated external-link Help table of contents and an About card that
   explains the browser/launcher boundary. Setup, KSP selection, service
   Install / Repair, updates, and Dashboard feed control remain launcher tasks.

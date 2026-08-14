@@ -21,7 +21,7 @@ import {
 
 export type SettingsFeatureId = DashboardFeatureId;
 
-export type SettingsFeatureStatus = "available" | "fallback" | "unavailable" | "unknown";
+export type SettingsFeatureStatus = "available" | "installed" | "fallback" | "not-detected" | "unavailable" | "unknown";
 
 export const SETTINGS_FEATURES: readonly {
   id: SettingsFeatureId;
@@ -84,7 +84,9 @@ function wikiUrl(base: string, slug: string) {
 
 function statusLabel(status: SettingsFeatureStatus) {
   if (status === "available") return "AVAILABLE";
+  if (status === "installed") return "INSTALLED · NOT OBSERVED HERE";
   if (status === "fallback") return "STOCK FALLBACK ACTIVE";
+  if (status === "not-detected") return "NOT DETECTED";
   if (status === "unavailable") return "UNAVAILABLE";
   return "UNKNOWN";
 }
@@ -221,13 +223,13 @@ function FeaturesSection({ telemetry }: { telemetry?: SettingsTelemetryInfo }) {
   const [expanded, setExpanded] = useState<SettingsFeatureId | null>(null);
   return <section aria-labelledby="settings-features-heading" className="settings-section">
     <h3 id="settings-features-heading">Features &amp; Mods</h3>
-    <p className="settings-section-intro">Availability is reported by the current dashboard feed. Missing or invalid capability data is shown as UNKNOWN.</p>
+    <p className="settings-section-intro">AVAILABLE and STOCK FALLBACK ACTIVE require live runtime evidence. INSTALLED means the known dependencies were found but are not observable in this scene. NOT DETECTED means a fixed known marker was not found; UNKNOWN means the feed cannot classify it.</p>
     <div className="settings-feature-list">
       {SETTINGS_FEATURES.map((feature) => {
         const capability = validCapabilitySnapshot(telemetry?.capabilities)
           ? telemetry.capabilities.features[feature.id]
           : undefined;
-        const status: SettingsFeatureStatus = capability?.status === "available"
+        let status: SettingsFeatureStatus = capability?.status === "available"
           || capability?.status === "fallback"
           || capability?.status === "unavailable"
           ? capability.status
@@ -235,6 +237,12 @@ function FeaturesSection({ telemetry }: { telemetry?: SettingsTelemetryInfo }) {
         const evidence = capability && Array.isArray(capability.evidence)
           ? capability.evidence.filter((item): item is DashboardCapabilityEvidence => !!item && typeof item === "object" && (item.status === "active" || item.status === "detected" || item.status === "missing" || item.status === "unavailable" || item.status === "unknown") && (item.source === "runtime" || item.source === "root_scan") && typeof item.id === "string")
           : [];
+        const installationEvidence = evidence.filter((item) => item.source === "root_scan");
+        if (status === "unknown" && capability?.reason === "not_observed" && installationEvidence.length > 0 && installationEvidence.every((item) => item.status === "detected")) {
+          status = "installed";
+        } else if (status === "unknown" && capability?.reason === "dependency_missing" && installationEvidence.some((item) => item.status === "missing")) {
+          status = "not-detected";
+        }
         const open = expanded === feature.id;
         return <article className={`settings-feature settings-feature-${status}`} key={feature.id}>
           <button

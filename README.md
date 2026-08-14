@@ -122,12 +122,14 @@ The dashboard adds a Settings rail drawer with four sections:
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
   in browser-local storage, and can restore hidden dashboard panels.
 - **Features & Mods** reports only known Mission Control capabilities and
-  integrations. **Available** means an active provider is ready; **Stock
-  fallback active** means the feature is working through its stock fallback;
-  **Unavailable** means a known provider or dependency cannot provide it; and
-  **Unknown** means that an authoritative observation is not available. Unknown
-  is not Missing. This view checks a fixed set of known markers and runtime
-  providers; it is not an inventory of arbitrary installed mods.
+  integrations. **Available** means an active provider is ready; **Installed ·
+  not observed here** means its known dependencies were found but the current
+  scene cannot prove that it is active; **Stock fallback active** requires live
+  evidence that the feature is using its stock backend; **Not detected** means
+  a fixed known marker was not found; **Unavailable** means runtime evidence
+  says the provider cannot serve the feature; and **Unknown** means the feed
+  cannot classify it. This view is not an inventory of arbitrary installed
+  mods.
 - **Help** is a curated table of contents of external setup, dashboard,
   compatibility, safety, and troubleshooting guides. It opens the existing
   project wiki and support links rather than copying documentation into the

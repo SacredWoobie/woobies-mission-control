@@ -86,6 +86,32 @@ describe("SettingsDrawer", () => {
     });
   });
 
+  it("distinguishes installed and not-detected markers from runtime availability", () => {
+    render(<SettingsDrawer {...props({
+      section: "features-mods",
+      telemetry: {
+        capabilities: {
+          schemaVersion: 1,
+          features: {
+            notes: {
+              status: "unknown",
+              reason: "not_observed",
+              evidence: [{ id: "notes", status: "detected", source: "root_scan" }],
+            },
+            science_telemetry: {
+              status: "unknown",
+              reason: "dependency_missing",
+              evidence: [{ id: "wcs", status: "missing", source: "root_scan" }],
+            },
+          } as never,
+        },
+      },
+    })} />);
+    expect(screen.getByRole("button", { name: /Notes.*INSTALLED · NOT OBSERVED HERE/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Science telemetry.*NOT DETECTED/ })).toBeTruthy();
+    expect(screen.queryByText("STOCK FALLBACK ACTIVE")).toBeNull();
+  });
+
   it("reports the current palette without exposing a theme chooser", () => {
     render(<SettingsDrawer {...props({ section: "about" })} />);
     const dialog = screen.getByRole("dialog", { name: "Mission Control Settings" });

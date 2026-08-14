@@ -54,9 +54,9 @@ _SCAN_WHITELIST = {
     "system_heat_mod": (("GameData", "SystemHeat", "Plugin", "SystemHeat.dll"), False),
     "woobies_mechjeb": (("GameData", "KRPC.WoobiesMechJeb", "KRPC.WoobiesMechJeb.dll"), False),
     "mechjeb": (("GameData", "MechJeb2", "Plugins", "MechJeb2.dll"), False),
-    "remote_tech": (("GameData", "RemoteTech", "RemoteTech.dll"), False),
-    "kac": (("GameData", "TriggerTech", "KerbalAlarmClock", "KerbalAlarmClock.dll"), False),
-    "dynamic_battery_storage": (("GameData", "DynamicBatteryStorage", "DynamicBatteryStorage.dll"), False),
+    "remote_tech": (("GameData", "RemoteTech", "Plugins", "RemoteTech.dll"), False),
+    "kac": (("GameData", "TriggerTech", "KerbalAlarmClock", "Plugins", "KerbalAlarmClock.dll"), False),
+    "dynamic_battery_storage": (("GameData", "DynamicBatteryStorage", "Plugins", "DynamicBatteryStorage.dll"), False),
 }
 
 _FEATURE_DEPENDENCIES = {
@@ -329,16 +329,18 @@ def build_dashboard_capabilities(
             evidence = evidence + scan_evidence
             if status == "unknown" and any(item["status"] == "missing" for item in scan_evidence):
                 if feature in _STOCK_FALLBACK_FEATURES:
-                    status, reason = "fallback", "fallback_active"
+                    # A missing optional-provider marker is installation
+                    # evidence, not proof that the stock backend is active in
+                    # the current scene. Keep the runtime state unobserved.
+                    status, reason = "unknown", "dependency_missing"
                 else:
                     status, reason = "unavailable", "dependency_missing"
         elif scan_evidence and configured and not scan_error:
             statuses = {item["status"] for item in scan_evidence}
             if "missing" in statuses:
-                if feature in _STOCK_FALLBACK_FEATURES:
-                    status, reason = "fallback", "fallback_active"
-                else:
-                    status, reason = "unavailable", "dependency_missing"
+                # A scan can say that a fixed marker was not detected, but it
+                # cannot claim a runtime fallback or current unavailability.
+                status, reason = "unknown", "dependency_missing"
             elif statuses == {"detected"}:
                 status, reason = "unknown", "not_observed"
             else:
