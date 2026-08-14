@@ -2,6 +2,32 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added a Settings rail drawer with Preferences, Features & Mods, Help, and
+  About sections. Preferences retain the dashboard time system and local
+  science-alarm defaults, can restore hidden panels, and offer four persistent
+  color themes: Mission Control Dark, Daylight Console, Warm CRT, and Green
+  Phosphor. Theme changes apply immediately without changing dashboard layout
+  or typography. Flight hardware, inactive annunciators, Plan state washes,
+  and advisory text use theme-specific contrast while lit warning lamps and
+  graphic instruments retain their operational colors.
+- Added dashboard-wide Features & Mods status based on the configured KSP
+  installation rather than the current game scene: Available, Available - Stock,
+  Unavailable, and Detection unavailable. Expanded rows show only the fixed,
+  known integration checks used to drive that status. The inventory remains
+  limited to known Mission Control integrations and does not scan arbitrary
+  installed mods.
+- Added a curated external-link Help table of contents and an About card that
+  explains the browser/launcher boundary. Setup, KSP selection, service
+  Install / Repair, updates, and Dashboard feed control remain launcher tasks.
+- Reworked Delta-V plan management into clearly labeled Plan Name and Plan
+  Tools groups, with a wider name field, distinct Update and Save as new
+  actions, inline save feedback, and a non-redundant planner title. Saved-plan,
+  reset, and model dialogs now inherit the selected dashboard color theme.
+  Simple / Advanced transfer planning now sits with the mission-wide Planning
+  Budget rather than inside the per-stop arrival builder.
+
 ## v0.7.1 - Release packaging repair
 
 - Fixed full and managed-update packaging so the Editor electrical snapshot

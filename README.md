@@ -115,6 +115,39 @@ does not execute nodes, warp, steer, stage, or change throttle.
 - Optional Notes, Kerbal Alarm Clock, RemoteTech, System Heat, and ESP32
   integrations without making them requirements for the rest of the dashboard.
 
+## Settings, Help, and About
+
+The dashboard adds a Settings rail drawer with four sections:
+
+- **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
+  in browser-local storage, can restore hidden dashboard panels, and offers
+  Mission Control Dark, Daylight Console, Warm CRT, and Green Phosphor color
+  themes. A selection applies immediately and persists in that browser. The
+  themes change semantic color and surface treatments while retaining the same
+  typography and layout.
+- **Features & Mods** reports only known Mission Control capabilities and
+  integrations for the dashboard as a whole, independent of the current game
+  scene. **Available** means the required known integrations were detected;
+  **Available · Stock** means an optional integration was not detected but the
+  dashboard retains its built-in stock path; **Unavailable** means a required
+  known integration was not detected; and **Detection unavailable** means the
+  configured KSP installation could not be checked. Expanded rows show the
+  fixed installation checks behind the result. This view is not an inventory
+  of arbitrary installed mods.
+- **Help** is a curated table of contents of external setup, dashboard,
+  compatibility, safety, and troubleshooting guides. It opens the existing
+  project wiki and support links rather than copying documentation into the
+  dashboard.
+- **About** identifies the product, version, build channel, current theme, and
+  local dashboard endpoint, and explains where installation belongs. The
+  browser dashboard does not select a KSP folder, install or repair
+  service DLLs, apply package updates, or write the selected live KSP
+  `GameData`; use `Dashboard\Start KSP Dashboard.bat` for those launcher
+  responsibilities.
+
+The public baseline remains v0.7.1 until a later release is selected and
+published.
+
 ## Packaged KSP services
 
 The v0.7.1 public release selects four independently versioned kRPC extensions.

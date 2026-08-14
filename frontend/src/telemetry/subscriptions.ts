@@ -195,6 +195,17 @@ export function notesSnapshotsEqual(
   return fieldsEqual(left, right, [...keys]);
 }
 
+export function settingsSnapshotsEqual(
+  left: TelemetrySnapshot | null,
+  right: TelemetrySnapshot | null,
+) {
+  return fieldsEqual(left, right, [
+    "context.mode",
+    "dashboard.capabilities",
+    "sci.alarmProviders",
+  ]);
+}
+
 export function clockSnapshotsEqual(left: TelemetrySnapshot | null, right: TelemetrySnapshot | null) {
   return fieldsEqual(left, right, ["context.mode", "t.universalTime", "v.name", "v.body", "v.situationString", "v.missionTime", "rt.available", "rt.hasConnection", "rt.signalDelay", "comm.krpc.canCommunicate", "comm.krpc.signalStrength"]);
 }

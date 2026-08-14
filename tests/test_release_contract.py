@@ -635,6 +635,7 @@ class ReleaseContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         for module in (
+            "dashboard_capabilities.py",
             "damage.py",
             "electricity.py",
             "editor_electrical_snapshot.py",

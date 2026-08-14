@@ -103,6 +103,37 @@ const contrastContracts = [
   { foreground: "--surface-amber-face-text", background: "--surface-amber-face-top", minimum: 4.5 },
 ];
 
+const alternateThemeIds = ["daylight-console", "warm-crt", "green-phosphor"];
+const requiredThemeColorTokens = new Set([
+  "--page-background",
+  "--state-amber-text",
+  "--state-body-muted",
+  "--state-body-text",
+  "--state-red-text",
+  ...contrastContracts.flatMap(({ foreground, background }) => [foreground, background]),
+]);
+const requiredThemeCompositeTokens = new Set([
+  "--flight-screw-shadow",
+  "--flight-status-border-top",
+  "--flight-label-shadow",
+  "--flight-selector-face",
+  "--flight-rebalance-face",
+  "--flight-context-face",
+  "--flight-unlit-border",
+  "--flight-unlit-text",
+  "--flight-unlit-face",
+  "--stage-current-face",
+  "--state-wash-amber",
+  "--state-wash-cyan",
+  "--state-wash-green",
+  "--state-wash-red",
+  "--state-wash-depth",
+  "--plan-panel-ground",
+  "--plan-step-face",
+  "--plan-route-wash",
+  "--plan-control-face",
+]);
+
 const minimumPixelFontSize = 8;
 
 export function maskCommentsAndStrings(source) {
@@ -203,6 +234,13 @@ export function contrastRatio(foreground, background) {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
+function colorDefinitions(block) {
+  return new Map(
+    [...block.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-f]{3}|#[0-9a-f]{6})\s*;/gi)]
+      .map((match) => [match[1], expandHex(match[2])]),
+  );
+}
+
 export function checkCssContract(sources) {
   const failures = [];
   const declarations = new Map();
@@ -246,6 +284,13 @@ export function checkCssContract(sources) {
       }]),
   );
   const rootColors = new Map([...rootColorDefinitions].map(([name, definition]) => [name, definition.literal]));
+  const rootDeclarationLines = new Set();
+  for (const blockMatch of rootSource?.text.matchAll(/:root(?:\[data-theme=["'][^"']+["']\])?\s*\{([\s\S]*?)\}/g) ?? []) {
+    const blockStart = (blockMatch.index ?? 0) + blockMatch[0].indexOf(blockMatch[1]);
+    for (const declaration of blockMatch[1].matchAll(/--[a-z0-9-]+\s*:/gi)) {
+      rootDeclarationLines.add(lineNumberAt(rootSource.text, blockStart + (declaration.index ?? 0)));
+    }
+  }
 
   for (const token of opaqueSurfaceBackgroundTokens) {
     if (!rootColors.has(token)) {
@@ -265,6 +310,7 @@ export function checkCssContract(sources) {
       lines.forEach((line, index) => {
         const definition = rootColorDefinitions.get(token);
         if (source.file === rootSource?.file && index + 1 === definition?.line) return;
+        if (source.file === rootSource?.file && rootDeclarationLines.has(index + 1)) return;
         const literals = [...line.matchAll(/#[0-9a-f]{3}(?:[0-9a-f]{3})?\b/gi)].map((match) => expandHex(match[0]));
         if (literals.includes(literal)) {
           failures.push(`${source.file}:${index + 1} uses ${literal} directly; use var(${token}).`);
@@ -280,6 +326,34 @@ export function checkCssContract(sources) {
     const ratio = contrastRatio(foreground, background);
     if (ratio + Number.EPSILON < contract.minimum) {
       failures.push(`${contract.foreground} contrast against ${contract.background} is ${ratio.toFixed(2)}:1; expected at least ${contract.minimum.toFixed(1)}:1.`);
+    }
+  }
+
+
+  for (const themeId of alternateThemeIds) {
+    const escapedThemeId = themeId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const themeBlock = rootSource?.text.match(new RegExp(`:root\\[data-theme=["']${escapedThemeId}["']\\]\\s*\\{([\\s\\S]*?)\\}`))?.[1] ?? "";
+    if (!themeBlock) {
+      failures.push(`Theme ${themeId} must define a :root[data-theme="${themeId}"] block.`);
+      continue;
+    }
+    const themeColors = colorDefinitions(themeBlock);
+    for (const token of requiredThemeColorTokens) {
+      if (!themeColors.has(token)) failures.push(`Theme ${themeId} must override ${token} with an opaque hex color.`);
+    }
+    for (const token of requiredThemeCompositeTokens) {
+      if (!new RegExp(`${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`).test(themeBlock)) {
+        failures.push(`Theme ${themeId} must override composite token ${token}.`);
+      }
+    }
+    for (const contract of contrastContracts) {
+      const foreground = themeColors.get(contract.foreground);
+      const background = themeColors.get(contract.background);
+      if (!foreground || !background) continue;
+      const ratio = contrastRatio(foreground, background);
+      if (ratio + Number.EPSILON < contract.minimum) {
+        failures.push(`Theme ${themeId}: ${contract.foreground} contrast against ${contract.background} is ${ratio.toFixed(2)}:1; expected at least ${contract.minimum.toFixed(1)}:1.`);
+      }
     }
   }
 

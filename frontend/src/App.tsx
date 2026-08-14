@@ -77,6 +77,7 @@ function FixtureDashboard({ mode, notesOpen, onCloseNotes, onSetNotesOpen }: { m
   return (
     <DashboardSurface
       datalink={(open, onClose) => <DatalinkDrawer connectionStatus="fixture" endpoint="deterministic fixtures" onClose={onClose} open={open} sceneMode={mode} />}
+      effectiveEndpoint="deterministic fixtures"
       footerLabel="Development"
       identity={identity}
       linkText={`FIXTURE · ${mode}`}
@@ -85,6 +86,7 @@ function FixtureDashboard({ mode, notesOpen, onCloseNotes, onSetNotesOpen }: { m
       notesSnapshot={snapshot}
       onCloseNotes={onCloseNotes}
       onSetNotesOpen={onSetNotesOpen}
+      settingsSnapshot={snapshot}
     >
       {mode === "flight"
         ? <FixtureFlightDashboard snapshot={snapshot} />

@@ -20,6 +20,7 @@ import {
   HideablePanelSlot,
   PanelRestoreRail,
   PanelVisibilityProvider,
+  usePanelVisibility,
   type DashboardPanelId,
 } from "./components/PanelVisibility";
 import { PinnedNotePanel } from "./components/PinnedNotePanel";
@@ -33,6 +34,7 @@ import { PinnedResonantOrbitPanel } from "./resonantOrbit/PinnedResonantOrbitPan
 import { ResonantOrbitProvider, useResonantOrbitState } from "./resonantOrbit/state";
 import { ResonantOrbitTool } from "./resonantOrbit/ResonantOrbitTool";
 import { usePlannerPersistenceStatus } from "./sharedPlannerPersistence";
+import { SettingsDrawer, SettingsProvider, useSettings } from "./settings";
 import { liveTelemetryStore } from "./telemetry/store";
 import {
   ascensionSnapshotsEqual,
@@ -49,12 +51,13 @@ import {
   overviewSnapshotsEqual,
   pinnedNoteSnapshotsEqual,
   scienceSnapshotsEqual,
+  settingsSnapshotsEqual,
   stagingSnapshotsEqual,
   targetSnapshotsEqual,
 } from "./telemetry/subscriptions";
 import type { SceneMode, TelemetryCommand, TelemetrySnapshot } from "./telemetry/types";
 import { shallowEqual, useLiveDiagnostics, useLiveTelemetrySelector } from "./telemetry/useLiveTelemetry";
-import { TimeSystemProvider } from "./timeSystem";
+import { TimeSystemProvider, useTimeSystem } from "./timeSystem";
 
 export const DEFAULT_LIVE_ENDPOINT = "ws://127.0.0.1:8090";
 
@@ -100,9 +103,11 @@ function PlannerPersistenceIndicator() {
 export function DashboardProviders({ children }: PropsWithChildren) {
   return (
     <TimeSystemProvider>
-      <ResonantOrbitProvider>
-        <DeltaVDraftProvider>{children}</DeltaVDraftProvider>
-      </ResonantOrbitProvider>
+      <SettingsProvider>
+        <ResonantOrbitProvider>
+          <DeltaVDraftProvider>{children}</DeltaVDraftProvider>
+        </ResonantOrbitProvider>
+      </SettingsProvider>
     </TimeSystemProvider>
   );
 }
@@ -118,6 +123,7 @@ export function DashboardAppFrame({ children, notesOpen }: PropsWithChildren<{ n
 interface DashboardSurfaceProps {
   children?: ReactNode;
   datalink(open: boolean, onClose: () => void): ReactNode;
+  effectiveEndpoint?: string;
   footerLabel: "Development" | "Production";
   identity?: string;
   linkText: string;
@@ -130,12 +136,14 @@ interface DashboardSurfaceProps {
   onCloseNotes(): void;
   onSetNotesOpen(open: boolean): void;
   onSendNotesCommand?(command: TelemetryCommand): boolean;
+  settingsSnapshot?: TelemetrySnapshot;
   waitingMessage?: string;
 }
 
 export function DashboardSurface({
   children,
   datalink,
+  effectiveEndpoint,
   footerLabel,
   identity,
   linkText,
@@ -148,11 +156,27 @@ export function DashboardSurface({
   onCloseNotes,
   onSetNotesOpen,
   onSendNotesCommand = () => false,
+  settingsSnapshot,
   waitingMessage = "Waiting for the first valid Mission Control telemetry frame.",
 }: DashboardSurfaceProps) {
   const showHeader = liveWaiting;
   const [datalinkOpen, setDatalinkOpen] = useState(false);
   const { closeDeltaVDrawer, closeDrawer } = useResonantOrbitState();
+  const { hiddenPanels, restoreAllHiddenPanels } = usePanelVisibility();
+  const { system: timeSystem, setSystem: setTimeSystem } = useTimeSystem();
+  const plannerPersistence = usePlannerPersistenceStatus();
+  const {
+    closeSettings,
+    open: settingsOpen,
+    openSettings,
+    scienceAlarmSettings,
+    section: settingsSection,
+    selectSection,
+    themeId,
+    updateTheme,
+    updateScienceAlarmSettings,
+  } = useSettings();
+  const dashboardSettingsSnapshot = settingsSnapshot ?? notesSnapshot;
   const closeDatalink = useCallback(() => setDatalinkOpen(false), []);
   const closeOtherTools = useCallback(() => {
     onCloseNotes();
@@ -161,22 +185,63 @@ export function DashboardSurface({
   }, [closeDeltaVDrawer, closeDrawer, onCloseNotes]);
   const toggleDatalink = useCallback(() => {
     setDatalinkOpen((current) => {
-      if (!current) closeOtherTools();
+      if (!current) {
+        closeOtherTools();
+        closeSettings();
+      }
       return !current;
     });
-  }, [closeOtherTools]);
+  }, [closeOtherTools, closeSettings]);
+  const toggleSettings = useCallback(() => {
+    if (settingsOpen) {
+      closeSettings();
+      return;
+    }
+    closeOtherTools();
+    closeDatalink();
+    openSettings(settingsSection);
+  }, [closeDatalink, closeOtherTools, closeSettings, openSettings, settingsOpen, settingsSection]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    closeOtherTools();
+    closeDatalink();
+  }, [closeDatalink, closeOtherTools, settingsOpen]);
 
   return (
     <section className={`dashboard-surface ${mode === "flight" ? "flight-mode" : mode === "editor" ? "editor-mode" : "inactive-mode"}`}>
+      <SettingsDrawer
+        buildLabel={footerLabel}
+        effectiveEndpoint={effectiveEndpoint}
+        hiddenPanelCount={hiddenPanels.size}
+        onClose={closeSettings}
+        onRestoreHiddenPanels={restoreAllHiddenPanels}
+        onScienceAlarmSettingsChange={updateScienceAlarmSettings}
+        onSectionChange={selectSection}
+        onSetTimeSystem={setTimeSystem}
+        onSetTheme={updateTheme}
+        open={settingsOpen}
+        scienceAlarmProviders={dashboardSettingsSnapshot["sci.alarmProviders"]}
+        scienceAlarmSettings={scienceAlarmSettings}
+        section={settingsSection}
+        telemetry={{
+          capabilities: dashboardSettingsSnapshot["dashboard.capabilities"],
+          effectiveEndpoint,
+          persistenceStatus: plannerPersistence.status,
+        }}
+        themeId={themeId}
+        timeSystem={timeSystem}
+      />
       <NotesContinuityPreview commandEnabled={notesCommandEnabled} onClose={onCloseNotes} onSendCommand={onSendNotesCommand} open={notesOpen} snapshot={notesSnapshot} />
       {datalink(datalinkOpen, closeDatalink)}
       <DashboardRail
         datalinkButton={<DatalinkRailButton onToggle={toggleDatalink} open={datalinkOpen} />}
-        notesButton={<NotesRailButton onOpen={closeDatalink} open={notesOpen} setOpen={onSetNotesOpen} />}
+        notesButton={<NotesRailButton onOpen={() => { closeDatalink(); closeSettings(); }} open={notesOpen} setOpen={onSetNotesOpen} />}
+        settingsButton={<SettingsRailButton onToggle={toggleSettings} open={settingsOpen} />}
         tools={(
           <>
-            <ResonantOrbitTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} snapshot={notesSnapshot} />
-            <DeltaVTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); }} snapshot={notesSnapshot} />
+            <ResonantOrbitTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); closeSettings(); }} snapshot={notesSnapshot} />
+            <DeltaVTool mode={mode} onOpen={() => { onCloseNotes(); closeDatalink(); closeSettings(); }} snapshot={notesSnapshot} />
           </>
         )}
       />
@@ -375,6 +440,7 @@ export function LiveDashboard({
   const annunciator = useFlightAnnunciator({ ...annunciatorInput, watchdog: true });
   const headerSnapshot = useLiveTelemetrySelector((state) => state.snapshot, headerSnapshotsEqual);
   const notesSnapshot = useLiveTelemetrySelector((state) => state.snapshot, notesSnapshotsEqual);
+  const settingsSnapshot = useLiveTelemetrySelector((state) => state.snapshot, settingsSnapshotsEqual);
   const mode = headerSnapshot?.["context.mode"] ?? "inactive";
   const waiting = headerSnapshot === null;
   const identity = mode === "flight" ? String(headerSnapshot?.["v.name"] ?? "Active vessel") : mode === "editor" ? String(headerSnapshot?.["editor.craftName"] ?? "Untitled craft") : undefined;
@@ -428,6 +494,7 @@ export function LiveDashboard({
           sceneMode={mode}
         />
       )}
+      effectiveEndpoint={connectionEndpoint}
       footerLabel={footerLabel}
       identity={identity}
       linkText={linkText}
@@ -440,6 +507,7 @@ export function LiveDashboard({
       onCloseNotes={onCloseNotes}
       onSetNotesOpen={onSetNotesOpen}
       onSendNotesCommand={(command) => liveTelemetryStore.send(command)}
+      settingsSnapshot={settingsSnapshot ?? emptyTelemetry}
       waitingMessage={waitingMessage}
     >
       {mode === "flight"
@@ -489,6 +557,23 @@ function NotesRailButton({ onOpen, open, setOpen }: { onOpen(): void; open: bool
     >
       <span aria-hidden="true" className="panel-rail-label">Notes</span>
       <PanelRailIcon name="notes" />
+    </button>
+  );
+}
+
+function SettingsRailButton({ onToggle, open }: { onToggle(): void; open: boolean }) {
+  return (
+    <button
+      aria-controls="settings-drawer"
+      aria-expanded={open}
+      aria-label="Settings"
+      className="settings-rail-tab dashboard-tool-button panel-rail-button"
+      onClick={onToggle}
+      title="Open Settings"
+      type="button"
+    >
+      <span aria-hidden="true" className="panel-rail-label">Settings</span>
+      <PanelRailIcon name="settings" />
     </button>
   );
 }

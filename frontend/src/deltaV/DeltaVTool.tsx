@@ -38,14 +38,17 @@ function DeltaVDrawer({ mode, snapshot }: { mode: SceneMode; snapshot?: Telemetr
     <div aria-hidden="true" className="resonant-drawer-backdrop" onMouseDown={closeDeltaVDrawer} />
     <aside aria-label="Delta-v planner" aria-modal="true" className="resonant-drawer delta-v-drawer" id="delta-v-drawer" ref={drawerDialogRef} role="dialog" tabIndex={-1}>
       <header>
-        <div><span>MISSION PLANNING · DELTA-V</span><h2>Delta-V Mission Planner</h2><p>Build an idealized mission budget from the live KSP body catalog without changing the active craft.</p></div>
+        <div><h2>Delta-V Mission Planner</h2><p>Build an idealized mission budget from the live KSP body catalog without changing the active craft.</p></div>
         <div className="delta-v-header-controls">
           <div className="delta-v-save-slot" ref={setSaveTarget} />
-          <div className="delta-v-header-actions">
-            <button aria-haspopup="dialog" aria-label="Load saved plans" className="delta-v-saved-plans-button" onClick={() => setSavedPlansOpen(true)} title="Load saved plans" type="button"><span>SAVED PLANS</span><strong>{currentSavePlanCount}</strong></button>
-            <button aria-haspopup="dialog" aria-label="Reset current plan" className="delta-v-reset-button" disabled={!draftHasContent} onClick={() => setResetConfirmationOpen(true)} title={draftHasContent ? "Clear the current draft and start a new plan" : "The current draft is already empty"} type="button">RESET</button>
-            <button aria-label="Model assumptions and limits" className="delta-v-assumptions-button" onClick={() => setAssumptionsOpen(true)} title="Model assumptions and limits" type="button">?</button>
-            <button aria-label="Close delta-v planner" onClick={closeDeltaVDrawer} type="button">×</button>
+          <div aria-label="Plan tools" className="delta-v-header-actions" role="group">
+            <span className="delta-v-header-actions-heading">PLAN TOOLS</span>
+            <div className="delta-v-header-action-buttons">
+              <button aria-haspopup="dialog" aria-label="Load saved plans" className="delta-v-saved-plans-button" onClick={() => setSavedPlansOpen(true)} title="Load saved plans" type="button"><span>SAVED PLANS</span><strong>{currentSavePlanCount}</strong></button>
+              <button aria-haspopup="dialog" aria-label="Reset current plan" className="delta-v-reset-button" disabled={!draftHasContent} onClick={() => setResetConfirmationOpen(true)} title={draftHasContent ? "Clear the current draft and start a new plan" : "The current draft is already empty"} type="button">RESET</button>
+              <button aria-label="Model assumptions and limits" className="delta-v-assumptions-button" onClick={() => setAssumptionsOpen(true)} title="Model assumptions and limits" type="button">MODEL</button>
+              <button aria-label="Close delta-v planner" onClick={closeDeltaVDrawer} type="button">×</button>
+            </div>
           </div>
         </div>
       </header>

@@ -45,6 +45,216 @@ test("developer controls stay out of screenshots until the corner is engaged", a
   await expect(tab).toHaveCSS("opacity", "1");
 });
 
+test("Settings remains the last usable Tool without horizontal overflow across the acceptance viewports", async ({ page }) => {
+  for (const viewport of [
+    { width: 1920, height: 889 },
+    { width: 1280, height: 800 },
+    { width: 1080, height: 1920 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+
+    const tools = page.getByRole("group", { name: "Tools" });
+    const opener = page.getByRole("button", { name: "Settings", exact: true });
+    await expect(opener).toBeVisible();
+    expect(await tools.evaluate((group) => group.lastElementChild?.getAttribute("aria-label"))).toBe("Settings");
+
+    await opener.click();
+    const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+    const navigation = drawer.getByRole("navigation", { name: "Settings sections" });
+    await expect(drawer).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Preferences" })).toHaveAttribute("aria-current", "page");
+
+    for (const [section, heading] of [
+      ["Features & Mods", "Features & Mods"],
+      ["Help", "Help"],
+      ["About", "About"],
+      ["Preferences", "Preferences"],
+    ]) {
+      await navigation.getByRole("button", { name: section, exact: true }).click();
+      await expect(drawer.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      if (section === "Features & Mods") {
+        await expect(drawer.getByText("AVAILABLE", { exact: true })).toHaveCount(10);
+        await expect(drawer.getByText("AVAILABLE · STOCK", { exact: true })).toHaveCount(0);
+        await expect(drawer.getByText("UNAVAILABLE", { exact: true })).toHaveCount(0);
+        await expect(drawer.getByText("DETECTION UNAVAILABLE", { exact: true })).toHaveCount(0);
+      }
+    }
+
+    const layout = await drawer.evaluate((element) => {
+      const body = element.querySelector<HTMLElement>(".settings-drawer-body")!;
+      const navigationElement = element.querySelector<HTMLElement>(".settings-section-nav")!;
+      const section = element.querySelector<HTMLElement>(".settings-section")!;
+      return {
+        bodyClientWidth: body.clientWidth,
+        bodyOverflowX: getComputedStyle(body).overflowX,
+        bodyScrollWidth: body.scrollWidth,
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        drawerClientWidth: element.clientWidth,
+        drawerScrollWidth: element.scrollWidth,
+        navigationOverflowX: getComputedStyle(navigationElement).overflowX,
+        sectionClientWidth: section.clientWidth,
+        sectionScrollWidth: section.scrollWidth,
+      };
+    });
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+    expect(layout.drawerScrollWidth).toBeLessThanOrEqual(layout.drawerClientWidth + 1);
+    expect(layout.bodyScrollWidth).toBeLessThanOrEqual(layout.bodyClientWidth + 1);
+    expect(layout.bodyOverflowX).toBe("hidden");
+    expect(layout.sectionScrollWidth).toBeLessThanOrEqual(layout.sectionClientWidth + 1);
+    if (viewport.width === 390) expect(layout.navigationOverflowX).toBe("auto");
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(opener).toBeFocused();
+  }
+});
+
+test("Settings applies and persists every dashboard color theme", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+
+  for (const theme of [
+    { id: "daylight-console", label: "Daylight Console", scheme: "light" },
+    { id: "warm-crt", label: "Warm CRT", scheme: "dark" },
+    { id: "green-phosphor", label: "Green Phosphor", scheme: "dark" },
+    { id: "mission-control-dark", label: "Mission Control Dark", scheme: "dark" },
+  ]) {
+    const option = drawer.getByRole("radio", { name: new RegExp(theme.label) });
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    expect(await page.locator("html").getAttribute("data-theme")).toBe(theme.id);
+    expect(await page.locator("html").evaluate((root) => getComputedStyle(root).colorScheme)).toBe(theme.scheme);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("wmc-theme-v1") ?? "null"))).toBe(theme.id);
+  }
+
+  await page.reload();
+  expect(await page.locator("html").getAttribute("data-theme")).toBe("mission-control-dark");
+});
+
+test("Daylight Flight chrome keeps inactive hardware quiet and exposes light Plan state roles", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/");
+
+  const litIndicator = page.locator(".annunciator-indicator.new").first();
+  const darkLitFace = await litIndicator.evaluate((element) => getComputedStyle(element).backgroundImage);
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+  await drawer.getByRole("radio", { name: /Daylight Console/ }).click();
+  await page.keyboard.press("Escape");
+
+  const inactiveIndicator = page.locator(".annunciator-indicator:not(.new):not(.acknowledged)").first();
+  const flightChrome = await inactiveIndicator.evaluate((element) => {
+    const root = getComputedStyle(document.documentElement);
+    const inactive = getComputedStyle(element);
+    const identity = getComputedStyle(document.querySelector<HTMLElement>(".flight-context-identity strong")!);
+    const clock = getComputedStyle(document.querySelector<HTMLElement>(".clockcell .big")!);
+    return {
+      clockShadow: clock.textShadow,
+      identityShadow: identity.textShadow,
+      inactiveBackground: inactive.backgroundImage,
+      inactiveBorder: inactive.borderColor,
+      inactiveText: inactive.color,
+      planGround: root.getPropertyValue("--plan-panel-ground").trim(),
+      planStep: root.getPropertyValue("--plan-step-face").trim(),
+      stateCyan: root.getPropertyValue("--state-wash-cyan").trim(),
+    };
+  });
+  expect(flightChrome.clockShadow).toBe("none");
+  expect(flightChrome.identityShadow).toBe("none");
+  expect(flightChrome.inactiveBackground).toContain("rgb(233, 238, 243)");
+  expect(flightChrome.inactiveBorder).toBe("rgb(167, 179, 192)");
+  expect(flightChrome.inactiveText).toBe("rgb(102, 116, 130)");
+  expect(flightChrome.planGround).toBe("#ffffff");
+  expect(flightChrome.planStep).toContain("#f1f5f9");
+  expect(flightChrome.stateCyan).toContain("rgba(255,255,255,.9)");
+  expect(await litIndicator.evaluate((element) => getComputedStyle(element).backgroundImage)).toBe(darkLitFace);
+
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const planner = page.getByRole("dialog", { name: "Delta-v planner" });
+  const profile = planner.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+  if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+  if (await planner.getByRole("combobox", { name: "Start" }).count()) {
+    await planner.getByRole("button", { name: /Add next stop/ }).click();
+  }
+  await planner.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await planner.getByRole("button", { name: /Add next stop/ }).click();
+  await planner.getByRole("textbox", { name: "Delta-v plan name" }).fill("Daylight state review");
+  await planner.getByRole("button", { name: "Save plan", exact: true }).click();
+  await planner.getByRole("button", { name: "Load saved plans" }).click();
+  const savedPlans = page.getByRole("dialog", { name: "Saved Delta-v plans" });
+  await savedPlans.getByRole("button", { name: "Pin to active vessel" }).click();
+  await savedPlans.getByRole("button", { name: "Close saved plans" }).click();
+  await planner.getByRole("button", { name: "Close delta-v planner" }).click();
+  await page.getByRole("tab", { name: "PLAN", exact: true }).click();
+  await expect(page.locator('.flight-workspace-selector[data-active-view="plan"]')).toBeVisible();
+
+  const comparison = page.locator(".delta-v-pinned-comparison");
+  const launchSuggestion = page.locator(".delta-v-progress-suggestion");
+  await expect(comparison).toBeVisible();
+  await expect(launchSuggestion).toBeVisible();
+  const planState = await comparison.evaluate((element) => ({
+    background: getComputedStyle(element).backgroundImage,
+    body: getComputedStyle(element.querySelector("p")!).color,
+    shortfall: getComputedStyle(element.querySelector("header strong")!).color,
+    suggestion: getComputedStyle(document.querySelector<HTMLElement>(".delta-v-progress-suggestion span")!).color,
+  }));
+  expect(planState.background).toContain("rgba(255, 255, 255, 0.9)");
+  expect(planState.body).toBe("rgb(43, 56, 70)");
+  expect(planState.shortfall).toBe("rgb(143, 41, 34)");
+  expect(planState.suggestion).toBe("rgb(78, 92, 108)");
+});
+
+test("Settings provides 44px targets on a coarse 390px mobile viewport", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    const opener = page.getByRole("button", { name: "Settings", exact: true });
+    await opener.click();
+    const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+    await expect(drawer).toBeVisible();
+
+    const targets = await drawer.evaluate((element) => {
+      const controls = [
+        ...element.querySelectorAll<HTMLElement>(".settings-section-nav button"),
+        ...element.querySelectorAll<HTMLElement>(".settings-theme-option"),
+        element.querySelector<HTMLElement>("header > button")!,
+      ];
+      return {
+        coarsePointer: matchMedia("(pointer: coarse)").matches,
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        drawerClientWidth: element.clientWidth,
+        drawerScrollWidth: element.scrollWidth,
+        openerHeight: document.querySelector<HTMLElement>(".settings-rail-tab")?.getBoundingClientRect().height,
+        openerWidth: document.querySelector<HTMLElement>(".settings-rail-tab")?.getBoundingClientRect().width,
+        controls: controls.map((control) => {
+          const bounds = control.getBoundingClientRect();
+          return { height: bounds.height, width: bounds.width };
+        }),
+      };
+    });
+    expect(targets.coarsePointer).toBe(true);
+    expect(targets.documentScrollWidth).toBeLessThanOrEqual(targets.documentClientWidth);
+    expect(targets.drawerScrollWidth).toBeLessThanOrEqual(targets.drawerClientWidth + 1);
+    expect(targets.openerWidth).toBeGreaterThanOrEqual(44);
+    expect(targets.openerHeight).toBeGreaterThanOrEqual(44);
+    expect(targets.controls.every((control) => control.width >= 44 && control.height >= 44)).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(opener).toBeFocused();
+  } finally {
+    await context.close();
+  }
+});
+
 test("both mission planners remain usable at a normal desktop viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
@@ -99,9 +309,20 @@ test("saved Delta-v plan feedback reserves visible header space", async ({ page 
     const header = element.querySelector<HTMLElement>(":scope > header")!.getBoundingClientRect();
     const body = element.querySelector<HTMLElement>(":scope > .delta-v-drawer-body")!.getBoundingClientRect();
     const message = element.querySelector<HTMLElement>(".delta-v-save-feedback")!.getBoundingClientRect();
+    const nameHeading = element.querySelector<HTMLElement>(".delta-v-save-heading > span")!.getBoundingClientRect();
+    const nameInput = element.querySelector<HTMLElement>(".delta-v-save-bar input")!.getBoundingClientRect();
+    const saveActions = Array.from(element.querySelectorAll<HTMLElement>(".delta-v-save-actions button")).map((button) => button.getBoundingClientRect());
+    const planTools = element.querySelector<HTMLElement>(".delta-v-header-actions")!.getBoundingClientRect();
     return {
       containedByHeader: message.top >= header.top && message.bottom <= header.bottom + 1,
       clearOfBody: message.bottom <= body.top + 1,
+      headerHeight: header.height,
+      nameHeadingHeight: nameHeading.height,
+      nameHeadingWidth: nameHeading.width,
+      nameInputWidth: nameInput.width,
+      planToolsSeparated: saveActions.at(-1)!.right < planTools.left,
+      saveControlsSeparated: nameInput.right <= saveActions[0].left
+        && saveActions.every((button, index) => index === 0 || saveActions[index - 1].right <= button.left),
       visibleHeight: message.height,
       drawerClientWidth: element.clientWidth,
       drawerScrollWidth: element.scrollWidth,
@@ -109,8 +330,62 @@ test("saved Delta-v plan feedback reserves visible header space", async ({ page 
   });
   expect(layout.containedByHeader).toBe(true);
   expect(layout.clearOfBody).toBe(true);
-  expect(layout.visibleHeight).toBeGreaterThanOrEqual(18);
+  expect(layout.headerHeight).toBeLessThanOrEqual(65);
+  expect(layout.nameHeadingHeight).toBeLessThanOrEqual(16);
+  expect(layout.nameHeadingWidth).toBeGreaterThanOrEqual(65);
+  expect(layout.nameInputWidth).toBeGreaterThanOrEqual(240);
+  expect(layout.planToolsSeparated).toBe(true);
+  expect(layout.saveControlsSeparated).toBe(true);
+  expect(layout.visibleHeight).toBeGreaterThanOrEqual(10);
   expect(layout.drawerScrollWidth).toBeLessThanOrEqual(layout.drawerClientWidth + 1);
+  await expect(drawer.getByRole("heading", { name: "Delta-V Mission Planner" })).toBeVisible();
+  await expect(drawer.getByText("MISSION PLANNING · DELTA-V", { exact: true })).toHaveCount(0);
+});
+
+test("saved Delta-v plans inherit the active dashboard theme", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const planner = page.getByRole("dialog", { name: "Delta-v planner" });
+  const profile = planner.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+  if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+  if (await planner.getByRole("combobox", { name: "Start" }).count()) {
+    await planner.getByRole("button", { name: /Add next stop/ }).click();
+  }
+  await planner.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await planner.getByRole("button", { name: /Add next stop/ }).click();
+  await planner.getByRole("textbox", { name: "Delta-v plan name" }).fill("Theme inheritance check");
+  await planner.getByRole("button", { name: "Save plan", exact: true }).click();
+  await planner.getByRole("button", { name: "Load saved plans" }).click();
+
+  const library = planner.getByRole("dialog", { name: "Saved Delta-V plans" });
+  const readSurfaces = () => library.evaluate((element) => ({
+    card: getComputedStyle(element.querySelector<HTMLElement>(".delta-v-plan-library-list article")!).backgroundColor,
+    header: getComputedStyle(element.querySelector<HTMLElement>(":scope > header")!).backgroundImage,
+    modal: getComputedStyle(element).backgroundImage,
+  }));
+  const darkSurfaces = await readSurfaces();
+  await library.getByRole("button", { name: "Close saved plans" }).click();
+  await planner.getByRole("button", { name: "Close delta-v planner" }).click();
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const settings = page.getByRole("dialog", { name: "Mission Control Settings" });
+  await settings.getByRole("radio", { name: /Daylight Console/ }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const daylightPlanner = page.getByRole("dialog", { name: "Delta-v planner" });
+  await daylightPlanner.getByRole("button", { name: "Load saved plans" }).click();
+  const daylightLibrary = daylightPlanner.getByRole("dialog", { name: "Saved Delta-V plans" });
+  const daylightSurfaces = await daylightLibrary.evaluate((element) => ({
+    card: getComputedStyle(element.querySelector<HTMLElement>(".delta-v-plan-library-list article")!).backgroundColor,
+    header: getComputedStyle(element.querySelector<HTMLElement>(":scope > header")!).backgroundImage,
+    modal: getComputedStyle(element).backgroundImage,
+  }));
+
+  expect(await page.locator("html").getAttribute("data-theme")).toBe("daylight-console");
+  expect(daylightSurfaces.modal).not.toBe(darkSurfaces.modal);
+  expect(daylightSurfaces.header).not.toBe(darkSurfaces.header);
+  expect(daylightSurfaces.card).not.toBe(darkSurfaces.card);
 });
 
 test("Delta-v density keeps the route primary on fine and coarse pointers", async ({ page, browser, baseURL }) => {
@@ -173,12 +448,15 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
       routeHeaderHeight: bounds(".delta-v-route > header").height,
       routeListHeight: bounds(".delta-v-route-list").height,
       summaryHeight: bounds(".delta-v-summary").height,
+      transferModeInMissionSummary: Boolean(drawer.querySelector(".delta-v-summary .delta-v-transfer-mode"))
+        && !drawer.querySelector(".delta-v-controls .delta-v-transfer-mode"),
     };
   });
 
-  expect(desktop.headerHeight).toBeLessThanOrEqual(50);
+  expect(desktop.headerHeight).toBeLessThanOrEqual(65);
   expect(desktop.configurationHeight).toBeLessThanOrEqual(115);
-  expect(desktop.summaryHeight).toBeLessThanOrEqual(115);
+  expect(desktop.summaryHeight).toBeLessThanOrEqual(122);
+  expect(desktop.transferModeInMissionSummary).toBe(true);
   expect(desktop.routeHeaderHeight).toBeLessThanOrEqual(36);
   expect(desktop.routeListHeight).toBeGreaterThanOrEqual(500);
   expect(desktop.footerHeight).toBeLessThanOrEqual(27);
@@ -204,8 +482,8 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
   await page.getByRole("radio", { name: "Parking orbit" }).check({ force: true });
   await expect(page.getByRole("spinbutton", { name: "Planned altitude" })).toBeVisible();
   await expect(page.getByText(/ATMO Ends at 50.0/)).toBeVisible();
-  await expect(page.getByText("Simple: ideal dates")).toBeVisible();
-  await expect(page.getByText("Advanced: per-leg porkchops")).toHaveCount(0);
+  await expect(page.getByText("Ideal dates")).toBeVisible();
+  await expect(page.getByText("Per-leg porkchops")).toHaveCount(0);
   const portraitMargin = await page.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
     const card = drawer.querySelector<HTMLElement>(".delta-v-margin-card")!.getBoundingClientRect();
     const controls = drawer.querySelector<HTMLElement>(".delta-v-margin-controls")!.getBoundingClientRect();

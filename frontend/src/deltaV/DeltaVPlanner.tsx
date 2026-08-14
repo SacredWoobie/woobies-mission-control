@@ -853,12 +853,15 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     ? `${plan.origin.name} round trip`
     : plan ? `${plan.origin.name} → ${plan.destination.name}` : "";
   const saveControls = plan ? <div className="delta-v-save-bar">
-    <label><span>Plan name:</span><input aria-label="Delta-v plan name" placeholder={suggestedPlanName} value={planName} onChange={(event) => { setPlanName(event.target.value); setSaveError(false); setSavedNotice(""); }} /></label>
+    <div className="delta-v-save-heading">
+      <span>PLAN NAME</span>
+      {savedNotice && <small className={`delta-v-save-feedback${saveError ? " error" : ""}`} role={saveError ? "alert" : "status"}>{savedNotice}</small>}
+    </div>
+    <label><span className="sr-only">Plan name</span><input aria-label="Delta-v plan name" placeholder={suggestedPlanName} value={planName} onChange={(event) => { setPlanName(event.target.value); setSaveError(false); setSavedNotice(""); }} /></label>
     <div className="delta-v-save-actions">
       <button disabled={advancedPlanIncomplete} onClick={() => saveCurrentPlan(false)} type="button">{activeSavedPlanId ? "Update plan" : "Save plan"}</button>
       {activeSavedPlanId && <button className="secondary" disabled={advancedPlanIncomplete} onClick={() => saveCurrentPlan(true)} type="button">Save as new</button>}
     </div>
-    {savedNotice && <small className={`delta-v-save-feedback${saveError ? " error" : ""}`} role={saveError ? "alert" : "status"}>{savedNotice}</small>}
   </div> : null;
   const renderSavedPlan = (record: SavedDeltaVPlanRecord) => {
     const isPinned = pinned?.id === record.id;
@@ -894,15 +897,9 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
           {nextStop.endpoint === "orbit" && <ParkingAltitudeInput body={nextStopBody} label="Planned altitude" onChange={(parkingAltitude) => setNextStop((current) => ({ ...current, parkingAltitude }))} unit={unit} value={nextStop.parkingAltitude} />}
         </> : <div className="delta-v-empty-stop"><span>ARRIVAL PROFILE</span><strong>Choose a body to configure the next stop.</strong></div>}
       </div>}
-      <div className="delta-v-mission-row one-way">
-        <fieldset><legend className="delta-v-field-heading"><span>Transfer planning</span></legend><div className="resonant-segments delta-v-transfer-mode">
-          <label><input checked={transferMode === "simple"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("simple")} /><span>Simple</span></label>
-          <label><input checked={transferMode === "advanced"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("advanced")} /><span>Advanced</span></label>
-        </div></fieldset>
-        <div className="delta-v-add-stop-row">
-          <button disabled={startLocked && !nextStopBody} onClick={startLocked ? addStop : lockStart} title={editingStopId ? "Update this route stop" : startLocked ? "Add this stop and keep the builder ready for the next leg" : "Lock the mission start and configure the first destination"} type="button">{editingStopId ? "Update stop" : "+ Add next stop"}</button>
-          {editingStopId && <button className="secondary" onClick={cancelStopEdit} type="button">Cancel edit</button>}
-        </div>
+      <div className="delta-v-add-stop-row">
+        <button disabled={startLocked && !nextStopBody} onClick={startLocked ? addStop : lockStart} title={editingStopId ? "Update this route stop" : startLocked ? "Add this stop and keep the builder ready for the next leg" : "Lock the mission start and configure the first destination"} type="button">{editingStopId ? "Update stop" : "+ Add next stop"}</button>
+        {editingStopId && <button className="secondary" onClick={cancelStopEdit} type="button">Cancel edit</button>}
       </div>
       </section>}
     </div>
@@ -931,7 +928,14 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     {calculation.error && <div className="resonant-error delta-v-error" role="alert">{calculation.error}</div>}
     {plan && <div className="delta-v-output">
       <section className="delta-v-summary">
-        <header><div><span>PLANNING BUDGET</span><h3>{routeHeading}</h3></div><div className="delta-v-summary-mode"><small>{transferMode === "simple" ? "Simple: ideal dates" : "Advanced: per-leg porkchops"}</small><strong>{transferMode.toUpperCase()} + {marginPercent}%</strong></div></header>
+        <header>
+          <div><span>PLANNING BUDGET</span><h3>{routeHeading}</h3></div>
+          <fieldset className="delta-v-summary-transfer-mode"><legend className="sr-only">Transfer planning</legend><div className="resonant-segments delta-v-transfer-mode">
+            <label><input checked={transferMode === "simple"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("simple")} /><span>Simple</span></label>
+            <label><input checked={transferMode === "advanced"} name="transfer-planning-mode" type="radio" onChange={() => selectTransferMode("advanced")} /><span>Advanced</span></label>
+          </div></fieldset>
+          <div className="delta-v-summary-mode"><small>{transferMode === "simple" ? "Ideal dates" : "Per-leg porkchops"}</small><strong>{marginPercent}% MARGIN</strong></div>
+        </header>
         <div className="delta-v-total"><span>Total mission budget</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : formatDeltaV(plan.totalDeltaV)}</strong><small>{planningStops.length} mission stop{planningStops.length === 1 ? "" : "s"} · {surfaceStopCount} surface stop{surfaceStopCount === 1 ? "" : "s"} · {plan.legs.length} modeled legs</small></div>
         <div className="delta-v-stat-grid">
           <article><span>Nominal route</span><strong className={advancedPlanIncomplete ? "delta-v-incomplete-bumper" : undefined}>{advancedPlanIncomplete ? "INCOMPLETE" : formatDeltaV(plan.nominalDeltaV)}</strong><small>Before planning margin</small></article>

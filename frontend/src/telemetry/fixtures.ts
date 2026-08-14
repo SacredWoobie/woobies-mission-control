@@ -1,4 +1,4 @@
-import type { NoteTelemetry, TelemetrySnapshot } from "./types";
+import type { DashboardCapabilitiesSnapshot, NoteTelemetry, TelemetrySnapshot } from "./types";
 import { representativeElectricityFixture } from "../electricityPlanner/fixtures";
 
 const editorStages = [
@@ -38,7 +38,28 @@ const activeNote: NoteTelemetry = {
   truncated: false,
 };
 
+export const dashboardCapabilitiesFixture: DashboardCapabilitiesSnapshot = {
+  schemaVersion: 1,
+  features: {
+    // Development fixtures deliberately represent a fully provisioned install.
+    // Settings consumes only root-scan evidence so its dashboard-wide inventory
+    // stays independent from whichever scene fixture is currently selected.
+    notes: { status: "available", reason: "ready", evidence: [{ id: "notes", status: "active", source: "runtime" }, { id: "notes", status: "detected", source: "root_scan" }] },
+    science_telemetry: { status: "available", reason: "ready", evidence: [{ id: "vessel_science", status: "active", source: "runtime" }, { id: "wcs", status: "detected", source: "root_scan" }] },
+    science_alarms: { status: "available", reason: "ready", evidence: [{ id: "kac", status: "active", source: "runtime" }, { id: "stock", status: "active", source: "runtime" }, { id: "kac", status: "detected", source: "root_scan" }] },
+    communications: { status: "available", reason: "ready", evidence: [{ id: "remote_tech", status: "active", source: "runtime" }, { id: "remote_tech", status: "detected", source: "root_scan" }] },
+    stage_analysis: { status: "available", reason: "ready", evidence: [{ id: "stage_stats", status: "active", source: "runtime" }, { id: "stage_stats", status: "detected", source: "root_scan" }, { id: "mechjeb", status: "detected", source: "root_scan" }] },
+    live_transfer_calculations: { status: "available", reason: "ready", evidence: [{ id: "woobies_mechjeb", status: "active", source: "runtime" }, { id: "mechjeb", status: "detected", source: "runtime", version: "2.15.3.0" }, { id: "woobies_mechjeb", status: "detected", source: "root_scan" }, { id: "mechjeb", status: "detected", source: "root_scan" }] },
+    heat_monitoring: { status: "available", reason: "ready", evidence: [{ id: "system_heat", status: "active", source: "runtime" }, { id: "system_heat_service", status: "detected", source: "root_scan" }, { id: "system_heat_mod", status: "detected", source: "root_scan" }] },
+    heat_controls: { status: "available", reason: "ready", evidence: [{ id: "system_heat_service", status: "active", source: "runtime" }, { id: "system_heat_service", status: "detected", source: "root_scan" }, { id: "system_heat_mod", status: "detected", source: "root_scan" }] },
+    editor_electricity: { status: "available", reason: "ready", evidence: [{ id: "dynamic_battery_storage", status: "active", source: "runtime", version: "2.3.0.0" }, { id: "dynamic_battery_storage", status: "detected", source: "root_scan" }] },
+    damage_monitoring: { status: "available", reason: "ready", evidence: [{ id: "vessel_damage", status: "active", source: "runtime" }, { id: "wcs", status: "detected", source: "root_scan" }] },
+  },
+};
+
 const notesFixture = {
+  "dashboard.capabilities": dashboardCapabilitiesFixture,
+  "sci.alarmProviders": { kac: true, stock: true },
   "notes.available": true,
   "notes.activeFound": true,
   "notes.message": "",
@@ -219,7 +240,6 @@ export const flightTelemetryFixture: TelemetrySnapshot = {
   "sci.krpc.labTelemetryAvailable": true,
   "sci.krpc.labDaySeconds": 21_600,
   "sci.krpc.labCount": 1,
-  "sci.alarmProviders": { kac: true, stock: true },
   "sci.krpc.failedLabCount": 0,
   "sci.krpc.malformedLabCount": 0,
   "sci.krpc.labs": [{
