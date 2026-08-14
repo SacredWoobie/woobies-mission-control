@@ -122,14 +122,14 @@ The dashboard adds a Settings rail drawer with four sections:
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
   in browser-local storage, and can restore hidden dashboard panels.
 - **Features & Mods** reports only known Mission Control capabilities and
-  integrations. **Available** means an active provider is ready; **Installed ·
-  not observed here** means its known dependencies were found but the current
-  scene cannot prove that it is active; **Stock fallback active** requires live
-  evidence that the feature is using its stock backend; **Not detected** means
-  a fixed known marker was not found; **Unavailable** means runtime evidence
-  says the provider cannot serve the feature; and **Unknown** means the feed
-  cannot classify it. This view is not an inventory of arbitrary installed
-  mods.
+  integrations for the dashboard as a whole, independent of the current game
+  scene. **Available** means the required known integrations were detected;
+  **Available · Stock** means an optional integration was not detected but the
+  dashboard retains its built-in stock path; **Unavailable** means a required
+  known integration was not detected; and **Detection unavailable** means the
+  configured KSP installation could not be checked. Expanded rows show the
+  fixed installation checks behind the result. This view is not an inventory
+  of arbitrary installed mods.
 - **Help** is a curated table of contents of external setup, dashboard,
   compatibility, safety, and troubleshooting guides. It opens the existing
   project wiki and support links rather than copying documentation into the

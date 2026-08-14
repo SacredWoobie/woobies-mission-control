@@ -56,9 +56,9 @@ describe("SettingsDrawer", () => {
     expect(view.container.textContent).toContain("ws://127.0.0.1:8090");
   });
 
-  it("uses unknown for invalid feature statuses and only publishes approved wiki links", () => {
+  it("uses detection unavailable for invalid capability data and only publishes approved wiki links", () => {
     render(<SettingsDrawer {...props({ section: "features-mods", telemetry: { capabilities: { schemaVersion: 1, features: { notes: { status: "not-a-status", reason: "not-a-reason", evidence: [] } } as never } } })} />);
-    expect(screen.getAllByText("UNKNOWN").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("DETECTION UNAVAILABLE").length).toBeGreaterThan(0);
 
     const onSectionChange = vi.fn();
     cleanup();
@@ -86,7 +86,7 @@ describe("SettingsDrawer", () => {
     });
   });
 
-  it("distinguishes installed and not-detected markers from runtime availability", () => {
+  it("reports dashboard-wide installation capability without scene-dependent status", () => {
     render(<SettingsDrawer {...props({
       section: "features-mods",
       telemetry: {
@@ -99,17 +99,42 @@ describe("SettingsDrawer", () => {
               evidence: [{ id: "notes", status: "detected", source: "root_scan" }],
             },
             science_telemetry: {
+              status: "fallback",
+              reason: "fallback_active",
+              evidence: [
+                { id: "stock_science", status: "active", source: "runtime" },
+                { id: "wcs", status: "detected", source: "root_scan" },
+              ],
+            },
+            communications: {
+              status: "available",
+              reason: "ready",
+              evidence: [
+                { id: "remote_tech", status: "active", source: "runtime" },
+                { id: "remote_tech", status: "missing", source: "root_scan" },
+              ],
+            },
+            stage_analysis: {
               status: "unknown",
               reason: "dependency_missing",
-              evidence: [{ id: "wcs", status: "missing", source: "root_scan" }],
+              evidence: [
+                { id: "stage_stats", status: "missing", source: "root_scan" },
+                { id: "mechjeb", status: "missing", source: "root_scan" },
+              ],
             },
           } as never,
         },
       },
     })} />);
-    expect(screen.getByRole("button", { name: /Notes.*INSTALLED · NOT OBSERVED HERE/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Science telemetry.*NOT DETECTED/ })).toBeTruthy();
-    expect(screen.queryByText("STOCK FALLBACK ACTIVE")).toBeNull();
+    expect(screen.getByRole("button", { name: /Notes.*AVAILABLE/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Science telemetry.*AVAILABLE/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Communications.*AVAILABLE · STOCK/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Stage analysis.*UNAVAILABLE/ })).toBeTruthy();
+    expect(screen.queryByText(/NOT OBSERVED|STOCK FALLBACK ACTIVE|NOT DETECTED/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Science telemetry.*AVAILABLE/ }));
+    expect(screen.queryByText("Runtime")).toBeNull();
+    expect(screen.getByText(/Woobies Control Stats service.*DETECTED.*Installation scan/)).toBeTruthy();
   });
 
   it("reports the current palette without exposing a theme chooser", () => {

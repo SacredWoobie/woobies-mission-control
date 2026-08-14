@@ -21,7 +21,7 @@ import {
 
 export type SettingsFeatureId = DashboardFeatureId;
 
-export type SettingsFeatureStatus = "available" | "installed" | "fallback" | "not-detected" | "unavailable" | "unknown";
+export type SettingsFeatureStatus = "available" | "stock" | "unavailable" | "unknown";
 
 export const SETTINGS_FEATURES: readonly {
   id: SettingsFeatureId;
@@ -84,12 +84,19 @@ function wikiUrl(base: string, slug: string) {
 
 function statusLabel(status: SettingsFeatureStatus) {
   if (status === "available") return "AVAILABLE";
-  if (status === "installed") return "INSTALLED · NOT OBSERVED HERE";
-  if (status === "fallback") return "STOCK FALLBACK ACTIVE";
-  if (status === "not-detected") return "NOT DETECTED";
+  if (status === "stock") return "AVAILABLE · STOCK";
   if (status === "unavailable") return "UNAVAILABLE";
-  return "UNKNOWN";
+  return "DETECTION UNAVAILABLE";
 }
+
+const STOCK_CAPABILITY_FEATURES = new Set<SettingsFeatureId>([
+  "science_telemetry",
+  "science_alarms",
+  "communications",
+  "heat_monitoring",
+  "editor_electricity",
+  "damage_monitoring",
+]);
 
 function validCapabilitySnapshot(snapshot: DashboardCapabilitiesSnapshot | null | undefined): snapshot is DashboardCapabilitiesSnapshot {
   return !!snapshot
@@ -223,26 +230,23 @@ function FeaturesSection({ telemetry }: { telemetry?: SettingsTelemetryInfo }) {
   const [expanded, setExpanded] = useState<SettingsFeatureId | null>(null);
   return <section aria-labelledby="settings-features-heading" className="settings-section">
     <h3 id="settings-features-heading">Features &amp; Mods</h3>
-    <p className="settings-section-intro">AVAILABLE and STOCK FALLBACK ACTIVE require live runtime evidence. INSTALLED means the known dependencies were found but are not observable in this scene. NOT DETECTED means a fixed known marker was not found; UNKNOWN means the feed cannot classify it.</p>
+    <p className="settings-section-intro">Dashboard-wide status is based on the configured KSP installation, not the current game scene. AVAILABLE means the required known integrations were detected. AVAILABLE · STOCK means the feature remains available through Mission Control&apos;s built-in stock path. DETECTION UNAVAILABLE means the installation could not be checked.</p>
     <div className="settings-feature-list">
       {SETTINGS_FEATURES.map((feature) => {
         const capability = validCapabilitySnapshot(telemetry?.capabilities)
           ? telemetry.capabilities.features[feature.id]
           : undefined;
-        let status: SettingsFeatureStatus = capability?.status === "available"
-          || capability?.status === "fallback"
-          || capability?.status === "unavailable"
-          ? capability.status
-          : "unknown";
-        const evidence = capability && Array.isArray(capability.evidence)
+        const installationEvidence = capability && Array.isArray(capability.evidence)
           ? capability.evidence.filter((item): item is DashboardCapabilityEvidence => !!item && typeof item === "object" && (item.status === "active" || item.status === "detected" || item.status === "missing" || item.status === "unavailable" || item.status === "unknown") && (item.source === "runtime" || item.source === "root_scan") && typeof item.id === "string")
+            .filter((item) => item.source === "root_scan")
           : [];
-        const installationEvidence = evidence.filter((item) => item.source === "root_scan");
-        if (status === "unknown" && capability?.reason === "not_observed" && installationEvidence.length > 0 && installationEvidence.every((item) => item.status === "detected")) {
-          status = "installed";
-        } else if (status === "unknown" && capability?.reason === "dependency_missing" && installationEvidence.some((item) => item.status === "missing")) {
-          status = "not-detected";
-        }
+        const detected = installationEvidence.length > 0 && installationEvidence.every((item) => item.status === "detected");
+        const missing = installationEvidence.some((item) => item.status === "missing");
+        const status: SettingsFeatureStatus = detected
+          ? "available"
+          : missing
+            ? STOCK_CAPABILITY_FEATURES.has(feature.id) ? "stock" : "unavailable"
+            : "unknown";
         const open = expanded === feature.id;
         return <article className={`settings-feature settings-feature-${status}`} key={feature.id}>
           <button
@@ -256,7 +260,7 @@ function FeaturesSection({ telemetry }: { telemetry?: SettingsTelemetryInfo }) {
           </button>
           {open && <div id={`settings-feature-evidence-${feature.id}`} className="settings-feature-evidence">
             <p>{feature.evidence}</p>
-            {evidence.length > 0 && <ul>{evidence.map((item, index) => <li key={`${item.source}-${item.id}-${index}`}>{evidenceLabel(item)} / {evidenceStatusLabel(item.status)} / {item.source === "runtime" ? "Runtime" : "Installation scan"}{evidenceVersion(item)}</li>)}</ul>}
+            {installationEvidence.length > 0 && <ul>{installationEvidence.map((item, index) => <li key={`${item.source}-${item.id}-${index}`}>{evidenceLabel(item)} / {evidenceStatusLabel(item.status)} / Installation scan{evidenceVersion(item)}</li>)}</ul>}
           </div>}
         </article>;
       })}
