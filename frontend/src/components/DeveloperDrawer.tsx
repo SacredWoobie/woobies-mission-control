@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PRODUCT_VERSION } from "../buildIdentity";
+import { FIXTURE_OPTIONAL_MODS, type FixtureOptionalModId } from "../telemetry/fixtureMods";
 import type { SceneMode } from "../telemetry/types";
 import { useLiveDiagnostics } from "../telemetry/useLiveTelemetry";
 
@@ -7,22 +8,28 @@ export type TelemetrySource = "fixtures" | "live";
 
 interface DeveloperDrawerProps {
   endpoint: string;
+  enabledFixtureMods: ReadonlySet<FixtureOptionalModId>;
   fixtureMode: SceneMode;
   source: TelemetrySource;
   onConnectLive(): void;
   onDisconnectLive(): void;
   onEndpointChange(endpoint: string): void;
+  onFixtureModToggle(id: FixtureOptionalModId): void;
   onFixtureModeChange(mode: SceneMode): void;
+  onSetAllFixtureMods(enabled: boolean): void;
   onUseFixtures(): void;
 }
 
 export function DeveloperDrawer({
   endpoint,
+  enabledFixtureMods,
   fixtureMode,
   onConnectLive,
   onDisconnectLive,
   onEndpointChange,
+  onFixtureModToggle,
   onFixtureModeChange,
+  onSetAllFixtureMods,
   onUseFixtures,
   source,
 }: DeveloperDrawerProps) {
@@ -71,22 +78,48 @@ export function DeveloperDrawer({
           </div>
 
           {source === "fixtures" && (
-            <div className="dev-control-group">
-              <span className="dev-control-label">Scene fixture</span>
-              <div className="fixture-picker" aria-label="Telemetry fixture">
-                {(["flight", "editor", "inactive"] as const).map((candidate) => (
-                  <button
-                    aria-pressed={candidate === fixtureMode}
-                    className={candidate === fixtureMode ? "active" : ""}
-                    key={candidate}
-                    onClick={() => onFixtureModeChange(candidate)}
-                    type="button"
-                  >
-                    {candidate}
-                  </button>
-                ))}
+            <>
+              <div className="dev-control-group">
+                <span className="dev-control-label">Scene fixture</span>
+                <div className="fixture-picker" aria-label="Telemetry fixture">
+                  {(["flight", "editor", "inactive"] as const).map((candidate) => (
+                    <button
+                      aria-pressed={candidate === fixtureMode}
+                      className={candidate === fixtureMode ? "active" : ""}
+                      key={candidate}
+                      onClick={() => onFixtureModeChange(candidate)}
+                      type="button"
+                    >
+                      {candidate}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div className="dev-control-group dev-mod-controls">
+                <div className="dev-mod-heading">
+                  <span className="dev-control-label">Optional mods</span>
+                  <span>{enabledFixtureMods.size}/{FIXTURE_OPTIONAL_MODS.length} on</span>
+                </div>
+                <p>Fixture-only overrides. kRPC and Mission Control services stay enabled.</p>
+                <div className="dev-mod-list" role="group" aria-label="Optional fixture mods">
+                  {FIXTURE_OPTIONAL_MODS.map((mod) => {
+                    const enabled = enabledFixtureMods.has(mod.id);
+                    return <button
+                      aria-label={`${mod.label} ${enabled ? "enabled" : "disabled"}`}
+                      aria-pressed={enabled}
+                      className="dev-mod-toggle"
+                      key={mod.id}
+                      onClick={() => onFixtureModToggle(mod.id)}
+                      type="button"
+                    ><span>{mod.label}</span><strong>{enabled ? "ON" : "OFF"}</strong></button>;
+                  })}
+                </div>
+                <div className="dev-mod-actions" role="group" aria-label="Optional fixture mod presets">
+                  <button disabled={enabledFixtureMods.size === FIXTURE_OPTIONAL_MODS.length} onClick={() => onSetAllFixtureMods(true)} type="button">ALL ON</button>
+                  <button disabled={enabledFixtureMods.size === 0} onClick={() => onSetAllFixtureMods(false)} type="button">ALL OFF</button>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="dev-control-group">
