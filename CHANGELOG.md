@@ -21,6 +21,10 @@ All notable public changes will be recorded here.
 - Added a curated external-link Help table of contents and an About card that
   explains the browser/launcher boundary. Setup, KSP selection, service
   Install / Repair, updates, and Dashboard feed control remain launcher tasks.
+- Reworked Delta-V plan management into clearly labeled Plan Name and Plan
+  Tools groups, with a wider name field, distinct Update and Save as new
+  actions, inline save feedback, and a non-redundant planner title. Saved-plan,
+  reset, and model dialogs now inherit the selected dashboard color theme.
 
 ## v0.7.1 - Release packaging repair
 

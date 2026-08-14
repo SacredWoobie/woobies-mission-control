@@ -853,12 +853,15 @@ export function DeltaVPlanner({ mode, onCloseSavedPlans, resetRevision, saveTarg
     ? `${plan.origin.name} round trip`
     : plan ? `${plan.origin.name} → ${plan.destination.name}` : "";
   const saveControls = plan ? <div className="delta-v-save-bar">
-    <label><span>Plan name:</span><input aria-label="Delta-v plan name" placeholder={suggestedPlanName} value={planName} onChange={(event) => { setPlanName(event.target.value); setSaveError(false); setSavedNotice(""); }} /></label>
+    <div className="delta-v-save-heading">
+      <span>PLAN NAME</span>
+      {savedNotice && <small className={`delta-v-save-feedback${saveError ? " error" : ""}`} role={saveError ? "alert" : "status"}>{savedNotice}</small>}
+    </div>
+    <label><span className="sr-only">Plan name</span><input aria-label="Delta-v plan name" placeholder={suggestedPlanName} value={planName} onChange={(event) => { setPlanName(event.target.value); setSaveError(false); setSavedNotice(""); }} /></label>
     <div className="delta-v-save-actions">
       <button disabled={advancedPlanIncomplete} onClick={() => saveCurrentPlan(false)} type="button">{activeSavedPlanId ? "Update plan" : "Save plan"}</button>
       {activeSavedPlanId && <button className="secondary" disabled={advancedPlanIncomplete} onClick={() => saveCurrentPlan(true)} type="button">Save as new</button>}
     </div>
-    {savedNotice && <small className={`delta-v-save-feedback${saveError ? " error" : ""}`} role={saveError ? "alert" : "status"}>{savedNotice}</small>}
   </div> : null;
   const renderSavedPlan = (record: SavedDeltaVPlanRecord) => {
     const isPinned = pinned?.id === record.id;

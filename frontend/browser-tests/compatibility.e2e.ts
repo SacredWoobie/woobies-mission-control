@@ -303,9 +303,20 @@ test("saved Delta-v plan feedback reserves visible header space", async ({ page 
     const header = element.querySelector<HTMLElement>(":scope > header")!.getBoundingClientRect();
     const body = element.querySelector<HTMLElement>(":scope > .delta-v-drawer-body")!.getBoundingClientRect();
     const message = element.querySelector<HTMLElement>(".delta-v-save-feedback")!.getBoundingClientRect();
+    const nameHeading = element.querySelector<HTMLElement>(".delta-v-save-heading > span")!.getBoundingClientRect();
+    const nameInput = element.querySelector<HTMLElement>(".delta-v-save-bar input")!.getBoundingClientRect();
+    const saveActions = Array.from(element.querySelectorAll<HTMLElement>(".delta-v-save-actions button")).map((button) => button.getBoundingClientRect());
+    const planTools = element.querySelector<HTMLElement>(".delta-v-header-actions")!.getBoundingClientRect();
     return {
       containedByHeader: message.top >= header.top && message.bottom <= header.bottom + 1,
       clearOfBody: message.bottom <= body.top + 1,
+      headerHeight: header.height,
+      nameHeadingHeight: nameHeading.height,
+      nameHeadingWidth: nameHeading.width,
+      nameInputWidth: nameInput.width,
+      planToolsSeparated: saveActions.at(-1)!.right < planTools.left,
+      saveControlsSeparated: nameInput.right <= saveActions[0].left
+        && saveActions.every((button, index) => index === 0 || saveActions[index - 1].right <= button.left),
       visibleHeight: message.height,
       drawerClientWidth: element.clientWidth,
       drawerScrollWidth: element.scrollWidth,
@@ -313,8 +324,62 @@ test("saved Delta-v plan feedback reserves visible header space", async ({ page 
   });
   expect(layout.containedByHeader).toBe(true);
   expect(layout.clearOfBody).toBe(true);
-  expect(layout.visibleHeight).toBeGreaterThanOrEqual(18);
+  expect(layout.headerHeight).toBeLessThanOrEqual(65);
+  expect(layout.nameHeadingHeight).toBeLessThanOrEqual(16);
+  expect(layout.nameHeadingWidth).toBeGreaterThanOrEqual(65);
+  expect(layout.nameInputWidth).toBeGreaterThanOrEqual(240);
+  expect(layout.planToolsSeparated).toBe(true);
+  expect(layout.saveControlsSeparated).toBe(true);
+  expect(layout.visibleHeight).toBeGreaterThanOrEqual(10);
   expect(layout.drawerScrollWidth).toBeLessThanOrEqual(layout.drawerClientWidth + 1);
+  await expect(drawer.getByRole("heading", { name: "Delta-V Mission Planner" })).toBeVisible();
+  await expect(drawer.getByText("MISSION PLANNING · DELTA-V", { exact: true })).toHaveCount(0);
+});
+
+test("saved Delta-v plans inherit the active dashboard theme", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const planner = page.getByRole("dialog", { name: "Delta-v planner" });
+  const profile = planner.getByRole("button", { name: /SYSTEM PROFILE & MISSION SETUP/ });
+  if (await profile.getAttribute("aria-expanded") === "false") await profile.click();
+  if (await planner.getByRole("combobox", { name: "Start" }).count()) {
+    await planner.getByRole("button", { name: /Add next stop/ }).click();
+  }
+  await planner.getByRole("combobox", { name: "Next stop" }).selectOption("Duna");
+  await planner.getByRole("button", { name: /Add next stop/ }).click();
+  await planner.getByRole("textbox", { name: "Delta-v plan name" }).fill("Theme inheritance check");
+  await planner.getByRole("button", { name: "Save plan", exact: true }).click();
+  await planner.getByRole("button", { name: "Load saved plans" }).click();
+
+  const library = planner.getByRole("dialog", { name: "Saved Delta-V plans" });
+  const readSurfaces = () => library.evaluate((element) => ({
+    card: getComputedStyle(element.querySelector<HTMLElement>(".delta-v-plan-library-list article")!).backgroundColor,
+    header: getComputedStyle(element.querySelector<HTMLElement>(":scope > header")!).backgroundImage,
+    modal: getComputedStyle(element).backgroundImage,
+  }));
+  const darkSurfaces = await readSurfaces();
+  await library.getByRole("button", { name: "Close saved plans" }).click();
+  await planner.getByRole("button", { name: "Close delta-v planner" }).click();
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const settings = page.getByRole("dialog", { name: "Mission Control Settings" });
+  await settings.getByRole("radio", { name: /Daylight Console/ }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Delta-v planner" }).click();
+  const daylightPlanner = page.getByRole("dialog", { name: "Delta-v planner" });
+  await daylightPlanner.getByRole("button", { name: "Load saved plans" }).click();
+  const daylightLibrary = daylightPlanner.getByRole("dialog", { name: "Saved Delta-V plans" });
+  const daylightSurfaces = await daylightLibrary.evaluate((element) => ({
+    card: getComputedStyle(element.querySelector<HTMLElement>(".delta-v-plan-library-list article")!).backgroundColor,
+    header: getComputedStyle(element.querySelector<HTMLElement>(":scope > header")!).backgroundImage,
+    modal: getComputedStyle(element).backgroundImage,
+  }));
+
+  expect(await page.locator("html").getAttribute("data-theme")).toBe("daylight-console");
+  expect(daylightSurfaces.modal).not.toBe(darkSurfaces.modal);
+  expect(daylightSurfaces.header).not.toBe(darkSurfaces.header);
+  expect(daylightSurfaces.card).not.toBe(darkSurfaces.card);
 });
 
 test("Delta-v density keeps the route primary on fine and coarse pointers", async ({ page, browser, baseURL }) => {
@@ -380,7 +445,7 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
     };
   });
 
-  expect(desktop.headerHeight).toBeLessThanOrEqual(50);
+  expect(desktop.headerHeight).toBeLessThanOrEqual(65);
   expect(desktop.configurationHeight).toBeLessThanOrEqual(115);
   expect(desktop.summaryHeight).toBeLessThanOrEqual(115);
   expect(desktop.routeHeaderHeight).toBeLessThanOrEqual(36);
