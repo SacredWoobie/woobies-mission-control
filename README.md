@@ -115,6 +115,35 @@ does not execute nodes, warp, steer, stage, or change throttle.
 - Optional Notes, Kerbal Alarm Clock, RemoteTech, System Heat, and ESP32
   integrations without making them requirements for the rest of the dashboard.
 
+## Settings, Help, and About
+
+The dashboard adds a Settings rail drawer with four sections:
+
+- **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
+  in browser-local storage, and can restore hidden dashboard panels.
+- **Features & Mods** reports only known Mission Control capabilities and
+  integrations. **Available** means an active provider is ready; **Stock
+  fallback active** means the feature is working through its stock fallback;
+  **Unavailable** means a known provider or dependency cannot provide it; and
+  **Unknown** means that an authoritative observation is not available. Unknown
+  is not Missing. This view checks a fixed set of known markers and runtime
+  providers; it is not an inventory of arbitrary installed mods.
+- **Help** is a curated table of contents of external setup, dashboard,
+  compatibility, safety, and troubleshooting guides. It opens the existing
+  project wiki and support links rather than copying documentation into the
+  dashboard.
+- **About** identifies the product, version, build channel, and local dashboard
+  endpoint, reports the current **Mission Control Dark** palette as read-only,
+  and explains where installation belongs. There is no theme chooser yet; the
+  theme identifier leaves room for a future palette without promising one
+  today. The browser dashboard does not select a KSP folder, install or repair
+  service DLLs, apply package updates, or write the selected live KSP
+  `GameData`; use `Dashboard\Start KSP Dashboard.bat` for those launcher
+  responsibilities.
+
+The public baseline remains v0.7.1 until a later release is selected and
+published.
+
 ## Packaged KSP services
 
 The v0.7.1 public release selects four independently versioned kRPC extensions.

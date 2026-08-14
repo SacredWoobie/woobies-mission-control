@@ -75,6 +75,7 @@ interface PanelVisibilityValue {
   clearAutoCollapse(id: DashboardPanelId): void;
   hidePanel(id: DashboardPanelId): void;
   registerAvailablePanels(sourceId: string, panels: ReadonlySet<DashboardPanelId>): () => void;
+  restoreAllHiddenPanels(): void;
   restorePanel(id: DashboardPanelId): void;
 }
 
@@ -87,6 +88,7 @@ const fallbackVisibility: PanelVisibilityValue = {
   clearAutoCollapse() {},
   hidePanel() {},
   registerAvailablePanels() { return () => {}; },
+  restoreAllHiddenPanels() {},
   restorePanel() {},
 };
 const PanelVisibilityContext = createContext<PanelVisibilityValue>(fallbackVisibility);
@@ -202,6 +204,16 @@ export function PanelVisibilityProvider({
     setLastRestore((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
   }, [persist]);
 
+  const restoreAllHiddenPanels = useCallback(() => {
+    const firstHidden = panelOrder.find((id) => hiddenPanels.has(id));
+    setPreferenceHiddenPanels(new Set<DashboardPanelId>());
+    setAutoHiddenPanels(new Set<DashboardPanelId>());
+    persist(new Set<DashboardPanelId>());
+    if (firstHidden) {
+      setLastRestore((current) => ({ id: firstHidden, sequence: (current?.sequence ?? 0) + 1 }));
+    }
+  }, [hiddenPanels, persist]);
+
   const value = useMemo<PanelVisibilityValue>(() => ({
     availablePanels,
     centralizedRail,
@@ -211,6 +223,7 @@ export function PanelVisibilityProvider({
     clearAutoCollapse,
     hidePanel,
     registerAvailablePanels,
+    restoreAllHiddenPanels,
     restorePanel,
   }), [
     autoCollapsePanel,
@@ -221,6 +234,7 @@ export function PanelVisibilityProvider({
     hidePanel,
     lastRestore,
     registerAvailablePanels,
+    restoreAllHiddenPanels,
     restorePanel,
   ]);
 
@@ -275,10 +289,12 @@ export function PanelRestoreRail({ available }: { available: ReadonlySet<Dashboa
 export function DashboardRail({
   datalinkButton,
   notesButton,
+  settingsButton,
   tools,
 }: {
   datalinkButton: ReactNode;
   notesButton: ReactNode;
+  settingsButton: ReactNode;
   tools: ReactNode;
 }) {
   const { availablePanels, hiddenPanels, restorePanel } = usePanelVisibility();
@@ -304,6 +320,7 @@ export function DashboardRail({
         ))}
         {notesButton}
         {tools}
+        {settingsButton}
       </div>
     </nav>
   );

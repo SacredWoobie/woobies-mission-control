@@ -2,6 +2,21 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added a Settings rail drawer with Preferences, Features & Mods, Help, and
+  About sections. Preferences retain the dashboard time system and local
+  science-alarm defaults, and can restore hidden panels. About reports the
+  current Mission Control Dark palette without exposing a theme chooser yet.
+- Added capability-aware Features & Mods status copy: Available, Stock
+  fallback active, Unavailable, and Unknown. Unknown means that an authoritative
+  provider observation is not available; it is not the same as Missing. The
+  inventory is limited to known Mission Control integrations and does not scan
+  arbitrary installed mods.
+- Added a curated external-link Help table of contents and an About card that
+  explains the browser/launcher boundary. Setup, KSP selection, service
+  Install / Repair, updates, and Dashboard feed control remain launcher tasks.
+
 ## v0.7.1 - Release packaging repair
 
 - Fixed full and managed-update packaging so the Editor electrical snapshot

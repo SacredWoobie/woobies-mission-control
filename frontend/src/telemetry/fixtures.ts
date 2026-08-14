@@ -1,4 +1,4 @@
-import type { NoteTelemetry, TelemetrySnapshot } from "./types";
+import type { DashboardCapabilitiesSnapshot, NoteTelemetry, TelemetrySnapshot } from "./types";
 import { representativeElectricityFixture } from "../electricityPlanner/fixtures";
 
 const editorStages = [
@@ -38,7 +38,24 @@ const activeNote: NoteTelemetry = {
   truncated: false,
 };
 
+export const dashboardCapabilitiesFixture: DashboardCapabilitiesSnapshot = {
+  schemaVersion: 1,
+  features: {
+    notes: { status: "available", reason: "ready", evidence: [{ id: "notes", status: "active", source: "runtime" }] },
+    science_telemetry: { status: "available", reason: "ready", evidence: [{ id: "vessel_science", status: "active", source: "runtime" }, { id: "wcs", status: "detected", source: "root_scan" }] },
+    science_alarms: { status: "available", reason: "ready", evidence: [{ id: "kac", status: "active", source: "runtime" }, { id: "stock", status: "active", source: "runtime" }] },
+    communications: { status: "available", reason: "ready", evidence: [{ id: "remote_tech", status: "active", source: "runtime" }] },
+    stage_analysis: { status: "available", reason: "ready", evidence: [{ id: "stage_stats", status: "active", source: "runtime" }, { id: "mechjeb", status: "detected", source: "root_scan" }] },
+    live_transfer_calculations: { status: "available", reason: "ready", evidence: [{ id: "woobies_mechjeb", status: "active", source: "runtime" }, { id: "mechjeb", status: "detected", source: "runtime", version: "2.15.3.0" }] },
+    heat_monitoring: { status: "available", reason: "ready", evidence: [{ id: "system_heat", status: "active", source: "runtime" }] },
+    heat_controls: { status: "available", reason: "ready", evidence: [{ id: "system_heat_service", status: "active", source: "runtime" }] },
+    editor_electricity: { status: "available", reason: "ready", evidence: [{ id: "dynamic_battery_storage", status: "active", source: "runtime", version: "2.3.0.0" }] },
+    damage_monitoring: { status: "available", reason: "ready", evidence: [{ id: "vessel_damage", status: "active", source: "runtime" }] },
+  },
+};
+
 const notesFixture = {
+  "dashboard.capabilities": dashboardCapabilitiesFixture,
   "notes.available": true,
   "notes.activeFound": true,
   "notes.message": "",

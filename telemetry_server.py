@@ -39,6 +39,11 @@ from electricity import (
     solar_summary,
 )
 from damage import gather_part_damage, read_loss_fields
+from dashboard_capabilities import (
+    TELEMETRY_KEY as DASHBOARD_CAPABILITIES_KEY,
+    build_dashboard_capabilities,
+    scan_root_capabilities,
+)
 from heat import enrich_system_heat_result
 from heat_electricity_snapshot import decode_heat_electricity_snapshot
 from flight_core_snapshot import decode_flight_core_snapshot
@@ -131,6 +136,8 @@ _damage_cache_key = None
 _damage_last_ut = None
 _damage_loss_cache = None
 _damage_loss_revision = None
+_dashboard_capability_scan_root = None
+_dashboard_capability_scan = None
 _res_cache = {}
 _res_last_poll = 0.0
 _res_cache_key = None
@@ -4566,14 +4573,31 @@ def _gather_overview_telemetry(conn, scene, now=None):
     return data
 
 
+def _dashboard_capability_installation_scan():
+    """Read the fixed install markers once per configured root."""
+    global _dashboard_capability_scan_root, _dashboard_capability_scan
+    configured_root = os.environ.get("WOOBIE_KSP_ROOT", "").strip()
+    if (
+        _dashboard_capability_scan is None
+        or configured_root != _dashboard_capability_scan_root
+    ):
+        _dashboard_capability_scan_root = configured_root
+        _dashboard_capability_scan = scan_root_capabilities(configured_root)
+    return _dashboard_capability_scan
+
+
 def _finalize_telemetry(conn, payload):
-    """Attach shared planning and derived fields to one scene payload."""
+    """Attach shared planning, capabilities, and derived fields to one scene."""
     payload.update(_mission_planning.gather(
         conn,
         payload.get("context.mode"),
         payload.get("t.universalTime"),
     ))
     payload.update(_electricity_flow.update(payload))
+    payload[DASHBOARD_CAPABILITIES_KEY] = build_dashboard_capabilities(
+        payload,
+        _dashboard_capability_installation_scan(),
+    )
     return payload
 
 

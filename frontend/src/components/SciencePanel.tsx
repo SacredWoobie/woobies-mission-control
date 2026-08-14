@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useDialogFocus } from "../deltaV/useDialogFocus";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatScienceColumn, formatScienceInline, isFiniteNumber } from "../formatting/numbers";
+import { useScienceAlarmSettings, useSettings } from "../settings";
 import type {
-  ScienceAlarmAction,
   ScienceAlarmProvider,
   ScienceAlarmProviderPreference,
   ScienceAlarmResult,
@@ -15,44 +14,7 @@ import type {
 import { Panel } from "./Panel";
 import { selectScience, type ScienceLabViewModel } from "./scienceModel";
 
-const SCIENCE_ALARM_SETTINGS_KEY = "wmc-science-alarm-defaults-v1";
-type ScienceAlarmLead = 1800 | 3600;
 type SciencePanelCommand = Extract<TelemetryCommand, { type: "science.alarm.create" | "science.lab.research" | "science.lab.transmit" }>;
-
-interface ScienceAlarmDefaults {
-  provider: ScienceAlarmProviderPreference;
-  leadSeconds: ScienceAlarmLead;
-  kacAction: ScienceAlarmAction;
-}
-
-const defaultScienceAlarmSettings: ScienceAlarmDefaults = {
-  provider: "auto",
-  leadSeconds: 3600,
-  kacAction: "kill_warp",
-};
-
-const scienceAlarmActions: Array<{ label: string; value: ScienceAlarmAction }> = [
-  { label: "KILL WARP", value: "kill_warp" },
-  { label: "PAUSE GAME", value: "pause_game" },
-  { label: "MESSAGE ONLY", value: "message_only" },
-  { label: "DO NOTHING", value: "do_nothing" },
-];
-
-function readScienceAlarmSettings(): ScienceAlarmDefaults {
-  if (typeof localStorage === "undefined") return defaultScienceAlarmSettings;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SCIENCE_ALARM_SETTINGS_KEY) ?? "null") as Partial<ScienceAlarmDefaults> | null;
-    return {
-      provider: parsed?.provider === "kac" || parsed?.provider === "stock" ? parsed.provider : "auto",
-      leadSeconds: parsed?.leadSeconds === 1800 ? 1800 : 3600,
-      kacAction: scienceAlarmActions.some(({ value }) => value === parsed?.kacAction)
-        ? parsed!.kacAction as ScienceAlarmAction
-        : "kill_warp",
-    };
-  } catch {
-    return defaultScienceAlarmSettings;
-  }
-}
 
 function resolvedAlarmProvider(
   preference: ScienceAlarmProviderPreference,
@@ -157,11 +119,8 @@ export function SciencePanel({
   transmitResult?: ScienceLabTransmitResult;
 }) {
   const model = selectScience(snapshot);
-  const [alarmSettings, setAlarmSettings] = useState(readScienceAlarmSettings);
-  const [draftProvider, setDraftProvider] = useState<ScienceAlarmProviderPreference>(alarmSettings.provider);
-  const [draftLeadSeconds, setDraftLeadSeconds] = useState<ScienceAlarmLead>(alarmSettings.leadSeconds);
-  const [draftKacAction, setDraftKacAction] = useState<ScienceAlarmAction>(alarmSettings.kacAction);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { scienceAlarmSettings: alarmSettings } = useScienceAlarmSettings();
+  const { openSettings } = useSettings();
   const [experimentDetailOpen, setExperimentDetailOpen] = useState(false);
   const [scienceSlotHeight, setScienceSlotHeight] = useState<number>();
   const [pending, setPending] = useState<{ labId: string; requestId: string } | null>(null);
@@ -170,8 +129,6 @@ export function SciencePanel({
   const [feedback, setFeedback] = useState<{ labId: string; message: string; status: "accepted" | "error" } | null>(null);
   const providers = snapshot["sci.alarmProviders"] ?? { kac: false, stock: false };
   const selectedProvider = resolvedAlarmProvider(alarmSettings.provider, providers);
-  const closeSettings = useCallback(() => setSettingsOpen(false), []);
-  const settingsDialogRef = useDialogFocus<HTMLElement>(settingsOpen, closeSettings);
   const experimentButtonRef = useRef<HTMLButtonElement>(null);
   const experimentBackRef = useRef<HTMLButtonElement>(null);
   const scienceBaselineRef = useRef<HTMLDivElement>(null);
@@ -243,24 +200,6 @@ export function SciencePanel({
     const timer = globalThis.setTimeout(() => setFeedback(null), 10_000);
     return () => globalThis.clearTimeout(timer);
   }, [feedback]);
-
-  const openSettings = () => {
-    setDraftProvider(alarmSettings.provider);
-    setDraftLeadSeconds(alarmSettings.leadSeconds);
-    setDraftKacAction(alarmSettings.kacAction);
-    setSettingsOpen(true);
-  };
-
-  const saveSettings = () => {
-    const next = { provider: draftProvider, leadSeconds: draftLeadSeconds, kacAction: draftKacAction };
-    setAlarmSettings(next);
-    try {
-      localStorage.setItem(SCIENCE_ALARM_SETTINGS_KEY, JSON.stringify(next));
-    } catch {
-      // The in-memory choice still applies when browser storage is unavailable.
-    }
-    setSettingsOpen(false);
-  };
 
   const createAlarm = (lab: ScienceLabViewModel) => {
     if (!commandEnabled || !selectedProvider || !["finite", "depleted"].includes(lab.etaKind) || !isFiniteNumber(lab.etaSeconds) || pending) return;
@@ -412,7 +351,7 @@ export function SciencePanel({
                     title={!alarmEligible ? "A finite completion estimate is required" : !selectedProvider ? "No selected alarm provider is available" : "Create a one-shot science capacity alarm"}
                     type="button"
                   >{waiting ? "SETTING…" : "SET ALARM"}</button>
-                  <button aria-haspopup="dialog" aria-label="Science alarm settings" className="sci-alarm-settings" onClick={openSettings} title="Science alarm defaults" type="button">
+                  <button aria-haspopup="dialog" aria-label="Science alarm settings" className="sci-alarm-settings" onClick={() => openSettings("science-alarms")} title="Science alarm defaults" type="button">
                     <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9.7 2h4.6l.6 2.1 1.5.9 2.1-.5 2.3 4-1.5 1.6v1.8l1.5 1.6-2.3 4-2.1-.5-1.5.9-.6 2.1H9.7l-.6-2.1-1.5-.9-2.1.5-2.3-4 1.5-1.6V9.1L3.2 7.5l2.3-4 2.1.5 1.5-.9L9.7 2Zm2.3 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z" /></svg>
                   </button>
                 </div>
@@ -451,26 +390,6 @@ export function SciencePanel({
         </section>}
       </div>}
 
-      {settingsOpen && <div className="delta-v-modal-backdrop sci-alarm-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSettings(); }}>
-        <section aria-labelledby="science-alarm-settings-title" aria-modal="true" className="sci-alarm-modal" onMouseDown={(event) => event.stopPropagation()} ref={settingsDialogRef} role="dialog" tabIndex={-1}>
-          <header><div><span>SCIENCE ALARMS</span><h3 id="science-alarm-settings-title">Alarm defaults</h3></div><button aria-label="Close science alarm settings" onClick={closeSettings} type="button">×</button></header>
-          <div className="sci-alarm-modal-body">
-            <fieldset><legend>Provider</legend><div className="sci-alarm-options">
-              {(["auto", "kac", "stock"] as const).map((provider) => <button aria-pressed={draftProvider === provider} disabled={provider !== "auto" && !providers[provider]} key={provider} onClick={() => setDraftProvider(provider)} type="button">{provider.toUpperCase()}</button>)}
-            </div></fieldset>
-            <small>{draftProvider === "auto" ? "KAC is preferred when available; Stock is the fallback." : `${draftProvider.toUpperCase()} will be used when available.`}</small>
-            <fieldset><legend>Lead time</legend><div className="sci-alarm-options lead">
-              <button aria-pressed={draftLeadSeconds === 1800} onClick={() => setDraftLeadSeconds(1800)} type="button">30 MIN</button>
-              <button aria-pressed={draftLeadSeconds === 3600} onClick={() => setDraftLeadSeconds(3600)} type="button">1 HOUR</button>
-            </div></fieldset>
-            <fieldset><legend>KAC alarm action</legend><div className="sci-alarm-options action">
-              {scienceAlarmActions.map(({ label, value }) => <button aria-pressed={draftKacAction === value} key={value} onClick={() => setDraftKacAction(value)} type="button">{label}</button>)}
-            </div></fieldset>
-            <small>Alarms are created once from the current estimate and are not rescheduled automatically. Stock alarms always stop time warp.</small>
-          </div>
-          <footer><button onClick={closeSettings} type="button">CANCEL</button><button onClick={saveSettings} type="button">SAVE DEFAULTS</button></footer>
-        </section>
-      </div>}
     </Panel>
   );
 }

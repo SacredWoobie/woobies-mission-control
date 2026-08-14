@@ -141,6 +141,60 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("button", { name: "Time system: Earth" })).toBeTruthy();
   });
 
+  it("opens one global Settings drawer, applies preferences, and restores its opener", () => {
+    const view = render(<App />);
+    const settingsButton = screen.getByRole("button", { name: "Settings" });
+    const tools = screen.getByRole("group", { name: "Tools" });
+    expect(tools.lastElementChild).toBe(settingsButton);
+    expect(settingsButton.getAttribute("aria-controls")).toBe("settings-drawer");
+    expect(settingsButton.getAttribute("aria-expanded")).toBe("false");
+
+    settingsButton.focus();
+    fireEvent.click(settingsButton);
+    const drawer = screen.getByRole("dialog", { name: "Mission Control Settings" });
+    expect(settingsButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Preferences" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("button", { name: "EARTH TIME" }));
+    expect(localStorage.getItem("wmc-time-system-v1")).toBe("earth");
+
+    fireEvent.click(screen.getByRole("button", { name: "Features & Mods" }));
+    expect(drawer.querySelectorAll(".settings-feature-toggle")).toHaveLength(10);
+    expect(screen.getAllByText("AVAILABLE").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(screen.getByText("Mission Control Dark (read-only)", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Development", { exact: true })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Mission Control Settings" })).toBeNull();
+    expect(document.activeElement).toBe(settingsButton);
+
+    const scienceSettings = screen.getByRole("button", { name: "Science alarm settings" });
+    scienceSettings.focus();
+    fireEvent.click(scienceSettings);
+    expect(screen.getByRole("heading", { name: "Science alarm defaults" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Preferences" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "KERBIN TIME" })).toBeNull();
+    fireEvent.mouseDown(view.container.querySelector(".settings-drawer-backdrop")!);
+    expect(screen.queryByRole("dialog", { name: "Mission Control Settings" })).toBeNull();
+    expect(document.activeElement).toBe(scienceSettings);
+  });
+
+  it("keeps Settings mutually exclusive with other global utility drawers", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("dialog", { name: "Mission Control Settings" })).toBeTruthy();
+
+    fireEvent.click(document.querySelector<HTMLButtonElement>('button[aria-label="Datalink"]')!);
+    expect(screen.queryByRole("dialog", { name: "Mission Control Settings" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Datalink controls" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close Datalink drawer" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(document.querySelector<HTMLButtonElement>('button[aria-label="Notes"]')!);
+    expect(screen.queryByRole("dialog", { name: "Mission Control Settings" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Notes continuity preview" })).toBeTruthy();
+  });
+
   it("renders the complete flight dashboard with in-place Flight panel collapse", () => {
     const firstView = render(<App />);
     expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.7.1 · Development")).toBeTruthy();
@@ -188,16 +242,21 @@ describe("Dashboard lifecycle", () => {
     const toolsGroup = screen.getByRole("group", { name: "Tools" });
     const resonantTool = screen.getByRole("button", { name: "Resonant orbit planner" });
     const deltaVTool = screen.getByRole("button", { name: "Delta-v planner" });
+    const settingsTool = screen.getByRole("button", { name: "Settings" });
     expect(toolsGroup.textContent).toContain("Tools");
     expect(toolsGroup.firstElementChild?.classList.contains("dashboard-rail-section-label")).toBe(true);
     expect(toolsGroup.contains(screen.getByRole("button", { name: "Datalink" }))).toBe(true);
     expect(toolsGroup.contains(screen.getByRole("button", { name: "Notes" }))).toBe(true);
     expect(toolsGroup.contains(resonantTool)).toBe(true);
     expect(toolsGroup.contains(deltaVTool)).toBe(true);
+    expect(toolsGroup.contains(settingsTool)).toBe(true);
+    expect(toolsGroup.lastElementChild).toBe(settingsTool);
     expect(resonantTool.classList.contains("dashboard-tool-button")).toBe(true);
     expect(deltaVTool.classList.contains("dashboard-tool-button")).toBe(true);
     expect(resonantTool.querySelector(".panel-rail-label")?.textContent).toBe("Resonant Orbit Planner");
     expect(deltaVTool.querySelector(".panel-rail-label")?.textContent).toBe("Delta-V Planner");
+    expect(settingsTool.querySelector(".panel-rail-icon-settings")).toBeTruthy();
+    expect(settingsTool.querySelector(".panel-rail-label")?.textContent).toBe("Settings");
     expect(firstView.container.querySelector("#conn")).toBeNull();
     expect(firstView.container.querySelector("svg.spark")).toBeNull();
     expect(firstView.container.querySelector(".attitude-strip")).toBeTruthy();

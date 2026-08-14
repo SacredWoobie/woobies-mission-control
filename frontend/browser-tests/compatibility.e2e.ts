@@ -45,6 +45,111 @@ test("developer controls stay out of screenshots until the corner is engaged", a
   await expect(tab).toHaveCSS("opacity", "1");
 });
 
+test("Settings remains the last usable Tool without horizontal overflow across the acceptance viewports", async ({ page }) => {
+  for (const viewport of [
+    { width: 1920, height: 889 },
+    { width: 1280, height: 800 },
+    { width: 1080, height: 1920 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+
+    const tools = page.getByRole("group", { name: "Tools" });
+    const opener = page.getByRole("button", { name: "Settings", exact: true });
+    await expect(opener).toBeVisible();
+    expect(await tools.evaluate((group) => group.lastElementChild?.getAttribute("aria-label"))).toBe("Settings");
+
+    await opener.click();
+    const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+    const navigation = drawer.getByRole("navigation", { name: "Settings sections" });
+    await expect(drawer).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Preferences" })).toHaveAttribute("aria-current", "page");
+
+    for (const [section, heading] of [
+      ["Features & Mods", "Features & Mods"],
+      ["Help", "Help"],
+      ["About", "About"],
+      ["Preferences", "Preferences"],
+    ]) {
+      await navigation.getByRole("button", { name: section, exact: true }).click();
+      await expect(drawer.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    }
+
+    const layout = await drawer.evaluate((element) => {
+      const body = element.querySelector<HTMLElement>(".settings-drawer-body")!;
+      const navigationElement = element.querySelector<HTMLElement>(".settings-section-nav")!;
+      const section = element.querySelector<HTMLElement>(".settings-section")!;
+      return {
+        bodyClientWidth: body.clientWidth,
+        bodyOverflowX: getComputedStyle(body).overflowX,
+        bodyScrollWidth: body.scrollWidth,
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        drawerClientWidth: element.clientWidth,
+        drawerScrollWidth: element.scrollWidth,
+        navigationOverflowX: getComputedStyle(navigationElement).overflowX,
+        sectionClientWidth: section.clientWidth,
+        sectionScrollWidth: section.scrollWidth,
+      };
+    });
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+    expect(layout.drawerScrollWidth).toBeLessThanOrEqual(layout.drawerClientWidth + 1);
+    expect(layout.bodyScrollWidth).toBeLessThanOrEqual(layout.bodyClientWidth + 1);
+    expect(layout.bodyOverflowX).toBe("hidden");
+    expect(layout.sectionScrollWidth).toBeLessThanOrEqual(layout.sectionClientWidth + 1);
+    if (viewport.width === 390) expect(layout.navigationOverflowX).toBe("auto");
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(opener).toBeFocused();
+  }
+});
+
+test("Settings provides 44px targets on a coarse 390px mobile viewport", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto("/");
+    const opener = page.getByRole("button", { name: "Settings", exact: true });
+    await opener.click();
+    const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+    await expect(drawer).toBeVisible();
+
+    const targets = await drawer.evaluate((element) => {
+      const controls = [
+        ...element.querySelectorAll<HTMLElement>(".settings-section-nav button"),
+        element.querySelector<HTMLElement>("header > button")!,
+      ];
+      return {
+        coarsePointer: matchMedia("(pointer: coarse)").matches,
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        drawerClientWidth: element.clientWidth,
+        drawerScrollWidth: element.scrollWidth,
+        openerHeight: document.querySelector<HTMLElement>(".settings-rail-tab")?.getBoundingClientRect().height,
+        openerWidth: document.querySelector<HTMLElement>(".settings-rail-tab")?.getBoundingClientRect().width,
+        controls: controls.map((control) => {
+          const bounds = control.getBoundingClientRect();
+          return { height: bounds.height, width: bounds.width };
+        }),
+      };
+    });
+    expect(targets.coarsePointer).toBe(true);
+    expect(targets.documentScrollWidth).toBeLessThanOrEqual(targets.documentClientWidth);
+    expect(targets.drawerScrollWidth).toBeLessThanOrEqual(targets.drawerClientWidth + 1);
+    expect(targets.openerWidth).toBeGreaterThanOrEqual(44);
+    expect(targets.openerHeight).toBeGreaterThanOrEqual(44);
+    expect(targets.controls.every((control) => control.width >= 44 && control.height >= 44)).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(opener).toBeFocused();
+  } finally {
+    await context.close();
+  }
+});
+
 test("both mission planners remain usable at a normal desktop viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");

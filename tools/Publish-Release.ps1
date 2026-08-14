@@ -281,6 +281,7 @@ $sourceFiles = @(
     @{ Source = 'runtime_update_helper.py'; Destination = 'Dashboard/runtime_update_helper.py' },
     @{ Source = 'runtime-update-contract.json'; Destination = 'Dashboard/runtime-update-contract.json' },
     @{ Source = 'panel_bridge.py'; Destination = 'Dashboard/panel_bridge.py' },
+    @{ Source = 'dashboard_capabilities.py'; Destination = 'Dashboard/dashboard_capabilities.py' },
     @{ Source = 'damage.py'; Destination = 'Dashboard/damage.py' },
     @{ Source = 'electricity.py'; Destination = 'Dashboard/electricity.py' },
     @{ Source = 'editor_electrical_snapshot.py'; Destination = 'Dashboard/editor_electrical_snapshot.py' },

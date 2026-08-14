@@ -7,6 +7,7 @@ export type PanelRailIconName =
   | "elec"
   | "sci"
   | "stage"
+  | "settings"
   | "target"
   | "notes"
   | "flightNote"
@@ -68,6 +69,12 @@ export function PanelRailIcon({ name }: { name: PanelRailIconName }) {
       <path className="rail-icon-fill" d="m10.5 22 2.6-5h5.8l2.6 5Z" />
       <circle className="rail-icon-detail" cx="15" cy="22" r="1" />
       <circle className="rail-icon-detail" cx="18.5" cy="19" r=".8" />
+    </svg>
+  );
+  if (name === "settings") return (
+    <svg {...common}>
+      <path d="M13.3 3h5.4l.8 3 2.1 1.2 3-.8 2.7 4.7-2.2 2.2v2.4l2.2 2.2-2.7 4.7-3-.8-2.1 1.2-.8 3h-5.4l-.8-3-2.1-1.2-3 .8-2.7-4.7 2.2-2.2v-2.4l-2.2-2.2 2.7-4.7 3 .8 2.1-1.2.8-3Z" />
+      <circle className="rail-icon-detail" cx="16" cy="14.5" r="4" />
     </svg>
   );
   if (name === "stage") return (

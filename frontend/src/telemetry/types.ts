@@ -379,6 +379,49 @@ export interface OverviewCapabilities {
   contracts: boolean;
 }
 
+export type DashboardFeatureId =
+  | "notes"
+  | "science_telemetry"
+  | "science_alarms"
+  | "communications"
+  | "stage_analysis"
+  | "live_transfer_calculations"
+  | "heat_monitoring"
+  | "heat_controls"
+  | "editor_electricity"
+  | "damage_monitoring";
+
+export type DashboardCapabilityStatus = "available" | "fallback" | "unavailable" | "unknown";
+export type DashboardCapabilityReason =
+  | "ready"
+  | "fallback_active"
+  | "dependency_missing"
+  | "provider_unavailable"
+  | "not_observed"
+  | "scan_unconfigured"
+  | "probe_error";
+export type DashboardCapabilityEvidenceStatus = "active" | "detected" | "missing" | "unavailable" | "unknown";
+export type DashboardCapabilityEvidenceSource = "runtime" | "root_scan";
+
+export interface DashboardCapabilityEvidence {
+  id: string;
+  status: DashboardCapabilityEvidenceStatus;
+  source: DashboardCapabilityEvidenceSource;
+  version?: string;
+}
+
+export interface DashboardFeatureCapability {
+  status: DashboardCapabilityStatus;
+  reason: DashboardCapabilityReason;
+  provider?: string;
+  evidence: DashboardCapabilityEvidence[];
+}
+
+export interface DashboardCapabilitiesSnapshot {
+  schemaVersion: 1;
+  features: Record<DashboardFeatureId, DashboardFeatureCapability>;
+}
+
 export interface CelestialBodyTelemetry {
   name: string;
   parent?: string;
@@ -462,6 +505,7 @@ export interface TelemetrySnapshot {
   "overview.gameMode"?: string;
   "overview.readOnly"?: boolean;
   "overview.capabilities"?: OverviewCapabilities;
+  "dashboard.capabilities"?: DashboardCapabilitiesSnapshot;
   "overview.funds"?: number;
   "overview.science"?: number;
   "overview.reputation"?: number;

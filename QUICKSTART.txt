@@ -121,5 +121,18 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    Use A- and A+ in either Notes view to adjust text size; click the size value
    to return to the default.
 
+   SETTINGS RAIL: The Settings rail groups browser-local Preferences, known
+   Features & Mods, curated external Help links, and About information.
+   Preferences controls Kerbin/Earth time, Science alarm defaults, and hidden
+   panel restoration. About reports Mission Control Dark and has no theme
+   chooser. Features & Mods uses Available, Stock fallback active, Unavailable,
+   and Unknown; Unknown means that a provider was not authoritatively observed,
+   not that the integration is Missing. Only known Mission Control providers
+   and integrations are shown, not an arbitrary inventory of installed mods.
+   Setup, KSP-folder selection, service Install / Repair, package updates, and
+   Dashboard feed start/stop remain launcher tasks in
+   Dashboard\Start KSP Dashboard.bat; the browser does not write the selected
+   live KSP GameData.
+
 For component choices, compatibility information, troubleshooting, and ESP32
 control-pad instructions, see README.md.
