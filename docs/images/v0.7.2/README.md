@@ -37,4 +37,7 @@ a separate gate and must prove fixture/development controls are absent.
 The publish script assigns these files to `.zz-01` through `.zz-05` so the
 product ZIP, checksum, and corresponding-source archive remain first.
 
-Capture authority: pending the committed v0.7.2 release candidate.
+Capture authority: committed v0.7.2 release candidate `de4ed6f`. Chrome was
+held at a 1920x889 CSS viewport with device scale factor 1; the capture bytes
+were losslessly encoded as PNG without resizing after verifying an empty
+browser error/warning log.
