@@ -2,7 +2,7 @@
 
 All notable public changes will be recorded here.
 
-## Unreleased
+## v0.7.2 - Settings, themes, and planning refinements
 
 - Added a Settings rail drawer with Preferences, Features & Mods, Help, and
   About sections. Preferences retain the dashboard time system and local

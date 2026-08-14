@@ -242,11 +242,11 @@ $updateChecksumPath = "$updateArchivePath.sha256"
 $updateStageRoot = Join-Path $OutputDirectory "$packageName-runtime-update-stage"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
-    @{ Source = 'docs/images/v0.7.0/space-center-overview.png'; Name = "$packageName.zz-01-space-center-overview.png" },
-    @{ Source = 'docs/images/v0.7.0/active-contract-focus.png'; Name = "$packageName.zz-02-active-contract-focus.png" },
-    @{ Source = 'docs/images/v0.7.0/editor-craft-analysis.png'; Name = "$packageName.zz-03-editor-craft-analysis.png" },
-    @{ Source = 'docs/images/v0.7.0/flight-damage-monitor.png'; Name = "$packageName.zz-04-flight-damage-monitor.png" },
-    @{ Source = 'docs/images/v0.7.0/flight-plan-workspace.png'; Name = "$packageName.zz-05-flight-plan-workspace.png" }
+    @{ Source = 'docs/images/v0.7.2/flight-mission-control-dark.png'; Name = "$packageName.zz-01-flight-mission-control-dark.png" },
+    @{ Source = 'docs/images/v0.7.2/editor-green-phosphor.png'; Name = "$packageName.zz-02-editor-green-phosphor.png" },
+    @{ Source = 'docs/images/v0.7.2/mission-overview-warm-crt.png'; Name = "$packageName.zz-03-mission-overview-warm-crt.png" },
+    @{ Source = 'docs/images/v0.7.2/mission-overview-settings-daylight.png'; Name = "$packageName.zz-04-mission-overview-settings-daylight.png" },
+    @{ Source = 'docs/images/v0.7.2/delta-v-planner-daylight.png'; Name = "$packageName.zz-05-delta-v-planner-daylight.png" }
 )
 $activeReleaseImages = @(
     if (-not $SkipReleaseImages) {

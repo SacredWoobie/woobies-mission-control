@@ -107,9 +107,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Release packaging repair", section)
-        self.assertIn("Editor electrical snapshot", section)
-        self.assertIn("repository-local", section)
+        self.assertIn("Settings, themes, and planning refinements", section)
+        self.assertIn("Features & Mods", section)
+        self.assertIn("Delta-V plan management", section)
 
 
 if __name__ == "__main__":
