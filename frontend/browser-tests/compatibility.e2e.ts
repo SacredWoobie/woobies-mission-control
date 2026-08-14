@@ -74,6 +74,12 @@ test("Settings remains the last usable Tool without horizontal overflow across t
     ]) {
       await navigation.getByRole("button", { name: section, exact: true }).click();
       await expect(drawer.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      if (section === "Features & Mods") {
+        await expect(drawer.getByText("AVAILABLE", { exact: true })).toHaveCount(10);
+        await expect(drawer.getByText("AVAILABLE · STOCK", { exact: true })).toHaveCount(0);
+        await expect(drawer.getByText("UNAVAILABLE", { exact: true })).toHaveCount(0);
+        await expect(drawer.getByText("DETECTION UNAVAILABLE", { exact: true })).toHaveCount(0);
+      }
     }
 
     const layout = await drawer.evaluate((element) => {

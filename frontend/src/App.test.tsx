@@ -156,6 +156,8 @@ describe("Dashboard lifecycle", () => {
     const drawer = screen.getByRole("dialog", { name: "Mission Control Settings" });
     expect(settingsButton.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: "Preferences" }).getAttribute("aria-current")).toBe("page");
+    expect((screen.getByRole("button", { name: "KAC" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "STOCK" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "EARTH TIME" }));
     expect(localStorage.getItem("wmc-time-system-v1")).toBe("earth");
     fireEvent.click(screen.getByRole("radio", { name: /Daylight Console/ }));
@@ -164,7 +166,10 @@ describe("Dashboard lifecycle", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Features & Mods" }));
     expect(drawer.querySelectorAll(".settings-feature-toggle")).toHaveLength(10);
-    expect(screen.getAllByText("AVAILABLE").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("AVAILABLE", { exact: true })).toHaveLength(10);
+    expect(screen.queryByText("AVAILABLE · STOCK", { exact: true })).toBeNull();
+    expect(screen.queryByText("UNAVAILABLE", { exact: true })).toBeNull();
+    expect(screen.queryByText("DETECTION UNAVAILABLE", { exact: true })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "About" }));
     expect(screen.getByText("Daylight Console", { exact: true })).toBeTruthy();
     expect(screen.getByText("Development", { exact: true })).toBeTruthy();
