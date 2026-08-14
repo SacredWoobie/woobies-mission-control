@@ -207,7 +207,7 @@ describe("Dashboard lifecycle", () => {
 
   it("renders the complete flight dashboard with in-place Flight panel collapse", () => {
     const firstView = render(<App />);
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.7.1 · Development")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.7.2 · Development")).toBeTruthy();
     ["Flight context", "Ascension", "Consumables", "Heat Management", "Electricity", "Science", "Staging analysis", "Target"].forEach((heading) => {
       expect(screen.getByRole("heading", { name: new RegExp(`^${heading}`) })).toBeTruthy();
     });

@@ -1,17 +1,17 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.7.1](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.1)**
+Current public release: **[v0.7.2](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.2)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.7.1 repairs the v0.7.0 release package by restoring the Editor
-electrical snapshot decoder required at telemetry startup and adds a release
-check for omitted local Python imports. It retains v0.7.0's hardware-style
-Flight instrument plate, read-only VAB/SPH electricity planner, and managed
-update path from v0.6.1 without changing KSP `GameData` or service DLLs.
+Version 0.7.2 adds a dashboard-wide Settings drawer, four persistent color
+themes, a bounded view of known installed integrations, curated Help and About
+surfaces, and clearer Delta-V plan management. The capability contract is
+additive, older feeds remain supported, and the release does not change KSP
+`GameData` or the selected service DLL versions.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -21,8 +21,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.7.0/space-center-overview.png">
-    <img src="docs/images/v0.7.0/space-center-overview.png" width="900" alt="Mission Control overview with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and active contracts">
+  <a href="docs/images/v0.7.2/mission-overview-warm-crt.png">
+    <img src="docs/images/v0.7.2/mission-overview-warm-crt.png" width="900" alt="Mission Control overview in the Warm CRT theme with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and active contracts">
   </a>
 </p>
 
@@ -51,8 +51,8 @@ line-of-sight guidance for evenly spaced constellations. Plans can be saved and
 pinned to a craft for use in the VAB or Flight.
 
 <p align="center">
-  <a href="docs/images/v0.4.0/delta-v-planner.png">
-    <img src="docs/images/v0.4.0/delta-v-planner.png" width="900" alt="Delta-v planner showing a saved Kerbin-to-Sarnus mission">
+  <a href="docs/images/v0.7.2/delta-v-planner-daylight.png">
+    <img src="docs/images/v0.7.2/delta-v-planner-daylight.png" width="900" alt="Delta-V planner in the Daylight Console theme showing a loaded Kerbin-to-Duna mission">
   </a>
 </p>
 
@@ -64,8 +64,8 @@ custom allowances, and craft assignment.
 ### VAB and SPH
 
 <p align="center">
-  <a href="docs/images/v0.7.0/editor-craft-analysis.png">
-    <img src="docs/images/v0.7.0/editor-craft-analysis.png" width="900" alt="VAB craft analysis with staging, resources, electricity planning, and pinned mission and resonant-orbit plans">
+  <a href="docs/images/v0.7.2/editor-green-phosphor.png">
+    <img src="docs/images/v0.7.2/editor-green-phosphor.png" width="900" alt="VAB craft analysis in the Green Phosphor theme with staging, resources, electricity planning, and pinned mission and resonant-orbit plans">
   </a>
 </p>
 
@@ -81,8 +81,8 @@ vehicle, with exact-plan editing when assumptions change.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.7.0/flight-damage-monitor.png">
-    <img src="docs/images/v0.7.0/flight-damage-monitor.png" width="900" alt="Flight Monitor workspace with the DAMAGE annunciator and focused broken-part report visible">
+  <a href="docs/images/v0.7.2/flight-mission-control-dark.png">
+    <img src="docs/images/v0.7.2/flight-mission-control-dark.png" width="900" alt="Flight dashboard in the Mission Control Dark theme with the instrument plate and operational panels visible">
   </a>
 </p>
 
@@ -117,6 +117,12 @@ does not execute nodes, warp, steer, stage, or change throttle.
 
 ## Settings, Help, and About
 
+<p align="center">
+  <a href="docs/images/v0.7.2/mission-overview-settings-daylight.png">
+    <img src="docs/images/v0.7.2/mission-overview-settings-daylight.png" width="900" alt="Mission Control overview with the Settings appearance drawer open in the Daylight Console theme">
+  </a>
+</p>
+
 The dashboard adds a Settings rail drawer with four sections:
 
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
@@ -145,12 +151,11 @@ The dashboard adds a Settings rail drawer with four sections:
   `GameData`; use `Dashboard\Start KSP Dashboard.bat` for those launcher
   responsibilities.
 
-The public baseline remains v0.7.1 until a later release is selected and
-published.
+The public baseline is v0.7.2.
 
 ## Packaged KSP services
 
-The v0.7.1 public release selects four independently versioned kRPC extensions.
+The v0.7.2 public release selects four independently versioned kRPC extensions.
 Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
