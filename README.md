@@ -120,7 +120,11 @@ does not execute nodes, warp, steer, stage, or change throttle.
 The dashboard adds a Settings rail drawer with four sections:
 
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
-  in browser-local storage, and can restore hidden dashboard panels.
+  in browser-local storage, can restore hidden dashboard panels, and offers
+  Mission Control Dark, Daylight Console, Warm CRT, and Green Phosphor color
+  themes. A selection applies immediately and persists in that browser. The
+  themes change semantic color and surface treatments while retaining the same
+  typography and layout.
 - **Features & Mods** reports only known Mission Control capabilities and
   integrations for the dashboard as a whole, independent of the current game
   scene. **Available** means the required known integrations were detected;
@@ -134,11 +138,9 @@ The dashboard adds a Settings rail drawer with four sections:
   compatibility, safety, and troubleshooting guides. It opens the existing
   project wiki and support links rather than copying documentation into the
   dashboard.
-- **About** identifies the product, version, build channel, and local dashboard
-  endpoint, reports the current **Mission Control Dark** palette as read-only,
-  and explains where installation belongs. There is no theme chooser yet; the
-  theme identifier leaves room for a future palette without promising one
-  today. The browser dashboard does not select a KSP folder, install or repair
+- **About** identifies the product, version, build channel, current theme, and
+  local dashboard endpoint, and explains where installation belongs. The
+  browser dashboard does not select a KSP folder, install or repair
   service DLLs, apply package updates, or write the selected live KSP
   `GameData`; use `Dashboard\Start KSP Dashboard.bat` for those launcher
   responsibilities.

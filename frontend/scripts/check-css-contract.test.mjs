@@ -74,6 +74,16 @@ describe("CSS contract checker", () => {
     expect(checkCssContract(productionSources).failures).toEqual([]);
   });
 
+  it("checks every alternate theme instead of inheriting an unreviewed default token", () => {
+    const mutated = productionSources.map((source) => source.file === "src/styles.css"
+      ? { ...source, text: source.text.replace(/(:root\[data-theme="daylight-console"\][\s\S]*?)--text-primary:\s*#[0-9a-f]+;/, "$1") }
+      : source);
+
+    expect(checkCssContract(mutated).failures).toContain(
+      "Theme daylight-console must override --text-primary with an opaque hex color.",
+    );
+  });
+
   it("rejects a migrated literal reintroduced through a local alias", () => {
     const mutated = productionSources.map((source) => source.file === "src/resonantOrbit/resonantOrbit.css"
       ? { ...source, text: `${source.text}\n.regression { --local-border: #315166; border-color: var(--local-border); }` }

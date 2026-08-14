@@ -10,6 +10,11 @@ import type {
   ScienceAlarmAction,
   ScienceAlarmProviderPreference,
 } from "../telemetry/types";
+import {
+  loadThemeId,
+  selectTheme,
+  type ThemeId,
+} from "../theme";
 
 export const SCIENCE_ALARM_SETTINGS_KEY = "wmc-science-alarm-defaults-v1";
 
@@ -84,9 +89,11 @@ interface SettingsContextValue {
   open: boolean;
   section: SettingsSection;
   scienceAlarmSettings: ScienceAlarmDefaults;
+  themeId: ThemeId;
   closeSettings(): void;
   openSettings(section?: SettingsSection): void;
   selectSection(section: SettingsSection): void;
+  updateTheme(themeId: ThemeId): void;
   updateScienceAlarmSettings(next: Partial<ScienceAlarmDefaults> | ScienceAlarmDefaults): void;
 }
 
@@ -94,9 +101,11 @@ const fallbackSettings: SettingsContextValue = {
   open: false,
   section: "preferences",
   scienceAlarmSettings: DEFAULT_SCIENCE_ALARM_SETTINGS,
+  themeId: "mission-control-dark",
   closeSettings() {},
   openSettings() {},
   selectSection() {},
+  updateTheme() {},
   updateScienceAlarmSettings() {},
 };
 
@@ -106,6 +115,7 @@ export function SettingsProvider({ children }: PropsWithChildren) {
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<SettingsSection>("preferences");
   const [scienceAlarmSettings, setScienceAlarmSettings] = useState(readScienceAlarmSettings);
+  const [themeId, setThemeId] = useState(loadThemeId);
 
   const closeSettings = useCallback(() => setOpen(false), []);
   const openSettings = useCallback((nextSection: SettingsSection = "preferences") => {
@@ -113,6 +123,9 @@ export function SettingsProvider({ children }: PropsWithChildren) {
     setOpen(true);
   }, []);
   const selectSection = useCallback((nextSection: SettingsSection) => setSection(nextSection), []);
+  const updateTheme = useCallback((nextThemeId: ThemeId) => {
+    setThemeId(selectTheme(nextThemeId));
+  }, []);
   const updateScienceAlarmSettings = useCallback((next: Partial<ScienceAlarmDefaults> | ScienceAlarmDefaults) => {
     setScienceAlarmSettings((current) => {
       const merged = normalizeScienceAlarmSettings({ ...current, ...next });
@@ -128,8 +141,10 @@ export function SettingsProvider({ children }: PropsWithChildren) {
     scienceAlarmSettings,
     section,
     selectSection,
+    themeId,
+    updateTheme,
     updateScienceAlarmSettings,
-  }), [closeSettings, open, openSettings, scienceAlarmSettings, section, selectSection, updateScienceAlarmSettings]);
+  }), [closeSettings, open, openSettings, scienceAlarmSettings, section, selectSection, themeId, updateScienceAlarmSettings, updateTheme]);
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }

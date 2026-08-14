@@ -6,8 +6,10 @@ All notable public changes will be recorded here.
 
 - Added a Settings rail drawer with Preferences, Features & Mods, Help, and
   About sections. Preferences retain the dashboard time system and local
-  science-alarm defaults, and can restore hidden panels. About reports the
-  current Mission Control Dark palette without exposing a theme chooser yet.
+  science-alarm defaults, can restore hidden panels, and offer four persistent
+  color themes: Mission Control Dark, Daylight Console, Warm CRT, and Green
+  Phosphor. Theme changes apply immediately without changing dashboard layout
+  or typography.
 - Added dashboard-wide Features & Mods status based on the configured KSP
   installation rather than the current game scene: Available, Available - Stock,
   Unavailable, and Detection unavailable. Expanded rows show only the fixed,

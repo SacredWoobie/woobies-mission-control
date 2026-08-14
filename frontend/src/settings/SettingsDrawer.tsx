@@ -2,7 +2,10 @@ import { useState } from "react";
 import { PRODUCT_NAME, PRODUCT_VERSION } from "../buildIdentity";
 import { useDialogFocus } from "../deltaV/useDialogFocus";
 import {
-  CURRENT_THEME_METADATA,
+  DEFAULT_THEME_ID,
+  THEME_METADATA,
+  THEME_OPTIONS,
+  type ThemeId,
 } from "../theme";
 import type { TimeSystem } from "../timeSystem";
 import type {
@@ -58,8 +61,8 @@ export interface SettingsDrawerProps {
   onScienceAlarmSettingsChange(next: Partial<ScienceAlarmDefaults>): void;
   onSectionChange(section: SettingsSection): void;
   onSetTimeSystem?(system: TimeSystem): void;
+  onSetTheme?(themeId: ThemeId): void;
   open: boolean;
-  paletteLabel?: string;
   productName?: string;
   productVersion?: string;
   releaseUrl?: string;
@@ -68,6 +71,7 @@ export interface SettingsDrawerProps {
   scienceAlarmSettings: ScienceAlarmDefaults;
   section: SettingsSection;
   telemetry?: SettingsTelemetryInfo;
+  themeId?: ThemeId;
   timeSystem?: TimeSystem;
   wikiBaseUrl?: string;
 }
@@ -163,13 +167,35 @@ function PreferencesSection({
   onRestoreHiddenPanels,
   onScienceAlarmSettingsChange,
   onSetTimeSystem,
+  onSetTheme,
   scienceAlarmProviders,
   scienceAlarmSettings,
   scienceOnly = false,
+  themeId,
   timeSystem,
-}: Pick<SettingsDrawerProps, "hiddenPanelCount" | "onRestoreHiddenPanels" | "onScienceAlarmSettingsChange" | "onSetTimeSystem" | "scienceAlarmProviders" | "scienceAlarmSettings" | "timeSystem"> & { heading?: string; scienceOnly?: boolean }) {
+}: Pick<SettingsDrawerProps, "hiddenPanelCount" | "onRestoreHiddenPanels" | "onScienceAlarmSettingsChange" | "onSetTimeSystem" | "onSetTheme" | "scienceAlarmProviders" | "scienceAlarmSettings" | "themeId" | "timeSystem"> & { heading?: string; scienceOnly?: boolean }) {
   return <section aria-labelledby="settings-preferences-heading" className="settings-section">
     <h3 id="settings-preferences-heading">{heading}</h3>
+    {!scienceOnly && <fieldset className="settings-fieldset">
+      <legend>Appearance</legend>
+      <div aria-label="Dashboard theme" className="settings-theme-grid" role="radiogroup">
+        {THEME_OPTIONS.map((theme) => <button
+          aria-checked={themeId === theme.id}
+          className="settings-theme-option"
+          key={theme.id}
+          onClick={() => onSetTheme?.(theme.id)}
+          role="radio"
+          type="button"
+        >
+          <span aria-hidden="true" className="settings-theme-swatches">
+            {theme.swatches.map((swatch) => <i key={swatch} style={{ background: swatch }} />)}
+          </span>
+          <strong>{theme.label}</strong>
+          <small>{theme.description}</small>
+        </button>)}
+      </div>
+      <small>Applies immediately and is stored in this browser. Typography and layout remain unchanged.</small>
+    </fieldset>}
     {!scienceOnly && <fieldset className="settings-fieldset">
       <legend>Time system</legend>
       <div className="settings-choice-row">
@@ -305,7 +331,7 @@ function AboutSection({
   issuesUrl,
   launcherBoundary,
   licenseUrl,
-  paletteLabel,
+  themeLabel,
   productName,
   productVersion,
   releaseUrl,
@@ -317,7 +343,7 @@ function AboutSection({
   issuesUrl: string;
   launcherBoundary: string;
   licenseUrl: string;
-  paletteLabel: string;
+  themeLabel: string;
   productName: string;
   productVersion: string;
   releaseUrl: string;
@@ -330,7 +356,7 @@ function AboutSection({
       <div><dt>Product</dt><dd>{productName}</dd></div>
       <div><dt>Release</dt><dd>v{productVersion}</dd></div>
       <div><dt>Build</dt><dd>{buildLabel}</dd></div>
-      <div><dt>Palette</dt><dd>{paletteLabel} (read-only)</dd></div>
+      <div><dt>Theme</dt><dd>{themeLabel}</dd></div>
       <div><dt>Loopback endpoint</dt><dd>{effectiveEndpoint || "Unknown"}</dd></div>
       <div><dt>Launcher boundary</dt><dd>{launcherBoundary}</dd></div>
     </dl>
@@ -356,8 +382,8 @@ export function SettingsDrawer({
   onScienceAlarmSettingsChange,
   onSectionChange,
   onSetTimeSystem,
+  onSetTheme,
   open,
-  paletteLabel = CURRENT_THEME_METADATA.label,
   productName = PRODUCT_NAME,
   productVersion = PRODUCT_VERSION,
   releaseUrl = RELEASE_URL,
@@ -366,6 +392,7 @@ export function SettingsDrawer({
   scienceAlarmSettings,
   section,
   telemetry,
+  themeId = DEFAULT_THEME_ID,
   timeSystem,
   wikiBaseUrl = DEFAULT_WIKI_BASE,
 }: SettingsDrawerProps) {
@@ -396,8 +423,10 @@ export function SettingsDrawer({
           onRestoreHiddenPanels={onRestoreHiddenPanels}
           onScienceAlarmSettingsChange={onScienceAlarmSettingsChange}
           onSetTimeSystem={onSetTimeSystem}
+          onSetTheme={onSetTheme}
           scienceAlarmProviders={scienceAlarmProviders}
           scienceAlarmSettings={scienceAlarmSettings}
+          themeId={themeId}
           timeSystem={timeSystem}
         />}
         {section === "science-alarms" && <PreferencesSection
@@ -406,9 +435,11 @@ export function SettingsDrawer({
           onRestoreHiddenPanels={onRestoreHiddenPanels}
           onScienceAlarmSettingsChange={onScienceAlarmSettingsChange}
           onSetTimeSystem={onSetTimeSystem}
+          onSetTheme={onSetTheme}
           scienceAlarmProviders={scienceAlarmProviders}
           scienceAlarmSettings={scienceAlarmSettings}
           scienceOnly
+          themeId={themeId}
           timeSystem={timeSystem}
         />}
         {section === "features-mods" && <FeaturesSection telemetry={effectiveTelemetry} />}
@@ -419,7 +450,7 @@ export function SettingsDrawer({
           issuesUrl={issuesUrl}
           launcherBoundary={launcherBoundary}
           licenseUrl={licenseUrl}
-          paletteLabel={paletteLabel}
+          themeLabel={THEME_METADATA[themeId].label}
           productName={productName}
           productVersion={productVersion}
           releaseUrl={releaseUrl}

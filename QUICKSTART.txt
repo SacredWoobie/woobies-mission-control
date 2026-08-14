@@ -124,8 +124,10 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    SETTINGS RAIL: The Settings rail groups browser-local Preferences, known
    Features & Mods, curated external Help links, and About information.
    Preferences controls Kerbin/Earth time, Science alarm defaults, and hidden
-   panel restoration. About reports Mission Control Dark and has no theme
-   chooser. Features & Mods reports dashboard-wide status from the configured
+   panel restoration. It also offers Mission Control Dark, Daylight Console,
+   Warm CRT, and Green Phosphor color themes; the selected colors apply
+   immediately and persist in the browser without changing layout or type.
+   About reports the active theme. Features & Mods reports dashboard-wide status from the configured
    KSP installation, independent of the current game scene: Available,
    Available - Stock, Unavailable, or Detection unavailable. Expanded rows show
    the fixed known integration checks behind the result. This is not an

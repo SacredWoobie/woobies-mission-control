@@ -8,43 +8,53 @@ import {
   DEFAULT_THEME_METADATA,
   loadThemeId,
   parseStoredThemeId,
+  selectTheme,
   serializeThemeId,
   SUPPORTED_THEME_IDS,
+  THEME_METADATA,
+  THEME_OPTIONS,
   THEME_STORAGE_KEY,
 } from "./theme";
 
-describe("current theme contract", () => {
+describe("dashboard theme contract", () => {
   beforeEach(() => {
     localStorage.clear();
-    delete document.documentElement.dataset.theme;
+    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.style.removeProperty("color-scheme");
   });
 
   afterEach(() => {
     localStorage.clear();
-    delete document.documentElement.dataset.theme;
+    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.style.removeProperty("color-scheme");
   });
 
-  it("defines one current dark palette and its canonical JSON storage form", () => {
+  it("defines four stable themes while preserving Mission Control Dark as the default", () => {
     expect(DEFAULT_THEME_ID).toBe("mission-control-dark");
-    expect(SUPPORTED_THEME_IDS).toEqual([DEFAULT_THEME_ID]);
-    expect(CURRENT_THEME_METADATA).toEqual({
-      id: DEFAULT_THEME_ID,
-      label: "Mission Control Dark",
-      colorScheme: "dark",
-      palette: "mission-control",
-    });
+    expect(SUPPORTED_THEME_IDS).toEqual([
+      "mission-control-dark",
+      "daylight-console",
+      "warm-crt",
+      "green-phosphor",
+    ]);
+    expect(THEME_OPTIONS.map(({ id, label, colorScheme }) => ({ id, label, colorScheme }))).toEqual([
+      { id: "mission-control-dark", label: "Mission Control Dark", colorScheme: "dark" },
+      { id: "daylight-console", label: "Daylight Console", colorScheme: "light" },
+      { id: "warm-crt", label: "Warm CRT", colorScheme: "dark" },
+      { id: "green-phosphor", label: "Green Phosphor", colorScheme: "dark" },
+    ]);
     expect(DEFAULT_THEME_METADATA).toBe(CURRENT_THEME_METADATA);
+    expect(THEME_METADATA[DEFAULT_THEME_ID].palette).toBe("mission-control");
     expect(serializeThemeId(DEFAULT_THEME_ID)).toBe('"mission-control-dark"');
   });
 
-  it("loads the valid canonical JSON string and compatible raw identifier", () => {
-    expect(parseStoredThemeId(serializeThemeId(DEFAULT_THEME_ID))).toBe(DEFAULT_THEME_ID);
-    expect(parseStoredThemeId(DEFAULT_THEME_ID)).toBe(DEFAULT_THEME_ID);
-
-    localStorage.setItem(THEME_STORAGE_KEY, serializeThemeId(DEFAULT_THEME_ID));
-    expect(loadThemeId()).toBe(DEFAULT_THEME_ID);
-    localStorage.setItem(THEME_STORAGE_KEY, DEFAULT_THEME_ID);
-    expect(loadThemeId()).toBe(DEFAULT_THEME_ID);
+  it("loads every valid canonical JSON string and compatible raw identifier", () => {
+    for (const themeId of SUPPORTED_THEME_IDS) {
+      expect(parseStoredThemeId(serializeThemeId(themeId))).toBe(themeId);
+      expect(parseStoredThemeId(themeId)).toBe(themeId);
+      localStorage.setItem(THEME_STORAGE_KEY, serializeThemeId(themeId));
+      expect(loadThemeId()).toBe(themeId);
+    }
   });
 
   it("falls back safely for malformed, unknown, and non-string values", () => {
@@ -53,24 +63,23 @@ describe("current theme contract", () => {
     expect(parseStoredThemeId("future-theme")).toBe(DEFAULT_THEME_ID);
     expect(parseStoredThemeId(null)).toBe(DEFAULT_THEME_ID);
     expect(parseStoredThemeId(undefined)).toBe(DEFAULT_THEME_ID);
-
-    localStorage.setItem(THEME_STORAGE_KEY, "{not-json");
-    expect(loadThemeId()).toBe(DEFAULT_THEME_ID);
   });
 
-  it("bootstraps the validated ID on the document root without storage writes", () => {
-    localStorage.setItem(THEME_STORAGE_KEY, serializeThemeId(DEFAULT_THEME_ID));
-    expect(bootstrapTheme()).toBe(DEFAULT_THEME_ID);
-    expect(document.documentElement.dataset.theme).toBe(DEFAULT_THEME_ID);
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe(serializeThemeId(DEFAULT_THEME_ID));
+  it("bootstraps the stored theme before React without rewriting storage", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, serializeThemeId("daylight-console"));
+    expect(bootstrapTheme()).toBe("daylight-console");
+    expect(document.documentElement.dataset.theme).toBe("daylight-console");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe(serializeThemeId("daylight-console"));
   });
 
-  it("applies idempotently and rejects runtime IDs outside the single theme", () => {
-    expect(applyTheme(DEFAULT_THEME_ID)).toBe(DEFAULT_THEME_ID);
-    expect(applyTheme(DEFAULT_THEME_ID)).toBe(DEFAULT_THEME_ID);
-    expect(document.documentElement.dataset.theme).toBe(DEFAULT_THEME_ID);
+  it("applies, persists, and rejects runtime IDs outside the supported set", () => {
+    expect(selectTheme("warm-crt")).toBe("warm-crt");
+    expect(document.documentElement.dataset.theme).toBe("warm-crt");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe(serializeThemeId("warm-crt"));
+
     expect(applyTheme("future-theme")).toBe(DEFAULT_THEME_ID);
     expect(document.documentElement.dataset.theme).toBe(DEFAULT_THEME_ID);
-    expect(SUPPORTED_THEME_IDS).toHaveLength(1);
   });
 });

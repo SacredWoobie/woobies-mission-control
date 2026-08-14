@@ -106,6 +106,30 @@ test("Settings remains the last usable Tool without horizontal overflow across t
   }
 });
 
+test("Settings applies and persists every dashboard color theme", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+
+  for (const theme of [
+    { id: "daylight-console", label: "Daylight Console", scheme: "light" },
+    { id: "warm-crt", label: "Warm CRT", scheme: "dark" },
+    { id: "green-phosphor", label: "Green Phosphor", scheme: "dark" },
+    { id: "mission-control-dark", label: "Mission Control Dark", scheme: "dark" },
+  ]) {
+    const option = drawer.getByRole("radio", { name: new RegExp(theme.label) });
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    expect(await page.locator("html").getAttribute("data-theme")).toBe(theme.id);
+    expect(await page.locator("html").evaluate((root) => getComputedStyle(root).colorScheme)).toBe(theme.scheme);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("wmc-theme-v1") ?? "null"))).toBe(theme.id);
+  }
+
+  await page.reload();
+  expect(await page.locator("html").getAttribute("data-theme")).toBe("mission-control-dark");
+});
+
 test("Settings provides 44px targets on a coarse 390px mobile viewport", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
@@ -119,6 +143,7 @@ test("Settings provides 44px targets on a coarse 390px mobile viewport", async (
     const targets = await drawer.evaluate((element) => {
       const controls = [
         ...element.querySelectorAll<HTMLElement>(".settings-section-nav button"),
+        ...element.querySelectorAll<HTMLElement>(".settings-theme-option"),
         element.querySelector<HTMLElement>("header > button")!,
       ];
       return {

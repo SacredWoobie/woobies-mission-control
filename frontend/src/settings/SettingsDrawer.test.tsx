@@ -15,6 +15,7 @@ function props(overrides: Partial<SettingsDrawerProps> = {}): SettingsDrawerProp
     onScienceAlarmSettingsChange: vi.fn(),
     onSectionChange: vi.fn(),
     onSetTimeSystem: vi.fn(),
+    onSetTheme: vi.fn(),
     open: true,
     scienceAlarmProviders: { kac: true, stock: true },
     scienceAlarmSettings: DEFAULT_SCIENCE_ALARM_SETTINGS,
@@ -24,6 +25,7 @@ function props(overrides: Partial<SettingsDrawerProps> = {}): SettingsDrawerProp
       capabilities: { schemaVersion: 1, features: {} as never },
       persistenceStatus: "shared",
     },
+    themeId: "mission-control-dark",
     timeSystem: "kerbin",
     ...overrides,
   };
@@ -137,12 +139,23 @@ describe("SettingsDrawer", () => {
     expect(screen.getByText(/Woobies Control Stats service.*DETECTED.*Installation scan/)).toBeTruthy();
   });
 
-  it("reports the current palette without exposing a theme chooser", () => {
-    render(<SettingsDrawer {...props({ section: "about" })} />);
+  it("offers all four themes and reports the current selection in About", () => {
+    const onSetTheme = vi.fn();
+    const view = render(<SettingsDrawer {...props({ onSetTheme })} />);
     const dialog = screen.getByRole("dialog", { name: "Mission Control Settings" });
-    expect(within(dialog).getByText("Mission Control Dark (read-only)")).toBeTruthy();
-    expect(within(dialog).queryByRole("combobox")).toBeNull();
-    expect(within(dialog).queryByRole("button", { name: /theme|palette/i })).toBeNull();
+    const themes = within(dialog).getAllByRole("radio");
+    expect(themes.map((theme) => theme.textContent)).toEqual([
+      expect.stringContaining("Mission Control Dark"),
+      expect.stringContaining("Daylight Console"),
+      expect.stringContaining("Warm CRT"),
+      expect.stringContaining("Green Phosphor"),
+    ]);
+    expect(themes[0].getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Daylight Console/ }));
+    expect(onSetTheme).toHaveBeenCalledWith("daylight-console");
+
+    view.rerender(<SettingsDrawer {...props({ onSetTheme, section: "about", themeId: "daylight-console" })} />);
+    expect(within(screen.getByRole("dialog", { name: "Mission Control Settings" })).getByText("Daylight Console")).toBeTruthy();
   });
 
   it("deep-links science alarms while retaining the Preferences navigator", () => {

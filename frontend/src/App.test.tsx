@@ -70,6 +70,8 @@ beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeWebSocket);
   liveTelemetryStore.disconnect();
   localStorage.clear();
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.style.removeProperty("color-scheme");
 });
 
 afterEach(() => {
@@ -156,12 +158,15 @@ describe("Dashboard lifecycle", () => {
     expect(screen.getByRole("button", { name: "Preferences" }).getAttribute("aria-current")).toBe("page");
     fireEvent.click(screen.getByRole("button", { name: "EARTH TIME" }));
     expect(localStorage.getItem("wmc-time-system-v1")).toBe("earth");
+    fireEvent.click(screen.getByRole("radio", { name: /Daylight Console/ }));
+    expect(localStorage.getItem("wmc-theme-v1")).toBe('"daylight-console"');
+    expect(document.documentElement.dataset.theme).toBe("daylight-console");
 
     fireEvent.click(screen.getByRole("button", { name: "Features & Mods" }));
     expect(drawer.querySelectorAll(".settings-feature-toggle")).toHaveLength(10);
     expect(screen.getAllByText("AVAILABLE").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "About" }));
-    expect(screen.getByText("Mission Control Dark (read-only)", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Daylight Console", { exact: true })).toBeTruthy();
     expect(screen.getByText("Development", { exact: true })).toBeTruthy();
 
     fireEvent.keyDown(document, { key: "Escape" });

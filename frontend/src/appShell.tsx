@@ -172,6 +172,8 @@ export function DashboardSurface({
     scienceAlarmSettings,
     section: settingsSection,
     selectSection,
+    themeId,
+    updateTheme,
     updateScienceAlarmSettings,
   } = useSettings();
   const dashboardSettingsSnapshot = settingsSnapshot ?? notesSnapshot;
@@ -217,6 +219,7 @@ export function DashboardSurface({
         onScienceAlarmSettingsChange={updateScienceAlarmSettings}
         onSectionChange={selectSection}
         onSetTimeSystem={setTimeSystem}
+        onSetTheme={updateTheme}
         open={settingsOpen}
         scienceAlarmProviders={dashboardSettingsSnapshot["sci.alarmProviders"]}
         scienceAlarmSettings={scienceAlarmSettings}
@@ -226,6 +229,7 @@ export function DashboardSurface({
           effectiveEndpoint,
           persistenceStatus: plannerPersistence.status,
         }}
+        themeId={themeId}
         timeSystem={timeSystem}
       />
       <NotesContinuityPreview commandEnabled={notesCommandEnabled} onClose={onCloseNotes} onSendCommand={onSendNotesCommand} open={notesOpen} snapshot={notesSnapshot} />
