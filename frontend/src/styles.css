@@ -2334,6 +2334,43 @@ button { font: inherit; }
   }
 }
 
+@media (orientation: portrait) and (min-width: 901px) {
+  .inactive-mode .overview-data-grid:not(.contracts-focused) {
+    align-items: stretch;
+    grid-template-areas:
+      "fleet roster"
+      "fleet contracts"
+      "fleet alarms";
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  .inactive-mode .overview-data-grid:not(.contracts-focused).without-contracts {
+    grid-template-areas:
+      "fleet roster"
+      "fleet alarms";
+  }
+  .inactive-mode .overview-data-grid:not(.contracts-focused).without-alarms {
+    grid-template-areas:
+      "fleet roster"
+      "fleet contracts";
+  }
+  .inactive-mode .overview-data-grid:not(.contracts-focused).without-alarms.without-contracts {
+    grid-template-areas: "fleet roster";
+  }
+  .inactive-mode .overview-fleet {
+    display: flex;
+    min-height: 0;
+    grid-area: fleet;
+    flex-direction: column;
+  }
+  .inactive-mode .overview-roster { grid-area: roster; }
+  .inactive-mode .overview-contracts { grid-area: contracts; }
+  .inactive-mode .overview-alarms { grid-area: alarms; }
+  .inactive-mode .overview-data-grid:not(.contracts-focused) .overview-vessel-split {
+    max-height: none;
+    flex: 1 1 auto;
+  }
+}
+
 @media (min-width: 980px) {
   .flight-grid {
     grid-template-columns: minmax(0,1fr) minmax(0,1fr);

@@ -931,8 +931,8 @@ export function MissionOverview({
       ].filter(Boolean).join(" ")}>
         <FleetSection alarms={snapshot["overview.alarms"] ?? []} bodyCatalog={snapshot["catalog.bodies"] ?? []} commandEnabled={commandEnabled} editResult={editResult} kerbin={kerbin} lifecycleResult={lifecycleResult} onSendCommand={onSendCommand} roster={snapshot["overview.roster"] ?? []} rows={snapshot["overview.vessels"] ?? []} switchResult={switchResult} terminationAvailable={snapshot["overview.vesselTerminationAvailable"] === true} universalTime={snapshot["t.universalTime"]} />
         {rosterDisplayed && <RosterSection available={snapshot["overview.rosterAvailable"] === true} rows={snapshot["overview.roster"] ?? []} />}
-        {alarmsDisplayed && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
         {capabilities.contracts && <ContractSection kerbin={kerbin} onFocusChange={setContractFocused} rows={contracts} universalTime={snapshot["t.universalTime"]} />}
+        {alarmsDisplayed && <AlarmSection kerbin={kerbin} rows={snapshot["overview.alarms"] ?? []} universalTime={snapshot["t.universalTime"]} />}
       </div>
     </div>
     {snapshot["overview.vesselsTruncated"] && <p className="overview-truncated">Fleet list limited to the first 500 tracked objects.</p>}

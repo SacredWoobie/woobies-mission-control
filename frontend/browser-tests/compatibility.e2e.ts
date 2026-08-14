@@ -1637,6 +1637,52 @@ test("Mission Control gives transfer-window cards the full panel body", async ({
   expect(narrowHeader.scrollWidth).toBeLessThanOrEqual(narrowHeader.clientWidth + 1);
 });
 
+test("Mission Control portrait stacks alarms below contracts and stretches the fleet", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto("/");
+  await page.getByTitle("Dashboard developer controls").click();
+  await page.getByLabel("Telemetry fixture").getByRole("button", { name: "inactive" }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const layout = await page.evaluate(() => {
+    const box = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector)!;
+      const rect = element.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        height: rect.height,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+      };
+    };
+    const dataGrid = document.querySelector<HTMLElement>(".overview-data-grid")!;
+    return {
+      alarms: box(".overview-alarms"),
+      contracts: box(".overview-contracts"),
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      fleet: box(".overview-fleet"),
+      gridAreas: getComputedStyle(dataGrid).gridTemplateAreas,
+      roster: box(".overview-roster"),
+      vesselSplit: box(".overview-vessel-split"),
+    };
+  });
+
+  expect(layout.gridAreas).toBe('"fleet roster" "fleet contracts" "fleet alarms"');
+  expect(Math.abs(layout.fleet.top - layout.roster.top)).toBeLessThanOrEqual(1);
+  expect(Math.abs(layout.fleet.bottom - layout.alarms.bottom)).toBeLessThanOrEqual(1);
+  expect(layout.contracts.top).toBeGreaterThanOrEqual(layout.roster.bottom + 8);
+  expect(layout.alarms.top).toBeGreaterThanOrEqual(layout.contracts.bottom + 8);
+  expect(layout.roster.left).toBe(layout.contracts.left);
+  expect(layout.contracts.left).toBe(layout.alarms.left);
+  expect(layout.vesselSplit.height).toBeGreaterThan(800);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+});
+
 test("Mission Control contract focus preserves keyboard, scroll, and responsive boundaries", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");

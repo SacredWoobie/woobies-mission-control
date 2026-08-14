@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Rebalanced the portrait Mission Control overview so Active Vessels uses the
+  full left-column height while Astronaut Roster, Active Contracts, and Upcoming
+  Alarms form a continuous right-column stack.
+
 ## v0.7.2 - Settings, themes, and planning refinements
 
 - Added a Settings rail drawer with Preferences, Features & Mods, Help, and
