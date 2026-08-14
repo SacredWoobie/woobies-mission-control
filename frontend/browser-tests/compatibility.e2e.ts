@@ -442,12 +442,15 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
       routeHeaderHeight: bounds(".delta-v-route > header").height,
       routeListHeight: bounds(".delta-v-route-list").height,
       summaryHeight: bounds(".delta-v-summary").height,
+      transferModeInMissionSummary: Boolean(drawer.querySelector(".delta-v-summary .delta-v-transfer-mode"))
+        && !drawer.querySelector(".delta-v-controls .delta-v-transfer-mode"),
     };
   });
 
   expect(desktop.headerHeight).toBeLessThanOrEqual(65);
   expect(desktop.configurationHeight).toBeLessThanOrEqual(115);
-  expect(desktop.summaryHeight).toBeLessThanOrEqual(115);
+  expect(desktop.summaryHeight).toBeLessThanOrEqual(122);
+  expect(desktop.transferModeInMissionSummary).toBe(true);
   expect(desktop.routeHeaderHeight).toBeLessThanOrEqual(36);
   expect(desktop.routeListHeight).toBeGreaterThanOrEqual(500);
   expect(desktop.footerHeight).toBeLessThanOrEqual(27);
@@ -473,8 +476,8 @@ test("Delta-v density keeps the route primary on fine and coarse pointers", asyn
   await page.getByRole("radio", { name: "Parking orbit" }).check({ force: true });
   await expect(page.getByRole("spinbutton", { name: "Planned altitude" })).toBeVisible();
   await expect(page.getByText(/ATMO Ends at 50.0/)).toBeVisible();
-  await expect(page.getByText("Simple: ideal dates")).toBeVisible();
-  await expect(page.getByText("Advanced: per-leg porkchops")).toHaveCount(0);
+  await expect(page.getByText("Ideal dates")).toBeVisible();
+  await expect(page.getByText("Per-leg porkchops")).toHaveCount(0);
   const portraitMargin = await page.getByRole("dialog", { name: "Delta-v planner" }).evaluate((drawer) => {
     const card = drawer.querySelector<HTMLElement>(".delta-v-margin-card")!.getBoundingClientRect();
     const controls = drawer.querySelector<HTMLElement>(".delta-v-margin-controls")!.getBoundingClientRect();

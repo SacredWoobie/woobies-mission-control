@@ -186,9 +186,12 @@
 .delta-v-error { margin-bottom: 0; }
 .delta-v-output { display: grid; min-height: min(360px,100%); flex: 1; grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); grid-template-areas: "summary" "route"; gap: 8px; padding: 9px 16px 11px; overflow: hidden; }
 .delta-v-summary { display: grid; grid-area: summary; grid-template-columns: minmax(270px,.65fr) minmax(0,1.35fr); grid-template-areas: "budget-head budget-head" "budget-total budget-stats"; gap: 6px; min-width: 0; }
-.delta-v-summary > header { display: flex; grid-area: budget-head; align-items: center; justify-content: space-between; gap: 10px; }
+.delta-v-summary > header { display: grid; grid-area: budget-head; grid-template-columns: minmax(180px,1fr) minmax(220px,300px) auto; align-items: end; gap: 10px; }
 .delta-v-summary > header span, .delta-v-route > header span { color: var(--cyan); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .delta-v-summary > header h3 { margin: 3px 0 0; color: var(--text-primary); font-size: 14px; }
+.delta-v-summary-transfer-mode { min-width: 0; margin: 0; padding: 0; border: 0; }
+.delta-v-summary-transfer-mode > legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.delta-v-summary-transfer-mode .delta-v-transfer-mode label span { min-height: 30px; }
 .delta-v-summary-mode { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
 .delta-v-summary-mode > small { overflow: hidden; color: var(--slate-muted-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .delta-v-summary-mode > strong { flex: 0 0 auto; padding: 5px 7px; border: 1px solid rgba(126,231,135,.35); color: var(--green); font-size: 9px; letter-spacing: .06em; }
@@ -1848,7 +1851,7 @@
   .delta-v-planner:has(> .delta-v-output) > .delta-v-configuration:not(.collapsed) { max-height: calc(100% - 300px); }
   .delta-v-configuration-toggle { min-height: 36px; padding: 5px 16px; }
   .delta-v-configuration-toggle > span { display: flex; align-items: baseline; gap: 8px; }
-  .delta-v-controls { display: grid; grid-template-columns: minmax(130px,.85fr) minmax(175px,1.05fr) minmax(150px,.9fr) minmax(190px,1.1fr) auto; align-items: start; gap: 10px; padding: 8px 16px 10px; }
+  .delta-v-controls { display: grid; grid-template-columns: minmax(150px,.9fr) minmax(190px,1.1fr) minmax(170px,1fr) auto; align-items: start; gap: 10px; padding: 8px 16px 10px; }
   .delta-v-location-row, .delta-v-mission-row, .delta-v-mission-row.one-way { display: contents; }
   .delta-v-controls label { gap: 4px; }
   .delta-v-controls label > span, .delta-v-controls legend { height: 14px; line-height: 14px; }
@@ -1864,9 +1867,10 @@
 
   .delta-v-output { gap: 6px; padding: 7px 16px 8px; }
   .delta-v-summary { grid-template-columns: minmax(240px,.72fr) minmax(0,1.28fr); gap: 5px; }
-  .delta-v-summary > header { min-height: 20px; }
+  .delta-v-summary > header { min-height: 30px; }
   .delta-v-summary > header > div { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
   .delta-v-summary > header h3 { margin: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  .delta-v-summary-transfer-mode .delta-v-transfer-mode label span { min-height: 30px; }
   .delta-v-summary-mode > strong { padding: 3px 6px; }
   .delta-v-total { display: grid; align-content: center; grid-template-columns: auto 1fr; column-gap: 8px; padding: 8px 10px; }
   .delta-v-total > span { grid-column: 1; }
@@ -1938,6 +1942,9 @@
   .delta-v-location-row > :last-child, .delta-v-mission-row > :last-child { grid-column: 1 / -1; }
   .delta-v-output { min-height: 0; grid-template-rows: minmax(96px,.7fr) minmax(200px,1.3fr); }
   .delta-v-summary { min-height: 0; grid-template-columns: minmax(0,1fr); grid-template-areas: "budget-head" "budget-total" "budget-stats"; align-content: start; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .delta-v-summary > header { grid-template-columns: minmax(0,1fr) auto; align-items: end; }
+  .delta-v-summary-transfer-mode { grid-column: 1 / -1; grid-row: 2; }
+  .delta-v-summary-mode { grid-column: 2; grid-row: 1; }
   .delta-v-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .delta-v-margin-card { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto auto; row-gap: 5px; }
   .delta-v-margin-controls { width: 100%; min-width: 0; grid-column: 1; grid-row: 3; grid-template-columns: repeat(3,minmax(0,1fr)); grid-template-rows: repeat(2,44px); }

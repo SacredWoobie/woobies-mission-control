@@ -25,6 +25,8 @@ All notable public changes will be recorded here.
   Tools groups, with a wider name field, distinct Update and Save as new
   actions, inline save feedback, and a non-redundant planner title. Saved-plan,
   reset, and model dialogs now inherit the selected dashboard color theme.
+  Simple / Advanced transfer planning now sits with the mission-wide Planning
+  Budget rather than inside the per-stop arrival builder.
 
 ## v0.7.1 - Release packaging repair
 

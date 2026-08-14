@@ -104,6 +104,14 @@ describe("delta-v planner drawer", () => {
     expect(nextStop.selectedOptions[0]?.textContent).toBe("Choose next body…");
     expect((screen.getByRole("button", { name: /Add next stop/ }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(nextStop, { target: { value: "Duna" } });
+    const simplePlanning = screen.getByRole("radio", { name: "Simple" });
+    const advancedPlanning = screen.getByRole("radio", { name: "Advanced" });
+    expect(simplePlanning.closest(".delta-v-summary")).toBeTruthy();
+    expect(simplePlanning.closest(".delta-v-controls")).toBeNull();
+    fireEvent.click(advancedPlanning);
+    expect(screen.getByText("Per-leg porkchops")).toBeTruthy();
+    fireEvent.click(simplePlanning);
+    expect(screen.getByText("Ideal dates")).toBeTruthy();
     expect(screen.queryByRole("spinbutton", { name: "Planned altitude" })).toBeNull();
     fireEvent.click(screen.getAllByRole("radio", { name: "Parking orbit" })[0]);
     expect(screen.getByRole("spinbutton", { name: "Planned altitude" })).toBeTruthy();
@@ -558,16 +566,16 @@ describe("delta-v planner drawer", () => {
 
     expect((screen.getByRole("radio", { name: "Simple" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByRole("button", { name: "PORKCHOP" })).toBeNull();
-    expect(screen.getByText("Simple: ideal dates")).toBeTruthy();
-    expect(screen.queryByText("Advanced: per-leg porkchops")).toBeNull();
+    expect(screen.getByText("Ideal dates")).toBeTruthy();
+    expect(screen.queryByText("Per-leg porkchops")).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: "Parking orbit" }));
     expect(screen.getByRole("spinbutton", { name: "Planned altitude" })).toBeTruthy();
     expect(screen.getByText(/ATMO Ends at 50.0/)).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: "Advanced" }));
     expect(screen.getByRole("button", { name: "PORKCHOP" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Calculate ideal windows" })).toBeNull();
-    expect(screen.getByText("Advanced: per-leg porkchops")).toBeTruthy();
-    expect(screen.queryByText("Simple: ideal dates")).toBeNull();
+    expect(screen.getByText("Per-leg porkchops")).toBeTruthy();
+    expect(screen.queryByText("Ideal dates")).toBeNull();
     expect(screen.getByText("Planning margin")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Close delta-v planner" }));
