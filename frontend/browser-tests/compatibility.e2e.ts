@@ -1770,6 +1770,9 @@ test("Mission Control portrait stacks alarms below contracts and stretches the f
       };
     };
     const dataGrid = document.querySelector<HTMLElement>(".overview-data-grid")!;
+    const rosterHeader = document.querySelector<HTMLElement>(".overview-roster .overview-section-head")!;
+    const rosterSummary = document.querySelector<HTMLElement>(".overview-roster-summary")!;
+    const rosterSummaryChips = [...rosterSummary.querySelectorAll<HTMLElement>(".overview-roster-summary-chip")];
     return {
       alarms: box(".overview-alarms"),
       contracts: box(".overview-contracts"),
@@ -1780,6 +1783,18 @@ test("Mission Control portrait stacks alarms below contracts and stretches the f
       fleet: box(".overview-fleet"),
       gridAreas: getComputedStyle(dataGrid).gridTemplateAreas,
       roster: box(".overview-roster"),
+      rosterHeaderHeight: rosterHeader.getBoundingClientRect().height,
+      rosterSummaryColumns: getComputedStyle(rosterSummary).gridTemplateColumns,
+      rosterSummaryRows: getComputedStyle(rosterSummary).gridTemplateRows,
+      rosterSummaryChips: rosterSummaryChips.map((chip) => {
+        const label = chip.querySelector<HTMLElement>("span")!;
+        const rect = chip.getBoundingClientRect();
+        return {
+          labelClipped: label.scrollWidth > label.clientWidth,
+          left: rect.left,
+          top: rect.top,
+        };
+      }),
       vesselSplit: box(".overview-vessel-split"),
     };
   });
@@ -1791,6 +1806,14 @@ test("Mission Control portrait stacks alarms below contracts and stretches the f
   expect(layout.alarms.top).toBeGreaterThanOrEqual(layout.contracts.bottom + 8);
   expect(layout.roster.left).toBe(layout.contracts.left);
   expect(layout.contracts.left).toBe(layout.alarms.left);
+  expect(layout.rosterHeaderHeight).toBeLessThanOrEqual(53);
+  expect(layout.rosterSummaryColumns.split(" ")).toHaveLength(2);
+  expect(layout.rosterSummaryRows.split(" ")).toHaveLength(2);
+  expect(layout.rosterSummaryChips).toHaveLength(3);
+  expect(layout.rosterSummaryChips.every(({ labelClipped }) => !labelClipped)).toBe(true);
+  expect(Math.abs(layout.rosterSummaryChips[0].top - layout.rosterSummaryChips[1].top)).toBeLessThanOrEqual(1);
+  expect(layout.rosterSummaryChips[2].top).toBeGreaterThan(layout.rosterSummaryChips[0].top);
+  expect(Math.abs(layout.rosterSummaryChips[0].left - layout.rosterSummaryChips[2].left)).toBeLessThanOrEqual(1);
   expect(layout.vesselSplit.height).toBeGreaterThan(800);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);

@@ -1460,10 +1460,11 @@ button { font: inherit; }
 .overview-vessel-lifecycle-modal.terminate footer button:last-child { border-color: var(--danger); color: #170707; background: var(--danger); }
 .overview-vessel-detail-empty { display: grid; color: var(--slate-muted-text); font-size: 9px; place-items: center; text-align: center; }
 .overview-roster-table-wrap { min-height: 180px; max-height: clamp(220px,38vh,420px); background: var(--surface-well-top); scrollbar-gutter: stable; overscroll-behavior: contain; }
-.overview-roster-summary { display: flex; min-width: 0; align-items: center; gap: 5px; }
-.overview-roster-summary-chip { display: flex; min-width: 62px; min-height: 24px; padding: 3px 6px; align-items: center; justify-content: space-between; gap: 7px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--slate); background: var(--chip-surface); }
-.overview-roster-summary-chip > span { overflow: hidden; font-size: 9px; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-.overview-roster-summary-chip > strong { color: var(--cyan); font-size: 10px; font-weight: 500; }
+.overview-roster .overview-section-head { padding-block: 4px; }
+.overview-roster-summary { display: grid; width: 189px; min-width: 189px; flex: 0 0 189px; grid-template-columns: repeat(2,92px); grid-auto-rows: 20px; gap: 3px 5px; }
+.overview-roster-summary-chip { display: flex; min-width: 0; height: 20px; min-height: 20px; padding: 1px 4px; align-items: center; justify-content: space-between; gap: 3px; border: 1px solid var(--rule-bright); border-radius: 2px; color: var(--slate); background: var(--chip-surface); }
+.overview-roster-summary-chip > span { overflow: hidden; font-size: 9px; letter-spacing: .06em; line-height: 1; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.overview-roster-summary-chip > strong { color: var(--cyan); font-size: 10px; font-weight: 500; line-height: 1; }
 .overview-roster-summary-chip.assigned { border-color: var(--accent-border); }
 .overview-roster-summary-chip.available { border-color: var(--success-border); }
 .overview-roster-summary-chip.dead, .overview-roster-summary-chip.missing { border-color: var(--memorial-border); }
