@@ -153,7 +153,7 @@ test("Mission Control remains the default navball and the KSP2 texture persists 
   const textured = page.locator("#asc .navball-textured");
   await expect(textured).toBeVisible();
   await expect(textured).toHaveAccessibleName(/KSP2 pre-alpha style navball at heading 92, pitch 4, roll -1/);
-  await expect(textured.locator("canvas")).toHaveAttribute("width", /^(168|336)$/);
+  await expect(textured.locator("canvas")).toHaveAttribute("width", "336");
   await expect(textured).not.toHaveClass(/texture-failed/);
   expect(await textured.locator("canvas").evaluate((canvas) => {
     const target = canvas as HTMLCanvasElement;

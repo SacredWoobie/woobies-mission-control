@@ -5,7 +5,7 @@ import { NavballAircraftSymbol } from "./NavballAircraftSymbol";
 import { renderTexturedNavball, type NavballTextureSource } from "./navballTexture";
 
 const displaySize = 168;
-const maximumDevicePixelRatio = 2;
+const supersampleScale = 2;
 let texturePromise: Promise<NavballTextureSource> | undefined;
 
 function loadTexture(): Promise<NavballTextureSource> {
@@ -54,8 +54,10 @@ export function TexturedNavball({ heading, pitch, roll }: { heading: number; pit
         const canvas = canvasRef.current;
         const context = canvas?.getContext("2d");
         if (!canvas || !context) return;
-        const ratio = Math.min(maximumDevicePixelRatio, Math.max(1, window.devicePixelRatio || 1));
-        const size = Math.round(displaySize * ratio);
+        // Always render above the CSS display size. The source is line-heavy,
+        // so browser downsampling gives its curved markings cleaner edges even
+        // on a 1x display while retaining the same physical instrument size.
+        const size = displaySize * supersampleScale;
         let buffer = renderBufferRef.current;
         if (!buffer || buffer.canvas !== canvas || buffer.size !== size) {
           canvas.width = size;
