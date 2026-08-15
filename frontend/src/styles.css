@@ -2145,6 +2145,7 @@ button { font: inherit; }
 .nav-sphere-ground { fill: #6b4f33; }
 .nav-spherical-grid { fill: none; stroke: #fff; stroke-width: .8; }
 .nav-spherical-horizon { fill: none; stroke: #f2f8fc; stroke-width: 1.4; stroke-opacity: .9; }
+.nav-spherical-north-reference { fill: none; stroke: #f28c28; stroke-width: 1.8; stroke-linecap: round; }
 .nav-cardinals { fill: #fff; font: 9px var(--mono); text-anchor: middle; }
 .nav-sphere-rim { fill: none; stroke: #0a1119; stroke-width: 2; stroke-opacity: .55; }
 .aircraft { fill: none; stroke: var(--amber); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }

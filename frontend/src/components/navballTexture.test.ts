@@ -10,9 +10,9 @@ describe("textured navball projection", () => {
     expect(navballTextureCoordinates(makeNavballBasis(0, -90, 0), 0, 0)).toEqual({ u: .5, v: 1 });
   });
 
-  it("rotates the texture with roll and wraps equivalent headings", () => {
+  it("rotates the texture left for a positive right bank and wraps equivalent headings", () => {
     const rolledTop = navballTextureCoordinates(makeNavballBasis(0, 0, 90), 0, 1);
-    expect(rolledTop?.u).toBeCloseTo(.25, 10);
+    expect(rolledTop?.u).toBeCloseTo(.75, 10);
     expect(rolledTop?.v).toBeCloseTo(.5, 10);
     expect(navballTextureCoordinates(makeNavballBasis(360, 0, 0), 0, 0)?.u).toBeCloseTo(.5, 10);
   });

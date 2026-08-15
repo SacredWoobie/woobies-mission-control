@@ -16,6 +16,7 @@ export interface NavballGeometry {
   grid: readonly { path: string; opacity: number }[];
   heading: number;
   horizonPath: string;
+  northReferencePath: string;
   pitch: number;
   roll: number;
   skyPath: string;
@@ -44,7 +45,9 @@ function combine(a: Vector3, aScale: number, b: Vector3, bScale: number): Vector
 export function makeNavballBasis(heading: number, pitch: number, roll: number): NavballBasis {
   const headingRadians = heading * degreesToRadians;
   const pitchRadians = pitch * degreesToRadians;
-  const rollRadians = roll * degreesToRadians;
+  // kRPC reports positive roll as a right bank. An attitude indicator keeps
+  // the aircraft fixed, so the world must rotate in the opposite direction.
+  const rollRadians = roll === 0 ? 0 : -roll * degreesToRadians;
   const forward: Vector3 = [
     Math.sin(headingRadians) * Math.cos(pitchRadians),
     Math.cos(headingRadians) * Math.cos(pitchRadians),
@@ -201,6 +204,7 @@ export function buildNavballGeometry({
     grid,
     heading,
     horizonPath: curvePath(latitudeRing(0, 200), basis),
+    northReferencePath: curvePath(halfMeridian(0, 90), basis),
     pitch,
     roll,
     skyPath: skyRegion(basis),

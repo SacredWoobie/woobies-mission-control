@@ -198,6 +198,43 @@ describe("Flight annunciator rule catalog", () => {
     expect(evaluate(COMMS_LINK_RULE, {})).toEqual({ kind: "source-unknown" });
   });
 
+  it("suppresses only the initial RemoteTech false-negative before using the normal loss dwell", () => {
+    const disconnected: TelemetrySnapshot = {
+      "context.mode": "flight",
+      "rt.available": true,
+      "rt.hasConnection": false,
+    };
+    let state = evaluateAnnunciatorSnapshot(
+      createAnnunciatorState(),
+      [COMMS_LINK_RULE],
+      disconnected,
+      { nowMs: 0, vesselIdentity: "vessel-a" },
+    );
+    state = evaluateAnnunciatorSnapshot(state, [COMMS_LINK_RULE], disconnected, {
+      nowMs: 4_999,
+      vesselIdentity: "vessel-a",
+    });
+    expect(state.episodes).toEqual([]);
+    state = evaluateAnnunciatorSnapshot(state, [COMMS_LINK_RULE], disconnected, {
+      nowMs: 5_000,
+      vesselIdentity: "vessel-a",
+    });
+    state = evaluateAnnunciatorSnapshot(state, [COMMS_LINK_RULE], disconnected, {
+      nowMs: 6_499,
+      vesselIdentity: "vessel-a",
+    });
+    expect(state.episodes).toEqual([]);
+    state = evaluateAnnunciatorSnapshot(state, [COMMS_LINK_RULE], disconnected, {
+      nowMs: 6_500,
+      vesselIdentity: "vessel-a",
+    });
+    expect(state.episodes).toMatchObject([{
+      ruleId: "comms-link-lost",
+      subsystem: "COMMS",
+      message: "RemoteTech reports no vessel connection.",
+    }]);
+  });
+
   it("raises immediate grouped damage warnings only from complete authoritative scans", () => {
     expect(evaluate(PART_DAMAGE_RULE, { "damage.status": "unknown" })).toEqual({ kind: "source-unknown" });
     expect(evaluate(PART_DAMAGE_RULE, { "damage.status": "incomplete", "damage.parts": [] })).toEqual({ kind: "source-unknown" });

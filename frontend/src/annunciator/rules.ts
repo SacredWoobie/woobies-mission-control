@@ -15,6 +15,7 @@ export interface FlightAnnunciatorConditionContract {
   subsystem: string;
   tier: AnnunciatorTier | "caution-to-warning";
   activationDwellMs?: number;
+  lifecycleGraceMs?: number;
   latchSubDwell: boolean;
   trip: string;
   reset: string;
@@ -38,6 +39,7 @@ const ELECTRIC_CHARGE_CAUTION_TRIP = 0.40;
 const ELECTRIC_CHARGE_CAUTION_RESET = 0.45;
 const ELECTRIC_CHARGE_WARNING_TRIP = 0.15;
 const COMMS_ACTIVATION_DWELL_MS = 1_500;
+const COMMS_LIFECYCLE_GRACE_MS = 5_000;
 
 function active(
   instanceId: string,
@@ -420,6 +422,7 @@ export const COMMS_LINK_RULE: AnnunciatorRule = {
   subsystem: "COMMS",
   defaultTier: "caution",
   activationDwellMs: COMMS_ACTIVATION_DWELL_MS,
+  lifecycleGraceMs: COMMS_LIFECYCLE_GRACE_MS,
   evaluate: commsEvaluation,
 };
 
@@ -505,12 +508,13 @@ export const FLIGHT_ANNUNCIATOR_CONDITION_TABLE: FlightAnnunciatorConditionContr
     subsystem: "COMMS",
     tier: "caution",
     activationDwellMs: COMMS_ACTIVATION_DWELL_MS,
+    lifecycleGraceMs: COMMS_LIFECYCLE_GRACE_MS,
     latchSubDwell: false,
-    trip: "RemoteTech (authoritative when available) or stock CommNet reports no connection for 1.5 s.",
+    trip: "After a 5 s Flight/vessel lifecycle initialization grace, RemoteTech (authoritative when available) or stock CommNet reports no connection for 1.5 s.",
     reset: "Authoritative connection remains restored through global clear dwell.",
     identity: "Singleton active vessel, reset on persistent vessel change or revert.",
     completeness: "RemoteTech availability and connection boolean, otherwise stock canCommunicate boolean, sampled every frame.",
-    rationale: "Short handoff drops are diagnostic blips; sustained loss is actionable but not inherently destructive.",
+    rationale: "RemoteTech can briefly report no connection while a newly loaded vessel initializes. The one-time lifecycle grace suppresses that false launch caution without extending the established-vessel loss dwell.",
   },
   {
     ruleId: PART_DAMAGE_RULE.ruleId,
