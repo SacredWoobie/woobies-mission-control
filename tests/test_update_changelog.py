@@ -107,9 +107,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Portrait layouts and visual options", section)
-        self.assertIn("Catppuccin Mocha", section)
-        self.assertIn("KSP2 Pre-Alpha Style NavBall", section)
+        self.assertIn("Flight navball and launch communications", section)
+        self.assertIn("north-reference line", section)
+        self.assertIn("false COMMS Master Caution", section)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 All notable public changes will be recorded here.
 
-## Unreleased
+## v0.7.4 - Flight navball and launch communications
 
 - Added a projected orange north-reference line to the vector Flight navball
   and corrected the shared vector/textured roll direction to match KSP's
