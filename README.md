@@ -126,11 +126,12 @@ does not execute nodes, warp, steer, stage, or change throttle.
 The dashboard adds a Settings rail drawer with four sections:
 
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
-  in browser-local storage, can restore hidden dashboard panels, and offers
-  Mission Control Dark, Daylight Console, Warm CRT, Green Phosphor, and
-  Catppuccin Mocha color themes. A selection applies immediately and persists
-  in that browser. The themes change semantic color and surface treatments
-  while retaining the same typography and layout.
+  in browser-local storage and can restore hidden dashboard panels. Public
+  v0.7.2 offers Mission Control Dark, Daylight Console, Warm CRT, and Green
+  Phosphor; the Unreleased source build adds Catppuccin Mocha as a fifth theme.
+  A selection applies immediately and persists in that browser. The themes
+  change semantic color and surface treatments while retaining the same
+  typography and layout.
 - **Features & Mods** reports only known Mission Control capabilities and
   integrations for the dashboard as a whole, independent of the current game
   scene. **Available** means the required known integrations were detected;
@@ -273,10 +274,10 @@ Mission Control is released under the [MIT License](LICENSE). Created by
 **SacredWoobie**. Bundled and adapted components retain their own licenses and
 notices in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
+The Unreleased source build includes an optional KSP2 Pre-Alpha Style NavBall.
 Special thanks to [SqueakyB](https://spacedock.info/profile/SqueakyB) for
-creating the KSP2 Pre-Alpha Style NavBall, suggesting its Mission Control
-integration, and granting permission to include the artwork as an optional
-navball style.
+creating it, suggesting its Mission Control integration, and granting
+permission to include the artwork.
 
 Mission planning is powered in part by
 [MechJeb 2](https://github.com/MuMech/MechJeb2), installed separately by the

@@ -686,9 +686,10 @@ class ReleaseContractTests(unittest.TestCase):
         acknowledgment = "https://spacedock.info/profile/SqueakyB"
         self.assertIn(acknowledgment, readme)
         self.assertIn(acknowledgment, changelog)
-        self.assertIn("granting permission", notices)
-        self.assertIn("granting permission", readme)
-        self.assertIn("granting permission", changelog)
+        self.assertIn("Unreleased source build", readme)
+        self.assertIn("granting permission", " ".join(notices.split()))
+        self.assertIn("granting permission", " ".join(readme.split()))
+        self.assertIn("granting permission", " ".join(changelog.split()))
 
     def test_packaged_python_runtime_closes_over_local_imports(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
