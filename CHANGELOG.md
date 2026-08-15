@@ -13,7 +13,9 @@ All notable public changes will be recorded here.
 - Added SqueakyB's KSP2 Pre-Alpha Style NavBall as an attributed, browser-local
   Flight preference. Mission Control's existing vector navball remains the
   default; the optional texture follows live heading, pitch, and roll without
-  requiring the in-game NavBall Texture Changer mod.
+  requiring the in-game NavBall Texture Changer mod. Special thanks to
+  [SqueakyB](https://spacedock.info/profile/SqueakyB) for suggesting the
+  integration and granting permission to include their artwork.
 - Rebalanced portrait dashboard layouts. Mission Control now lets Active Vessels
   use the full left-column height while Astronaut Roster, Active Contracts, and
   Upcoming Alarms form a continuous right-column stack. The Editor now places

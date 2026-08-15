@@ -273,6 +273,11 @@ Mission Control is released under the [MIT License](LICENSE). Created by
 **SacredWoobie**. Bundled and adapted components retain their own licenses and
 notices in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
+Special thanks to [SqueakyB](https://spacedock.info/profile/SqueakyB) for
+creating the KSP2 Pre-Alpha Style NavBall, suggesting its Mission Control
+integration, and granting permission to include the artwork as an optional
+navball style.
+
 Mission planning is powered in part by
 [MechJeb 2](https://github.com/MuMech/MechJeb2), installed separately by the
 user. The distributed bridge is Woobie's GPLv3 fork of

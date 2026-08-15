@@ -9,7 +9,7 @@ a whole.
 Mission Control optionally includes the diffuse texture and chooser thumbnail
 from SqueakyB's KSP2 Pre-Alpha Style NavBall 1.0:
 
-- Author listed by SpaceDock: SqueakyB
+- Author listed by SpaceDock: [SqueakyB](https://spacedock.info/profile/SqueakyB)
 - Source: <https://spacedock.info/mod/3738/KSP2%20Pre-Alpha%20Style%20NavBall>
 - License declared by the source page: MIT
 - Original ZIP SHA-256:
@@ -25,6 +25,9 @@ distributed because the dashboard renderer does not use them.
 The downloaded archive does not contain a separate copyright or license notice;
 the author attribution and MIT license declaration above come from its SpaceDock
 source page.
+
+Special thanks to SqueakyB for suggesting this Mission Control integration and
+granting permission to include their navball artwork.
 
 ```text
 MIT License
