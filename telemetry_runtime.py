@@ -78,7 +78,7 @@ def is_local_network_address(value):
 
 def bind_host_allowed(host):
     """Return whether *host* is safe for the dashboard server to bind to."""
-    return host == "127.0.0.1" or is_local_network_address(host)
+    return is_local_network_address(host)
 
 
 def remote_address_allowed(remote_address):
@@ -109,6 +109,30 @@ def detect_lan_address(probe_factory=lambda: socket.socket(socket.AF_INET, socke
     finally:
         probe.close()
     return candidate if is_local_network_address(candidate) else None
+
+
+def is_handshake_noise(record):
+    """Return whether a ``websockets.server`` log record is routine LAN
+    noise from a malformed/incomplete handshake, safe to drop from the log.
+
+    A LAN-facing socket routinely receives non-HTTP traffic (device
+    discovery, health-check probes, port scans), and websockets logs a full
+    traceback for each one. Filtering on the specific parse-failure
+    exception types -- rather than muting the whole logger -- keeps genuine
+    handshake and connection-handler errors visible. These connections never
+    reach process_request, so nothing is ever disclosed by them; this is
+    purely about keeping the log readable.
+    """
+    if record.getMessage() != "opening handshake failed":
+        return False
+    exc_type = record.exc_info[0] if record.exc_info else None
+    if exc_type is None:
+        return False
+    if exc_type is EOFError:
+        return True
+    from websockets.exceptions import InvalidMessage
+
+    return issubclass(exc_type, InvalidMessage)
 
 
 def planner_event(store, command):
@@ -199,11 +223,11 @@ def create_telemetry_runtime(
             print("[telemetry] Install with:  pip install websockets")
             return False
 
-        # Malformed or incomplete handshakes -- routine noise from other
-        # devices on a LAN interface -- would otherwise dump a full traceback
-        # per occurrence; they never reach process_request, so nothing is
-        # ever disclosed by them.
-        logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
+        class _HandshakeNoiseFilter(logging.Filter):
+            def filter(self, record):
+                return not is_handshake_noise(record)
+
+        logging.getLogger("websockets.server").addFilter(_HandshakeNoiseFilter())
 
         tconn = connect("KSP Dashboard Telemetry")
         if tconn is None:

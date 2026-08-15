@@ -18,6 +18,15 @@ spec.loader.exec_module(runtime)
 from planner_persistence import PlannerPersistence
 
 
+class FakeLogRecord:
+    def __init__(self, message, exc_info):
+        self._message = message
+        self.exc_info = exc_info
+
+    def getMessage(self):
+        return self._message
+
+
 class TelemetryRuntimeTests(unittest.TestCase):
     def test_canonical_host_validation_is_exact(self):
         self.assertTrue(runtime.allowed_host_header("127.0.0.1:8090", "127.0.0.1", 8090))
@@ -99,6 +108,33 @@ class TelemetryRuntimeTests(unittest.TestCase):
 
         self.assertIsNone(runtime.detect_lan_address(probe_factory=failing_factory))
 
+    def test_is_handshake_noise_ignores_unrelated_messages(self):
+        record = FakeLogRecord("connection handler failed", (EOFError, EOFError(), None))
+        self.assertFalse(runtime.is_handshake_noise(record))
+
+    def test_is_handshake_noise_ignores_records_without_exception(self):
+        record = FakeLogRecord("opening handshake failed", None)
+        self.assertFalse(runtime.is_handshake_noise(record))
+
+    def test_is_handshake_noise_matches_eof_during_handshake(self):
+        record = FakeLogRecord("opening handshake failed", (EOFError, EOFError(), None))
+        self.assertTrue(runtime.is_handshake_noise(record))
+
+    def test_is_handshake_noise_matches_invalid_message(self):
+        from websockets.exceptions import InvalidMessage
+
+        record = FakeLogRecord(
+            "opening handshake failed",
+            (InvalidMessage, InvalidMessage("did not receive a valid HTTP request"), None),
+        )
+        self.assertTrue(runtime.is_handshake_noise(record))
+
+    def test_is_handshake_noise_leaves_genuine_errors_visible(self):
+        record = FakeLogRecord(
+            "opening handshake failed", (ValueError, ValueError("boom"), None)
+        )
+        self.assertFalse(runtime.is_handshake_noise(record))
+
     def test_planner_wire_events_preserve_status_revision_and_request(self):
         with tempfile.TemporaryDirectory() as temporary:
             store = PlannerPersistence(Path(temporary) / "mission_planning.json")
@@ -163,7 +199,7 @@ class TelemetryRuntimeTests(unittest.TestCase):
         source = (ROOT / "telemetry_runtime.py").read_text(encoding="utf-8")
         for marker in (
             "origins=[origin, None]",
-            'logging.getLogger("websockets.server").setLevel(logging.CRITICAL)',
+            'logging.getLogger("websockets.server").addFilter(_HandshakeNoiseFilter())',
             "Content-Security-Policy",
             "Queue(maxsize=MAX_PENDING_COMMANDS)",
             "sessions.get(ws) != session_id",
