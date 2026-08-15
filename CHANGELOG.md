@@ -2,7 +2,7 @@
 
 All notable public changes will be recorded here.
 
-## Unreleased
+## v0.7.3 - Portrait layouts and visual options
 
 - Added development-fixture controls for independently enabling and disabling
   supported optional mods while keeping the required kRPC and Mission Control

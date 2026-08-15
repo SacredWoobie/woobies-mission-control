@@ -107,9 +107,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Settings, themes, and planning refinements", section)
-        self.assertIn("Features & Mods", section)
-        self.assertIn("Delta-V plan management", section)
+        self.assertIn("Portrait layouts and visual options", section)
+        self.assertIn("Catppuccin Mocha", section)
+        self.assertIn("KSP2 Pre-Alpha Style NavBall", section)
 
 
 if __name__ == "__main__":

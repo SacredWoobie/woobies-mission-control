@@ -242,11 +242,11 @@ $updateChecksumPath = "$updateArchivePath.sha256"
 $updateStageRoot = Join-Path $OutputDirectory "$packageName-runtime-update-stage"
 $notesPath = Join-Path $OutputDirectory "release-notes-v$Version.md"
 $releaseImages = @(
-    @{ Source = 'docs/images/v0.7.2/flight-mission-control-dark.png'; Name = "$packageName.zz-01-flight-mission-control-dark.png" },
-    @{ Source = 'docs/images/v0.7.2/editor-green-phosphor.png'; Name = "$packageName.zz-02-editor-green-phosphor.png" },
-    @{ Source = 'docs/images/v0.7.2/mission-overview-warm-crt.png'; Name = "$packageName.zz-03-mission-overview-warm-crt.png" },
-    @{ Source = 'docs/images/v0.7.2/mission-overview-settings-daylight.png'; Name = "$packageName.zz-04-mission-overview-settings-daylight.png" },
-    @{ Source = 'docs/images/v0.7.2/delta-v-planner-daylight.png'; Name = "$packageName.zz-05-delta-v-planner-daylight.png" }
+    @{ Source = 'docs/images/v0.7.3/mission-overview-catppuccin-portrait.png'; Name = "$packageName.zz-01-mission-overview-catppuccin-portrait.png" },
+    @{ Source = 'docs/images/v0.7.3/editor-catppuccin-portrait.png'; Name = "$packageName.zz-02-editor-catppuccin-portrait.png" },
+    @{ Source = 'docs/images/v0.7.3/flight-ksp2-navball.png'; Name = "$packageName.zz-03-flight-ksp2-navball.png" },
+    @{ Source = 'docs/images/v0.7.3/flight-settings-visual-options.png'; Name = "$packageName.zz-04-flight-settings-visual-options.png" },
+    @{ Source = 'docs/images/v0.7.3/mission-overview-roster-transfers.png'; Name = "$packageName.zz-05-mission-overview-roster-transfers.png" }
 )
 $activeReleaseImages = @(
     if (-not $SkipReleaseImages) {
