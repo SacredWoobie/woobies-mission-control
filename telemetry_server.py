@@ -4,7 +4,7 @@ This module owns every dashboard-facing responsibility:
   * its own kRPC connection and reconnect loop
   * flight, orbit, resource, science, heat, electricity, target, and stage data
   * VAB/SPH craft stage analysis and editor-condition selection
-  * the loopback HTTP and WebSocket server consumed by the React dashboard
+  * loopback and optional trusted-LAN HTTP/WebSocket dashboard listeners
 
 It has no ESP32, serial-port, staging, abort, or panel-control dependencies.
 The physical control pad is handled exclusively by panel_bridge.py in a
@@ -12,13 +12,12 @@ separate process and a separate kRPC connection.
 
 Requires:  pip install krpc websockets
 
-Optional args: telemetry_server.py [host] [port]
+Optional args: telemetry_server.py [lan_host] [port]
   telemetry_server.py 192.168.1.50 8090
 
 Set WOOBIE_STAGE_TRACE=1 to emit opt-in StageStats lifecycle diagnostics.
-Set WOOBIE_ALLOW_LAN=1 to auto-detect this machine's private LAN address and
-serve the dashboard there instead of loopback-only. Falls back to loopback if
-no private address can be detected.
+Set WOOBIE_ALLOW_LAN=1 and WOOBIE_LAN_BIND to a selected RFC1918 IPv4 address
+to add a trusted-LAN listener. Loopback remains available in every mode.
 """
 import json
 import math
@@ -58,7 +57,7 @@ from mission_planning import (
 from resource_snapshot import decode_resource_snapshot
 from stage_snapshot import decode_flight_stage_snapshot
 from staging import enrich_stage_result, flight_conditions
-from telemetry_runtime import create_telemetry_runtime, detect_lan_address
+from telemetry_runtime import create_telemetry_runtime, is_loopback_address
 
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
 TELEMETRY_HZ = 4          # dashboard update rate
@@ -120,6 +119,7 @@ STAGE_TRACE_ENABLED = os.environ.get("WOOBIE_STAGE_TRACE", "").casefold() in {
 ALLOW_LAN_ENABLED = os.environ.get("WOOBIE_ALLOW_LAN", "").casefold() in {
     "1", "true", "yes", "on",
 }
+LAN_BIND_ADDRESS = os.environ.get("WOOBIE_LAN_BIND", "").strip()
 
 # KSP Recall exposes these internal refund-bookkeeping resources through kRPC.
 # They are implementation details, not vessel consumables. Match normalized
@@ -5409,7 +5409,7 @@ def gather_telemetry(conn):
     return _finalize_telemetry(conn, payload)
 
 
-def run_telemetry_server(host, port):
+def run_telemetry_server(host, port, lan_host=None):
     """Run the hardened, session-bound production dashboard transport."""
     _asset_handler, server = create_telemetry_runtime(
         dashboard_asset,
@@ -5419,31 +5419,34 @@ def run_telemetry_server(host, port):
         DASHBOARD_WEB_ROOT,
         TELEMETRY_HZ,
     )
-    return server(host, port)
+    return server(host, port, (lan_host,) if lan_host else ())
 
 
 def main():
+    loopback_host = "127.0.0.1"
     if len(sys.argv) >= 2:
-        host = sys.argv[1]
+        requested_host = sys.argv[1]
+        lan_host = None if is_loopback_address(requested_host) else requested_host
     elif ALLOW_LAN_ENABLED:
-        host = detect_lan_address()
-        if host is None:
+        lan_host = LAN_BIND_ADDRESS
+        if not lan_host:
             print(
-                "[telemetry] WOOBIE_ALLOW_LAN is set but no private LAN "
-                "address could be detected; staying on loopback."
+                "[telemetry] WOOBIE_ALLOW_LAN=1 requires an explicit "
+                "WOOBIE_LAN_BIND private IPv4 address."
             )
-            host = "127.0.0.1"
+            return 2
     else:
-        host = "127.0.0.1"
+        lan_host = None
     port = int(sys.argv[2]) if len(sys.argv) >= 3 else TELEMETRY_WS_PORT
 
     print("KSP React dashboard and telemetry server (no ESP32 control code).")
-    print(f"Serving on http://{host}:{port}/. Ctrl+C to stop.")
-    if host not in ("127.0.0.1", "localhost", "::1"):
-        print("WARNING: this read-only telemetry feed has no authentication.")
-        print(f"Network binding is enabled on {host}; use only a trusted network.")
+    print(f"Local dashboard: http://{loopback_host}:{port}/. Ctrl+C to stop.")
+    if lan_host:
+        print(f"Trusted-LAN dashboard: http://{lan_host}:{port}/")
+        print("WARNING: LAN access has no authentication or encryption.")
+        print("Trusted peers can view private data and issue every dashboard command.")
 
-    return 0 if run_telemetry_server(host, port) else 2
+    return 0 if run_telemetry_server(loopback_host, port, lan_host) else 2
 
 
 if __name__ == "__main__":

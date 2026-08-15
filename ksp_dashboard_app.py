@@ -4,7 +4,7 @@ The launcher discovers the optional components beside this file. A component is
 shown only when its Python script exists, so a distribution may include either
 script or both:
 
-  * telemetry_server.py -- React dashboard loopback and telemetry server
+  * telemetry_server.py -- React dashboard loopback and optional LAN server
   * panel_bridge.py     -- ESP32 serial/kRPC control bridge
 
 Each discovered component runs as an independent child process. Closing this
@@ -39,6 +39,7 @@ import tkinter as tk
 from tkinter import filedialog, font as tkfont, messagebox, scrolledtext, ttk
 
 import runtime_update
+from telemetry_runtime import detect_lan_addresses, is_private_lan_address
 
 
 HERE = Path(__file__).resolve().parent
@@ -56,6 +57,7 @@ LATEST_RELEASE_API = (
 UPDATE_CACHE_SECONDS = 24 * 60 * 60
 UPDATE_TIMEOUT_SECONDS = 4
 MAX_RELEASE_RESPONSE_BYTES = 2 * 1024 * 1024
+LAN_WARNING_ACK_VERSION = 1
 
 
 def _default_update_state_path():
@@ -126,7 +128,10 @@ COMPONENTS = (
         "name": "feed",
         "title": "Dashboard feed (telemetry)",
         "script": "telemetry_server.py",
-        "description": "Serves the React dashboard and kRPC telemetry on local loopback.",
+        "description": (
+            "Serves the React dashboard and kRPC telemetry locally, with "
+            "optional trusted-LAN access."
+        ),
         "dashboard": True,
         "requirements": "requirements-dashboard.txt",
         "dependencies": (
@@ -1983,16 +1988,34 @@ def save_update_state(state, path=UPDATE_STATE_PATH):
 
 def load_settings(path=SETTINGS_PATH):
     """Load launcher settings, returning safe defaults on any error."""
+    defaults = {
+        "ksp_root": "",
+        "lan_access_enabled": False,
+        "lan_bind_address": "",
+        "lan_warning_ack_version": 0,
+    }
     try:
         settings = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
-        return {"ksp_root": "", "lan_access_enabled": False}
+        return defaults
     if not isinstance(settings, dict):
-        return {"ksp_root": "", "lan_access_enabled": False}
+        return defaults
     root = settings.get("ksp_root")
+    lan_bind_address = settings.get("lan_bind_address")
+    warning_version = settings.get("lan_warning_ack_version")
     return {
         "ksp_root": root.strip() if isinstance(root, str) else "",
         "lan_access_enabled": settings.get("lan_access_enabled") is True,
+        "lan_bind_address": (
+            lan_bind_address.strip() if isinstance(lan_bind_address, str) else ""
+        ),
+        "lan_warning_ack_version": (
+            warning_version
+            if isinstance(warning_version, int)
+            and not isinstance(warning_version, bool)
+            and warning_version >= 0
+            else 0
+        ),
     }
 
 
@@ -2021,12 +2044,20 @@ def resolve_ksp_root(value):
     return None
 
 
-def telemetry_environment(ksp_root_value, lan_access_enabled=False):
+def telemetry_environment(
+    ksp_root_value,
+    lan_access_enabled=False,
+    lan_bind_address="",
+):
     """Return the child-process environment override for telemetry."""
     root = resolve_ksp_root(ksp_root_value)
     environment = {"WOOBIE_KSP_ROOT": str(root)} if root is not None else {}
-    if lan_access_enabled:
-        environment["WOOBIE_ALLOW_LAN"] = "1"
+    selected_address = str(lan_bind_address or "").strip()
+    valid_address = is_private_lan_address(selected_address)
+    environment["WOOBIE_ALLOW_LAN"] = (
+        "1" if lan_access_enabled and valid_address else "0"
+    )
+    environment["WOOBIE_LAN_BIND"] = selected_address if valid_address else ""
     return environment
 
 
@@ -2058,6 +2089,9 @@ def component_preflight(
     dashboard_port_available=local_tcp_port_available,
     version_reader=read_windows_file_version,
     hash_reader=sha256_file,
+    lan_access_enabled=False,
+    lan_bind_address="",
+    lan_address_provider=detect_lan_addresses,
 ):
     """Return actionable errors and warnings before a kRPC component starts."""
     if isinstance(ksp_root_value, os.PathLike):
@@ -2195,6 +2229,27 @@ def component_preflight(
                 f"Dashboard telemetry port {DASHBOARD_FEED_PORT} is already in "
                 "use. Stop the other dashboard feed or program using that port, "
                 "then try again."
+            )
+    if component_name == "feed" and lan_access_enabled:
+        selected_address = str(lan_bind_address or "").strip()
+        try:
+            active_addresses = tuple(lan_address_provider())
+        except OSError:
+            active_addresses = ()
+        if (
+            not is_private_lan_address(selected_address)
+            or selected_address not in active_addresses
+        ):
+            errors.append(
+                "The selected LAN address is no longer active or is not an "
+                "RFC1918 private IPv4 address. Refresh the address list and "
+                "choose an active address."
+            )
+        elif not dashboard_port_available(DASHBOARD_FEED_PORT, selected_address):
+            errors.append(
+                f"Dashboard telemetry port {DASHBOARD_FEED_PORT} cannot be bound "
+                f"on LAN address {selected_address}. Stop the program using that "
+                "endpoint or choose another active address."
             )
     return {
         "errors": errors,
@@ -2499,9 +2554,17 @@ class App:
         self.update_download_root = Path(update_download_root)
         self.settings_path = Path(settings_path)
         self.settings = load_settings(self.settings_path)
+        self.lan_addresses = detect_lan_addresses()
+        saved_lan_address = self.settings.get("lan_bind_address", "")
+        selected_lan_address = (
+            saved_lan_address
+            if saved_lan_address
+            else (self.lan_addresses[0] if self.lan_addresses else "")
+        )
         self.lan_access_var = tk.BooleanVar(
             value=self.settings.get("lan_access_enabled", False)
         )
+        self.lan_address_var = tk.StringVar(value=selected_lan_address)
         self.update_generation = 0
         self.update_checking = False
         self.update_staging = False
@@ -3016,18 +3079,53 @@ class App:
                 self._toggle_lan_access,
             )
             self.lan_access_control.pack(side="left")
+            address_row = ttk.Frame(frame)
+            address_row.pack(fill="x", padx=9, pady=(2, 4))
+            ttk.Label(address_row, text="LAN address:").pack(side="left")
+            self.lan_address_combo = ttk.Combobox(
+                address_row,
+                textvariable=self.lan_address_var,
+                values=self.lan_addresses,
+                state="readonly",
+                width=18,
+            )
+            self.lan_address_combo.pack(side="left", padx=(7, 5))
+            self.lan_address_combo.bind(
+                "<<ComboboxSelected>>", self._select_lan_address
+            )
+            ttk.Button(
+                address_row,
+                text="Refresh",
+                command=self._refresh_lan_addresses,
+            ).pack(side="left", padx=3)
+            self.copy_lan_url_button = ttk.Button(
+                address_row,
+                text="Copy LAN URL",
+                command=self._copy_lan_url,
+            )
+            self.copy_lan_url_button.pack(side="left", padx=3)
+            self.lan_address_status = ttk.Label(
+                frame,
+                text="",
+                foreground=THEME["slate_dim"],
+                anchor="w",
+                justify="left",
+            )
+            self.lan_address_status.pack(fill="x", padx=9, pady=(0, 4))
             ttk.Label(
                 frame,
                 text=(
-                    "Serves the dashboard to other devices on your local "
-                    "network instead of just this computer. Only enable on "
-                    "networks you trust -- the feed has no authentication."
+                    "Adds a command-capable listener for trusted devices while "
+                    "keeping this computer on 127.0.0.1. LAN access has no "
+                    "authentication or encryption; Windows firewall access must "
+                    "be limited to Private networks."
                 ),
                 foreground=THEME["slate_dim"],
                 anchor="w",
                 justify="left",
                 wraplength=670,
             ).pack(fill="x", padx=9, pady=(0, 8))
+            self._update_lan_address_status()
 
         self.backends.append(backend)
         self.backend_rows.append(
@@ -3124,7 +3222,9 @@ class App:
 
     def _telemetry_environment(self):
         return telemetry_environment(
-            self.ksp_root_var.get(), self.lan_access_var.get()
+            self.ksp_root_var.get(),
+            self.lan_access_var.get(),
+            self.lan_address_var.get(),
         )
 
     def _refresh_ksp_root_status(self):
@@ -4261,15 +4361,8 @@ class App:
             foreground=THEME["slate_dim"],
         )
 
-    def _toggle_lan_access(self):
-        enabled = self.lan_access_var.get()
-        self.settings["lan_access_enabled"] = enabled
-        try:
-            save_settings(self.settings, self.settings_path)
-        except OSError as exc:
-            self._enqueue("feed", f"couldn't save network setting: {exc}")
-            return
-        feed_backend = next(
+    def _feed_backend(self):
+        return next(
             (
                 row["backend"]
                 for row in self.backend_rows
@@ -4277,12 +4370,252 @@ class App:
             ),
             None,
         )
+
+    def _stop_feed_for_network_change(self):
+        feed_backend = self._feed_backend()
         if feed_backend is not None and feed_backend.running():
+            feed_backend.stop()
             self._enqueue(
                 "feed",
-                "Local network access setting changed; restart Dashboard feed "
-                "to apply.",
+                "Network access configuration changed; Dashboard feed stopped. "
+                "Click Start to apply the new listeners.",
             )
+
+    def _show_lan_access_warning(self):
+        result = {"confirmed": False, "remember": False}
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Enable trusted-LAN dashboard access?")
+        dialog.transient(self.root)
+        dialog.resizable(False, False)
+        dialog.configure(background=THEME["bg"])
+
+        body = ttk.Frame(dialog, padding=(20, 18))
+        body.pack(fill="both", expand=True)
+        ttk.Label(
+            body,
+            text="ENABLE TRUSTED-LAN DASHBOARD ACCESS?",
+            style="DialogTitle.TLabel",
+            anchor="w",
+        ).pack(fill="x")
+        ttk.Label(
+            body,
+            text=(
+                "This opens Mission Control to trusted devices on your local "
+                "network. There is no authentication and traffic is not encrypted."
+            ),
+            style="DialogBody.TLabel",
+            wraplength=610,
+            justify="left",
+        ).pack(fill="x", pady=(10, 8))
+        ttk.Label(
+            body,
+            text=(
+                "Trusted peers can view telemetry, finances, contracts, notes, "
+                "and vessel information. They can also issue every dashboard "
+                "command, including vessel recovery or termination, system "
+                "controls, and maneuver-node creation."
+            ),
+            foreground=THEME["warn"],
+            style="Shell.TLabel",
+            wraplength=610,
+            justify="left",
+        ).pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            body,
+            text=(
+                "Only continue on a network you trust. If Windows asks, allow "
+                "access on Private networks only; Mission Control does not create "
+                "or change firewall rules."
+            ),
+            style="DialogBody.TLabel",
+            wraplength=610,
+            justify="left",
+        ).pack(fill="x", pady=(0, 12))
+
+        remember_var = tk.BooleanVar(value=False)
+        remember_control = CheckXControl(
+            body,
+            remember_var,
+            "Remember that I understand this warning",
+            lambda: None,
+        )
+        remember_control.pack(anchor="w", pady=(0, 14))
+
+        def close(confirmed=False):
+            result["confirmed"] = confirmed
+            result["remember"] = bool(confirmed and remember_var.get())
+            dialog.destroy()
+
+        footer = ttk.Frame(body)
+        footer.pack(fill="x")
+        cancel_button = ttk.Button(
+            footer, text="Cancel", width=10, command=lambda: close(False)
+        )
+        cancel_button.pack(side="right")
+        confirm_button = ttk.Button(
+            footer,
+            text="Enable LAN access",
+            command=lambda: close(True),
+        )
+        confirm_button.pack(side="right", padx=(0, 8))
+
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
+        dialog.bind("<Escape>", lambda _event: close(False))
+        confirm_button.bind("<Return>", lambda _event: close(True))
+        cancel_button.bind("<Return>", lambda _event: close(False))
+        dialog.update_idletasks()
+        x = self.root.winfo_rootx() + max(
+            0, (self.root.winfo_width() - dialog.winfo_width()) // 2
+        )
+        y = self.root.winfo_rooty() + max(
+            0, (self.root.winfo_height() - dialog.winfo_height()) // 2
+        )
+        dialog.geometry(f"+{x}+{y}")
+        dialog.grab_set()
+        dialog.lift()
+        confirm_button.focus_set()
+        self.root.wait_window(dialog)
+        return result["confirmed"], result["remember"]
+
+    def _toggle_lan_access(self):
+        enabled = bool(self.lan_access_var.get())
+        was_enabled = self.settings.get("lan_access_enabled") is True
+        if enabled == was_enabled:
+            return
+
+        selected_address = self.lan_address_var.get().strip()
+        if enabled and (
+            not is_private_lan_address(selected_address)
+            or selected_address not in self.lan_addresses
+        ):
+            self.lan_access_var.set(False)
+            messagebox.showerror(
+                "Choose an active LAN address",
+                "Refresh the address list and choose an active RFC1918 private "
+                "IPv4 address before enabling LAN access.",
+                parent=self.root,
+            )
+            self._update_lan_address_status()
+            return
+
+        remember = False
+        if (
+            enabled
+            and self.settings.get("lan_warning_ack_version", 0)
+            != LAN_WARNING_ACK_VERSION
+        ):
+            confirmed, remember = self._show_lan_access_warning()
+            if not confirmed:
+                self.lan_access_var.set(False)
+                return
+
+        candidate = dict(self.settings)
+        candidate["lan_access_enabled"] = enabled
+        candidate["lan_bind_address"] = selected_address
+        if enabled and remember:
+            candidate["lan_warning_ack_version"] = LAN_WARNING_ACK_VERSION
+
+        if not enabled:
+            self._stop_feed_for_network_change()
+        try:
+            save_settings(candidate, self.settings_path)
+        except OSError as exc:
+            self._enqueue("feed", f"couldn't save network setting: {exc}")
+            self.lan_access_var.set(was_enabled)
+            messagebox.showerror(
+                "Could not save LAN setting",
+                "LAN access was not changed because the launcher could not save "
+                f"your settings.\n\n{exc}",
+                parent=self.root,
+            )
+            return
+        self.settings = candidate
+        if enabled:
+            self._stop_feed_for_network_change()
+        self._update_lan_address_status()
+
+    def _select_lan_address(self, _event=None):
+        selected_address = self.lan_address_var.get().strip()
+        previous_address = self.settings.get("lan_bind_address", "")
+        if selected_address == previous_address:
+            self._update_lan_address_status()
+            return
+        if (
+            not is_private_lan_address(selected_address)
+            or selected_address not in self.lan_addresses
+        ):
+            self.lan_address_var.set(previous_address)
+            self._update_lan_address_status()
+            return
+
+        self._stop_feed_for_network_change()
+        candidate = dict(self.settings)
+        candidate["lan_bind_address"] = selected_address
+        try:
+            save_settings(candidate, self.settings_path)
+        except OSError as exc:
+            self.lan_address_var.set(previous_address)
+            self._enqueue("feed", f"couldn't save LAN address: {exc}")
+            messagebox.showerror(
+                "Could not save LAN address",
+                f"The selected address was not saved.\n\n{exc}",
+                parent=self.root,
+            )
+        else:
+            self.settings = candidate
+        self._update_lan_address_status()
+
+    def _refresh_lan_addresses(self):
+        self.lan_addresses = detect_lan_addresses()
+        self.lan_address_combo.configure(values=self.lan_addresses)
+        if not self.lan_address_var.get().strip() and self.lan_addresses:
+            self.lan_address_var.set(self.lan_addresses[0])
+        self._update_lan_address_status()
+
+    def _update_lan_address_status(self):
+        selected_address = self.lan_address_var.get().strip()
+        active = (
+            is_private_lan_address(selected_address)
+            and selected_address in self.lan_addresses
+        )
+        if active:
+            text = f"LAN URL: http://{selected_address}:{DASHBOARD_FEED_PORT}/"
+            color = THEME["green"] if self.lan_access_var.get() else THEME["slate_dim"]
+        elif selected_address:
+            text = (
+                "Selected address is unavailable. Refresh and choose an active address."
+            )
+            color = THEME["warn"]
+        else:
+            text = "No active RFC1918 private IPv4 address was found."
+            color = THEME["warn"]
+        self.lan_address_status.config(text=text, foreground=color)
+        self.copy_lan_url_button.config(state="normal" if active else "disabled")
+
+    def _copy_lan_url(self):
+        selected_address = self.lan_address_var.get().strip()
+        if (
+            not is_private_lan_address(selected_address)
+            or selected_address not in self.lan_addresses
+        ):
+            messagebox.showerror(
+                "LAN address unavailable",
+                "Refresh the address list and choose an active private IPv4 address.",
+                parent=self.root,
+            )
+            return
+        url = f"http://{selected_address}:{DASHBOARD_FEED_PORT}/"
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(url)
+            self.root.update_idletasks()
+        except tk.TclError as exc:
+            self._enqueue("feed", f"couldn't copy LAN URL: {exc}")
+            messagebox.showerror(
+                "Could not copy LAN URL", str(exc), parent=self.root
+            )
+            return
+        self._enqueue("feed", f"copied trusted-LAN dashboard URL: {url}")
 
     def _save_update_state(self):
         try:
@@ -4459,8 +4792,14 @@ class App:
             backend.stop()
             return
 
+        preflight_options = {}
+        if backend.name == "feed":
+            preflight_options = {
+                "lan_access_enabled": self.lan_access_var.get(),
+                "lan_bind_address": self.lan_address_var.get(),
+            }
         preflight = component_preflight(
-            self.ksp_root_var.get(), backend.name
+            self.ksp_root_var.get(), backend.name, **preflight_options
         )
         for warning in preflight["warnings"]:
             self._enqueue("preflight", warning)

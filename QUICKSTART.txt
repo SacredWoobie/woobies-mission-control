@@ -95,6 +95,25 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    failed kRPC attempts (about 20 seconds) instead of retrying forever. Its
    connection status then turns amber and recommends Test connection.
 
+   OPTIONAL TRUSTED-LAN ACCESS: Leave Allow local network access off unless
+   every device on the selected network is trusted. Choose an active private
+   IPv4 address from the LAN address list; Refresh rescans the host and Copy
+   LAN URL copies the address for a second device. Turning LAN access on opens
+   a warning that explains the listener has no authentication or encryption.
+   LAN peers can view telemetry, finances, contracts, Notes, and vessel data,
+   and can issue every dashboard command, including vessel recovery or
+   termination, system controls, and maneuver-node creation. Choose Cancel to
+   leave LAN access off. The Remember checkbox is off by default; without it,
+   the warning returns every time LAN access is turned on.
+
+   Enabling, disabling, or changing the LAN address stops a running Dashboard
+   feed. Click Start again, then use the copied LAN URL from the trusted device;
+   the local browser continues to use http://127.0.0.1:8090/. If Windows shows
+   a firewall prompt, allow access on Private networks only. Mission Control
+   does not create firewall rules. Never forward port 8090 through a router or
+   expose it on a public network, and verify the chosen adapter on VPN or
+   multi-network computers.
+
    In Space Center and Tracking Station scenes, Mission Control shows a
    read-only program overview with save-mode-appropriate economy totals,
    filterable tracked vessels and roster, active contracts, and a combined

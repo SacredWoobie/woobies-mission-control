@@ -33,6 +33,19 @@ class TelemetryRuntimeTests(unittest.TestCase):
         self.assertFalse(runtime.allowed_host_header("localhost:8090", "127.0.0.1", 8090))
         self.assertFalse(runtime.allowed_host_header("attacker.example", "127.0.0.1", 8090))
 
+    def test_origin_validation_is_listener_specific(self):
+        self.assertTrue(runtime.allowed_origin_header(None, "192.168.1.50", 8090))
+        self.assertTrue(
+            runtime.allowed_origin_header(
+                "http://192.168.1.50:8090", "192.168.1.50", 8090
+            )
+        )
+        self.assertFalse(
+            runtime.allowed_origin_header(
+                "http://127.0.0.1:8090", "192.168.1.50", 8090
+            )
+        )
+
     def test_is_local_network_address_accepts_loopback_and_rfc1918(self):
         for address in (
             "127.0.0.1",
@@ -67,6 +80,23 @@ class TelemetryRuntimeTests(unittest.TestCase):
         self.assertFalse(runtime.remote_address_allowed(("8.8.8.8", 54321)))
         self.assertFalse(runtime.remote_address_allowed(None))
         self.assertFalse(runtime.remote_address_allowed(()))
+
+    def test_remote_address_must_match_listener_class(self):
+        self.assertTrue(
+            runtime.remote_address_allowed(("127.0.0.1", 5000), "127.0.0.1")
+        )
+        self.assertFalse(
+            runtime.remote_address_allowed(("192.168.1.20", 5000), "127.0.0.1")
+        )
+        self.assertTrue(
+            runtime.remote_address_allowed(("192.168.1.20", 5000), "192.168.1.50")
+        )
+        self.assertFalse(
+            runtime.remote_address_allowed(("127.0.0.1", 5000), "192.168.1.50")
+        )
+        self.assertFalse(
+            runtime.remote_address_allowed(("8.8.8.8", 5000), "192.168.1.50")
+        )
 
     def test_detect_lan_address_returns_private_candidate(self):
         class FakeSocket:
@@ -107,6 +137,25 @@ class TelemetryRuntimeTests(unittest.TestCase):
             raise OSError("no network")
 
         self.assertIsNone(runtime.detect_lan_address(probe_factory=failing_factory))
+
+    def test_detect_lan_addresses_prioritizes_route_and_deduplicates(self):
+        self.assertEqual(
+            runtime.detect_lan_addresses(
+                route_detector=lambda: "192.168.1.50",
+                hostname_factory=lambda: "host",
+                hostname_resolver=lambda _host: (
+                    "host",
+                    [],
+                    ["10.10.0.4", "192.168.1.50", "127.0.0.1", "8.8.8.8"],
+                ),
+            ),
+            ("192.168.1.50", "10.10.0.4"),
+        )
+
+    def test_private_lan_predicate_rejects_loopback_wildcard_public_and_ipv6(self):
+        self.assertTrue(runtime.is_private_lan_address("172.20.1.5"))
+        for address in ("127.0.0.1", "0.0.0.0", "8.8.8.8", "::1"):
+            self.assertFalse(runtime.is_private_lan_address(address), address)
 
     def test_is_handshake_noise_ignores_unrelated_messages(self):
         record = FakeLogRecord("connection handler failed", (EOFError, EOFError(), None))
@@ -195,10 +244,33 @@ class TelemetryRuntimeTests(unittest.TestCase):
         self.assertEqual(dashboard_asset("/assets/config.js")[2], "no-cache")
         self.assertEqual(dashboard_asset("/config.json")[2], "no-cache")
 
+    def test_server_requires_loopback_primary_and_private_additional_hosts(self):
+        connections = []
+
+        def baseline(_target, _root=None):
+            return HTTPStatus.OK, "text/html", "no-cache", b"ok"
+
+        _dashboard_asset, server = runtime.create_telemetry_runtime(
+            baseline,
+            lambda name: connections.append(name),
+            lambda _conn: {},
+            lambda _conn, _command: None,
+            ROOT / "web",
+            4,
+        )
+
+        self.assertFalse(server("192.168.1.50", 8090))
+        self.assertFalse(server("127.0.0.1", 8090, ("0.0.0.0",)))
+        self.assertFalse(server("127.0.0.1", 8090, ("8.8.8.8",)))
+        self.assertEqual(connections, [])
+
     def test_packaged_server_source_contains_origin_csp_and_session_guards(self):
         source = (ROOT / "telemetry_runtime.py").read_text(encoding="utf-8")
         for marker in (
             "origins=[origin, None]",
+            "AsyncExitStack",
+            "remote_address_allowed(",
+            "allowed_origin_header(",
             'logging.getLogger("websockets.server").addFilter(_HandshakeNoiseFilter())',
             "Content-Security-Policy",
             "Queue(maxsize=MAX_PENDING_COMMANDS)",

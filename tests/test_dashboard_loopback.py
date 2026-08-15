@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest import mock
 from http import HTTPStatus
 from pathlib import Path
 
@@ -7,6 +8,43 @@ import telemetry_server
 
 
 class DashboardLoopbackTests(unittest.TestCase):
+    def test_server_main_keeps_loopback_when_lan_is_enabled(self):
+        with (
+            mock.patch.object(telemetry_server.sys, "argv", ["telemetry_server.py"]),
+            mock.patch.object(telemetry_server, "ALLOW_LAN_ENABLED", True),
+            mock.patch.object(telemetry_server, "LAN_BIND_ADDRESS", "192.168.1.50"),
+            mock.patch.object(
+                telemetry_server, "run_telemetry_server", return_value=True
+            ) as run,
+        ):
+            self.assertEqual(telemetry_server.main(), 0)
+        run.assert_called_once_with("127.0.0.1", 8090, "192.168.1.50")
+
+    def test_server_main_fails_closed_when_enabled_without_selected_address(self):
+        with (
+            mock.patch.object(telemetry_server.sys, "argv", ["telemetry_server.py"]),
+            mock.patch.object(telemetry_server, "ALLOW_LAN_ENABLED", True),
+            mock.patch.object(telemetry_server, "LAN_BIND_ADDRESS", ""),
+            mock.patch.object(telemetry_server, "run_telemetry_server") as run,
+        ):
+            self.assertEqual(telemetry_server.main(), 2)
+        run.assert_not_called()
+
+    def test_explicit_cli_host_is_an_additional_listener(self):
+        with (
+            mock.patch.object(
+                telemetry_server.sys,
+                "argv",
+                ["telemetry_server.py", "10.0.0.5", "9000"],
+            ),
+            mock.patch.object(telemetry_server, "ALLOW_LAN_ENABLED", False),
+            mock.patch.object(
+                telemetry_server, "run_telemetry_server", return_value=True
+            ) as run,
+        ):
+            self.assertEqual(telemetry_server.main(), 0)
+        run.assert_called_once_with("127.0.0.1", 9000, "10.0.0.5")
+
     def test_serves_index_and_hashed_assets_with_expected_cache_policy(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -56,7 +56,10 @@ populated scenes; `--drop-every 4` exercises reconnect behavior. Use
 
 To test the compiled production dashboard instead of Vite, double-click
 `tools\Mock Mission Control.bat`. That controller serves both the dashboard and
-the same populated telemetry on the production loopback port `8090`.
+the same populated telemetry on the production loopback port `8090`. The
+production client derives its WebSocket endpoint from the page origin, so a
+dashboard loaded through an enabled trusted-LAN URL connects back to that same
+LAN address while the launcher's local browser continues to use loopback.
 
 ## Verification and production build
 

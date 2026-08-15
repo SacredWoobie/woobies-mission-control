@@ -2,6 +2,24 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added opt-in trusted-LAN dashboard access while preserving the launcher's
+  loopback dashboard. The launcher discovers active private IPv4 interfaces,
+  lets the user select one and copy its URL, and requires a detailed warning
+  confirmation before enabling the unauthenticated, unencrypted,
+  command-capable listener. The warning can be remembered explicitly and is
+  versioned so materially changed capabilities require a new acknowledgement.
+- Hardened LAN serving with simultaneous listener-specific peer, Host, and
+  WebSocket Origin validation. Wildcard, public, stale, and unavailable binds
+  remain blocked, visible settings explicitly override inherited environment
+  values, and changing LAN configuration stops a running feed until the user
+  starts it again.
+- Documented Private-network Windows firewall guidance and the data and command
+  access granted to trusted LAN peers. No firewall rules are created
+  automatically, and no authentication, TLS, IPv6, telemetry-schema, or custom
+  service-DLL changes are included.
+
 ## v0.7.4 - Flight navball and launch communications
 
 - Added a projected orange north-reference line to the vector Flight navball

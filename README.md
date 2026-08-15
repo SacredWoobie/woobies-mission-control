@@ -4,8 +4,9 @@ Current public release: **[v0.7.4](https://github.com/SacredWoobie/woobies-missi
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
-the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
-ESP32 bridge provides physical stage and abort controls.
+the dashboard from your own computer at `http://127.0.0.1:8090/`. Opt-in
+trusted-LAN access can add a second listener on a selected private IPv4 address.
+An optional ESP32 bridge provides physical stage and abort controls.
 
 Version 0.7.4 corrects the shared vector and textured Flight navball roll
 direction, adds an orange north-reference line to the vector navball, and
@@ -206,12 +207,24 @@ The accepted local endpoints are:
 | kRPC stream port | `50001` |
 | Mission Control dashboard | `http://127.0.0.1:8090/` |
 
-The launcher's "Allow local network access" toggle (off by default) lets the
-dashboard feed serve other devices on your own network instead of only this
-computer. When enabled, it auto-detects this machine's private LAN address
-(e.g. `192.168.x.x`, `10.x.x.x`) and binds only there -- it never binds to a
-public-facing address, and every connection is independently checked against
-the same private-address ranges before being accepted.
+The launcher's **Allow local network access** toggle is off by default. It keeps
+the local listener at `127.0.0.1:8090` and can add a second listener on an active
+RFC1918 IPv4 address selected from the launcher's address picker. The routed
+default is preselected when available; **Refresh** updates the active choices,
+and **Copy LAN URL** copies the address to share with a trusted device. Changing
+enablement or the selected address stops a running feed, so click **Start** again
+to apply the displayed configuration.
+
+Enabling LAN access requires confirmation that the listener has no
+authentication or encryption. Trusted peers can view telemetry, finances,
+contracts, Notes, and vessel information and can issue every dashboard command,
+including vessel recovery or termination, system controls, and maneuver-node
+creation. The warning appears on every off-to-on transition unless the user
+explicitly checks **Remember that I understand this warning**. Mission Control
+rejects loopback, wildcard, public, stale, and unavailable LAN selections. It
+does not create firewall rules; if Windows prompts, allow Python/Mission Control
+on **Private networks only**, never Public networks. VPN and multi-adapter hosts
+should verify the selected interface before starting the feed.
 
 See [`QUICKSTART.txt`](QUICKSTART.txt) for the compact offline walkthrough. The
 [project wiki](https://github.com/SacredWoobie/woobies-mission-control/wiki)
@@ -237,9 +250,11 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
   creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple
   dashboard tabs and scenes see the same saved plans.
-- The WebSocket feed has no authentication. Keep it on `127.0.0.1` unless you
-  deliberately enable "Allow local network access", and only do so on a
-  network you trust.
+- Trusted-LAN dashboard access has no authentication or encryption and grants
+  peers the same data and command access as the local dashboard. Keep it off
+  unless every device on the selected Private network is trusted; never expose
+  port `8090` through a router, VPN route, public firewall profile, or the
+  internet.
 - The optional ESP32 bridge can stage or abort a vessel. Test its arm/safe
   behavior on a disposable craft first.
 - Logs can contain local paths; review them before posting them publicly.

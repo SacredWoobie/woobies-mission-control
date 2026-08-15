@@ -80,6 +80,16 @@ class LauncherReadinessTests(unittest.TestCase):
         self.assertEqual(row["status"].options["text"], "\u25cb stopped")
         self.assertFalse(backend.startup_ready)
 
+    def test_loopback_ready_opens_immediately_without_retry_timeout(self):
+        launcher = self.make_launcher(FakeBackend())
+        launcher._dashboard_ready = mock.Mock(return_value=True)
+        launcher._open_dashboard = mock.Mock()
+
+        launcher._open_dashboard_when_ready()
+
+        launcher._open_dashboard.assert_called_once_with()
+        self.assertEqual(launcher.root.after_calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

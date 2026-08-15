@@ -374,7 +374,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("Next release candidate", readme)
         self.assertNotIn("v0.7.4 release candidate", readme)
 
-    def test_only_react_loopback_runtime_is_supported(self):
+    def test_react_runtime_keeps_loopback_and_supports_opt_in_lan(self):
         self.assertFalse((ROOT / "ksp_mission_dashboard.html").exists())
         self.assertFalse((ROOT / "Start React POC.bat").exists())
         self.assertFalse((ROOT / "Stop React POC.bat").exists())
@@ -385,7 +385,14 @@ class ReleaseContractTests(unittest.TestCase):
         telemetry = (ROOT / "telemetry_server.py").read_text(encoding="utf-8")
         self.assertIn('DASHBOARD = HERE / "web" / "index.html"', launcher)
         self.assertIn('DASHBOARD_URL = "http://127.0.0.1:8090/"', launcher)
-        self.assertIn('DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"', telemetry)
+        self.assertIn('environment["WOOBIE_ALLOW_LAN"]', launcher)
+        self.assertIn('environment["WOOBIE_LAN_BIND"]', launcher)
+        self.assertIn(
+            'DASHBOARD_WEB_ROOT = Path(__file__).resolve().parent / "web"', telemetry
+        )
+        self.assertIn(
+            'run_telemetry_server(loopback_host, port, lan_host)', telemetry
+        )
 
     def test_managed_frontend_server_uses_the_configured_vite_port(self):
         dev_script = (ROOT / "scripts" / "dashboard-dev.ps1").read_text(
@@ -568,6 +575,27 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(
             publish_script.count("Sort-CanonicalManifestPaths $"),
             2,
+        )
+
+    def test_lan_launcher_server_and_frontend_ship_in_one_managed_update(self):
+        publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
+            encoding="utf-8"
+        )
+        update_contract = json.loads(
+            (ROOT / "runtime-update-contract.json").read_text(encoding="utf-8")
+        )
+        for source in (
+            "ksp_dashboard_app.py",
+            "telemetry_runtime.py",
+            "telemetry_server.py",
+        ):
+            self.assertIn(
+                f"@{{ Source = '{source}'; Destination = 'Dashboard/{source}' }}",
+                publish_script,
+            )
+        self.assertIn(".py", update_contract["dashboard_top_level_extensions"])
+        self.assertEqual(
+            update_contract["dashboard_web_index"], "Dashboard/web/index.html"
         )
         self.assertIn("$Left.ToLowerInvariant()", publish_script)
         self.assertIn("$Right.ToLowerInvariant()", publish_script)
