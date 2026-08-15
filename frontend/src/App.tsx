@@ -35,6 +35,11 @@ import {
   flightTelemetryFixture,
   inactiveTelemetryFixture,
 } from "./telemetry/fixtures";
+import {
+  allFixtureOptionalMods,
+  applyFixtureOptionalMods,
+  type FixtureOptionalModId,
+} from "./telemetry/fixtureMods";
 import { liveTelemetryStore } from "./telemetry/store";
 import type { SceneMode, TelemetrySnapshot } from "./telemetry/types";
 
@@ -71,8 +76,8 @@ function FixtureFlightDashboard({ snapshot }: { snapshot: TelemetrySnapshot }) {
   );
 }
 
-function FixtureDashboard({ mode, notesOpen, onCloseNotes, onSetNotesOpen }: { mode: SceneMode; notesOpen: boolean; onCloseNotes(): void; onSetNotesOpen(open: boolean): void }) {
-  const snapshot = fixtures[mode];
+function FixtureDashboard({ enabledMods, mode, notesOpen, onCloseNotes, onSetNotesOpen }: { enabledMods: ReadonlySet<FixtureOptionalModId>; mode: SceneMode; notesOpen: boolean; onCloseNotes(): void; onSetNotesOpen(open: boolean): void }) {
+  const snapshot = useMemo(() => applyFixtureOptionalMods(fixtures[mode], enabledMods), [enabledMods, mode]);
   const identity = mode === "flight" ? String(snapshot["v.name"] ?? "Active vessel") : mode === "editor" ? String(snapshot["editor.craftName"] ?? "Untitled craft") : undefined;
   return (
     <DashboardSurface
@@ -110,6 +115,7 @@ function DevelopmentDashboardApp() {
   const [source, setSource] = useState<TelemetrySource>("fixtures");
   const [endpoint, setEndpoint] = useState(DEFAULT_LIVE_ENDPOINT);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [enabledFixtureMods, setEnabledFixtureMods] = useState<ReadonlySet<FixtureOptionalModId>>(() => allFixtureOptionalMods());
 
   useEffect(() => () => liveTelemetryStore.disconnect(), []);
 
@@ -131,20 +137,33 @@ function DevelopmentDashboardApp() {
     setSource("fixtures");
   }
 
+  function toggleFixtureMod(id: FixtureOptionalModId) {
+    setEnabledFixtureMods((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <DashboardAppFrame notesOpen={notesOpen}>
       <DeveloperDrawer
         endpoint={endpoint}
+        enabledFixtureMods={enabledFixtureMods}
         fixtureMode={fixtureMode}
         onConnectLive={connectLive}
         onDisconnectLive={disconnectLive}
         onEndpointChange={setEndpoint}
+        onFixtureModToggle={toggleFixtureMod}
         onFixtureModeChange={setFixtureMode}
+        onSetAllFixtureMods={(enabled) => setEnabledFixtureMods(enabled ? allFixtureOptionalMods() : new Set())}
         onUseFixtures={useFixtures}
         source={source}
       />
       {source === "fixtures" ? (
         <FixtureDashboard
+          enabledMods={enabledFixtureMods}
           mode={fixtureMode}
           notesOpen={notesOpen}
           onCloseNotes={() => setNotesOpen(false)}

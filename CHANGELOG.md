@@ -2,6 +2,13 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added development-fixture controls for independently enabling and disabling
+  supported optional mods while keeping the required kRPC and Mission Control
+  services fixed. Fixture scenes now expose the corresponding stock-fallback
+  and unavailable UI states without changing a live KSP installation.
+
 ## v0.7.2 - Settings, themes, and planning refinements
 
 - Added a Settings rail drawer with Preferences, Features & Mods, Help, and
