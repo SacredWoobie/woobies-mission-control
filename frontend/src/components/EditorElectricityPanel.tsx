@@ -28,13 +28,16 @@ function duration(value: number | undefined) {
 
 function Meter({ current, maximum }: { current?: number; maximum?: number }) {
   const known = current !== undefined && maximum !== undefined && maximum > 0;
-  return <meter
+  const value = known ? Math.min(Math.max(current ?? 0, 0), maximum ?? 1) : undefined;
+  const percent = known ? value! / maximum! * 100 : 0;
+  return <div
     aria-label={known ? `Battery charge ${number(current, 0)} of ${number(maximum, 0)} EC` : "Battery charge unavailable"}
+    aria-valuemax={known ? maximum : undefined}
+    aria-valuemin={known ? 0 : undefined}
+    aria-valuenow={value}
     className="editor-electricity-battery-meter"
-    max={known ? maximum : undefined}
-    min={known ? 0 : undefined}
-    value={known ? Math.min(Math.max(current ?? 0, 0), maximum ?? 1) : undefined}
-  />;
+    role="meter"
+  ><span style={{ width: `${percent}%` }} /></div>;
 }
 
 function RateBar({ label, rate, scale }: { label: string; rate: number | undefined; scale: number | undefined }) {

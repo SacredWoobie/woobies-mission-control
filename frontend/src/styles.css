@@ -3197,8 +3197,7 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .editor-electricity-storage { display: grid; min-width: 0; align-items: center; grid-template-columns: 63px minmax(0,1fr) auto; gap: 7px; color: var(--slate-muted-text); font-size: 10px; }
 .editor-electricity-storage strong { grid-column: 3; color: var(--text-value); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .editor-electricity-battery-meter { grid-row: 2; grid-column: 1 / -1; width: 100%; height: 8px; overflow: hidden; border: 0; border-radius: var(--surface-radius-meter); background: var(--surface-track); }
-.editor-electricity-battery-meter::-webkit-meter-bar { border: 0; border-radius: inherit; background: var(--surface-track); }
-.editor-electricity-battery-meter::-webkit-meter-optimum-value, .editor-electricity-battery-meter::-webkit-meter-suboptimum-value, .editor-electricity-battery-meter::-moz-meter-bar { border-radius: inherit; background: var(--green); }
+.editor-electricity-battery-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--green); }
 .editor-electricity-shadow-assessment { display: grid; align-items: center; grid-template-columns: minmax(0,1fr) auto; gap: 5px 8px; padding-top: 6px; border-top: 1px solid var(--surface-grout); }
 .editor-electricity-shadow-assessment p { margin: 0; color: var(--slate-muted-text); font-size: 10px; line-height: 1.35; }
 .editor-electricity-shadow-assessment p strong { display: inline-block; padding: 1px 6px; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); color: var(--slate); background: var(--surface-plate); font-size: 9px; font-weight: 650; letter-spacing: .08em; }

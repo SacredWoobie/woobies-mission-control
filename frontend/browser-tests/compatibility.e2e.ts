@@ -762,6 +762,9 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
     const consumerRows = Array.from(consumerBody.querySelectorAll<HTMLElement>(".editor-electricity-component"));
     const consumerBounds = consumerRows.map((row) => row.getBoundingClientRect());
     const consumerBodyBounds = consumerBody.getBoundingClientRect();
+    const rateBars = Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-rate-bar i"))
+      .map((bar) => bar.getBoundingClientRect());
+    const batteryBar = bounds(".editor-electricity-battery-meter");
 
     const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
     return {
@@ -770,6 +773,8 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
       )).length,
       consumerOverflowY: getComputedStyle(consumerBody).overflowY,
       consumerScrolls: consumerBody.scrollHeight > consumerBody.clientHeight + 1,
+      batteryBarHeightDifference: Math.max(...rateBars.map((bar) => Math.abs(bar.height - batteryBar.height))),
+      batteryBarWidthDifference: Math.max(...rateBars.map((bar) => Math.abs(bar.width - batteryBar.width))),
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
@@ -802,6 +807,8 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
   expect(layout.consumerRowsVisible).toBe(5);
   expect(layout.consumerScrolls).toBe(true);
   expect(layout.consumerOverflowY).toBe("auto");
+  expect(layout.batteryBarHeightDifference).toBeLessThanOrEqual(0.1);
+  expect(layout.batteryBarWidthDifference).toBeLessThanOrEqual(0.1);
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 });
