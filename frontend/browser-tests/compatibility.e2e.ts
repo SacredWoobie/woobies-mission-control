@@ -291,7 +291,7 @@ test("both mission planners remain usable at a normal desktop viewport", async (
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
 
-  await expect(page.getByText("React dashboard · v0.7.3", { exact: false })).toBeVisible();
+  await expect(page.getByText("React dashboard · v0.7.4", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Resonant orbit planner" }).click();
   const resonantDrawer = page.getByRole("dialog", { name: "Resonant orbit planner" });
   await expect(resonantDrawer).toBeVisible();
