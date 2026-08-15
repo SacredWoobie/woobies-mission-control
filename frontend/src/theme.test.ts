@@ -29,19 +29,21 @@ describe("dashboard theme contract", () => {
     document.documentElement.style.removeProperty("color-scheme");
   });
 
-  it("defines four stable themes while preserving Mission Control Dark as the default", () => {
+  it("defines five stable themes while preserving Mission Control Dark as the default", () => {
     expect(DEFAULT_THEME_ID).toBe("mission-control-dark");
     expect(SUPPORTED_THEME_IDS).toEqual([
       "mission-control-dark",
       "daylight-console",
       "warm-crt",
       "green-phosphor",
+      "catppuccin-mocha",
     ]);
     expect(THEME_OPTIONS.map(({ id, label, colorScheme }) => ({ id, label, colorScheme }))).toEqual([
       { id: "mission-control-dark", label: "Mission Control Dark", colorScheme: "dark" },
       { id: "daylight-console", label: "Daylight Console", colorScheme: "light" },
       { id: "warm-crt", label: "Warm CRT", colorScheme: "dark" },
       { id: "green-phosphor", label: "Green Phosphor", colorScheme: "dark" },
+      { id: "catppuccin-mocha", label: "Catppuccin Mocha", colorScheme: "dark" },
     ]);
     expect(DEFAULT_THEME_METADATA).toBe(CURRENT_THEME_METADATA);
     expect(THEME_METADATA[DEFAULT_THEME_ID].palette).toBe("mission-control");

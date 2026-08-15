@@ -167,12 +167,14 @@ export function DashboardSurface({
   const plannerPersistence = usePlannerPersistenceStatus();
   const {
     closeSettings,
+    navballStyleId,
     open: settingsOpen,
     openSettings,
     scienceAlarmSettings,
     section: settingsSection,
     selectSection,
     themeId,
+    updateNavballStyle,
     updateTheme,
     updateScienceAlarmSettings,
   } = useSettings();
@@ -214,10 +216,12 @@ export function DashboardSurface({
         buildLabel={footerLabel}
         effectiveEndpoint={effectiveEndpoint}
         hiddenPanelCount={hiddenPanels.size}
+        navballStyleId={navballStyleId}
         onClose={closeSettings}
         onRestoreHiddenPanels={restoreAllHiddenPanels}
         onScienceAlarmSettingsChange={updateScienceAlarmSettings}
         onSectionChange={selectSection}
+        onSetNavballStyle={updateNavballStyle}
         onSetTimeSystem={setTimeSystem}
         onSetTheme={updateTheme}
         open={settingsOpen}

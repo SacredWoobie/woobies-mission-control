@@ -150,14 +150,13 @@ export function TransferWindowsPanel({
         {rows.map((row) => <article className={`overview-transfer-card ${row.error ? "error" : ""}`} key={row.destination}>
           <div className="overview-transfer-route">
             <strong>
-              <span className="overview-transfer-origin">{origin} {"\u2192"} </span>
               <span className="overview-transfer-destination">{row.destination}</span>
             </strong>
             <span>{validDeparture(row) ? formatMissionUT(row.departureUT!, kerbin) : row.error || "No solution returned"}</span>
           </div>
           <div className="overview-transfer-countdown">
             <strong>{validDeparture(row) && currentUT !== null ? formatTransferWindowCountdown(row.departureUT!, currentUT, kerbin) : validDeparture(row) ? "UNKNOWN" : "UNAVAILABLE"}</strong>
-            <span>{row.error ? "CALCULATION FAILED" : "BEST UPCOMING DEPARTURE"}</span>
+            {row.error && <span>CALCULATION FAILED</span>}
           </div>
         </article>)}
       </div> : <p className="overview-empty">{

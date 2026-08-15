@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flightTelemetryFixture } from "../telemetry/fixtures";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { TimeSystemProvider } from "../timeSystem";
+import { NAVBALL_STYLE_STORAGE_KEY } from "../navballStyle";
+import { SettingsProvider } from "../settings";
 import { AscensionPanel, resolveSasDisplay } from "./AscensionPanel";
 
 beforeEach(() => {
@@ -119,6 +121,27 @@ describe("Ascension information hierarchy", () => {
     view.rerender(<AscensionPanel snapshot={{ ...targetSnapshot, "tar.name": "" }} />);
     expect(view.container.querySelector(".asc-speed-grid.has-target")).toBeNull();
     expect(view.container.textContent).not.toContain("Target relative");
+  });
+
+  it("renders the supplied texture only when the optional navball style is selected", () => {
+    localStorage.setItem(NAVBALL_STYLE_STORAGE_KEY, '"ksp2-pre-alpha"');
+    const view = render(<SettingsProvider><AscensionPanel snapshot={flightTelemetryFixture} /></SettingsProvider>);
+    const textured = view.container.querySelector(".navball-textured");
+    expect(textured?.getAttribute("role")).toBe("img");
+    expect(textured?.getAttribute("aria-label")).toContain("KSP2 pre-alpha style navball");
+    expect(textured?.querySelector("canvas")).not.toBeNull();
+    expect(textured?.querySelector(".aircraft")?.getAttribute("d")).toBe("M52 84 H71 L84 95 L97 84 H116");
+    expect(view.container.querySelector(".nav-sphere-world")).toBeNull();
+  });
+
+  it("retains the standard awaiting-telemetry instrument for either style", () => {
+    localStorage.setItem(NAVBALL_STYLE_STORAGE_KEY, '"ksp2-pre-alpha"');
+    const view = render(<SettingsProvider><AscensionPanel snapshot={{
+      ...flightTelemetryFixture,
+      "n.pitch": undefined,
+    }} /></SettingsProvider>);
+    expect(view.container.querySelector(".navball-textured")).toBeNull();
+    expect(view.container.querySelector("svg[aria-label='Attitude indicator awaiting telemetry']")).not.toBeNull();
   });
 
   it("surfaces trajectory context and explains open-orbit values without adding RCS", () => {

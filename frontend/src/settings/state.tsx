@@ -15,6 +15,12 @@ import {
   selectTheme,
   type ThemeId,
 } from "../theme";
+import {
+  DEFAULT_NAVBALL_STYLE_ID,
+  loadNavballStyleId,
+  selectNavballStyle,
+  type NavballStyleId,
+} from "../navballStyle";
 
 export const SCIENCE_ALARM_SETTINGS_KEY = "wmc-science-alarm-defaults-v1";
 
@@ -86,6 +92,7 @@ export const SETTINGS_SECTIONS: readonly { id: SettingsSection; label: string }[
 ];
 
 interface SettingsContextValue {
+  navballStyleId: NavballStyleId;
   open: boolean;
   section: SettingsSection;
   scienceAlarmSettings: ScienceAlarmDefaults;
@@ -93,11 +100,13 @@ interface SettingsContextValue {
   closeSettings(): void;
   openSettings(section?: SettingsSection): void;
   selectSection(section: SettingsSection): void;
+  updateNavballStyle(navballStyleId: NavballStyleId): void;
   updateTheme(themeId: ThemeId): void;
   updateScienceAlarmSettings(next: Partial<ScienceAlarmDefaults> | ScienceAlarmDefaults): void;
 }
 
 const fallbackSettings: SettingsContextValue = {
+  navballStyleId: DEFAULT_NAVBALL_STYLE_ID,
   open: false,
   section: "preferences",
   scienceAlarmSettings: DEFAULT_SCIENCE_ALARM_SETTINGS,
@@ -105,6 +114,7 @@ const fallbackSettings: SettingsContextValue = {
   closeSettings() {},
   openSettings() {},
   selectSection() {},
+  updateNavballStyle() {},
   updateTheme() {},
   updateScienceAlarmSettings() {},
 };
@@ -112,6 +122,7 @@ const fallbackSettings: SettingsContextValue = {
 const SettingsContext = createContext<SettingsContextValue>(fallbackSettings);
 
 export function SettingsProvider({ children }: PropsWithChildren) {
+  const [navballStyleId, setNavballStyleId] = useState(loadNavballStyleId);
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<SettingsSection>("preferences");
   const [scienceAlarmSettings, setScienceAlarmSettings] = useState(readScienceAlarmSettings);
@@ -123,6 +134,9 @@ export function SettingsProvider({ children }: PropsWithChildren) {
     setOpen(true);
   }, []);
   const selectSection = useCallback((nextSection: SettingsSection) => setSection(nextSection), []);
+  const updateNavballStyle = useCallback((nextNavballStyleId: NavballStyleId) => {
+    setNavballStyleId(selectNavballStyle(nextNavballStyleId));
+  }, []);
   const updateTheme = useCallback((nextThemeId: ThemeId) => {
     setThemeId(selectTheme(nextThemeId));
   }, []);
@@ -136,15 +150,17 @@ export function SettingsProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<SettingsContextValue>(() => ({
     closeSettings,
+    navballStyleId,
     open,
     openSettings,
     scienceAlarmSettings,
     section,
     selectSection,
     themeId,
+    updateNavballStyle,
     updateTheme,
     updateScienceAlarmSettings,
-  }), [closeSettings, open, openSettings, scienceAlarmSettings, section, selectSection, themeId, updateScienceAlarmSettings, updateTheme]);
+  }), [closeSettings, navballStyleId, open, openSettings, scienceAlarmSettings, section, selectSection, themeId, updateNavballStyle, updateScienceAlarmSettings, updateTheme]);
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }

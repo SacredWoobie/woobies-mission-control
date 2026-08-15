@@ -5,6 +5,7 @@ export const SUPPORTED_THEME_IDS = [
   "daylight-console",
   "warm-crt",
   "green-phosphor",
+  "catppuccin-mocha",
 ] as const;
 
 export type ThemeId = typeof SUPPORTED_THEME_IDS[number];
@@ -52,6 +53,14 @@ export const THEME_OPTIONS: readonly ThemeMetadata[] = [
     palette: "green-phosphor",
     description: "Deep green terminal surfaces with phosphor active states.",
     swatches: ["#040a07", "#ffc247", "#bdf6cf"],
+  },
+  {
+    id: "catppuccin-mocha",
+    label: "Catppuccin Mocha",
+    colorScheme: "dark",
+    palette: "catppuccin-mocha",
+    description: "Cozy pastel surfaces with yellow emphasis and sapphire active states.",
+    swatches: ["#11111b", "#f9e2af", "#74c7ec"],
   },
 ] as const;
 

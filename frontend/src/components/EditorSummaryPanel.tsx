@@ -56,7 +56,9 @@ function EditorSummaryContent({ names, snapshot }: { names: string[]; snapshot: 
 
 export function EditorSummaryPanel({ snapshot }: { snapshot: TelemetrySnapshot }) {
   const names = Array.isArray(snapshot["editor.res.names"])
-    ? snapshot["editor.res.names"].filter((name): name is string => typeof name === "string")
+    ? snapshot["editor.res.names"].filter((name): name is string => (
+      typeof name === "string" && name !== "ElectricCharge"
+    ))
     : [];
   const available = snapshot["editor.summaryAvailable"];
   const {

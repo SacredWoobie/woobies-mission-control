@@ -372,7 +372,7 @@ describe("MissionOverview", () => {
     expect(contracts.querySelector(".overview-contract-time")).toBeNull();
   });
 
-  it("keeps populated Career panels as equal-width data-grid peers", () => {
+  it("keeps populated Career panels in portrait reading order", () => {
     renderOverview();
     const dataGrid = document.querySelector(".overview-data-grid")!;
     const panelClasses = [...dataGrid.children].map((panel) => panel.className);
@@ -380,8 +380,8 @@ describe("MissionOverview", () => {
     expect(panelClasses).toEqual([
       expect.stringContaining("overview-fleet"),
       expect.stringContaining("overview-roster"),
-      expect.stringContaining("overview-alarms"),
       expect.stringContaining("overview-contracts"),
+      expect.stringContaining("overview-alarms"),
     ]);
     expect(document.querySelector(".overview-side-stack")).toBeNull();
     expect(document.querySelector(".overview-section-head > div:first-child > span")).toBeNull();
