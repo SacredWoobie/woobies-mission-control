@@ -213,7 +213,9 @@ RFC1918 IPv4 address selected from the launcher's address picker. The routed
 default is preselected when available; **Refresh** updates the active choices,
 and **Copy LAN URL** copies the address to share with a trusted device. Changing
 enablement or the selected address stops a running feed, so click **Start** again
-to apply the displayed configuration.
+to apply the displayed configuration. While LAN access is enabled, **Start**
+does not automatically open a browser on the host; **Open dashboard** remains
+available when a local loopback tab is also wanted.
 
 Enabling LAN access requires confirmation that the listener has no
 authentication or encryption. Trusted peers can view telemetry, finances,

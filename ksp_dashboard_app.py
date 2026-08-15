@@ -4818,7 +4818,15 @@ class App:
 
         started = backend.start()
         if started and open_dashboard and DASHBOARD.is_file():
-            self.root.after(250, self._open_dashboard_when_ready)
+            if self.lan_access_var.get():
+                self._enqueue(
+                    "launcher",
+                    "Trusted-LAN access is enabled, so the host browser was not "
+                    "opened automatically. Use Copy LAN URL for another device "
+                    "or Open dashboard for this computer.",
+                )
+            else:
+                self.root.after(250, self._open_dashboard_when_ready)
 
     def _dashboard_ready(self):
         try:

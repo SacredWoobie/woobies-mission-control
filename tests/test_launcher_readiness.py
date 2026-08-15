@@ -28,11 +28,26 @@ class FakeRoot:
 
 class FakeBackend:
     def __init__(self, running=True):
+        self.name = "feed"
         self.is_running = running
         self.startup_ready = False
+        self.start_calls = 0
 
     def running(self):
         return self.is_running
+
+    def start(self):
+        self.start_calls += 1
+        self.is_running = True
+        return True
+
+
+class FakeVar:
+    def __init__(self, value):
+        self.value = value
+
+    def get(self):
+        return self.value
 
 
 class LauncherReadinessTests(unittest.TestCase):
@@ -89,6 +104,55 @@ class LauncherReadinessTests(unittest.TestCase):
 
         launcher._open_dashboard.assert_called_once_with()
         self.assertEqual(launcher.root.after_calls, [])
+
+    def test_start_does_not_auto_open_host_browser_when_lan_is_enabled(self):
+        backend = FakeBackend(running=False)
+        launcher = self.make_launcher(backend)
+        launcher.ksp_root_var = FakeVar("")
+        launcher.lan_access_var = FakeVar(True)
+        launcher.lan_address_var = FakeVar("192.168.1.50")
+        launcher._enqueue = mock.Mock()
+        launcher._refresh_all_ksp_status = mock.Mock()
+        dashboard = mock.Mock()
+        dashboard.is_file.return_value = True
+
+        with (
+            mock.patch.object(
+                app,
+                "component_preflight",
+                return_value={"errors": [], "warnings": []},
+            ),
+            mock.patch.object(app, "DASHBOARD", dashboard),
+        ):
+            launcher._toggle(backend, open_dashboard=True)
+
+        self.assertEqual(backend.start_calls, 1)
+        self.assertEqual(launcher.root.after_calls, [])
+        self.assertIn("host browser was not opened", launcher._enqueue.call_args.args[1])
+
+    def test_start_still_auto_opens_loopback_when_lan_is_off(self):
+        backend = FakeBackend(running=False)
+        launcher = self.make_launcher(backend)
+        launcher.ksp_root_var = FakeVar("")
+        launcher.lan_access_var = FakeVar(False)
+        launcher.lan_address_var = FakeVar("")
+        launcher._enqueue = mock.Mock()
+        launcher._refresh_all_ksp_status = mock.Mock()
+        dashboard = mock.Mock()
+        dashboard.is_file.return_value = True
+
+        with (
+            mock.patch.object(
+                app,
+                "component_preflight",
+                return_value={"errors": [], "warnings": []},
+            ),
+            mock.patch.object(app, "DASHBOARD", dashboard),
+        ):
+            launcher._toggle(backend, open_dashboard=True)
+
+        self.assertEqual(backend.start_calls, 1)
+        self.assertEqual(launcher.root.after_calls[0][0], 250)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@ All notable public changes will be recorded here.
   confirmation before enabling the unauthenticated, unencrypted,
   command-capable listener. The warning can be remembered explicitly and is
   versioned so materially changed capabilities require a new acknowledgement.
+  Starting a LAN-enabled feed leaves the host browser closed; users can copy the
+  LAN URL for another device or explicitly open the local dashboard.
 - Hardened LAN serving with simultaneous listener-specific peer, Host, and
   WebSocket Origin validation. Wildcard, public, stale, and unavailable binds
   remain blocked, visible settings explicitly override inherited environment

@@ -90,8 +90,8 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    running. It confirms that kRPC responds and that services for the installed
    integration DLLs are registered.
    In the Mission Control launcher, start Dashboard feed (telemetry + React).
-   The launcher waits for the loopback server and opens the dashboard in your
-   browser automatically. Each tool stops after 10
+   With LAN access off, the launcher waits for the loopback server and opens
+   the dashboard in your browser automatically. Each tool stops after 10
    failed kRPC attempts (about 20 seconds) instead of retrying forever. Its
    connection status then turns amber and recommends Test connection.
 
@@ -107,8 +107,10 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    the warning returns every time LAN access is turned on.
 
    Enabling, disabling, or changing the LAN address stops a running Dashboard
-   feed. Click Start again, then use the copied LAN URL from the trusted device;
-   the local browser continues to use http://127.0.0.1:8090/. If Windows shows
+   feed. Click Start again, then use the copied LAN URL from the trusted device.
+   Start does not automatically open a browser on the host while LAN access is
+   enabled; choose Open dashboard if you also want a local loopback tab at
+   http://127.0.0.1:8090/. If Windows shows
    a firewall prompt, allow access on Private networks only. Mission Control
    does not create firewall rules. Never forward port 8090 through a router or
    expose it on a public network, and verify the chosen adapter on VPN or
