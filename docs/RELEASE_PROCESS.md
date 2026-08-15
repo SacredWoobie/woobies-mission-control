@@ -155,12 +155,11 @@ at a test channel or allow the updater to touch live KSP.
 
 Version 0.7.3 uses five new curated captures from the deterministic development
 dashboard because portrait layouts, Catppuccin Mocha, and the optional navball
-changed materially. Follow `docs/images/v0.7.3/README.md`; the two portrait
-captures must be true 1080x1729 PNGs and the three landscape captures true
-1920x889 PNGs, all with no visible pointer. The developer corner control must
-remain hidden, and the clean packaged runtime must be validated separately
-without fixtures or development-only controls. Older releases retain their
-original approved screenshot sets.
+changed materially. Follow `docs/images/v0.7.3/README.md`; all five captures
+must be true 1080x1785 portrait PNGs with no visible pointer. The developer
+corner control must remain hidden, and the clean packaged runtime must be
+validated separately without fixtures or development-only controls. Older
+releases retain their original approved screenshot sets.
 
 ## 5. Create a private draft release
 

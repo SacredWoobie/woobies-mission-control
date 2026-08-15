@@ -459,11 +459,11 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertEqual(len(required), 5)
         expected_dimensions = {
-            "mission-overview-catppuccin-portrait.png": (1080, 1729),
-            "editor-catppuccin-portrait.png": (1080, 1729),
-            "flight-ksp2-navball.png": (1920, 889),
-            "flight-settings-visual-options.png": (1920, 889),
-            "mission-overview-roster-transfers.png": (1920, 889),
+            "mission-overview-catppuccin-portrait.png": (1080, 1785),
+            "editor-catppuccin-portrait.png": (1080, 1785),
+            "flight-ksp2-navball.png": (1080, 1785),
+            "flight-settings-visual-options.png": (1080, 1785),
+            "mission-overview-roster-transfers.png": (1080, 1785),
         }
         self.assertEqual(set(required), set(expected_dimensions))
         for name in required:
