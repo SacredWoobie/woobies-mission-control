@@ -15,6 +15,12 @@ export {
   type SettingsSection,
 } from "./state";
 export {
+  DEFAULT_NAVBALL_STYLE_ID,
+  NAVBALL_STYLE_OPTIONS,
+  NAVBALL_STYLE_STORAGE_KEY,
+  type NavballStyleId,
+} from "../navballStyle";
+export {
   SETTINGS_FEATURES,
   SettingsDrawer,
   type SettingsDrawerProps,

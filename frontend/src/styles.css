@@ -1967,6 +1967,14 @@ button { font: inherit; }
 .target-metric .asc-flight-subtitle { max-width: 100%; overflow: visible; font-size: 10px; line-height: 1.25; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
 .navball-stage { display: grid; width: 100%; min-height: 0; place-items: center; }
 .navball { width: 168px; height: 168px; overflow: visible; filter: drop-shadow(0 7px 10px rgba(0,0,0,.5)); }
+.navball-textured { position: relative; border-radius: 50%; background: radial-gradient(circle at center,transparent 0 77px,#0a1119 78px 82px,transparent 83px); }
+.navball-textured canvas,
+.navball-textured-overlay { position: absolute; inset: 0; display: block; width: 168px; height: 168px; }
+.navball-textured canvas { border-radius: 50%; }
+.navball-textured-overlay { overflow: visible; }
+.navball-textured-overlay .nav-sphere-bezel { fill: none; }
+.navball-textured.texture-failed::after { position: absolute; inset: 18px; display: grid; border: 1px solid var(--rule-bright); border-radius: 50%; color: var(--slate-muted-text); background: #0a1119; content: "TEXTURE UNAVAILABLE"; place-items: center; font-size: 8px; text-align: center; }
+.navball-textured.texture-failed .navball-textured-overlay { z-index: 1; }
 .nav-empty { fill: #0a1119; stroke: #22364a; stroke-width: 1; }
 .nav-sphere-bezel { fill: #0a1119; stroke: #22364a; stroke-width: 1; }
 .nav-sphere-ground { fill: #6b4f33; }
@@ -3600,6 +3608,9 @@ body, .app-shell, .dashboard-surface { min-height: 100dvh; }
 .settings-theme-option small { color: var(--slate-muted-text); font-size: 9px; line-height: 1.35; }
 .settings-theme-swatches { display: flex; height: 15px; overflow: hidden; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); }
 .settings-theme-swatches i { display: block; min-width: 0; flex: 1 1 0; }
+.settings-navball-preview { display: block; width: 100%; height: 54px; overflow: hidden; border: 1px solid var(--surface-seam); border-radius: var(--surface-radius-face); background: var(--instrument-surface); object-fit: cover; }
+.settings-navball-preview-default { background: linear-gradient(to bottom,#63a9dd 0 49%,#f2f8fc 49% 51%,#6b4f33 51% 100%); }
+.settings-navball-option { min-height: 132px; }
 .settings-choice-row { display: flex; min-width: 0; flex-wrap: wrap; gap: 7px; }
 .settings-choice-row + .settings-choice-row { margin-top: 7px; }
 .settings-choice-row button,

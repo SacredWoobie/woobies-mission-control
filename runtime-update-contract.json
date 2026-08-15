@@ -28,7 +28,8 @@
   "dashboard_asset_extensions": [
     ".css",
     ".js",
-    ".map"
+    ".map",
+    ".png"
   ],
   "service_folders": [
     "KRPC.StageStats",

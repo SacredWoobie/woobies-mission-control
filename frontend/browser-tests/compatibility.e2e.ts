@@ -136,6 +136,37 @@ test("Settings applies and persists every dashboard color theme", async ({ page 
   expect(await page.locator("html").getAttribute("data-theme")).toBe("mission-control-dark");
 });
 
+test("Mission Control remains the default navball and the KSP2 texture persists when selected", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  await expect(page.locator("#asc .nav-sphere-world")).toBeVisible();
+  await expect(page.locator("#asc .navball-textured")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+  const options = drawer.getByRole("radiogroup", { name: "Navball style" });
+  await expect(options.getByRole("radio", { name: /Mission Control The standard/ })).toHaveAttribute("aria-checked", "true");
+  await options.getByRole("radio", { name: /KSP2 Pre-Alpha/ }).click();
+  await page.keyboard.press("Escape");
+
+  const textured = page.locator("#asc .navball-textured");
+  await expect(textured).toBeVisible();
+  await expect(textured).toHaveAccessibleName(/KSP2 pre-alpha style navball at heading 92, pitch 4, roll -1/);
+  await expect(textured.locator("canvas")).toHaveAttribute("width", /^(168|336)$/);
+  await expect(textured).not.toHaveClass(/texture-failed/);
+  expect(await textured.locator("canvas").evaluate((canvas) => {
+    const target = canvas as HTMLCanvasElement;
+    const context = target.getContext("2d");
+    return context?.getImageData(target.width / 2, target.height / 2, 1, 1).data[3] ?? 0;
+  })).toBe(255);
+  await expect(textured.locator(".aircraft")).toHaveAttribute("d", "M52 84 H71 L84 95 L97 84 H116");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("wmc-navball-style-v1") ?? "null"))).toBe("ksp2-pre-alpha");
+
+  await page.reload();
+  await expect(page.locator("#asc .navball-textured")).toBeVisible();
+});
+
 test("Daylight Flight chrome keeps inactive hardware quiet and exposes light Plan state roles", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/");

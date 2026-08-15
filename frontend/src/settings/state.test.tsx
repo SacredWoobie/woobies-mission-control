@@ -10,6 +10,7 @@ import {
   useSettings,
 } from "./state";
 import { THEME_STORAGE_KEY } from "../theme";
+import { NAVBALL_STYLE_STORAGE_KEY } from "../navballStyle";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -22,12 +23,14 @@ function Harness() {
   const settings = useSettings();
   return <>
     <output data-testid="open">{String(settings.open)}</output>
+    <output data-testid="navball-style">{settings.navballStyleId}</output>
     <output data-testid="section">{settings.section}</output>
     <output data-testid="alarm">{JSON.stringify(settings.scienceAlarmSettings)}</output>
     <output data-testid="theme">{settings.themeId}</output>
     <button onClick={() => settings.openSettings("science-alarms")} type="button">Open alarms</button>
     <button onClick={() => settings.updateScienceAlarmSettings({ provider: "stock", leadSeconds: 1800, kacAction: "pause_game" })} type="button">Set alarm</button>
     <button onClick={() => settings.updateTheme("green-phosphor")} type="button">Set theme</button>
+    <button onClick={() => settings.updateNavballStyle("ksp2-pre-alpha")} type="button">Set navball</button>
     <button onClick={settings.closeSettings} type="button">Close</button>
   </>;
 }
@@ -51,6 +54,16 @@ describe("settings state", () => {
     expect(screen.getByTestId("theme").textContent).toBe("green-phosphor");
     expect(document.documentElement.dataset.theme).toBe("green-phosphor");
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('"green-phosphor"');
+  });
+
+  it("defaults to the Mission Control navball and persists the optional texture style", () => {
+    localStorage.setItem(NAVBALL_STYLE_STORAGE_KEY, '"not-a-navball"');
+    render(<SettingsProvider><Harness /></SettingsProvider>);
+    expect(screen.getByTestId("navball-style").textContent).toBe("mission-control");
+
+    fireEvent.click(screen.getByRole("button", { name: "Set navball" }));
+    expect(screen.getByTestId("navball-style").textContent).toBe("ksp2-pre-alpha");
+    expect(localStorage.getItem(NAVBALL_STYLE_STORAGE_KEY)).toBe('"ksp2-pre-alpha"');
   });
 
   it("keeps the section session-local and persists alarm updates immediately", () => {
@@ -83,7 +96,9 @@ describe("settings state", () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("denied"); });
     render(<SettingsProvider><Harness /></SettingsProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Set alarm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set navball" }));
     expect(screen.getByTestId("alarm").textContent).toContain('"provider":"stock"');
+    expect(screen.getByTestId("navball-style").textContent).toBe("ksp2-pre-alpha");
     setItem.mockRestore();
   });
 });
