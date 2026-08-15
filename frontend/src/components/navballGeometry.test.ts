@@ -23,6 +23,12 @@ describe("spherical navball geometry", () => {
     expect(geometry.cardinals).toEqual([{ label: "N", x: 84, y: 80 }]);
   });
 
+  it("rotates the world left for a positive right bank", () => {
+    const projectedSkyPole = projectNavballPoint([0, 0, 1], makeNavballBasis(0, 0, 90));
+    expect(projectedSkyPole.x).toBeCloseTo(6, 10);
+    expect(projectedSkyPole.y).toBeCloseTo(84, 10);
+  });
+
   it("hides the north reference on the far side of a level south-facing ball", () => {
     expect(buildNavballGeometry({ heading: 180, pitch: 0, roll: 0 }).northReferencePath).toBe("");
   });

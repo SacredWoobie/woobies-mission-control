@@ -4,8 +4,9 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
-- Added a projected orange north-reference line to the vector Flight navball so
-  its orientation and roll direction remain immediately legible.
+- Added a projected orange north-reference line to the vector Flight navball
+  and corrected the shared vector/textured roll direction to match KSP's
+  positive right-bank convention.
 
 ## v0.7.3 - Portrait layouts and visual options
 
