@@ -206,6 +206,13 @@ The accepted local endpoints are:
 | kRPC stream port | `50001` |
 | Mission Control dashboard | `http://127.0.0.1:8090/` |
 
+The launcher's "Allow local network access" toggle (off by default) lets the
+dashboard feed serve other devices on your own network instead of only this
+computer. When enabled, it auto-detects this machine's private LAN address
+(e.g. `192.168.x.x`, `10.x.x.x`) and binds only there -- it never binds to a
+public-facing address, and every connection is independently checked against
+the same private-address ranges before being accepted.
+
 See [`QUICKSTART.txt`](QUICKSTART.txt) for the compact offline walkthrough. The
 [project wiki](https://github.com/SacredWoobie/woobies-mission-control/wiki)
 contains the full setup, planning, compatibility, and troubleshooting guides.
@@ -230,7 +237,9 @@ contains the full setup, planning, compatibility, and troubleshooting guides.
   creates exactly one node.
 - Planner records are stored in a shared local Mission Control file so multiple
   dashboard tabs and scenes see the same saved plans.
-- The WebSocket feed has no authentication. Keep it on `127.0.0.1`.
+- The WebSocket feed has no authentication. Keep it on `127.0.0.1` unless you
+  deliberately enable "Allow local network access", and only do so on a
+  network you trust.
 - The optional ESP32 bridge can stage or abort a vessel. Test its arm/safe
   behavior on a disposable craft first.
 - Logs can contain local paths; review them before posting them publicly.

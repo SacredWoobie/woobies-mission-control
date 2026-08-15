@@ -6,14 +6,28 @@ import { App } from "./App.production";
 import { liveTelemetryStore } from "./telemetry/store";
 
 
+const originalLocation = window.location;
+
+function stubLocation(url: string) {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: new URL(url),
+  });
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: originalLocation,
+  });
 });
 
 
 describe("Production dashboard entry", () => {
   it("connects directly to loopback without exposing developer controls", () => {
+    stubLocation("http://127.0.0.1:8090/");
     const connect = vi.spyOn(liveTelemetryStore, "connect").mockImplementation(() => undefined);
     const disconnect = vi.spyOn(liveTelemetryStore, "disconnect").mockImplementation(() => undefined);
 
@@ -34,5 +48,17 @@ describe("Production dashboard entry", () => {
 
     view.unmount();
     expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("connects back to the LAN address that actually served the page", () => {
+    stubLocation("http://192.168.1.201:8090/");
+    const connect = vi.spyOn(liveTelemetryStore, "connect").mockImplementation(() => undefined);
+    vi.spyOn(liveTelemetryStore, "disconnect").mockImplementation(() => undefined);
+
+    const view = render(<App />);
+
+    expect(connect).toHaveBeenCalledWith("ws://192.168.1.201:8090");
+
+    view.unmount();
   });
 });

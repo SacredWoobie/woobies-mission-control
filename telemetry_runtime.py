@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
+import logging
 import math
 import re
+import socket
 import urllib.parse
 import uuid
 from http import HTTPStatus
@@ -50,6 +53,10 @@ KRPC_COMMAND_TYPES = frozenset(
 MAX_COMMAND_BYTES = 2 * 1024 * 1024
 MAX_PENDING_COMMANDS = 256
 FINGERPRINTED_ASSET = re.compile(r"^.+-[A-Za-z0-9_-]{8,}\.[^.]+$")
+LOCAL_NETWORKS = tuple(
+    ipaddress.ip_network(cidr)
+    for cidr in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+)
 
 
 def canonical_origin(host, port):
@@ -58,6 +65,50 @@ def canonical_origin(host, port):
 
 def allowed_host_header(value, host, port):
     return str(value or "").casefold() == f"{host}:{int(port)}".casefold()
+
+
+def is_local_network_address(value):
+    """Return whether *value* is a loopback or private-LAN IPv4 address."""
+    try:
+        address = ipaddress.ip_address(str(value))
+    except ValueError:
+        return False
+    return any(address in network for network in LOCAL_NETWORKS)
+
+
+def bind_host_allowed(host):
+    """Return whether *host* is safe for the dashboard server to bind to."""
+    return host == "127.0.0.1" or is_local_network_address(host)
+
+
+def remote_address_allowed(remote_address):
+    """Return whether an inbound connection's peer address is local-network."""
+    if not remote_address:
+        return False
+    return is_local_network_address(remote_address[0])
+
+
+def detect_lan_address(probe_factory=lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)):
+    """Best-effort discovery of this machine's LAN-facing private IPv4 address.
+
+    Opens no real connection (UDP, non-routable target) -- only asks the OS
+    which local interface it would use. Returns ``None`` if detection fails
+    or the resolved address isn't itself private, so callers can fail closed
+    to loopback-only.
+    """
+    try:
+        probe = probe_factory()
+    except OSError:
+        return None
+    try:
+        probe.settimeout(0.2)
+        probe.connect(("10.255.255.255", 1))
+        candidate = probe.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        probe.close()
+    return candidate if is_local_network_address(candidate) else None
 
 
 def planner_event(store, command):
@@ -127,12 +178,17 @@ def create_telemetry_runtime(
         return status, media_type, cache_policy, body
 
     def run_telemetry_server(host, port):
-        if host != "127.0.0.1":
+        if not bind_host_allowed(host):
             print(
-                "[telemetry] Mission Control requires the canonical "
-                "loopback host 127.0.0.1."
+                "[telemetry] Mission Control requires the canonical loopback "
+                "host 127.0.0.1 or a private local-network address."
             )
             return False
+        if host != "127.0.0.1":
+            print(
+                f"[telemetry] LAN access enabled -- reachable from your local "
+                f"network at http://{host}:{port}/. Use only on a trusted network."
+            )
 
         try:
             import websockets
@@ -142,6 +198,12 @@ def create_telemetry_runtime(
             print("[telemetry] 'websockets' not installed -- dashboard feed disabled.")
             print("[telemetry] Install with:  pip install websockets")
             return False
+
+        # Malformed or incomplete handshakes -- routine noise from other
+        # devices on a LAN interface -- would otherwise dump a full traceback
+        # per occurrence; they never reach process_request, so nothing is
+        # ever disclosed by them.
+        logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
 
         tconn = connect("KSP Dashboard Telemetry")
         if tconn is None:
@@ -192,6 +254,8 @@ def create_telemetry_runtime(
             )
 
         def process_request(_connection, request):
+            if not remote_address_allowed(getattr(_connection, "remote_address", None)):
+                return response(HTTPStatus.FORBIDDEN, "Forbidden\n")
             if not allowed_host_header(request.headers.get("Host"), host, port):
                 if request.headers.get("Upgrade", "").casefold() == "websocket":
                     return response(HTTPStatus.FORBIDDEN, "Forbidden\n")

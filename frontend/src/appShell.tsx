@@ -61,6 +61,20 @@ import { TimeSystemProvider, useTimeSystem } from "./timeSystem";
 
 export const DEFAULT_LIVE_ENDPOINT = "ws://127.0.0.1:8090";
 
+/**
+ * Derive the telemetry WebSocket endpoint from the page's own origin rather
+ * than assuming loopback -- the same-origin server may be reachable from a
+ * LAN address (see Mission Control's local-network-access toggle), so the
+ * client must connect back to whatever host actually served it.
+ */
+export function resolveLiveEndpoint(
+  location: { protocol: string; host: string } = window.location,
+): string {
+  if (!location.host) return DEFAULT_LIVE_ENDPOINT;
+  const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${location.host}`;
+}
+
 const emptyTelemetry: TelemetrySnapshot = { "context.mode": "inactive" };
 const normalFlightPanels = new Set<DashboardPanelId>(["asc", "cons", "heat", "elec", "sci", "stage"]);
 

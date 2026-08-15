@@ -13,9 +13,12 @@ separate process and a separate kRPC connection.
 Requires:  pip install krpc websockets
 
 Optional args: telemetry_server.py [host] [port]
-  telemetry_server.py 0.0.0.0 8090
+  telemetry_server.py 192.168.1.50 8090
 
 Set WOOBIE_STAGE_TRACE=1 to emit opt-in StageStats lifecycle diagnostics.
+Set WOOBIE_ALLOW_LAN=1 to auto-detect this machine's private LAN address and
+serve the dashboard there instead of loopback-only. Falls back to loopback if
+no private address can be detected.
 """
 import json
 import math
@@ -55,7 +58,7 @@ from mission_planning import (
 from resource_snapshot import decode_resource_snapshot
 from stage_snapshot import decode_flight_stage_snapshot
 from staging import enrich_stage_result, flight_conditions
-from telemetry_runtime import create_telemetry_runtime
+from telemetry_runtime import create_telemetry_runtime, detect_lan_address
 
 TELEMETRY_WS_PORT = 8090  # dashboard connects here
 TELEMETRY_HZ = 4          # dashboard update rate
@@ -112,6 +115,9 @@ OVERVIEW_EDITABLE_VESSEL_TYPES = {
     "Station": KRPCVesselType.station,
 }
 STAGE_TRACE_ENABLED = os.environ.get("WOOBIE_STAGE_TRACE", "").casefold() in {
+    "1", "true", "yes", "on",
+}
+ALLOW_LAN_ENABLED = os.environ.get("WOOBIE_ALLOW_LAN", "").casefold() in {
     "1", "true", "yes", "on",
 }
 
@@ -5417,7 +5423,18 @@ def run_telemetry_server(host, port):
 
 
 def main():
-    host = sys.argv[1] if len(sys.argv) >= 2 else "127.0.0.1"
+    if len(sys.argv) >= 2:
+        host = sys.argv[1]
+    elif ALLOW_LAN_ENABLED:
+        host = detect_lan_address()
+        if host is None:
+            print(
+                "[telemetry] WOOBIE_ALLOW_LAN is set but no private LAN "
+                "address could be detected; staying on loopback."
+            )
+            host = "127.0.0.1"
+    else:
+        host = "127.0.0.1"
     port = int(sys.argv[2]) if len(sys.argv) >= 3 else TELEMETRY_WS_PORT
 
     print("KSP React dashboard and telemetry server (no ESP32 control code).")

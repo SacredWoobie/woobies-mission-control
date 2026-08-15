@@ -1986,11 +1986,14 @@ def load_settings(path=SETTINGS_PATH):
     try:
         settings = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
-        return {"ksp_root": ""}
+        return {"ksp_root": "", "lan_access_enabled": False}
     if not isinstance(settings, dict):
-        return {"ksp_root": ""}
+        return {"ksp_root": "", "lan_access_enabled": False}
     root = settings.get("ksp_root")
-    return {"ksp_root": root.strip() if isinstance(root, str) else ""}
+    return {
+        "ksp_root": root.strip() if isinstance(root, str) else "",
+        "lan_access_enabled": settings.get("lan_access_enabled") is True,
+    }
 
 
 def save_settings(settings, path=SETTINGS_PATH):
@@ -2018,10 +2021,13 @@ def resolve_ksp_root(value):
     return None
 
 
-def telemetry_environment(ksp_root_value):
+def telemetry_environment(ksp_root_value, lan_access_enabled=False):
     """Return the child-process environment override for telemetry."""
     root = resolve_ksp_root(ksp_root_value)
-    return {"WOOBIE_KSP_ROOT": str(root)} if root is not None else {}
+    environment = {"WOOBIE_KSP_ROOT": str(root)} if root is not None else {}
+    if lan_access_enabled:
+        environment["WOOBIE_ALLOW_LAN"] = "1"
+    return environment
 
 
 def tcp_port_open(address, port, timeout=0.15):
@@ -2493,6 +2499,9 @@ class App:
         self.update_download_root = Path(update_download_root)
         self.settings_path = Path(settings_path)
         self.settings = load_settings(self.settings_path)
+        self.lan_access_var = tk.BooleanVar(
+            value=self.settings.get("lan_access_enabled", False)
+        )
         self.update_generation = 0
         self.update_checking = False
         self.update_staging = False
@@ -2997,6 +3006,29 @@ class App:
             justify="left",
         ).pack(fill="x", padx=9, pady=(0, 8))
 
+        if component["name"] == "feed":
+            lan_row = ttk.Frame(frame)
+            lan_row.pack(fill="x", padx=8, pady=(0, 4))
+            self.lan_access_control = CheckXControl(
+                lan_row,
+                self.lan_access_var,
+                "ALLOW LOCAL NETWORK ACCESS",
+                self._toggle_lan_access,
+            )
+            self.lan_access_control.pack(side="left")
+            ttk.Label(
+                frame,
+                text=(
+                    "Serves the dashboard to other devices on your local "
+                    "network instead of just this computer. Only enable on "
+                    "networks you trust -- the feed has no authentication."
+                ),
+                foreground=THEME["slate_dim"],
+                anchor="w",
+                justify="left",
+                wraplength=670,
+            ).pack(fill="x", padx=9, pady=(0, 8))
+
         self.backends.append(backend)
         self.backend_rows.append(
             {
@@ -3091,7 +3123,9 @@ class App:
         self.root.after(100, self._drain_component_setup_queue)
 
     def _telemetry_environment(self):
-        return telemetry_environment(self.ksp_root_var.get())
+        return telemetry_environment(
+            self.ksp_root_var.get(), self.lan_access_var.get()
+        )
 
     def _refresh_ksp_root_status(self):
         raw = self.ksp_root_var.get().strip()
@@ -4226,6 +4260,29 @@ class App:
             text="Automatic update checks are off",
             foreground=THEME["slate_dim"],
         )
+
+    def _toggle_lan_access(self):
+        enabled = self.lan_access_var.get()
+        self.settings["lan_access_enabled"] = enabled
+        try:
+            save_settings(self.settings, self.settings_path)
+        except OSError as exc:
+            self._enqueue("feed", f"couldn't save network setting: {exc}")
+            return
+        feed_backend = next(
+            (
+                row["backend"]
+                for row in self.backend_rows
+                if row["component"]["name"] == "feed"
+            ),
+            None,
+        )
+        if feed_backend is not None and feed_backend.running():
+            self._enqueue(
+                "feed",
+                "Local network access setting changed; restart Dashboard feed "
+                "to apply.",
+            )
 
     def _save_update_state(self):
         try:
