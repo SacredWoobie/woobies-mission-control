@@ -16,8 +16,11 @@ import {
 import { selectThrottleFraction } from "../telemetry/selectors";
 import type { TelemetrySnapshot } from "../telemetry/types";
 import { isKerbinTime, useTimeSystem } from "../timeSystem";
+import { useSettings } from "../settings";
 import { buildNavballGeometry } from "./navballGeometry";
+import { NavballAircraftSymbol } from "./NavballAircraftSymbol";
 import { Panel } from "./Panel";
+import { TexturedNavball } from "./TexturedNavball";
 
 function normalHeading(value: number | undefined) {
   return isFiniteNumber(value) ? ((value % 360) + 360) % 360 : undefined;
@@ -40,16 +43,7 @@ function HeadingTape({ heading }: { heading?: number }) {
   return <svg aria-label={`Heading ${Math.round(normalized)} degrees`} viewBox={`0 0 ${width} 20`}><rect width={width} height="20" />{marks}<path className="tape-pointer" d={`M${center} 20 l-4 -5 h8 z`} /></svg>;
 }
 
-function NavballAircraftSymbol() {
-  return (
-    <>
-      <path className="aircraft" d="M52 84 H71 L84 95 L97 84 H116" />
-      <circle className="aircraft-dot" cx="84" cy="84" r="2" />
-    </>
-  );
-}
-
-function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; roll?: number }) {
+function MissionControlNavball({ heading, pitch, roll }: { heading?: number; pitch?: number; roll?: number }) {
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const geometry = useMemo(
     () => buildNavballGeometry({ heading, pitch, roll }),
@@ -86,6 +80,17 @@ function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; r
       <NavballAircraftSymbol />
     </svg>
   );
+}
+
+function Navball({ heading, pitch, roll }: { heading?: number; pitch?: number; roll?: number }) {
+  const { navballStyleId } = useSettings();
+  if (!isFiniteNumber(pitch) || !isFiniteNumber(roll)) {
+    return <MissionControlNavball heading={heading} pitch={pitch} roll={roll} />;
+  }
+  if (navballStyleId === "ksp2-pre-alpha") {
+    return <TexturedNavball heading={normalHeading(heading) ?? 0} pitch={pitch} roll={roll} />;
+  }
+  return <MissionControlNavball heading={heading} pitch={pitch} roll={roll} />;
 }
 
 function Stat({ label, subtitle, title, value }: { label: string; subtitle?: string; title?: string; value: string }) {

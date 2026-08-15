@@ -122,6 +122,7 @@ test("Settings applies and persists every dashboard color theme", async ({ page 
     { id: "daylight-console", label: "Daylight Console", scheme: "light" },
     { id: "warm-crt", label: "Warm CRT", scheme: "dark" },
     { id: "green-phosphor", label: "Green Phosphor", scheme: "dark" },
+    { id: "catppuccin-mocha", label: "Catppuccin Mocha", scheme: "dark" },
     { id: "mission-control-dark", label: "Mission Control Dark", scheme: "dark" },
   ]) {
     const option = drawer.getByRole("radio", { name: new RegExp(theme.label) });
@@ -134,6 +135,37 @@ test("Settings applies and persists every dashboard color theme", async ({ page 
 
   await page.reload();
   expect(await page.locator("html").getAttribute("data-theme")).toBe("mission-control-dark");
+});
+
+test("Mission Control remains the default navball and the KSP2 texture persists when selected", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 889 });
+  await page.goto("/");
+
+  await expect(page.locator("#asc .nav-sphere-world")).toBeVisible();
+  await expect(page.locator("#asc .navball-textured")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Mission Control Settings" });
+  const options = drawer.getByRole("radiogroup", { name: "Navball style" });
+  await expect(options.getByRole("radio", { name: /Mission Control The standard/ })).toHaveAttribute("aria-checked", "true");
+  await options.getByRole("radio", { name: /KSP2 Pre-Alpha/ }).click();
+  await page.keyboard.press("Escape");
+
+  const textured = page.locator("#asc .navball-textured");
+  await expect(textured).toBeVisible();
+  await expect(textured).toHaveAccessibleName(/KSP2 pre-alpha style navball at heading 92, pitch 4, roll -1/);
+  await expect(textured.locator("canvas")).toHaveAttribute("width", "336");
+  await expect(textured).not.toHaveClass(/texture-failed/);
+  expect(await textured.locator("canvas").evaluate((canvas) => {
+    const target = canvas as HTMLCanvasElement;
+    const context = target.getContext("2d");
+    return context?.getImageData(target.width / 2, target.height / 2, 1, 1).data[3] ?? 0;
+  })).toBe(255);
+  await expect(textured.locator(".aircraft")).toHaveAttribute("d", "M52 84 H71 L84 95 L97 84 H116");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("wmc-navball-style-v1") ?? "null"))).toBe("ksp2-pre-alpha");
+
+  await page.reload();
+  await expect(page.locator("#asc .navball-textured")).toBeVisible();
 });
 
 test("Daylight Flight chrome keeps inactive hardware quiet and exposes light Plan state roles", async ({ page }) => {
@@ -739,6 +771,80 @@ test("Editor electricity planning keeps a readable bounded instrument hierarchy"
   }
 });
 
+test("portrait Editor keeps staging and bounded resources above electricity", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "DEV", exact: true }).click();
+  await page.getByRole("button", { name: "editor", exact: true }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const layout = await page.locator(".editor-workspace").evaluate((workspace) => {
+    const bounds = (selector: string) => workspace.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const stage = bounds("#stage");
+    const summary = bounds("#editorSummary");
+    const electricity = bounds("#editorElectricity");
+    const resourceList = workspace.querySelector<HTMLElement>("#editorSummary .editor-resource-list")!;
+    const resourceRows = Array.from(resourceList.querySelectorAll<HTMLElement>(".editor-resource-row"));
+    const resourceClones = Array.from({ length: 8 }, (_, index) => resourceRows[index % resourceRows.length].cloneNode(true) as HTMLElement);
+    resourceClones.forEach((clone) => resourceList.append(clone));
+    const resourceScrollsWhenDense = resourceList.scrollHeight > resourceList.clientHeight + 1;
+    resourceClones.forEach((clone) => clone.remove());
+
+    const consumerBody = workspace.querySelector<HTMLElement>(".editor-electricity-ledger.is-consumer .editor-electricity-ledger-body")!;
+    const consumerRows = Array.from(consumerBody.querySelectorAll<HTMLElement>(".editor-electricity-component"));
+    const consumerBounds = consumerRows.map((row) => row.getBoundingClientRect());
+    const consumerBodyBounds = consumerBody.getBoundingClientRect();
+    const rateBars = Array.from(workspace.querySelectorAll<HTMLElement>(".editor-electricity-rate-bar i"))
+      .map((bar) => bar.getBoundingClientRect());
+    const batteryBar = bounds(".editor-electricity-battery-meter");
+
+    const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
+    return {
+      consumerRowsVisible: consumerBounds.filter((row) => (
+        row.top >= consumerBodyBounds.top - 1 && row.bottom <= consumerBodyBounds.bottom + 1
+      )).length,
+      consumerOverflowY: getComputedStyle(consumerBody).overflowY,
+      consumerScrolls: consumerBody.scrollHeight > consumerBody.clientHeight + 1,
+      batteryBarHeightDifference: Math.max(...rateBars.map((bar) => Math.abs(bar.height - batteryBar.height))),
+      batteryBarWidthDifference: Math.max(...rateBars.map((bar) => Math.abs(bar.width - batteryBar.width))),
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      electricityGap: electricity.top - Math.max(stage.bottom, summary.bottom),
+      electricityLeftDifference: Math.abs(electricity.left - stage.left),
+      electricityRightDifference: Math.abs(electricity.right - summary.right),
+      resourceListUsesNeededHeight: resourceList.getBoundingClientRect().height < summary.height - 80,
+      resourceRows: resourceRows.length,
+      resourceRowsFit: resourceList.scrollHeight <= resourceList.clientHeight + 1,
+      resourceScrollsWhenDense,
+      stageSummaryBottomDifference: Math.abs(stage.bottom - summary.bottom),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
+      stageTableHorizontalOverflow: table.scrollWidth > table.clientWidth + 1,
+    };
+  });
+
+  expect(layout.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(layout.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageSummaryBottomDifference).toBeLessThanOrEqual(1);
+  expect(layout.electricityGap).toBeGreaterThanOrEqual(10);
+  expect(layout.electricityLeftDifference).toBeLessThanOrEqual(1);
+  expect(layout.electricityRightDifference).toBeLessThanOrEqual(1);
+  expect(layout.stageTableHorizontalOverflow).toBe(false);
+  expect(layout.resourceListUsesNeededHeight).toBe(true);
+  expect(layout.resourceRowsFit).toBe(true);
+  expect(layout.resourceScrollsWhenDense).toBe(true);
+  expect(layout.resourceRows).toBe(3);
+  expect(layout.consumerRowsVisible).toBe(5);
+  expect(layout.consumerScrolls).toBe(true);
+  expect(layout.consumerOverflowY).toBe("auto");
+  expect(layout.batteryBarHeightDifference).toBeLessThanOrEqual(0.1);
+  expect(layout.batteryBarWidthDifference).toBeLessThanOrEqual(0.1);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
+});
+
 test("dense Editor analysis uses the empty planning width and reveals the active stage", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 889 });
   await page.goto("/");
@@ -1135,7 +1241,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(layout.derivedTopRowDifference).toBeLessThanOrEqual(1);
   expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
   expect(layout.stageRows).toBe(8);
-  expect(layout.resourceRows).toBe(4);
+  expect(layout.resourceRows).toBe(3);
   expect(layout.producerRows).toBe(4);
   expect(layout.consumerRows).toBe(7);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
@@ -1202,6 +1308,7 @@ test("Editor planning companions preserve the dense workspace alone and together
     const context = bounds("#editorContext");
     const stage = bounds("#stage");
     const summary = bounds("#editorSummary");
+    const electricity = bounds("#editorElectricity");
     const orbit = bounds("#editorOrbitPlan");
     const deltaV = bounds("#editorDeltaVPlan");
     return {
@@ -1211,14 +1318,20 @@ test("Editor planning companions preserve the dense workspace alone and together
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
       documentScrollWidth: document.documentElement.scrollWidth,
-      stageSummaryGap: summary.top - stage.bottom,
+      electricityStageGap: electricity.top - Math.max(stage.bottom, summary.bottom),
+      stageSummaryBottomDifference: Math.abs(stage.bottom - summary.bottom),
+      stageSummaryGap: summary.left - stage.right,
+      stageSummaryTopDifference: Math.abs(stage.top - summary.top),
       secondaryChildren: element.querySelector(".editor-workspace-secondary")!.children.length,
-      summaryPlanGap: orbit.top - summary.bottom,
+      summaryPlanGap: orbit.top - electricity.bottom,
     };
   });
   expect(portrait.secondaryChildren).toBe(2);
   expect(portrait.contextStageGap).toBeGreaterThanOrEqual(10);
   expect(portrait.stageSummaryGap).toBeGreaterThanOrEqual(10);
+  expect(portrait.stageSummaryTopDifference).toBeLessThanOrEqual(1);
+  expect(portrait.stageSummaryBottomDifference).toBeLessThanOrEqual(1);
+  expect(portrait.electricityStageGap).toBeGreaterThanOrEqual(10);
   expect(portrait.summaryPlanGap).toBeGreaterThanOrEqual(10);
   expect(portrait.companionGap).toBeGreaterThanOrEqual(10);
   expect(portrait.documentScrollWidth).toBeLessThanOrEqual(portrait.documentClientWidth);
@@ -1635,6 +1748,80 @@ test("Mission Control gives transfer-window cards the full panel body", async ({
     scrollWidth: element.scrollWidth,
   }));
   expect(narrowHeader.scrollWidth).toBeLessThanOrEqual(narrowHeader.clientWidth + 1);
+});
+
+test("Mission Control portrait stacks alarms below contracts and stretches the fleet", async ({ page }) => {
+  await page.setViewportSize({ width: 1080, height: 1920 });
+  await page.goto("/");
+  await page.getByTitle("Dashboard developer controls").click();
+  await page.getByLabel("Telemetry fixture").getByRole("button", { name: "inactive" }).click();
+  await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
+
+  const transferWindows = page.locator(".overview-transfer-windows");
+  await expect(transferWindows.locator(".overview-transfer-origin")).toHaveCount(0);
+  await expect(transferWindows.getByText("BEST UPCOMING DEPARTURE", { exact: true })).toHaveCount(0);
+  await expect(transferWindows.locator(".overview-transfer-destination").first()).toHaveText("Moho");
+
+  const layout = await page.evaluate(() => {
+    const box = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector)!;
+      const rect = element.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        height: rect.height,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+      };
+    };
+    const dataGrid = document.querySelector<HTMLElement>(".overview-data-grid")!;
+    const rosterHeader = document.querySelector<HTMLElement>(".overview-roster .overview-section-head")!;
+    const rosterSummary = document.querySelector<HTMLElement>(".overview-roster-summary")!;
+    const rosterSummaryChips = [...rosterSummary.querySelectorAll<HTMLElement>(".overview-roster-summary-chip")];
+    return {
+      alarms: box(".overview-alarms"),
+      contracts: box(".overview-contracts"),
+      documentClientHeight: document.documentElement.clientHeight,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      fleet: box(".overview-fleet"),
+      gridAreas: getComputedStyle(dataGrid).gridTemplateAreas,
+      roster: box(".overview-roster"),
+      rosterHeaderHeight: rosterHeader.getBoundingClientRect().height,
+      rosterSummaryColumns: getComputedStyle(rosterSummary).gridTemplateColumns,
+      rosterSummaryRows: getComputedStyle(rosterSummary).gridTemplateRows,
+      rosterSummaryChips: rosterSummaryChips.map((chip) => {
+        const label = chip.querySelector<HTMLElement>("span")!;
+        const rect = chip.getBoundingClientRect();
+        return {
+          labelClipped: label.scrollWidth > label.clientWidth,
+          left: rect.left,
+          top: rect.top,
+        };
+      }),
+      vesselSplit: box(".overview-vessel-split"),
+    };
+  });
+
+  expect(layout.gridAreas).toBe('"fleet roster" "fleet contracts" "fleet alarms"');
+  expect(Math.abs(layout.fleet.top - layout.roster.top)).toBeLessThanOrEqual(1);
+  expect(Math.abs(layout.fleet.bottom - layout.alarms.bottom)).toBeLessThanOrEqual(1);
+  expect(layout.contracts.top).toBeGreaterThanOrEqual(layout.roster.bottom + 8);
+  expect(layout.alarms.top).toBeGreaterThanOrEqual(layout.contracts.bottom + 8);
+  expect(layout.roster.left).toBe(layout.contracts.left);
+  expect(layout.contracts.left).toBe(layout.alarms.left);
+  expect(layout.rosterHeaderHeight).toBeLessThanOrEqual(53);
+  expect(layout.rosterSummaryColumns.split(" ")).toHaveLength(2);
+  expect(layout.rosterSummaryRows.split(" ")).toHaveLength(2);
+  expect(layout.rosterSummaryChips).toHaveLength(3);
+  expect(layout.rosterSummaryChips.every(({ labelClipped }) => !labelClipped)).toBe(true);
+  expect(Math.abs(layout.rosterSummaryChips[0].top - layout.rosterSummaryChips[1].top)).toBeLessThanOrEqual(1);
+  expect(layout.rosterSummaryChips[2].top).toBeGreaterThan(layout.rosterSummaryChips[0].top);
+  expect(Math.abs(layout.rosterSummaryChips[0].left - layout.rosterSummaryChips[2].left)).toBeLessThanOrEqual(1);
+  expect(layout.vesselSplit.height).toBeGreaterThan(800);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
 });
 
 test("Mission Control contract focus preserves keyboard, scroll, and responsive boundaries", async ({ page }) => {

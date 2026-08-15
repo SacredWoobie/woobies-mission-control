@@ -14,17 +14,18 @@ describe("EditorSummaryPanel", () => {
     expect(screen.getByRole("heading", { name: /Resource inventory/ })).toBeTruthy();
     expect(screen.getByRole("group", { name: "Craft resource inventory" })).toBeTruthy();
     expect(screen.queryByText("18,742 kg", { exact: true })).toBeNull();
+    expect(screen.queryByText("Electric Charge", { exact: true })).toBeNull();
     expect(screen.getByText("Liquid Fuel", { exact: true })).toBeTruthy();
     const fullMeters = screen.getAllByRole("meter", { name: "100% full" });
-    expect(fullMeters).toHaveLength(4);
+    expect(fullMeters).toHaveLength(3);
     expect(fullMeters.every((meter) => meter.querySelector(".fill.healthy"))).toBe(true);
   });
 
   it("uses the flight consumables severity colors", () => {
     render(<EditorSummaryPanel snapshot={{
       ...editorTelemetryFixture,
-      "editor.res[ElectricCharge]": 15,
-      "editor.resMax[ElectricCharge]": 100,
+      "editor.res[Oxidizer]": 15,
+      "editor.resMax[Oxidizer]": 100,
       "editor.res[LiquidFuel]": 40,
       "editor.resMax[LiquidFuel]": 100,
     }} />);
@@ -40,9 +41,9 @@ describe("EditorSummaryPanel", () => {
   ])("does not announce %s as a valid zero", (_label, amount, capacity) => {
     render(<EditorSummaryPanel snapshot={{
       ...editorTelemetryFixture,
-      "editor.res.names": ["ElectricCharge"],
-      "editor.res[ElectricCharge]": amount,
-      "editor.resMax[ElectricCharge]": capacity,
+      "editor.res.names": ["LiquidFuel"],
+      "editor.res[LiquidFuel]": amount,
+      "editor.resMax[LiquidFuel]": capacity,
     }} />);
 
     const meter = screen.getByRole("img", { name: "Amount unavailable" });

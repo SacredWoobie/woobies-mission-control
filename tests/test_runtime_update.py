@@ -264,6 +264,7 @@ class ManifestAndArchiveTests(unittest.TestCase):
             "Dashboard/runtime_update.py",
             "Dashboard/runtime-update-contract.json",
             "Dashboard/web/assets/index-abc.js",
+            "Dashboard/web/assets/ksp2-navball.png",
             "GameData/KRPC.StageStats/KRPC.StageStats.dll",
             "SOURCE/KRPC.WoobiesMechJeb-1.0.0-source.zip",
             "THIRD-PARTY/NOTICES.md",

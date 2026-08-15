@@ -12,11 +12,13 @@ function props(overrides: Partial<SettingsDrawerProps> = {}): SettingsDrawerProp
     hiddenPanelCount: 2,
     onClose: vi.fn(),
     onRestoreHiddenPanels: vi.fn(),
+    onSetNavballStyle: vi.fn(),
     onScienceAlarmSettingsChange: vi.fn(),
     onSectionChange: vi.fn(),
     onSetTimeSystem: vi.fn(),
     onSetTheme: vi.fn(),
     open: true,
+    navballStyleId: "mission-control",
     scienceAlarmProviders: { kac: true, stock: true },
     scienceAlarmSettings: DEFAULT_SCIENCE_ALARM_SETTINGS,
     section: "preferences",
@@ -139,16 +141,17 @@ describe("SettingsDrawer", () => {
     expect(screen.getByText(/Woobies Control Stats service.*DETECTED.*Installation scan/)).toBeTruthy();
   });
 
-  it("offers all four themes and reports the current selection in About", () => {
+  it("offers all five themes and reports the current selection in About", () => {
     const onSetTheme = vi.fn();
     const view = render(<SettingsDrawer {...props({ onSetTheme })} />);
     const dialog = screen.getByRole("dialog", { name: "Mission Control Settings" });
-    const themes = within(dialog).getAllByRole("radio");
+    const themes = within(within(dialog).getByRole("radiogroup", { name: "Dashboard theme" })).getAllByRole("radio");
     expect(themes.map((theme) => theme.textContent)).toEqual([
       expect.stringContaining("Mission Control Dark"),
       expect.stringContaining("Daylight Console"),
       expect.stringContaining("Warm CRT"),
       expect.stringContaining("Green Phosphor"),
+      expect.stringContaining("Catppuccin Mocha"),
     ]);
     expect(themes[0].getAttribute("aria-checked")).toBe("true");
     fireEvent.click(within(dialog).getByRole("radio", { name: /Daylight Console/ }));
@@ -156,6 +159,22 @@ describe("SettingsDrawer", () => {
 
     view.rerender(<SettingsDrawer {...props({ onSetTheme, section: "about", themeId: "daylight-console" })} />);
     expect(within(screen.getByRole("dialog", { name: "Mission Control Settings" })).getByText("Daylight Console")).toBeTruthy();
+  });
+
+  it("keeps Mission Control as the default navball and exposes the texture as an option", () => {
+    const onSetNavballStyle = vi.fn();
+    const view = render(<SettingsDrawer {...props({ onSetNavballStyle })} />);
+    const group = screen.getByRole("radiogroup", { name: "Navball style" });
+    const styles = within(group).getAllByRole("radio");
+    expect(styles).toHaveLength(2);
+    expect(styles[0].getAttribute("aria-checked")).toBe("true");
+    expect(styles[1].getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(within(group).getByRole("radio", { name: /KSP2 Pre-Alpha/ }));
+    expect(onSetNavballStyle).toHaveBeenCalledWith("ksp2-pre-alpha");
+
+    view.rerender(<SettingsDrawer {...props({ navballStyleId: "ksp2-pre-alpha", onSetNavballStyle })} />);
+    expect(screen.getByRole("radio", { name: /KSP2 Pre-Alpha/ }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("deep-links science alarms while retaining the Preferences navigator", () => {

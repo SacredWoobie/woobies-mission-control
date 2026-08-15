@@ -2,6 +2,30 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added development-fixture controls for independently enabling and disabling
+  supported optional mods while keeping the required kRPC and Mission Control
+  services fixed. Fixture scenes now expose the corresponding stock-fallback
+  and unavailable UI states without changing a live KSP installation.
+- Added an attributed Catppuccin Mocha color theme as a fifth persistent
+  dashboard appearance option. Mission Control Dark remains the default.
+- Added SqueakyB's KSP2 Pre-Alpha Style NavBall as an attributed, browser-local
+  Flight preference. Mission Control's existing vector navball remains the
+  default; the optional texture follows live heading, pitch, and roll without
+  requiring the in-game NavBall Texture Changer mod. Special thanks to
+  [SqueakyB](https://spacedock.info/profile/SqueakyB) for suggesting the
+  integration and granting permission to include their artwork.
+- Rebalanced portrait dashboard layouts. Mission Control now lets Active Vessels
+  use the full left-column height while Astronaut Roster, Active Contracts, and
+  Upcoming Alarms form a continuous right-column stack. The Editor now places
+  Staging Analysis beside a bounded Resource Inventory immediately below Sim
+  Conditions and above Electricity. Electric Charge is consolidated into a
+  full-width Battery meter there, and the consumer ledger shows five rows before
+  scrolling. The Roster summary uses a non-clipping 2x2 badge grid, and Transfer
+  Windows now emphasizes each destination without repeating the origin or a
+  redundant departure-status caption.
+
 ## v0.7.2 - Settings, themes, and planning refinements
 
 - Added a Settings rail drawer with Preferences, Features & Mods, Help, and

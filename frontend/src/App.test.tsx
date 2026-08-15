@@ -189,6 +189,34 @@ describe("Dashboard lifecycle", () => {
     expect(document.activeElement).toBe(scienceSettings);
   });
 
+  it("toggles optional mods in fixtures while keeping the required baseline fixed", () => {
+    render(<App />);
+    expect(screen.getByText("Signal delay")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "DEV" }));
+    const mods = screen.getByRole("group", { name: "Optional fixture mods" });
+    expect(mods.querySelectorAll("button")).toHaveLength(6);
+    expect(screen.getByText("6/6 on")).toBeTruthy();
+    expect(screen.getByText("Fixture-only overrides. kRPC and Mission Control services stay enabled.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "RemoteTech enabled" }));
+    expect(screen.getByRole("button", { name: "RemoteTech disabled" }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByText("Signal delay")).toBeNull();
+    expect(screen.getByText("5/6 on")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Features & Mods" }));
+    expect(screen.getByRole("button", { name: /Communications.*AVAILABLE.*STOCK/ })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "ALL OFF" }));
+    expect(screen.getByText("0/6 on")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Notes disabled" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "MechJeb disabled" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "System Heat disabled" })).toBeTruthy();
+    expect(screen.getByText("Staging simulation is not available.")).toBeTruthy();
+  });
+
   it("keeps Settings mutually exclusive with other global utility drawers", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));

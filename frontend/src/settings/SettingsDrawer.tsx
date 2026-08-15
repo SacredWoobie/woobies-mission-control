@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { PRODUCT_NAME, PRODUCT_VERSION } from "../buildIdentity";
 import { useDialogFocus } from "../deltaV/useDialogFocus";
+import navballThumbnailUrl from "../assets/navball/ksp2-pre-alpha-thumbnail.png";
+import {
+  DEFAULT_NAVBALL_STYLE_ID,
+  NAVBALL_STYLE_OPTIONS,
+  type NavballStyleId,
+} from "../navballStyle";
 import {
   DEFAULT_THEME_ID,
   THEME_METADATA,
@@ -58,11 +64,13 @@ export interface SettingsDrawerProps {
   licenseUrl?: string;
   onClose(): void;
   onRestoreHiddenPanels?(): void;
+  onSetNavballStyle?(navballStyleId: NavballStyleId): void;
   onScienceAlarmSettingsChange(next: Partial<ScienceAlarmDefaults>): void;
   onSectionChange(section: SettingsSection): void;
   onSetTimeSystem?(system: TimeSystem): void;
   onSetTheme?(themeId: ThemeId): void;
   open: boolean;
+  navballStyleId?: NavballStyleId;
   productName?: string;
   productVersion?: string;
   releaseUrl?: string;
@@ -165,15 +173,17 @@ function PreferencesSection({
   heading = "Preferences",
   hiddenPanelCount,
   onRestoreHiddenPanels,
+  onSetNavballStyle,
   onScienceAlarmSettingsChange,
   onSetTimeSystem,
   onSetTheme,
   scienceAlarmProviders,
   scienceAlarmSettings,
   scienceOnly = false,
+  navballStyleId,
   themeId,
   timeSystem,
-}: Pick<SettingsDrawerProps, "hiddenPanelCount" | "onRestoreHiddenPanels" | "onScienceAlarmSettingsChange" | "onSetTimeSystem" | "onSetTheme" | "scienceAlarmProviders" | "scienceAlarmSettings" | "themeId" | "timeSystem"> & { heading?: string; scienceOnly?: boolean }) {
+}: Pick<SettingsDrawerProps, "hiddenPanelCount" | "navballStyleId" | "onRestoreHiddenPanels" | "onScienceAlarmSettingsChange" | "onSetNavballStyle" | "onSetTimeSystem" | "onSetTheme" | "scienceAlarmProviders" | "scienceAlarmSettings" | "themeId" | "timeSystem"> & { heading?: string; scienceOnly?: boolean }) {
   return <section aria-labelledby="settings-preferences-heading" className="settings-section">
     <h3 id="settings-preferences-heading">{heading}</h3>
     {!scienceOnly && <fieldset className="settings-fieldset">
@@ -195,6 +205,26 @@ function PreferencesSection({
         </button>)}
       </div>
       <small>Applies immediately and is stored in this browser. Typography and layout remain unchanged.</small>
+    </fieldset>}
+    {!scienceOnly && <fieldset className="settings-fieldset">
+      <legend>Navball style</legend>
+      <div aria-label="Navball style" className="settings-theme-grid settings-navball-grid" role="radiogroup">
+        {NAVBALL_STYLE_OPTIONS.map((style) => <button
+          aria-checked={navballStyleId === style.id}
+          className="settings-theme-option settings-navball-option"
+          key={style.id}
+          onClick={() => onSetNavballStyle?.(style.id)}
+          role="radio"
+          type="button"
+        >
+          {style.id === "ksp2-pre-alpha"
+            ? <img alt="" aria-hidden="true" className="settings-navball-preview" src={navballThumbnailUrl} />
+            : <span aria-hidden="true" className="settings-navball-preview settings-navball-preview-default" />}
+          <strong>{style.label}</strong>
+          <small>{style.description}</small>
+        </button>)}
+      </div>
+      <small>Applies immediately in Flight and is stored in this browser. The Mission Control navball remains the default.</small>
     </fieldset>}
     {!scienceOnly && <fieldset className="settings-fieldset">
       <legend>Time system</legend>
@@ -379,11 +409,13 @@ export function SettingsDrawer({
   licenseUrl = LICENSE_URL,
   onClose,
   onRestoreHiddenPanels,
+  onSetNavballStyle,
   onScienceAlarmSettingsChange,
   onSectionChange,
   onSetTimeSystem,
   onSetTheme,
   open,
+  navballStyleId = DEFAULT_NAVBALL_STYLE_ID,
   productName = PRODUCT_NAME,
   productVersion = PRODUCT_VERSION,
   releaseUrl = RELEASE_URL,
@@ -420,8 +452,10 @@ export function SettingsDrawer({
         </nav>
         {section === "preferences" && <PreferencesSection
           hiddenPanelCount={hiddenPanelCount}
+          navballStyleId={navballStyleId}
           onRestoreHiddenPanels={onRestoreHiddenPanels}
           onScienceAlarmSettingsChange={onScienceAlarmSettingsChange}
+          onSetNavballStyle={onSetNavballStyle}
           onSetTimeSystem={onSetTimeSystem}
           onSetTheme={onSetTheme}
           scienceAlarmProviders={scienceAlarmProviders}
@@ -432,8 +466,10 @@ export function SettingsDrawer({
         {section === "science-alarms" && <PreferencesSection
           heading="Science alarm defaults"
           hiddenPanelCount={hiddenPanelCount}
+          navballStyleId={navballStyleId}
           onRestoreHiddenPanels={onRestoreHiddenPanels}
           onScienceAlarmSettingsChange={onScienceAlarmSettingsChange}
+          onSetNavballStyle={onSetNavballStyle}
           onSetTimeSystem={onSetTimeSystem}
           onSetTheme={onSetTheme}
           scienceAlarmProviders={scienceAlarmProviders}

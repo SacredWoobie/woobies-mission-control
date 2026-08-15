@@ -669,6 +669,28 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("SourceArchiveSha256", publish_script)
         self.assertIn('Destination = "SOURCE/', publish_script)
 
+    def test_new_visual_sources_keep_license_and_acknowledgment_provenance(self):
+        notices = (ROOT / "THIRD_PARTY_LICENSES.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+        for required_notice in (
+            "https://spacedock.info/mod/3738/KSP2%20Pre-Alpha%20Style%20NavBall",
+            "https://spacedock.info/profile/SqueakyB",
+            "License declared by the source page: MIT",
+            "Copyright (c) 2021 Catppuccin",
+            "https://github.com/catppuccin/catppuccin",
+        ):
+            self.assertIn(required_notice, notices)
+
+        acknowledgment = "https://spacedock.info/profile/SqueakyB"
+        self.assertIn(acknowledgment, readme)
+        self.assertIn(acknowledgment, changelog)
+        self.assertIn("Unreleased source build", readme)
+        self.assertIn("granting permission", " ".join(notices.split()))
+        self.assertIn("granting permission", " ".join(readme.split()))
+        self.assertIn("granting permission", " ".join(changelog.split()))
+
     def test_packaged_python_runtime_closes_over_local_imports(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
             encoding="utf-8"
