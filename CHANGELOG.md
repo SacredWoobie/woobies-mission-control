@@ -8,7 +8,9 @@ All notable public changes will be recorded here.
   use the full left-column height while Astronaut Roster, Active Contracts, and
   Upcoming Alarms form a continuous right-column stack. The Editor now places
   Staging Analysis beside a bounded Resource Inventory immediately below Sim
-  Conditions and above Electricity, with roomier scrollable electrical ledgers.
+  Conditions and above Electricity. Electric Charge is consolidated into a
+  full-width Battery meter there, and the consumer ledger shows five rows before
+  scrolling.
 
 ## v0.7.2 - Settings, themes, and planning refinements
 

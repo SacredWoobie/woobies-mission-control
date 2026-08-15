@@ -753,7 +753,7 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
     const electricity = bounds("#editorElectricity");
     const resourceList = workspace.querySelector<HTMLElement>("#editorSummary .editor-resource-list")!;
     const resourceRows = Array.from(resourceList.querySelectorAll<HTMLElement>(".editor-resource-row"));
-    const resourceClones = Array.from({ length: 6 }, (_, index) => resourceRows[index % resourceRows.length].cloneNode(true) as HTMLElement);
+    const resourceClones = Array.from({ length: 8 }, (_, index) => resourceRows[index % resourceRows.length].cloneNode(true) as HTMLElement);
     resourceClones.forEach((clone) => resourceList.append(clone));
     const resourceScrollsWhenDense = resourceList.scrollHeight > resourceList.clientHeight + 1;
     resourceClones.forEach((clone) => clone.remove());
@@ -761,12 +761,15 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
     const consumerBody = workspace.querySelector<HTMLElement>(".editor-electricity-ledger.is-consumer .editor-electricity-ledger-body")!;
     const consumerRows = Array.from(consumerBody.querySelectorAll<HTMLElement>(".editor-electricity-component"));
     const consumerBounds = consumerRows.map((row) => row.getBoundingClientRect());
+    const consumerBodyBounds = consumerBody.getBoundingClientRect();
 
     const table = workspace.querySelector<HTMLElement>(".stage-table.editor")!;
     return {
-      consumerRowsContained: consumerBounds[0].top >= consumerBody.getBoundingClientRect().top - 1
-        && consumerBounds.at(-1)!.bottom <= consumerBody.getBoundingClientRect().bottom + 1,
+      consumerRowsVisible: consumerBounds.filter((row) => (
+        row.top >= consumerBodyBounds.top - 1 && row.bottom <= consumerBodyBounds.bottom + 1
+      )).length,
       consumerOverflowY: getComputedStyle(consumerBody).overflowY,
+      consumerScrolls: consumerBody.scrollHeight > consumerBody.clientHeight + 1,
       documentClientHeight: document.documentElement.clientHeight,
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollHeight: document.documentElement.scrollHeight,
@@ -775,6 +778,7 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
       electricityLeftDifference: Math.abs(electricity.left - stage.left),
       electricityRightDifference: Math.abs(electricity.right - summary.right),
       resourceListUsesNeededHeight: resourceList.getBoundingClientRect().height < summary.height - 80,
+      resourceRows: resourceRows.length,
       resourceRowsFit: resourceList.scrollHeight <= resourceList.clientHeight + 1,
       resourceScrollsWhenDense,
       stageSummaryBottomDifference: Math.abs(stage.bottom - summary.bottom),
@@ -794,7 +798,9 @@ test("portrait Editor keeps staging and bounded resources above electricity", as
   expect(layout.resourceListUsesNeededHeight).toBe(true);
   expect(layout.resourceRowsFit).toBe(true);
   expect(layout.resourceScrollsWhenDense).toBe(true);
-  expect(layout.consumerRowsContained).toBe(true);
+  expect(layout.resourceRows).toBe(3);
+  expect(layout.consumerRowsVisible).toBe(5);
+  expect(layout.consumerScrolls).toBe(true);
   expect(layout.consumerOverflowY).toBe("auto");
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.documentClientHeight);
@@ -1196,7 +1202,7 @@ test("Editor planning companions preserve the dense workspace alone and together
   expect(layout.derivedTopRowDifference).toBeLessThanOrEqual(1);
   expect(layout.derivedBottomRowDifference).toBeLessThanOrEqual(1);
   expect(layout.stageRows).toBe(8);
-  expect(layout.resourceRows).toBe(4);
+  expect(layout.resourceRows).toBe(3);
   expect(layout.producerRows).toBe(4);
   expect(layout.consumerRows).toBe(7);
   expect(layout.tableScrollHeight).toBeLessThanOrEqual(layout.tableClientHeight + 1);
