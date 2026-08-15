@@ -18,8 +18,13 @@ describe("spherical navball geometry", () => {
     const geometry = buildNavballGeometry({ heading: 0, pitch: 0, roll: 0 });
     expect(geometry.grid).toHaveLength(9);
     expect(geometry.horizonPath).not.toBe("");
+    expect(geometry.northReferencePath).toContain("L84.0 84.0");
     expect(geometry.skyPath).not.toBe("");
     expect(geometry.cardinals).toEqual([{ label: "N", x: 84, y: 80 }]);
+  });
+
+  it("hides the north reference on the far side of a level south-facing ball", () => {
+    expect(buildNavballGeometry({ heading: 180, pitch: 0, roll: 0 }).northReferencePath).toBe("");
   });
 
   it("matches the supplied 45-degree eastward ascent reference attitude", () => {
@@ -33,6 +38,7 @@ describe("spherical navball geometry", () => {
     const geometry = buildNavballGeometry({ heading: 0, pitch: 90, roll: 0 });
     expect(geometry.skyPath).toBe("M6 84A78 78 0 1 1 162 84A78 78 0 1 1 6 84Z");
     expect(geometry.horizonPath).toBe("");
+    expect(geometry.northReferencePath).not.toBe("");
     expect(geometry.cardinals).toHaveLength(0);
   });
 

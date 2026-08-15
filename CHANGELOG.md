@@ -2,6 +2,11 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Added a projected orange north-reference line to the vector Flight navball so
+  its orientation and roll direction remain immediately legible.
+
 ## v0.7.3 - Portrait layouts and visual options
 
 - Added development-fixture controls for independently enabling and disabling

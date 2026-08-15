@@ -102,11 +102,13 @@ describe("Ascension information hierarchy", () => {
     expect(view.container.querySelector(".navball-stage .navball")).not.toBeNull();
     expect(view.container.querySelectorAll(".navball .nav-spherical-grid path")).toHaveLength(16);
     expect(view.container.querySelector(".navball .nav-spherical-horizon")).not.toBeNull();
+    expect(view.container.querySelector(".navball .nav-spherical-north-reference")?.getAttribute("d")).toBeTruthy();
     expect(view.container.querySelector(".navball .nav-sphere-rim")).not.toBeNull();
     const clippedWorld = view.container.querySelector(".navball .nav-sphere-world");
     expect(clippedWorld?.getAttribute("clip-path")).toMatch(/^url\(#navball-clip-/);
     expect(clippedWorld?.querySelector(".nav-sphere-sky")).not.toBeNull();
     expect(clippedWorld?.querySelector(".nav-spherical-grid")).not.toBeNull();
+    expect(clippedWorld?.querySelector(".nav-spherical-north-reference")).not.toBeNull();
     expect(clippedWorld?.querySelector(".nav-cardinals")).not.toBeNull();
     expect(clippedWorld?.contains(view.container.querySelector(".nav-sphere-rim"))).toBe(false);
     expect(view.container.querySelector(".navball .aircraft")?.getAttribute("d")).toBe("M52 84 H71 L84 95 L97 84 H116");

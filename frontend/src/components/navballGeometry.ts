@@ -16,6 +16,7 @@ export interface NavballGeometry {
   grid: readonly { path: string; opacity: number }[];
   heading: number;
   horizonPath: string;
+  northReferencePath: string;
   pitch: number;
   roll: number;
   skyPath: string;
@@ -201,6 +202,7 @@ export function buildNavballGeometry({
     grid,
     heading,
     horizonPath: curvePath(latitudeRing(0, 200), basis),
+    northReferencePath: curvePath(halfMeridian(0, 90), basis),
     pitch,
     roll,
     skyPath: skyRegion(basis),

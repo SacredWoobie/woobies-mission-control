@@ -55,7 +55,7 @@ function MissionControlNavball({ heading, pitch, roll }: { heading?: number; pit
   const skyGradientId = `navball-sky-${id}`;
   const clipId = `navball-clip-${id}`;
   return (
-    <svg aria-label={`Navball at heading ${Math.round(geometry.heading)}, pitch ${Math.round(geometry.pitch)}, roll ${Math.round(geometry.roll)}`} className="navball" role="img" viewBox="0 0 168 168">
+    <svg aria-label={`Navball with north reference line at heading ${Math.round(geometry.heading)}, pitch ${Math.round(geometry.pitch)}, roll ${Math.round(geometry.roll)}`} className="navball" role="img" viewBox="0 0 168 168">
       <defs>
         <linearGradient id={skyGradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stopColor="#63a9dd" />
@@ -72,6 +72,7 @@ function MissionControlNavball({ heading, pitch, roll }: { heading?: number; pit
           {geometry.grid.map((line, index) => <path d={line.path} key={index} opacity={line.opacity} />)}
         </g>
         {geometry.horizonPath && <path className="nav-spherical-horizon" d={geometry.horizonPath} />}
+        {geometry.northReferencePath && <path className="nav-spherical-north-reference" d={geometry.northReferencePath} />}
         <g className="nav-cardinals">
           {geometry.cardinals.map((cardinal) => <text key={cardinal.label} x={cardinal.x.toFixed(1)} y={cardinal.y.toFixed(1)}>{cardinal.label}</text>)}
         </g>
