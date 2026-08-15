@@ -299,9 +299,6 @@ def create_telemetry_runtime(
 
         logging.getLogger("websockets.server").addFilter(_HandshakeNoiseFilter())
 
-        tconn = connect("KSP Dashboard Telemetry")
-        if tconn is None:
-            return False
         if not web_root.joinpath("index.html").is_file():
             print(
                 "[telemetry] React dashboard files are missing. Expected "
@@ -472,7 +469,7 @@ def create_telemetry_runtime(
                 sessions.pop(ws, None)
                 send_locks.pop(ws, None)
 
-        async def broadcaster():
+        async def broadcaster(tconn):
             loop = asyncio.get_running_loop()
             interval = 1.0 / telemetry_hz
             while True:
@@ -517,7 +514,18 @@ def create_telemetry_runtime(
                             max_queue=32,
                         )
                     )
-                await broadcaster()
+                # Bind both HTTP/WebSocket listeners before the blocking kRPC
+                # retry begins. The launcher and local browser can therefore
+                # load immediately while KSP is still starting or at its main
+                # menu. The existing bounded retry still stops the component
+                # if no kRPC connection becomes available.
+                loop = asyncio.get_running_loop()
+                tconn = await loop.run_in_executor(
+                    None, connect, "KSP Dashboard Telemetry"
+                )
+                if tconn is None:
+                    raise RuntimeError("kRPC connection was not available")
+                await broadcaster(tconn)
 
         try:
             asyncio.run(serve())

@@ -1,9 +1,12 @@
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
 from http import HTTPStatus
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -263,6 +266,157 @@ class TelemetryRuntimeTests(unittest.TestCase):
         self.assertFalse(server("127.0.0.1", 8090, ("0.0.0.0",)))
         self.assertFalse(server("127.0.0.1", 8090, ("8.8.8.8",)))
         self.assertEqual(connections, [])
+
+    def test_dual_listeners_bind_before_krpc_and_share_security_and_commands(self):
+        registrations = []
+        applied_commands = []
+        connection_calls = []
+        handler_exercised = False
+        real_asyncio_sleep = runtime.asyncio.sleep
+
+        class FakeSocket:
+            def __init__(self):
+                self.messages = [
+                    json.dumps(
+                        {
+                            "type": "overview.vessel.lifecycle",
+                            "requestId": "lan-command-1",
+                        }
+                    )
+                ]
+                self.release = runtime.asyncio.Event()
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                if self.messages:
+                    return self.messages.pop(0)
+                await self.release.wait()
+                raise StopAsyncIteration
+
+            async def send(self, _payload):
+                pass
+
+        class FakeServerContext:
+            def __init__(self, registration):
+                self.registration = registration
+                self.socket = None
+                self.handler_task = None
+
+            async def __aenter__(self):
+                nonlocal handler_exercised
+                if not handler_exercised:
+                    handler_exercised = True
+                    self.socket = FakeSocket()
+                    self.handler_task = runtime.asyncio.create_task(
+                        self.registration["handler"](self.socket)
+                    )
+                    await real_asyncio_sleep(0)
+                return self
+
+            async def __aexit__(self, _exc_type, _exc, _traceback):
+                if self.handler_task is not None:
+                    self.socket.release.set()
+                    await self.handler_task
+                return False
+
+        def fake_serve(handler, host, port, **options):
+            registration = {
+                "handler": handler,
+                "host": host,
+                "port": port,
+                **options,
+            }
+            registrations.append(registration)
+            return FakeServerContext(registration)
+
+        def connect(name):
+            connection_calls.append((name, len(registrations)))
+            return "shared-krpc"
+
+        def apply_command(connection, command):
+            applied_commands.append((connection, command))
+            return {"type": "command.accepted"}
+
+        async def stop_after_first_cycle(_interval):
+            raise RuntimeError("stop integration server")
+
+        def baseline(_target, _root=None):
+            return HTTPStatus.OK, "text/html", "no-cache", b"dashboard"
+
+        class FakeStore:
+            path = Path("test-planner-store.json")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            web_root = Path(temporary)
+            (web_root / "index.html").write_text("dashboard", encoding="utf-8")
+            _asset, server = runtime.create_telemetry_runtime(
+                baseline,
+                connect,
+                lambda _conn: {},
+                apply_command,
+                web_root,
+                4,
+            )
+            with (
+                mock.patch("websockets.serve", side_effect=fake_serve),
+                mock.patch.object(runtime.asyncio, "sleep", stop_after_first_cycle),
+                mock.patch.object(runtime, "PlannerPersistence", return_value=FakeStore()),
+            ):
+                self.assertFalse(server("127.0.0.1", 8090, ("192.168.1.50",)))
+
+        self.assertEqual(
+            [(item["host"], item["port"]) for item in registrations],
+            [("127.0.0.1", 8090), ("192.168.1.50", 8090)],
+        )
+        self.assertIs(registrations[0]["handler"], registrations[1]["handler"])
+        self.assertEqual(connection_calls, [("KSP Dashboard Telemetry", 2)])
+        self.assertEqual(applied_commands[0][0], "shared-krpc")
+        self.assertEqual(
+            applied_commands[0][1]["type"], "overview.vessel.lifecycle"
+        )
+
+        loopback_policy = registrations[0]["process_request"]
+        lan_policy = registrations[1]["process_request"]
+
+        def websocket_request(host, origin):
+            return SimpleNamespace(
+                headers={"Host": host, "Upgrade": "websocket", "Origin": origin},
+                path="/",
+            )
+
+        self.assertIsNone(
+            loopback_policy(
+                SimpleNamespace(remote_address=("127.0.0.1", 5000)),
+                websocket_request(
+                    "127.0.0.1:8090", "http://127.0.0.1:8090"
+                ),
+            )
+        )
+        self.assertIsNone(
+            lan_policy(
+                SimpleNamespace(remote_address=("192.168.1.25", 5000)),
+                websocket_request(
+                    "192.168.1.50:8090", "http://192.168.1.50:8090"
+                ),
+            )
+        )
+        rejected_peer = loopback_policy(
+            SimpleNamespace(remote_address=("192.168.1.25", 5000)),
+            websocket_request("127.0.0.1:8090", "http://127.0.0.1:8090"),
+        )
+        rejected_host = lan_policy(
+            SimpleNamespace(remote_address=("192.168.1.25", 5000)),
+            websocket_request("127.0.0.1:8090", "http://192.168.1.50:8090"),
+        )
+        rejected_origin = lan_policy(
+            SimpleNamespace(remote_address=("192.168.1.25", 5000)),
+            websocket_request("192.168.1.50:8090", "http://127.0.0.1:8090"),
+        )
+        self.assertEqual(rejected_peer.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(rejected_host.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(rejected_origin.status_code, HTTPStatus.FORBIDDEN)
 
     def test_packaged_server_source_contains_origin_csp_and_session_guards(self):
         source = (ROOT / "telemetry_runtime.py").read_text(encoding="utf-8")
