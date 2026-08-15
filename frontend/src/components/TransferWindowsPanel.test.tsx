@@ -37,24 +37,6 @@ describe("TransferWindowsPanel", () => {
     const panel = screen.getByRole("heading", { name: "Transfer windows" }).closest("section")!;
     const cards = [...panel.querySelectorAll(".overview-transfer-card")];
 
-    expect(cards.map((card) => card.textContent?.split("BEST")[0])).toEqual([
-      expect.stringContaining("Kerbin \u2192 Moho"),
-      expect.stringContaining("Kerbin \u2192 Duna"),
-      expect.stringContaining("Kerbin \u2192 Dres"),
-      expect.stringContaining("Kerbin \u2192 Neidon"),
-      expect.stringContaining("Kerbin \u2192 Urlum"),
-      expect.stringContaining("Kerbin \u2192 Eve"),
-      expect.stringContaining("Kerbin \u2192 Jool"),
-      expect.stringContaining("Kerbin \u2192 Plock"),
-      expect.stringContaining("Kerbin \u2192 Sarnus"),
-    ]);
-    expect(panel.parentElement).toBe(view.container.querySelector(".overview-command-grid"));
-    expect(panel.parentElement?.parentElement).toBe(view.container.querySelector(".mission-overview"));
-    expect(panel.closest(".overview-primary-grid, .overview-side-stack")).toBeNull();
-    expect(panel.querySelector(".transfer-window-toolbar")).toBeNull();
-    expect(within(panel.querySelector(".overview-section-head") as HTMLElement).getByRole("button", { name: "Refresh windows" })).toBeTruthy();
-    expect(panel.querySelector(".overview-transfer-grid")?.parentElement).toBe(panel.querySelector(".transfer-window-body"));
-    expect(cards.every((card) => card.querySelector(".overview-transfer-origin")?.textContent === "Kerbin \u2192 ")).toBe(true);
     expect(cards.map((card) => card.querySelector(".overview-transfer-destination")?.textContent)).toEqual([
       "Moho",
       "Duna",
@@ -66,6 +48,14 @@ describe("TransferWindowsPanel", () => {
       "Plock",
       "Sarnus",
     ]);
+    expect(panel.parentElement).toBe(view.container.querySelector(".overview-command-grid"));
+    expect(panel.parentElement?.parentElement).toBe(view.container.querySelector(".mission-overview"));
+    expect(panel.closest(".overview-primary-grid, .overview-side-stack")).toBeNull();
+    expect(panel.querySelector(".transfer-window-toolbar")).toBeNull();
+    expect(within(panel.querySelector(".overview-section-head") as HTMLElement).getByRole("button", { name: "Refresh windows" })).toBeTruthy();
+    expect(panel.querySelector(".overview-transfer-grid")?.parentElement).toBe(panel.querySelector(".transfer-window-body"));
+    expect(panel.querySelector(".overview-transfer-origin")).toBeNull();
+    expect(within(panel).queryByText("BEST UPCOMING DEPARTURE", { exact: true })).toBeNull();
     expect(within(panel).getAllByText(/T\u2212/).every((node) => !/\d{2}:\d{2}:\d{2}/.test(node.textContent ?? ""))).toBe(true);
   });
 

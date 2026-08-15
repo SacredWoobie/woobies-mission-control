@@ -16,7 +16,9 @@ All notable public changes will be recorded here.
   Staging Analysis beside a bounded Resource Inventory immediately below Sim
   Conditions and above Electricity. Electric Charge is consolidated into a
   full-width Battery meter there, and the consumer ledger shows five rows before
-  scrolling.
+  scrolling. The Roster summary uses a non-clipping 2x2 badge grid, and Transfer
+  Windows now emphasizes each destination without repeating the origin or a
+  redundant departure-status caption.
 
 ## v0.7.2 - Settings, themes, and planning refinements
 

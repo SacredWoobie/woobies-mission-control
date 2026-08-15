@@ -1557,8 +1557,7 @@ button { font: inherit; }
 .overview-transfer-card > div { display: grid; min-width: 0; gap: 4px; }
 .overview-transfer-card strong { overflow: hidden; color: var(--text-value); font-size: 9px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .overview-transfer-card span { overflow: hidden; color: var(--slate-muted-text); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.overview-transfer-card .overview-transfer-origin,
-.overview-transfer-card .overview-transfer-destination { color: var(--text-value); font-size: 10px; }
+.overview-transfer-card .overview-transfer-destination { color: var(--cyan); font-size: 12px; font-weight: 600; }
 .overview-transfer-card.error { background: rgba(201,104,91,.055); }
 .overview-transfer-countdown { justify-items: end; text-align: right; }
 .overview-transfer-countdown strong { color: var(--amber); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -2571,8 +2570,7 @@ button { font: inherit; }
     gap: 2px;
   }
   .inactive-mode .overview-transfer-card > div { gap: 2px; }
-  .inactive-mode .overview-transfer-origin { display: none; }
-  .inactive-mode .overview-transfer-destination { color: var(--text-value); font-size: 13px; font-weight: 600; }
+  .inactive-mode .overview-transfer-destination { color: var(--cyan); font-size: 13px; font-weight: 600; }
   .inactive-mode .overview-transfer-countdown { justify-items: start; text-align: left; }
   .inactive-mode .overview-transfer-countdown span { display: none; }
   .inactive-mode .overview-data-grid {

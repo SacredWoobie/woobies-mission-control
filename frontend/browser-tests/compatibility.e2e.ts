@@ -1757,6 +1757,11 @@ test("Mission Control portrait stacks alarms below contracts and stretches the f
   await page.getByLabel("Telemetry fixture").getByRole("button", { name: "inactive" }).click();
   await page.getByRole("button", { name: "Close dashboard developer controls" }).click();
 
+  const transferWindows = page.locator(".overview-transfer-windows");
+  await expect(transferWindows.locator(".overview-transfer-origin")).toHaveCount(0);
+  await expect(transferWindows.getByText("BEST UPCOMING DEPARTURE", { exact: true })).toHaveCount(0);
+  await expect(transferWindows.locator(".overview-transfer-destination").first()).toHaveText("Moho");
+
   const layout = await page.evaluate(() => {
     const box = (selector: string) => {
       const element = document.querySelector<HTMLElement>(selector)!;
