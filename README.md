@@ -127,10 +127,10 @@ The dashboard adds a Settings rail drawer with four sections:
 
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
   in browser-local storage, can restore hidden dashboard panels, and offers
-  Mission Control Dark, Daylight Console, Warm CRT, and Green Phosphor color
-  themes. A selection applies immediately and persists in that browser. The
-  themes change semantic color and surface treatments while retaining the same
-  typography and layout.
+  Mission Control Dark, Daylight Console, Warm CRT, Green Phosphor, and
+  Catppuccin Mocha color themes. A selection applies immediately and persists
+  in that browser. The themes change semantic color and surface treatments
+  while retaining the same typography and layout.
 - **Features & Mods** reports only known Mission Control capabilities and
   integrations for the dashboard as a whole, independent of the current game
   scene. **Available** means the required known integrations were detected;

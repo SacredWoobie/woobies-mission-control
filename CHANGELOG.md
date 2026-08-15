@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Added an attributed Catppuccin Mocha color theme as a fifth persistent
+  dashboard appearance option. Mission Control Dark remains the default.
 - Added SqueakyB's KSP2 Pre-Alpha Style NavBall as an attributed, browser-local
   Flight preference. Mission Control's existing vector navball remains the
   default; the optional texture follows live heading, pitch, and roll without

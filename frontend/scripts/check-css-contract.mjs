@@ -103,7 +103,7 @@ const contrastContracts = [
   { foreground: "--surface-amber-face-text", background: "--surface-amber-face-top", minimum: 4.5 },
 ];
 
-const alternateThemeIds = ["daylight-console", "warm-crt", "green-phosphor"];
+const alternateThemeIds = ["daylight-console", "warm-crt", "green-phosphor", "catppuccin-mocha"];
 const requiredThemeColorTokens = new Set([
   "--page-background",
   "--state-amber-text",

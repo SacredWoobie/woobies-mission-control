@@ -141,7 +141,7 @@ describe("SettingsDrawer", () => {
     expect(screen.getByText(/Woobies Control Stats service.*DETECTED.*Installation scan/)).toBeTruthy();
   });
 
-  it("offers all four themes and reports the current selection in About", () => {
+  it("offers all five themes and reports the current selection in About", () => {
     const onSetTheme = vi.fn();
     const view = render(<SettingsDrawer {...props({ onSetTheme })} />);
     const dialog = screen.getByRole("dialog", { name: "Mission Control Settings" });
@@ -151,6 +151,7 @@ describe("SettingsDrawer", () => {
       expect.stringContaining("Daylight Console"),
       expect.stringContaining("Warm CRT"),
       expect.stringContaining("Green Phosphor"),
+      expect.stringContaining("Catppuccin Mocha"),
     ]);
     expect(themes[0].getAttribute("aria-checked")).toBe("true");
     fireEvent.click(within(dialog).getByRole("radio", { name: /Daylight Console/ }));

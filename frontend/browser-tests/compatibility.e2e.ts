@@ -122,6 +122,7 @@ test("Settings applies and persists every dashboard color theme", async ({ page 
     { id: "daylight-console", label: "Daylight Console", scheme: "light" },
     { id: "warm-crt", label: "Warm CRT", scheme: "dark" },
     { id: "green-phosphor", label: "Green Phosphor", scheme: "dark" },
+    { id: "catppuccin-mocha", label: "Catppuccin Mocha", scheme: "dark" },
     { id: "mission-control-dark", label: "Mission Control Dark", scheme: "dark" },
   ]) {
     const option = drawer.getByRole("radio", { name: new RegExp(theme.label) });
