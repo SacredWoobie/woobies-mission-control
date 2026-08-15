@@ -1,16 +1,17 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.7.2](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.2)**
+Current public release: **[v0.7.3](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.3)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
 the dashboard from your own computer at `http://127.0.0.1:8090/`. An optional
 ESP32 bridge provides physical stage and abort controls.
 
-Version 0.7.2 adds a dashboard-wide Settings drawer, four persistent color
-themes, a bounded view of known installed integrations, curated Help and About
-surfaces, and clearer Delta-V plan management. The capability contract is
-additive, older feeds remain supported, and the release does not change KSP
+Version 0.7.3 makes Mission Control and the Editor substantially more useful on
+portrait displays, adds Catppuccin Mocha as a fifth persistent theme, and offers
+SqueakyB's KSP2 Pre-Alpha Style NavBall as an optional Flight preference while
+keeping the existing vector navball as the default. Development fixtures gain
+optional-mod toggles for fallback testing. The release does not change KSP
 `GameData` or the selected service DLL versions.
 
 This is an unofficial community project and is not affiliated with or endorsed
@@ -21,8 +22,8 @@ by the developers or publishers of Kerbal Space Program or any supported mod.
 ### Mission Control
 
 <p align="center">
-  <a href="docs/images/v0.7.2/mission-overview-warm-crt.png">
-    <img src="docs/images/v0.7.2/mission-overview-warm-crt.png" width="900" alt="Mission Control overview in the Warm CRT theme with program status, transfer windows, fleet groups, Kerbonaut roster, alarms, and active contracts">
+  <a href="docs/images/v0.7.3/mission-overview-catppuccin-portrait.png">
+    <img src="docs/images/v0.7.3/mission-overview-catppuccin-portrait.png" width="600" alt="Portrait Mission Control overview in Catppuccin Mocha with the expanded vessel list and roster, contracts, and alarms stacked beside it">
   </a>
 </p>
 
@@ -64,8 +65,8 @@ custom allowances, and craft assignment.
 ### VAB and SPH
 
 <p align="center">
-  <a href="docs/images/v0.7.2/editor-green-phosphor.png">
-    <img src="docs/images/v0.7.2/editor-green-phosphor.png" width="900" alt="VAB craft analysis in the Green Phosphor theme with staging, resources, electricity planning, and pinned mission and resonant-orbit plans">
+  <a href="docs/images/v0.7.3/editor-catppuccin-portrait.png">
+    <img src="docs/images/v0.7.3/editor-catppuccin-portrait.png" width="600" alt="Portrait VAB craft analysis in Catppuccin Mocha with staging and resources above the read-only electricity planner">
   </a>
 </p>
 
@@ -81,8 +82,8 @@ vehicle, with exact-plan editing when assumptions change.
 ### Flight
 
 <p align="center">
-  <a href="docs/images/v0.7.2/flight-mission-control-dark.png">
-    <img src="docs/images/v0.7.2/flight-mission-control-dark.png" width="900" alt="Flight dashboard in the Mission Control Dark theme with the instrument plate and operational panels visible">
+  <a href="docs/images/v0.7.3/flight-ksp2-navball.png">
+    <img src="docs/images/v0.7.3/flight-ksp2-navball.png" width="900" alt="Flight dashboard with the optional KSP2 Pre-Alpha Style NavBall active while the existing operational instrument plate remains visible">
   </a>
 </p>
 
@@ -118,8 +119,8 @@ does not execute nodes, warp, steer, stage, or change throttle.
 ## Settings, Help, and About
 
 <p align="center">
-  <a href="docs/images/v0.7.2/mission-overview-settings-daylight.png">
-    <img src="docs/images/v0.7.2/mission-overview-settings-daylight.png" width="900" alt="Mission Control overview with the Settings appearance drawer open in the Daylight Console theme">
+  <a href="docs/images/v0.7.3/flight-settings-visual-options.png">
+    <img src="docs/images/v0.7.3/flight-settings-visual-options.png" width="900" alt="Flight dashboard with Settings open to the persistent Catppuccin Mocha and navball visual preferences">
   </a>
 </p>
 
@@ -127,9 +128,9 @@ The dashboard adds a Settings rail drawer with four sections:
 
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
   in browser-local storage and can restore hidden dashboard panels. Public
-  v0.7.2 offers Mission Control Dark, Daylight Console, Warm CRT, and Green
-  Phosphor; the Unreleased source build adds Catppuccin Mocha as a fifth theme.
-  A selection applies immediately and persists in that browser. The themes
+  v0.7.3 offers Mission Control Dark, Daylight Console, Warm CRT, Green
+  Phosphor, and Catppuccin Mocha. A selection applies immediately and persists
+  in that browser. The themes
   change semantic color and surface treatments while retaining the same
   typography and layout.
 - **Features & Mods** reports only known Mission Control capabilities and
@@ -152,11 +153,11 @@ The dashboard adds a Settings rail drawer with four sections:
   `GameData`; use `Dashboard\Start KSP Dashboard.bat` for those launcher
   responsibilities.
 
-The public baseline is v0.7.2.
+The public baseline is v0.7.3.
 
 ## Packaged KSP services
 
-The v0.7.2 public release selects four independently versioned kRPC extensions.
+The v0.7.3 public release selects four independently versioned kRPC extensions.
 Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
@@ -274,7 +275,7 @@ Mission Control is released under the [MIT License](LICENSE). Created by
 **SacredWoobie**. Bundled and adapted components retain their own licenses and
 notices in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
-The Unreleased source build includes an optional KSP2 Pre-Alpha Style NavBall.
+Version 0.7.3 includes an optional KSP2 Pre-Alpha Style NavBall.
 Special thanks to [SqueakyB](https://spacedock.info/profile/SqueakyB) for
 creating it, suggesting its Mission Control integration, and granting
 permission to include the artwork.

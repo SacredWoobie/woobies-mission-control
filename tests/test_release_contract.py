@@ -259,7 +259,15 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(v071_product, "0.7.1")
         self.assertEqual(v071_services["WoobiesControlStats"], "0.2.21.0")
 
-    def test_v072_release_manifest_records_krpc_060_service_cohort(self):
+    def test_v072_release_pack_remains_immutable(self):
+        v072_product, v072_services = read_manifest(
+            ROOT / "tools" / "Release-Pack-v0.7.2.psd1"
+        )
+
+        self.assertEqual(v072_product, "0.7.2")
+        self.assertEqual(v072_services["WoobiesControlStats"], "0.2.21.0")
+
+    def test_v073_release_manifest_records_krpc_060_service_cohort(self):
         manifest = (
             ROOT / "tools" / "Release-Manifest.psd1"
         ).read_text(encoding="utf-8")
@@ -270,7 +278,7 @@ class ReleaseContractTests(unittest.TestCase):
         spec.loader.exec_module(launcher)
 
         self.assertIn('ReleaseState = "Release"', manifest)
-        self.assertIn('ProductVersion = "0.7.2"', manifest)
+        self.assertIn('ProductVersion = "0.7.3"', manifest)
         self.assertIn('Version = "0.6.0"', manifest)
         self.assertIn(
             'PackageSha256 = "6B4399A8DB57C41DD15323FCD79DC3AA440999AEFED808729A5C850BAC1A17C8"',
@@ -295,7 +303,7 @@ class ReleaseContractTests(unittest.TestCase):
             r'SourceCommit = "5b15ecd83b95150c7a91006e2c49813a7ea9d6a1"',
         )
 
-    def test_v072_release_pack_matches_the_selected_manifest(self):
+    def test_v073_release_pack_matches_the_selected_manifest(self):
         publish_script = (ROOT / "tools" / "Publish-Release.ps1").read_text(
             encoding="utf-8"
         )
@@ -306,15 +314,15 @@ class ReleaseContractTests(unittest.TestCase):
             ROOT / "tools" / "Release-Manifest.psd1"
         )
         pack_product, pack_services = read_manifest(
-            ROOT / "tools" / "Release-Pack-v0.7.2.psd1"
+            ROOT / "tools" / "Release-Pack-v0.7.3.psd1"
         )
 
         self.assertIn("$manifest.ReleaseState -eq 'Unreleased'", publish_script)
         self.assertIn("Choose and align the product release version", publish_script)
-        self.assertEqual(manifest_product, "0.7.2")
+        self.assertEqual(manifest_product, "0.7.3")
         self.assertEqual(pack_product, manifest_product)
         self.assertEqual(pack_services, manifest_services)
-        self.assertIn("v0.7.2 release manifest selects", release_process)
+        self.assertIn("v0.7.3 release manifest selects", release_process)
 
     def test_product_versions_and_service_selection_are_aligned(self):
         spec = importlib.util.spec_from_file_location(
@@ -349,14 +357,14 @@ class ReleaseContractTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn(
-            "Current public release: **[v0.7.2]"
+            "Current public release: **[v0.7.3]"
             "(https://github.com/SacredWoobie/woobies-mission-control/"
-            "releases/tag/v0.7.2)**",
+            "releases/tag/v0.7.3)**",
             readme,
         )
-        self.assertIn("The v0.7.2 public release selects", readme)
+        self.assertIn("The v0.7.3 public release selects", readme)
         self.assertNotIn("Next release candidate", readme)
-        self.assertNotIn("v0.7.2 release candidate", readme)
+        self.assertNotIn("v0.7.3 release candidate", readme)
 
     def test_only_react_loopback_runtime_is_supported(self):
         self.assertFalse((ROOT / "ksp_mission_dashboard.html").exists())
@@ -442,7 +450,7 @@ class ReleaseContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         screenshot_brief = (
-            ROOT / "docs" / "images" / "v0.7.2" / "README.md"
+            ROOT / "docs" / "images" / "v0.7.3" / "README.md"
         ).read_text(encoding="utf-8")
         required = re.findall(
             r"\| \d \| (?:not ready|ready|captured|approved) "
@@ -450,13 +458,23 @@ class ReleaseContractTests(unittest.TestCase):
             screenshot_brief,
         )
         self.assertEqual(len(required), 5)
+        expected_dimensions = {
+            "mission-overview-catppuccin-portrait.png": (1080, 1729),
+            "editor-catppuccin-portrait.png": (1080, 1729),
+            "flight-ksp2-navball.png": (1920, 889),
+            "flight-settings-visual-options.png": (1920, 889),
+            "mission-overview-roster-transfers.png": (1920, 889),
+        }
+        self.assertEqual(set(required), set(expected_dimensions))
         for name in required:
-            self.assertIn(f"docs/images/v0.7.2/{name}", publish_script)
+            self.assertIn(f"docs/images/v0.7.3/{name}", publish_script)
             image = (
-                ROOT / "docs" / "images" / "v0.7.2" / name
+                ROOT / "docs" / "images" / "v0.7.3" / name
             ).read_bytes()
             self.assertTrue(image.startswith(b"\x89PNG\r\n\x1a\n"), name)
-            self.assertEqual(struct.unpack(">II", image[16:24]), (1920, 889))
+            self.assertEqual(
+                struct.unpack(">II", image[16:24]), expected_dimensions[name]
+            )
         self.assertFalse(any(" " in name or "&" in name for name in required))
 
     def test_release_assets_sort_zip_before_curated_images(self):
@@ -470,24 +488,24 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(
             image_names,
             [
-                "zz-01-flight-mission-control-dark.png",
-                "zz-02-editor-green-phosphor.png",
-                "zz-03-mission-overview-warm-crt.png",
-                "zz-04-mission-overview-settings-daylight.png",
-                "zz-05-delta-v-planner-daylight.png",
+                "zz-01-mission-overview-catppuccin-portrait.png",
+                "zz-02-editor-catppuccin-portrait.png",
+                "zz-03-flight-ksp2-navball.png",
+                "zz-04-flight-settings-visual-options.png",
+                "zz-05-mission-overview-roster-transfers.png",
             ],
         )
-        zip_name = "Woobies-Mission-Control-v0.7.2.zip"
+        zip_name = "Woobies-Mission-Control-v0.7.3.zip"
         checksum_name = f"{zip_name}.sha256"
         release_image_names = [
-            f"Woobies-Mission-Control-v0.7.2.{name}" for name in image_names
+            f"Woobies-Mission-Control-v0.7.3.{name}" for name in image_names
         ]
         source_archive_name = (
-            "Woobies-Mission-Control-v0.7.2.zz-00-"
+            "Woobies-Mission-Control-v0.7.3.zz-00-"
             "KRPC.WoobiesMechJeb-0.8.10-source.zip"
         )
         update_name = (
-            "Woobies-Mission-Control-v0.7.2.zz-90-runtime-update.zip"
+            "Woobies-Mission-Control-v0.7.3.zz-90-runtime-update.zip"
         )
         update_checksum_name = f"{update_name}.sha256"
         self.assertEqual(
@@ -686,7 +704,7 @@ class ReleaseContractTests(unittest.TestCase):
         acknowledgment = "https://spacedock.info/profile/SqueakyB"
         self.assertIn(acknowledgment, readme)
         self.assertIn(acknowledgment, changelog)
-        self.assertIn("Unreleased source build", readme)
+        self.assertIn("Version 0.7.3 includes", readme)
         self.assertIn("granting permission", " ".join(notices.split()))
         self.assertIn("granting permission", " ".join(readme.split()))
         self.assertIn("granting permission", " ".join(changelog.split()))
