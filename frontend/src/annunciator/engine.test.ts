@@ -341,4 +341,109 @@ describe("annunciator lifecycle and watchdog", () => {
     }, policy);
     expect(state.episodes).toEqual([]);
   });
+
+  it("applies a rule lifecycle grace only to a fresh Flight or vessel lifecycle", () => {
+    const commsRule = rule(() => ({
+      kind: "known",
+      complete: true,
+      observations: [{ instanceId: "active-vessel", state: "active", message: "No connection." }],
+    }), {
+      activationDwellMs: 100,
+      lifecycleGraceMs: 500,
+      ruleId: "comms-link-lost",
+      sourceId: "comms",
+      subsystem: "COMMS",
+    });
+    let state = evaluateAnnunciatorSnapshot(
+      createAnnunciatorState(),
+      [commsRule],
+      snapshot,
+      { nowMs: 0, vesselIdentity: "vessel-a" },
+      policy,
+    );
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 499,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    expect(state.episodes).toEqual([]);
+
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 500,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 599,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    expect(state.episodes).toEqual([]);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 600,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    expect(state.episodes).toHaveLength(1);
+
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 700,
+      vesselIdentity: "vessel-b",
+    }, policy);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 1_199,
+      vesselIdentity: "vessel-b",
+    }, policy);
+    expect(state.episodes).toEqual([]);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 1_200,
+      vesselIdentity: "vessel-b",
+    }, policy);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 1_300,
+      vesselIdentity: "vessel-b",
+    }, policy);
+    expect(state.episodes).toHaveLength(1);
+  });
+
+  it("retains the ordinary activation dwell after the lifecycle grace expires", () => {
+    let disconnected = false;
+    const commsRule = rule(() => ({
+      kind: "known",
+      complete: true,
+      observations: [{
+        instanceId: "active-vessel",
+        state: disconnected ? "active" : "clear",
+        message: "No connection.",
+      }],
+    }), {
+      activationDwellMs: 100,
+      lifecycleGraceMs: 500,
+      ruleId: "comms-link-lost",
+      sourceId: "comms",
+      subsystem: "COMMS",
+    });
+    let state = evaluateAnnunciatorSnapshot(
+      createAnnunciatorState(),
+      [commsRule],
+      snapshot,
+      { nowMs: 0, vesselIdentity: "vessel-a" },
+      policy,
+    );
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 500,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    disconnected = true;
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 1_000,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 1_099,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    expect(state.episodes).toEqual([]);
+    state = evaluateAnnunciatorSnapshot(state, [commsRule], snapshot, {
+      nowMs: 1_100,
+      vesselIdentity: "vessel-a",
+    }, policy);
+    expect(state.episodes).toHaveLength(1);
+  });
 });

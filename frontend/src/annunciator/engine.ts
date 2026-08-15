@@ -27,6 +27,7 @@ export interface AnnunciatorRule {
   defaultTier: AnnunciatorTier;
   latchSubDwell?: boolean;
   activationDwellMs?: number;
+  lifecycleGraceMs?: number;
   evaluate(snapshot: TelemetrySnapshot, context: RuleEvaluationContext): RuleEvaluation;
 }
 
@@ -452,6 +453,8 @@ export function evaluateAnnunciatorSnapshot(
   const sourceApplicable = new Set<string>();
 
   rules.forEach((rule) => {
+    const lifecycleAgeMs = input.nowMs - (next.feed.startedAtMs ?? input.nowMs);
+    if (lifecycleAgeMs < nonNegative(rule.lifecycleGraceMs ?? 0)) return;
     const definitionBase = {
       ruleId: rule.ruleId,
       sourceId: rule.sourceId,
