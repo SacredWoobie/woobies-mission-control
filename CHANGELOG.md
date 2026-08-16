@@ -4,6 +4,11 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+- Reworked the desktop launcher into a screen-efficient two-column workbench
+  with responsive single-column fallback, paired compatibility/service status
+  rows, a compact live-kRPC card, and a larger resizable Mission Log. The log
+  now supports source and warning filters, warning counts, copy, clear, and a
+  follow-tail toggle while retaining every existing launcher action.
 - Added opt-in trusted-LAN dashboard access while preserving the launcher's
   loopback dashboard. The launcher discovers active private IPv4 interfaces,
   lets the user select one and copy its URL, and requires a detailed warning

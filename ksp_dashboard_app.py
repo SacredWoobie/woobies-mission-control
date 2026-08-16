@@ -415,8 +415,8 @@ def calculate_initial_window_size(
     """Return a roomy launcher size clamped for the current display."""
     available_width = max(640, int(screen_width) - 80)
     available_height = max(520, int(screen_height) - 120)
-    desired_width = max(960, int(requested_width) + 24)
-    desired_height = max(820, int(requested_height) + 12)
+    desired_width = max(1360, int(requested_width) + 24)
+    desired_height = max(860, int(requested_height) + 12)
     return min(desired_width, available_width), min(
         desired_height, available_height
     )
@@ -424,9 +424,9 @@ def calculate_initial_window_size(
 
 def calculate_initial_pane_sash(
     available_height,
-    controls_share=0.74,
-    minimum_controls=240,
-    minimum_log=120,
+    controls_share=0.72,
+    minimum_controls=260,
+    minimum_log=150,
 ):
     """Return the initial controls/log divider position for the launcher."""
     available_height = max(0, int(available_height))
@@ -495,6 +495,12 @@ def configure_dashboard_theme(root):
         background=THEME["panel_2"],
         foreground=THEME["cyan"],
         font=UI_FONT_BOLD,
+    )
+    style.configure(
+        "TableHeader.TLabel",
+        background=THEME["panel_2"],
+        foreground=THEME["slate_dim"],
+        font=(UI_FONT_FAMILY, 8, "bold"),
     )
     style.configure(
         "DialogTitle.TLabel",
@@ -2531,6 +2537,128 @@ class ScrollableLauncherPane(ttk.Frame):
         return True
 
 
+class ResponsiveLauncherWorkbench(ttk.Frame):
+    """Arrange launcher cards in two columns and collapse safely when narrow."""
+
+    def __init__(self, parent, breakpoint=1120, left_width=390):
+        super().__init__(parent, style="Shell.TFrame")
+        self.breakpoint = int(breakpoint)
+        self.left_width = int(left_width)
+        self.left = ttk.Frame(self, style="Shell.TFrame")
+        self.right = ttk.Frame(self, style="Shell.TFrame")
+        self._wide = None
+        self.bind("<Configure>", self._apply_layout)
+        self.after_idle(self._apply_layout)
+
+    def _apply_layout(self, event=None):
+        width = int(getattr(event, "width", 0) or self.winfo_width())
+        wide = width >= self.breakpoint
+        if self._wide is wide:
+            return
+        self._wide = wide
+        self.left.grid_forget()
+        self.right.grid_forget()
+        if wide:
+            self.columnconfigure(0, weight=0, minsize=self.left_width)
+            self.columnconfigure(1, weight=1, minsize=0)
+            self.left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+            self.right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        else:
+            self.columnconfigure(0, weight=1, minsize=0)
+            self.columnconfigure(1, weight=0, minsize=0)
+            self.left.grid(row=0, column=0, sticky="nsew")
+            self.right.grid(row=1, column=0, sticky="nsew", pady=(6, 0))
+
+
+def build_paired_status_grid(parent, entries):
+    """Build a two-across status table and return its value labels by key."""
+    header = ttk.Frame(parent, style="CardInner.TFrame")
+    header.pack(fill="x", pady=(0, 4))
+    for column in range(2):
+        pair_header = ttk.Frame(header, style="CardInner.TFrame")
+        pair_header.grid(
+            row=0,
+            column=column,
+            sticky="ew",
+            padx=(0, 10) if column == 0 else (10, 0),
+        )
+        pair_header.columnconfigure(0, weight=1)
+        ttk.Label(
+            pair_header,
+            text="COMPONENT",
+            style="TableHeader.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            pair_header,
+            text="DETECTED",
+            style="TableHeader.TLabel",
+        ).grid(row=0, column=1, sticky="e")
+        header.columnconfigure(column, weight=1, uniform="status_header")
+
+    body = ttk.Frame(parent, style="CardInner.TFrame")
+    body.pack(fill="x")
+    body.columnconfigure(0, weight=1, uniform="status_body")
+    body.columnconfigure(1, weight=1, uniform="status_body")
+    labels = {}
+    for index, (key, title) in enumerate(entries):
+        row, column = divmod(index, 2)
+        pair = ttk.Frame(body, style="CardInner.TFrame")
+        pair.grid(
+            row=row,
+            column=column,
+            sticky="ew",
+            padx=(0, 10) if column == 0 else (10, 0),
+            pady=2,
+        )
+        pair.columnconfigure(0, weight=1)
+        ttk.Label(
+            pair,
+            text=title,
+            anchor="w",
+            style="Card.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+        status = ttk.Label(
+            pair,
+            text="Checking...",
+            anchor="e",
+            style="Card.TLabel",
+        )
+        status.grid(row=0, column=1, sticky="e", padx=(8, 0))
+        labels[key] = status
+    return labels
+
+
+LOG_WARNING_TERMS = (
+    " warning",
+    " error",
+    " failed",
+    " refused",
+    " timed out",
+    " exhausted",
+    " already in use",
+    " couldn't",
+    " denied",
+    " unavailable",
+    " missing",
+)
+
+
+def is_launcher_log_warning(source, message):
+    """Return whether a structured launcher log record merits warning focus."""
+    text = f" {source} {message}".casefold()
+    return any(term in text for term in LOG_WARNING_TERMS)
+
+
+def filter_launcher_log_records(records, selected_filter):
+    """Return structured log records visible for the selected log filter."""
+    selected_filter = str(selected_filter or "all").casefold()
+    if selected_filter == "all":
+        return list(records)
+    if selected_filter == "warnings":
+        return [record for record in records if record[2]]
+    return [record for record in records if record[0].casefold() == selected_filter]
+
+
 class App:
     def __init__(
         self,
@@ -2543,6 +2671,11 @@ class App:
     ):
         self.root = root
         self.log_queue = queue.Queue()
+        self.log_records = []
+        self.log_filter_var = tk.StringVar(root, value="all")
+        self.log_follow_var = tk.BooleanVar(root, value=True)
+        self.log_warning_count_var = tk.StringVar(root, value="0 warnings")
+        self.log_filter_buttons = {}
         self.update_queue = queue.Queue()
         self.krpc_test_queue = queue.Queue()
         self.component_setup_queue = queue.Queue()
@@ -2589,23 +2722,24 @@ class App:
         root.title(f"{APP_NAME} v{APP_VERSION}")
         root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        header = ttk.Frame(root, style="Shell.TFrame")
-        header.pack(fill="x", padx=14, pady=(14, 4))
+        self.header = ttk.Frame(root, style="Shell.TFrame")
+        self.header.pack(fill="x", padx=14, pady=(12, 7))
+        title_group = ttk.Frame(self.header, style="Shell.TFrame")
+        title_group.grid(row=0, column=0, sticky="w")
         ttk.Label(
-            header,
+            title_group,
             text=APP_NAME.upper(),
             anchor="w",
             style="Title.TLabel",
         ).pack(side="left")
         ttk.Label(
-            header, text=f"  //  v{APP_VERSION}", style="Version.TLabel"
+            title_group, text=f"  //  v{APP_VERSION}", style="Version.TLabel"
         ).pack(side="left")
-        ttk.Button(header, text="ABOUT", width=9, command=self._show_about).pack(
-            side="right"
-        )
 
-        update_bar = ttk.Frame(root, style="Shell.TFrame")
-        update_bar.pack(fill="x", padx=14, pady=(2, 7))
+        update_bar = ttk.Frame(self.header, style="Shell.TFrame")
+        update_bar.grid(row=0, column=1, sticky="ew", padx=(14, 0))
+        self.header.columnconfigure(1, weight=1)
+        self.header_update_bar = update_bar
         self.update_status = ttk.Label(
             update_bar,
             text="Update status: waiting",
@@ -2653,6 +2787,14 @@ class App:
             command=self._open_latest_release,
         )
         self.view_release_button.pack(side="left", padx=(4, 0))
+        self.about_button = ttk.Button(
+            update_actions,
+            text="About",
+            command=self._show_about,
+        )
+        self.about_button.pack(side="left", padx=(4, 0))
+        self.header_wide = None
+        self.header.bind("<Configure>", self._layout_header)
 
         self.main_panes = tk.PanedWindow(
             root,
@@ -2676,8 +2818,13 @@ class App:
         self.controls_root = self.controls_pane.content
         root.bind("<MouseWheel>", self._on_launcher_mousewheel, add="+")
 
+        self.workbench = ResponsiveLauncherWorkbench(self.controls_root)
+        self.workbench.pack(fill="x", padx=14, pady=6)
+        self.component_column = self.workbench.left
+        self.installation_column = self.workbench.right
+
         settings_frame = ttk.LabelFrame(
-            self.controls_root,
+            self.installation_column,
             text="KSP INSTALLATION",
         )
         settings_controls = ttk.Frame(settings_frame)
@@ -2719,6 +2866,12 @@ class App:
             anchor="w",
             style="CardTitle.TLabel",
         ).pack(side="left")
+        self.prerequisite_refresh_button = ttk.Button(
+            prerequisite_header,
+            text="Refresh all status",
+            command=self._refresh_all_ksp_status,
+        )
+        self.prerequisite_refresh_button.pack(side="right", padx=(8, 0))
         self.prerequisite_summary = ttk.Label(
             prerequisite_header,
             text="Checking...",
@@ -2728,129 +2881,38 @@ class App:
         )
         self.prerequisite_summary.pack(side="right")
 
-        ksp_version_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
-        ksp_version_row.pack(fill="x", pady=2)
-        ttk.Label(
-            ksp_version_row,
-            text="Kerbal Space Program",
-            anchor="w",
-            style="Card.TLabel",
-        ).pack(side="left", fill="x", expand=True)
-        self.ksp_version_status = ttk.Label(
-            ksp_version_row,
-            text="Checking...",
-            width=32,
-            anchor="e",
-            style="Card.TLabel",
+        compatibility_entries = [
+            ("__ksp_version", "Kerbal Space Program"),
+            ("__dll_layout", "Core DLL layout"),
+            *(
+                (definition["key"], definition["title"])
+                for definition in KSP_PREREQUISITES
+            ),
+            ("__system_heat", "System Heat thermal backend"),
+            ("__krpc_configuration", "kRPC server configuration"),
+            ("__notes", "Notes mod"),
+        ]
+        compatibility_labels = build_paired_status_grid(
+            prerequisites,
+            compatibility_entries,
         )
-        self.ksp_version_status.pack(side="right")
+        self.ksp_version_status = compatibility_labels["__ksp_version"]
+        self.dll_layout_status = compatibility_labels["__dll_layout"]
+        self.prerequisite_status_labels = {
+            definition["key"]: compatibility_labels[definition["key"]]
+            for definition in KSP_PREREQUISITES
+        }
+        self.system_heat_mod_status = compatibility_labels["__system_heat"]
+        self.krpc_configuration_status = compatibility_labels[
+            "__krpc_configuration"
+        ]
+        self.notes_mod_status = compatibility_labels["__notes"]
 
-        dll_layout_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
-        dll_layout_row.pack(fill="x", pady=2)
-        ttk.Label(
-            dll_layout_row,
-            text="Core DLL layout",
-            anchor="w",
-            style="Card.TLabel",
-        ).pack(side="left", fill="x", expand=True)
-        self.dll_layout_status = ttk.Label(
-            dll_layout_row,
-            text="Checking...",
-            width=32,
-            anchor="e",
-            style="Card.TLabel",
-        )
-        self.dll_layout_status.pack(side="right")
-
-        self.prerequisite_status_labels = {}
-        for definition in KSP_PREREQUISITES:
-            row = ttk.Frame(prerequisites, style="CardInner.TFrame")
-            row.pack(fill="x", pady=2)
-            ttk.Label(
-                row,
-                text=definition["title"],
-                anchor="w",
-                style="Card.TLabel",
-            ).pack(side="left", fill="x", expand=True)
-            status = ttk.Label(
-                row,
-                text="Checking...",
-                width=32,
-                anchor="e",
-                style="Card.TLabel",
-            )
-            status.pack(side="right")
-            self.prerequisite_status_labels[definition["key"]] = status
-
-        system_heat_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
-        system_heat_row.pack(fill="x", pady=2)
-        ttk.Label(
-            system_heat_row,
-            text="System Heat thermal backend",
-            anchor="w",
-            style="Card.TLabel",
-        ).pack(side="left", fill="x", expand=True)
-        self.system_heat_mod_status = ttk.Label(
-            system_heat_row,
-            text="Checking...",
-            width=32,
-            anchor="e",
-            style="Card.TLabel",
-        )
-        self.system_heat_mod_status.pack(side="right")
-
-        server_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
-        server_row.pack(fill="x", pady=2)
-        ttk.Label(
-            server_row,
-            text="kRPC server configuration",
-            anchor="w",
-            style="Card.TLabel",
-        ).pack(side="left", fill="x", expand=True)
-        self.krpc_configuration_status = ttk.Label(
-            server_row,
-            text="Checking...",
-            width=32,
-            anchor="e",
-            style="Card.TLabel",
-        )
-        self.krpc_configuration_status.pack(side="right")
-
-        connection_row = ttk.Frame(prerequisites, style="CardInner.TFrame")
-        connection_row.pack(fill="x", pady=2)
-        ttk.Label(
-            connection_row,
-            text="Live kRPC connection",
-            anchor="w",
-            style="Card.TLabel",
-        ).pack(side="left", fill="x", expand=True)
-        self.krpc_test_button = ttk.Button(
-            connection_row,
-            text="Test connection",
-            command=self._start_krpc_connection_test,
-        )
-        self.krpc_test_button.pack(side="right", padx=(7, 0))
-        self.krpc_connection_status = ttk.Label(
-            connection_row,
-            text="Not tested",
-            width=32,
-            anchor="e",
-            style="Card.TLabel",
-        )
-        self.krpc_connection_status.pack(side="right")
-
-        prerequisite_buttons = ttk.Frame(
+        self.prerequisite_buttons = ttk.Frame(
             prerequisites, style="CardInner.TFrame"
         )
-        prerequisite_buttons.pack(fill="x", pady=(10, 0))
-        self.prerequisite_refresh_button = ttk.Button(
-            prerequisite_buttons,
-            text="Refresh all status",
-            command=self._refresh_all_ksp_status,
-        )
-        self.prerequisite_refresh_button.pack(side="left")
         self.prerequisite_fix_button = ttk.Button(
-            prerequisite_buttons,
+            self.prerequisite_buttons,
             text="Review fixes",
             command=self._show_prerequisite_fixes,
             style="Accent.TButton",
@@ -2868,6 +2930,12 @@ class App:
             anchor="w",
             style="CardTitle.TLabel",
         ).pack(side="left")
+        self.service_refresh_button = ttk.Button(
+            services_header,
+            text="Refresh all status",
+            command=self._refresh_all_ksp_status,
+        )
+        self.service_refresh_button.pack(side="right", padx=(8, 0))
         self.service_summary = ttk.Label(
             services_header,
             text="Checking...",
@@ -2877,22 +2945,10 @@ class App:
         )
         self.service_summary.pack(side="right")
 
-        self.service_status_labels = {}
-        for folder, title in SERVICE_DLLS:
-            row = ttk.Frame(services, style="CardInner.TFrame")
-            row.pack(fill="x", pady=2)
-            ttk.Label(row, text=title, anchor="w", style="Card.TLabel").pack(
-                side="left", fill="x", expand=True
-            )
-            status = ttk.Label(
-                row,
-                text="Checking...",
-                width=44,
-                anchor="e",
-                style="Card.TLabel",
-            )
-            status.pack(side="right")
-            self.service_status_labels[folder] = status
+        self.service_status_labels = build_paired_status_grid(
+            services,
+            [(folder, title) for folder, title in SERVICE_DLLS],
+        )
 
         service_buttons = ttk.Frame(services, style="CardInner.TFrame")
         service_buttons.pack(fill="x", pady=(10, 0))
@@ -2904,11 +2960,6 @@ class App:
             style="Accent.TButton",
         )
         self.install_services_button.pack(side="left")
-        ttk.Button(
-            service_buttons,
-            text="Refresh all status",
-            command=self._refresh_all_ksp_status,
-        ).pack(side="left", padx=(6, 0))
         self.open_gamedata_button = ttk.Button(
             service_buttons,
             text="Open GameData",
@@ -2923,27 +2974,104 @@ class App:
             command=self._open_packaged_dlls,
         )
         self.open_packaged_dlls_button.pack(side="right", padx=(0, 6))
-        self._refresh_ksp_root_status()
 
         components = discover_components()
         if components:
             for component in components:
                 self._add_component(component)
         else:
-            empty = ttk.LabelFrame(self.controls_root, text="COMPONENTS")
-            empty.pack(fill="x", padx=14, pady=6)
+            empty = ttk.LabelFrame(self.component_column, text="COMPONENTS")
+            empty.pack(fill="x", pady=(0, 6))
             ttk.Label(
                 empty,
                 text="No supported Python components were found beside this launcher.",
                 anchor="w",
             ).pack(fill="x", padx=10, pady=12)
 
-        settings_frame.pack(fill="x", padx=14, pady=6)
+        live_krpc = ttk.LabelFrame(
+            self.component_column,
+            text="LIVE KRPC CONNECTION",
+        )
+        live_krpc.pack(fill="x", pady=(6, 0))
+        live_controls = ttk.Frame(live_krpc)
+        live_controls.pack(fill="x", padx=8, pady=(8, 4))
+        self.krpc_test_button = ttk.Button(
+            live_controls,
+            text="Test connection",
+            command=self._start_krpc_connection_test,
+        )
+        self.krpc_test_button.pack(side="left")
+        self.krpc_connection_status = ttk.Label(
+            live_controls,
+            text="Not tested",
+            anchor="e",
+            style="TLabel",
+        )
+        self.krpc_connection_status.pack(side="right", fill="x", expand=True)
+        ttk.Label(
+            live_krpc,
+            text=(
+                f"127.0.0.1 · RPC {KRPC_RPC_PORT} / stream {KRPC_STREAM_PORT}. "
+                "Tests the running kRPC server and expected services."
+            ),
+            foreground=THEME["slate"],
+            anchor="w",
+            justify="left",
+            wraplength=350,
+        ).pack(fill="x", padx=9, pady=(0, 8))
+
+        settings_frame.pack(fill="x")
+        self._refresh_ksp_root_status()
 
         log_shell = ttk.Frame(self.main_panes, style="Shell.TFrame")
-        log_frame = ttk.LabelFrame(log_shell, text="MISSION LOG")
+        log_frame = ttk.Frame(log_shell, style="Card.TFrame")
         log_frame.pack(fill="both", expand=True, padx=14, pady=(6, 12))
-        self.main_panes.add(log_shell, minsize=120, stretch="always")
+        log_header = ttk.Frame(log_frame, style="CardInner.TFrame")
+        log_header.pack(fill="x", padx=8, pady=(6, 3))
+        ttk.Label(
+            log_header,
+            text="MISSION LOG",
+            style="CardTitle.TLabel",
+        ).pack(side="left")
+        ttk.Label(
+            log_header,
+            textvariable=self.log_warning_count_var,
+            foreground=THEME["amber"],
+            style="Card.TLabel",
+        ).pack(side="left", padx=(8, 0))
+        ttk.Checkbutton(
+            log_header,
+            text="follow",
+            variable=self.log_follow_var,
+            command=self._render_log,
+            style="Panel.TCheckbutton",
+        ).pack(side="right", padx=(5, 0))
+        ttk.Button(
+            log_header,
+            text="Clear",
+            width=6,
+            command=self._clear_log,
+        ).pack(side="right", padx=(4, 0))
+        ttk.Button(
+            log_header,
+            text="Copy",
+            width=6,
+            command=self._copy_log,
+        ).pack(side="right", padx=(4, 0))
+        for selected_filter in ("warnings", "preflight", "feed", "all"):
+            button = ttk.Button(
+                log_header,
+                text=selected_filter.title(),
+                command=lambda value=selected_filter: self._select_log_filter(value),
+            )
+            button.pack(side="right", padx=(4, 0))
+            self.log_filter_buttons[selected_filter] = button
+        ttk.Label(
+            log_header,
+            text="FILTER",
+            style="TableHeader.TLabel",
+        ).pack(side="right", padx=(8, 0))
+        self.main_panes.add(log_shell, minsize=150, stretch="always")
         self.logbox = scrolledtext.ScrolledText(
             log_frame,
             height=10,
@@ -2961,6 +3089,7 @@ class App:
             pady=7,
         )
         self.logbox.pack(fill="both", expand=True, padx=7, pady=7)
+        self._select_log_filter("all")
 
         self._apply_initial_window_geometry()
         self.root.after_idle(self._place_initial_pane_sash)
@@ -2990,6 +3119,31 @@ class App:
             self.update_status.config(text="Automatic update checks are off")
         self.root.after(700, self._maybe_show_changelog)
 
+    def _layout_header(self, event=None):
+        width = int(getattr(event, "width", 0) or self.header.winfo_width())
+        wide = width >= 1180
+        if self.header_wide is wide:
+            return
+        self.header_wide = wide
+        self.header_update_bar.grid_forget()
+        if wide:
+            self.header_update_bar.grid(
+                row=0,
+                column=1,
+                sticky="ew",
+                padx=(14, 0),
+                pady=0,
+            )
+        else:
+            self.header_update_bar.grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky="ew",
+                padx=0,
+                pady=(7, 0),
+            )
+
     def _apply_initial_window_geometry(self):
         self.root.update_idletasks()
         width, height = calculate_initial_window_size(
@@ -2998,7 +3152,7 @@ class App:
             self.root.winfo_reqwidth(),
             self.root.winfo_reqheight(),
         )
-        self.root.minsize(min(900, width), min(640, height))
+        self.root.minsize(min(1100, width), min(700, height))
         x = max(0, (self.root.winfo_screenwidth() - width) // 2)
         y = max(0, (self.root.winfo_screenheight() - height) // 3)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
@@ -3027,10 +3181,10 @@ class App:
         )
 
         frame = ttk.LabelFrame(
-            self.controls_root,
+            self.component_column,
             text=component["title"].upper(),
         )
-        frame.pack(fill="x", padx=14, pady=6)
+        frame.pack(fill="x", pady=(0, 6))
 
         controls = ttk.Frame(frame)
         controls.pack(fill="x", padx=8, pady=(8, 2))
@@ -3081,13 +3235,13 @@ class App:
             self.lan_access_control.pack(side="left")
             address_row = ttk.Frame(frame)
             address_row.pack(fill="x", padx=9, pady=(2, 4))
-            ttk.Label(address_row, text="LAN address:").pack(side="left")
+            ttk.Label(address_row, text="LAN:").pack(side="left")
             self.lan_address_combo = ttk.Combobox(
                 address_row,
                 textvariable=self.lan_address_var,
                 values=self.lan_addresses,
                 state="readonly",
-                width=18,
+                width=15,
             )
             self.lan_address_combo.pack(side="left", padx=(7, 5))
             self.lan_address_combo.bind(
@@ -3123,7 +3277,7 @@ class App:
                 foreground=THEME["slate_dim"],
                 anchor="w",
                 justify="left",
-                wraplength=670,
+                wraplength=350,
             ).pack(fill="x", padx=9, pady=(0, 8))
             self._update_lan_address_status()
 
@@ -3231,16 +3385,7 @@ class App:
         raw = self.ksp_root_var.get().strip()
         root = resolve_ksp_root(raw)
         if root is not None:
-            notes_variants = (
-                root / "GameData" / "Notes" / "Plugins" / "PluginData" / "notes",
-                root / "GameData" / "notes" / "Plugins" / "PluginData" / "notes",
-            )
-            notes_installed = any(path.is_dir() for path in notes_variants)
             text = "KSP folder ready"
-            if notes_installed:
-                text += " - Notes mod detected"
-            else:
-                text += " - Notes mod not detected (optional)"
             self.ksp_root_status.config(text=text, foreground=THEME["green"])
         elif raw:
             self.ksp_root_status.config(
@@ -3250,8 +3395,8 @@ class App:
         else:
             self.ksp_root_status.config(
                 text=(
-                    "Choose the KSP folder to verify kRPC and mods, maintain "
-                    "services, and enable Notes."
+                    "Choose the KSP folder to verify kRPC, mods, and Mission "
+                    "Control services."
                 ),
                 foreground=THEME["slate_dim"],
             )
@@ -3333,6 +3478,22 @@ class App:
             heat_text, heat_color = "Not installed - stock heat (W)", THEME["cyan"]
         self.system_heat_mod_status.config(text=heat_text, foreground=heat_color)
 
+        if root is None:
+            notes_text, notes_color = "KSP folder required", THEME["slate_dim"]
+            notes_resolved = False
+        else:
+            notes_variants = (
+                root / "GameData" / "Notes" / "Plugins" / "PluginData" / "notes",
+                root / "GameData" / "notes" / "Plugins" / "PluginData" / "notes",
+            )
+            notes_installed = any(path.is_dir() for path in notes_variants)
+            if notes_installed:
+                notes_text, notes_color = "Detected", THEME["green"]
+            else:
+                notes_text, notes_color = "Not detected - optional", THEME["cyan"]
+            notes_resolved = True
+        self.notes_mod_status.config(text=notes_text, foreground=notes_color)
+
         configuration = krpc_configuration_inventory(self.ksp_root_var.get())
         config_status = configuration["status"]
         server = configuration.get("server")
@@ -3374,10 +3535,12 @@ class App:
             self.prerequisite_fix_button.config(
                 text=f"Review fixes ({len(self.prerequisite_fix_items)})"
             )
+            if not self.prerequisite_buttons.winfo_manager():
+                self.prerequisite_buttons.pack(fill="x", pady=(10, 0))
             if not self.prerequisite_fix_button.winfo_manager():
-                self.prerequisite_fix_button.pack(side="left", padx=(6, 0))
-        elif self.prerequisite_fix_button.winfo_manager():
-            self.prerequisite_fix_button.pack_forget()
+                self.prerequisite_fix_button.pack(side="left")
+        elif self.prerequisite_buttons.winfo_manager():
+            self.prerequisite_buttons.pack_forget()
 
         statuses = {item["key"]: item["status"] for item in inventory}
         optional_attention = any(
@@ -3416,6 +3579,21 @@ class App:
             summary_text, summary_color = "Manual kRPC action needed", THEME["amber"]
         else:
             summary_text, summary_color = "Prerequisites tested", THEME["green"]
+        total_checks = 5 + len(KSP_PREREQUISITES)
+        resolved_checks = sum(
+            (
+                ksp_status != "unconfigured",
+                layout_status not in {"unconfigured", "error"},
+                *(
+                    item["status"] != "unconfigured"
+                    for item in inventory
+                ),
+                system_heat["status"] != "unconfigured",
+                config_status != "unconfigured",
+                notes_resolved,
+            )
+        )
+        summary_text += f" · {resolved_checks}/{total_checks} resolved"
         self.prerequisite_summary.config(
             text=summary_text, foreground=summary_color
         )
@@ -3695,7 +3873,8 @@ class App:
             summary_color = THEME["slate_dim"]
         elif installed_issues and package_missing:
             summary_text = (
-                f"{installed_issues} installed service issue(s); package incomplete"
+                f"{installed_issues} installed issue(s) · "
+                f"{package_missing} missing from package"
             )
             summary_color = THEME["warn"]
         elif installed_issues:
@@ -3703,9 +3882,11 @@ class App:
             summary_color = THEME["warn"]
         elif package_missing:
             summary_text = (
-                "Installed services current; package incomplete"
+                f"{installed_current} current · "
+                f"{package_missing} missing from package"
                 if installed_current == len(inventory)
-                else "Installed services present; package incomplete"
+                else f"{installed_current} present · "
+                f"{package_missing} missing from package"
             )
             summary_color = THEME["amber"]
         elif counts.get("current_different", 0):
@@ -3868,12 +4049,69 @@ class App:
         self._save_ksp_root()
 
     def _enqueue(self, source, message):
-        self.log_queue.put(f"[{source}] {message}")
+        self.log_queue.put((str(source), str(message)))
+
+    def _select_log_filter(self, selected_filter):
+        selected_filter = str(selected_filter or "all").casefold()
+        self.log_filter_var.set(selected_filter)
+        for name, button in self.log_filter_buttons.items():
+            button.config(
+                style="Accent.TButton" if name == selected_filter else "TButton"
+            )
+        if hasattr(self, "logbox"):
+            self._render_log()
+
+    def _render_log(self):
+        if not hasattr(self, "logbox"):
+            return
+        previous_view = self.logbox.yview()
+        visible = filter_launcher_log_records(
+            self.log_records,
+            self.log_filter_var.get(),
+        )
+        self.logbox.configure(state="normal")
+        self.logbox.delete("1.0", "end")
+        for source, message, _warning in visible:
+            self.logbox.insert("end", f"[{source}] {message}\n")
+        self.logbox.configure(state="disabled")
+        if self.log_follow_var.get():
+            self.logbox.see("end")
+        elif previous_view:
+            self.logbox.yview_moveto(previous_view[0])
+
+    def _copy_log(self):
+        visible = filter_launcher_log_records(
+            self.log_records,
+            self.log_filter_var.get(),
+        )
+        text = "\n".join(
+            f"[{source}] {message}" for source, message, _warning in visible
+        )
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.root.update_idletasks()
+        except tk.TclError as exc:
+            self._enqueue("launcher", f"couldn't copy Mission Log: {exc}")
+
+    def _clear_log(self):
+        self.log_records.clear()
+        self.log_warning_count_var.set("0 warnings")
+        self._render_log()
 
     def _drain_log(self):
+        changed = False
         try:
             while True:
-                line = self.log_queue.get_nowait()
+                record = self.log_queue.get_nowait()
+                if isinstance(record, tuple) and len(record) == 2:
+                    source, message = record
+                else:
+                    line = str(record)
+                    source, separator, message = line.partition("] ")
+                    source = source.removeprefix("[") if separator else "launcher"
+                    message = message if separator else line
+                line = f"[{source}] {message}"
                 if KRPC_CONNECTED_EVENT in line:
                     self.live_krpc_state = {"status": "runtime_connected"}
                     self._refresh_prerequisite_status()
@@ -3885,12 +4123,19 @@ class App:
                     }
                     self._refresh_prerequisite_status()
                     continue
-                self.logbox.configure(state="normal")
-                self.logbox.insert("end", line + "\n")
-                self.logbox.see("end")
-                self.logbox.configure(state="disabled")
+                self.log_records.append(
+                    (source, message, is_launcher_log_warning(source, message))
+                )
+                if len(self.log_records) > 5000:
+                    del self.log_records[: len(self.log_records) - 5000]
+                changed = True
         except queue.Empty:
             pass
+        if changed:
+            warning_count = sum(record[2] for record in self.log_records)
+            suffix = "warning" if warning_count == 1 else "warnings"
+            self.log_warning_count_var.set(f"{warning_count} {suffix}")
+            self._render_log()
         self.root.after(100, self._drain_log)
 
     def _start_update_check(self, use_cache):
