@@ -305,7 +305,10 @@ class KrpcPrerequisiteTests(unittest.TestCase):
 
             self.assertEqual(inventory["status"], "current")
             self.assertEqual(inventory["installed_version"], "0.17.0.0")
-            self.assertEqual(inventory["target"], notes / "Plugins" / "Notes.dll")
+            self.assertEqual(
+                inventory["target"].resolve(),
+                (notes / "Plugins" / "Notes.dll").resolve(),
+            )
 
     def test_notes_inventory_reports_untested_unknown_and_missing(self):
         with tempfile.TemporaryDirectory() as directory:
