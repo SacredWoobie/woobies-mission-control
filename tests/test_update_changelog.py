@@ -148,9 +148,9 @@ class UpdateAndChangelogTests(unittest.TestCase):
         section = app.extract_version_changelog(
             app.load_changelog(path), app.APP_VERSION
         )
-        self.assertIn("Flight navball and launch communications", section)
-        self.assertIn("north-reference line", section)
-        self.assertIn("false COMMS Master Caution", section)
+        self.assertIn("Trusted LAN and launcher workbench", section)
+        self.assertIn("trusted-LAN dashboard access", section)
+        self.assertIn("zer0Kerbal's Notes", section)
 
 
 if __name__ == "__main__":

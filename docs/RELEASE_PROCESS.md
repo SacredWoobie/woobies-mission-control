@@ -31,7 +31,7 @@ versions for Mission Control, then stage exactly that set:
 .\Stage-Selected-Releases.bat
 ```
 
-The v0.7.4 release manifest selects:
+The v0.8.0 release manifest selects:
 
 | Service | Release |
 | --- | --- |
@@ -40,10 +40,10 @@ The v0.7.4 release manifest selects:
 | KRPC.SystemHeat | 0.2.11 |
 | KRPC.WoobiesMechJeb | 0.8.10 |
 
-The previous v0.6.1 through v0.7.3 release contracts remain frozen in
-their matching `tools/Release-Pack-v*.psd1` files. The selected v0.7.4 contract is recorded in
+The previous v0.6.1 through v0.7.4 release contracts remain frozen in
+their matching `tools/Release-Pack-v*.psd1` files. The selected v0.8.0 contract is recorded in
 `tools/Release-Manifest.psd1` and frozen in
-`tools/Release-Pack-v0.7.4.psd1`.
+`tools/Release-Pack-v0.8.0.psd1`.
 Versioned names are retained in the builder archives; the assembled KSP
 `GameData` folders use each service's canonical DLL filename as required by
 KSP and kRPC.
@@ -79,14 +79,14 @@ Before the screenshot session, build an internal acceptance package without
 image assets:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.7.4 -GameDataPath $serviceGameData -SkipReleaseImages
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.8.0 -GameDataPath $serviceGameData -SkipReleaseImages
 ```
 
 The switch is rejected when `-CreateDraftRelease` is present. After all five
 screenshots are approved, run the final package command without the switch:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.7.4 -GameDataPath $serviceGameData
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.8.0 -GameDataPath $serviceGameData
 ```
 
 The packager:
@@ -153,25 +153,27 @@ first public successor, so its acceptance must add one real v0.6.1-to-v0.7.0
 managed-update smoke in a disposable package tree. Do not point production code
 at a test channel or allow the updater to touch live KSP.
 
-Version 0.7.4 reuses the five approved v0.7.3 curated captures by explicit user
-decision. Follow `docs/images/v0.7.3/README.md`; all five source images remain
-true 1080x1785 portrait PNGs with no visible pointer. The developer corner
-control must remain hidden, and the clean packaged runtime must be validated
-separately without fixtures or development-only controls. Older releases retain
-their original approved screenshot sets.
+Version 0.8.0 release imagery remains a deliberate final gate. Use
+`-SkipReleaseImages` for internal package and updater acceptance until the user
+selects either the existing five approved v0.7.3 dashboard captures or a new
+curated set. Do not treat a redacted acceptance screenshot as an automatic
+public asset. Any selected images must have documented source briefs, exact
+dimensions and hashes, no visible pointer or private network details, and no
+fixtures or development-only controls. Older releases retain their original
+approved screenshot sets.
 
 ## 5. Create a private draft release
 
 After committing, pushing, and confirming that `main` matches `origin/main`:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.7.4 -GameDataPath $serviceGameData -CreateDraftRelease
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish-Release.ps1 -Version 0.8.0 -GameDataPath $serviceGameData -CreateDraftRelease
 ```
 
 This creates a draft GitHub Release and uploads the ZIP, checksum, GPL source
 archive, runtime-update ZIP and checksum, and five curated screenshots. The
 screenshot filenames use a `.zz-01` through `.zz-05` suffix and the updater uses
-`.zz-90`, so `Woobies-Mission-Control-v0.7.4.zip` remains the first release
+`.zz-90`, so `Woobies-Mission-Control-v0.8.0.zip` remains the first release
 asset. Review the draft, its generated notes, asset ordering, source archive,
 update manifests/checksums, and final screenshots before publishing it.
 
