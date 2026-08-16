@@ -1,5 +1,4 @@
 @{
-    ReleaseState = "Release"
     ProductVersion = "0.8.0"
     Krpc = @{
         Version = "0.6.0"

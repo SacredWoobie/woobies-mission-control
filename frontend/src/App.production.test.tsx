@@ -38,7 +38,7 @@ describe("Production dashboard entry", () => {
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "DEV" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
-    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.7.4 · Production")).toBeTruthy();
+    expect(screen.getByText("Woobie's Mission Control · React dashboard · v0.8.0 · Production")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("dialog", { name: "Mission Control Settings" })).toBeTruthy();

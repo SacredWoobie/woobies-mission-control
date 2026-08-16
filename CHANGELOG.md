@@ -4,6 +4,8 @@ All notable public changes will be recorded here.
 
 ## Unreleased
 
+## v0.8.0 - Trusted LAN and launcher workbench
+
 - Reworked the desktop launcher into a screen-efficient two-column workbench
   with responsive single-column fallback, paired compatibility/service status
   rows, a compact live-kRPC card, and a larger resizable Mission Log. The log

@@ -1,6 +1,6 @@
 # Woobie's Mission Control
 
-Current public release: **[v0.7.4](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.7.4)**
+Current public release: **[v0.8.0](https://github.com/SacredWoobie/woobies-mission-control/releases/tag/v0.8.0)**
 
 Woobie's Mission Control is a local browser dashboard and mission-planning
 workspace for Kerbal Space Program 1. It uses kRPC for live game data and serves
@@ -8,11 +8,14 @@ the dashboard from your own computer at `http://127.0.0.1:8090/`. Opt-in
 trusted-LAN access can add a second listener on a selected private IPv4 address.
 An optional ESP32 bridge provides physical stage and abort controls.
 
-Version 0.7.4 corrects the shared vector and textured Flight navball roll
-direction, adds an orange north-reference line to the vector navball, and
-prevents RemoteTech's brief Editor-to-launchpad initialization gap from raising
-a false COMMS Master Caution. The release does not change KSP `GameData` or the
-selected service DLL versions.
+Version 0.8.0 adds opt-in trusted-LAN dashboard access while keeping the local
+loopback dashboard available. It requires an explicit warning before exposing
+the full command-capable interface, lets users select an active private IPv4
+address, and validates each listener's peers, Host header, and WebSocket Origin.
+The release also reorganizes the launcher into a responsive workbench with a
+larger filterable Mission Log and explicit compatibility reporting for
+zer0Kerbal's Notes (Kollege Ruled) v0.17.0.0. It does not change the selected
+service DLL versions or automatically modify Windows firewall rules.
 
 This is an unofficial community project and is not affiliated with or endorsed
 by the developers or publishers of Kerbal Space Program or any supported mod.
@@ -129,7 +132,7 @@ The dashboard adds a Settings rail drawer with four sections:
 
 - **Preferences** keeps the Kerbin/Earth time system and Science alarm defaults
   in browser-local storage and can restore hidden dashboard panels. Public
-  v0.7.4 offers Mission Control Dark, Daylight Console, Warm CRT, Green
+  v0.8.0 offers Mission Control Dark, Daylight Console, Warm CRT, Green
   Phosphor, and Catppuccin Mocha. A selection applies immediately and persists
   in that browser. The themes
   change semantic color and surface treatments while retaining the same
@@ -154,11 +157,11 @@ The dashboard adds a Settings rail drawer with four sections:
   `GameData`; use `Dashboard\Start KSP Dashboard.bat` for those launcher
   responsibilities.
 
-The public baseline is v0.7.4.
+The public baseline is v0.8.0.
 
 ## Packaged KSP services
 
-The v0.7.4 public release selects four independently versioned kRPC extensions.
+The v0.8.0 public release selects four independently versioned kRPC extensions.
 Earlier release packs remain pinned to their original service bytes:
 
 | Service | Selected version | Purpose |
@@ -301,7 +304,7 @@ Mission Control is released under the [MIT License](LICENSE). Created by
 **SacredWoobie**. Bundled and adapted components retain their own licenses and
 notices in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
-Version 0.7.4 includes an optional KSP2 Pre-Alpha Style NavBall.
+Version 0.8.0 includes an optional KSP2 Pre-Alpha Style NavBall.
 Special thanks to [SqueakyB](https://spacedock.info/profile/SqueakyB) for
 creating it, suggesting its Mission Control integration, and granting
 permission to include the artwork.
