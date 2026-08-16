@@ -281,6 +281,68 @@ class KrpcPrerequisiteTests(unittest.TestCase):
         self.assertTrue(app.versions_equivalent("0.8.6.0", "0.8.6"))
         self.assertFalse(app.versions_equivalent("0.8.7", "0.8.6"))
 
+    def test_notes_inventory_reports_tested_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_root(directory)
+            notes = root / "GameData" / "Notes"
+            (notes / "Plugins").mkdir(parents=True)
+            (notes / "Plugins" / "Notes.dll").write_bytes(b"notes")
+            (notes / "Notes.version").write_text(
+                json.dumps(
+                    {
+                        "VERSION": {
+                            "MAJOR": 0,
+                            "MINOR": 17,
+                            "PATCH": 0,
+                            "BUILD": 0,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            inventory = app.notes_mod_inventory(root)
+
+            self.assertEqual(inventory["status"], "current")
+            self.assertEqual(inventory["installed_version"], "0.17.0.0")
+            self.assertEqual(
+                inventory["target"].resolve(),
+                (notes / "Plugins" / "Notes.dll").resolve(),
+            )
+
+    def test_notes_inventory_reports_untested_unknown_and_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_root(directory)
+            notes = root / "GameData" / "notes"
+            (notes / "Plugins").mkdir(parents=True)
+            (notes / "Plugins" / "Notes.dll").write_bytes(b"notes")
+            version_path = notes / "Notes.version"
+            version_path.write_text(
+                json.dumps(
+                    {
+                        "VERSION": {
+                            "MAJOR": 0,
+                            "MINOR": 18,
+                            "PATCH": 0,
+                            "BUILD": 0,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            untested = app.notes_mod_inventory(root)
+            self.assertEqual(untested["status"], "untested")
+            self.assertEqual(untested["installed_version"], "0.18.0.0")
+
+            version_path.unlink()
+            self.assertEqual(
+                app.notes_mod_inventory(root)["status"], "unknown_version"
+            )
+
+            (notes / "Plugins" / "Notes.dll").unlink()
+            self.assertEqual(app.notes_mod_inventory(root)["status"], "missing")
+
     def test_newer_mechjeb_recommends_ckan_downgrade_to_tested_version(self):
         inventory = []
         for definition in app.KSP_PREREQUISITES:

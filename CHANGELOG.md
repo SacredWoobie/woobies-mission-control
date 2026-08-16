@@ -2,6 +2,34 @@
 
 All notable public changes will be recorded here.
 
+## Unreleased
+
+- Reworked the desktop launcher into a screen-efficient two-column workbench
+  with responsive single-column fallback, paired compatibility/service status
+  rows, a compact live-kRPC card, and a larger resizable Mission Log. The log
+  now supports source and warning filters, warning counts, copy, clear, and a
+  follow-tail toggle while retaining every existing launcher action.
+- Clarified the optional Notes compatibility entry as zer0Kerbal's Notes
+  (Kollege Ruled) and now reports whether its detected version matches the
+  tested v0.17.0.0 release.
+- Added opt-in trusted-LAN dashboard access while preserving the launcher's
+  loopback dashboard. The launcher discovers active private IPv4 interfaces,
+  lets the user select one and copy its URL, and requires a detailed warning
+  confirmation before enabling the unauthenticated, unencrypted,
+  command-capable listener. The warning can be remembered explicitly and is
+  versioned so materially changed capabilities require a new acknowledgement.
+  Starting a LAN-enabled feed leaves the host browser closed; users can copy the
+  LAN URL for another device or explicitly open the local dashboard.
+- Hardened LAN serving with simultaneous listener-specific peer, Host, and
+  WebSocket Origin validation. Wildcard, public, stale, and unavailable binds
+  remain blocked, visible settings explicitly override inherited environment
+  values, and changing LAN configuration stops a running feed until the user
+  starts it again.
+- Documented Private-network Windows firewall guidance and the data and command
+  access granted to trusted LAN peers. No firewall rules are created
+  automatically, and no authentication, TLS, IPv6, telemetry-schema, or custom
+  service-DLL changes are included.
+
 ## v0.7.4 - Flight navball and launch communications
 
 - Added a projected orange north-reference line to the vector Flight navball

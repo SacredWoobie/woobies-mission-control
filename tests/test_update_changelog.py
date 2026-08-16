@@ -1,3 +1,4 @@
+import queue
 import sys
 import time
 import unittest
@@ -25,11 +26,11 @@ class UpdateAndChangelogTests(unittest.TestCase):
     def test_initial_window_size_is_roomy_and_screen_bounded(self):
         self.assertEqual(
             app.calculate_initial_window_size(2560, 1440, 706, 801),
-            (960, 820),
+            (1360, 860),
         )
         self.assertEqual(
             app.calculate_initial_window_size(1366, 768, 706, 801),
-            (960, 648),
+            (1286, 648),
         )
         self.assertEqual(
             app.calculate_initial_window_size(800, 600, 706, 801),
@@ -37,10 +38,50 @@ class UpdateAndChangelogTests(unittest.TestCase):
         )
 
     def test_initial_launcher_panes_favor_controls_and_preserve_log(self):
-        self.assertEqual(app.calculate_initial_pane_sash(700), 518)
-        self.assertEqual(app.calculate_initial_pane_sash(400), 280)
-        self.assertEqual(app.calculate_initial_pane_sash(300), 180)
+        self.assertEqual(app.calculate_initial_pane_sash(700), 504)
+        self.assertEqual(app.calculate_initial_pane_sash(400), 250)
+        self.assertEqual(app.calculate_initial_pane_sash(300), 150)
         self.assertEqual(app.calculate_initial_pane_sash(100), 0)
+
+    def test_launcher_log_filters_keep_sources_and_warning_focus(self):
+        records = [
+            ("feed", "telemetry ready", False),
+            ("preflight", "kRPC port refused the connection", True),
+            ("updates", "up to date", False),
+        ]
+        self.assertEqual(
+            app.filter_launcher_log_records(records, "feed"),
+            [records[0]],
+        )
+        self.assertEqual(
+            app.filter_launcher_log_records(records, "preflight"),
+            [records[1]],
+        )
+        self.assertEqual(
+            app.filter_launcher_log_records(records, "warnings"),
+            [records[1]],
+        )
+        self.assertEqual(
+            app.filter_launcher_log_records(records, "all"),
+            records,
+        )
+        self.assertTrue(
+            app.is_launcher_log_warning(
+                "feed", "WARNING: LAN access has no authentication"
+            )
+        )
+        self.assertFalse(
+            app.is_launcher_log_warning("preflight", "live kRPC test passed")
+        )
+
+    def test_launcher_enqueue_preserves_structured_source_and_message(self):
+        launcher = app.App.__new__(app.App)
+        launcher.log_queue = queue.Queue()
+        launcher._enqueue("feed", "telemetry ready")
+        self.assertEqual(
+            launcher.log_queue.get_nowait(),
+            ("feed", "telemetry ready"),
+        )
 
     def test_mousewheel_delta_normalizes_for_tk_scrolling(self):
         self.assertEqual(app.normalize_mousewheel_units(120), -1)

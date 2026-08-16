@@ -90,10 +90,31 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    running. It confirms that kRPC responds and that services for the installed
    integration DLLs are registered.
    In the Mission Control launcher, start Dashboard feed (telemetry + React).
-   The launcher waits for the loopback server and opens the dashboard in your
-   browser automatically. Each tool stops after 10
+   With LAN access off, the launcher waits for the loopback server and opens
+   the dashboard in your browser automatically. Each tool stops after 10
    failed kRPC attempts (about 20 seconds) instead of retrying forever. Its
    connection status then turns amber and recommends Test connection.
+
+   OPTIONAL TRUSTED-LAN ACCESS: Leave Allow local network access off unless
+   every device on the selected network is trusted. Choose an active private
+   IPv4 address from the LAN address list; Refresh rescans the host and Copy
+   LAN URL copies the address for a second device. Turning LAN access on opens
+   a warning that explains the listener has no authentication or encryption.
+   LAN peers can view telemetry, finances, contracts, Notes, and vessel data,
+   and can issue every dashboard command, including vessel recovery or
+   termination, system controls, and maneuver-node creation. Choose Cancel to
+   leave LAN access off. The Remember checkbox is off by default; without it,
+   the warning returns every time LAN access is turned on.
+
+   Enabling, disabling, or changing the LAN address stops a running Dashboard
+   feed. Click Start again, then use the copied LAN URL from the trusted device.
+   Start does not automatically open a browser on the host while LAN access is
+   enabled; choose Open dashboard if you also want a local loopback tab at
+   http://127.0.0.1:8090/. If Windows shows
+   a firewall prompt, allow access on Private networks only. Mission Control
+   does not create firewall rules. Never forward port 8090 through a router or
+   expose it on a public network, and verify the chosen adapter on VPN or
+   multi-network computers.
 
    In Space Center and Tracking Station scenes, Mission Control shows a
    read-only program overview with save-mode-appropriate economy totals,
@@ -114,12 +135,13 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    confirmation. Mission Control never executes the node, warps, steers,
    stages, or changes throttle.
 
-   OPTIONAL NOTES INTEGRATION: When the Notes mod is detected at the selected
-   KSP location, a Notes button appears in the dashboard during flight and
-   opens the active vessel's ship log in a right-side drawer. Select any saved
-   note and choose Pin to flight to show it in a scrollable final flight panel.
-   Use A- and A+ in either Notes view to adjust text size; click the size value
-   to return to the default.
+   OPTIONAL NOTES INTEGRATION: The launcher checks for zer0Kerbal's Notes
+   (Kollege Ruled) v0.17.0.0, the release tested with Mission Control. When the
+   mod is detected at the selected KSP location, a Notes button appears in the
+   dashboard during flight and opens the active vessel's ship log in a
+   right-side drawer. Select any saved note and choose Pin to flight to show it
+   in a scrollable final flight panel. Use A- and A+ in either Notes view to
+   adjust text size; click the size value to return to the default.
 
    SETTINGS RAIL: The Settings rail groups browser-local Preferences, known
    Features & Mods, curated external Help links, and About information.

@@ -2,23 +2,24 @@ import { useEffect, useState } from "react";
 import {
   DashboardAppFrame,
   DashboardProviders,
-  DEFAULT_LIVE_ENDPOINT,
   LiveDashboard,
+  resolveLiveEndpoint,
 } from "./appShell";
 import { liveTelemetryStore } from "./telemetry/store";
 
 function ProductionDashboardApp() {
   const [notesOpen, setNotesOpen] = useState(false);
+  const [liveEndpoint] = useState(resolveLiveEndpoint);
 
   useEffect(() => {
-    liveTelemetryStore.connect(DEFAULT_LIVE_ENDPOINT);
+    liveTelemetryStore.connect(liveEndpoint);
     return () => liveTelemetryStore.disconnect();
-  }, []);
+  }, [liveEndpoint]);
 
   return (
     <DashboardAppFrame notesOpen={notesOpen}>
       <LiveDashboard
-        endpointDraft={DEFAULT_LIVE_ENDPOINT}
+        endpointDraft={liveEndpoint}
         footerLabel="Production"
         notesOpen={notesOpen}
         onCloseNotes={() => setNotesOpen(false)}
