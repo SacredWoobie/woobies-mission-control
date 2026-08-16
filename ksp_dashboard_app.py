@@ -324,6 +324,7 @@ KRPC_SERVICE_ATTRIBUTES = (
 )
 SYSTEM_HEAT_MOD_PATH = Path("SystemHeat") / "Plugin" / "SystemHeat.dll"
 NOTES_MOD_NAME = "zer0Kerbal's Notes (Kollege Ruled)"
+NOTES_MOD_DISPLAY_NAME = "zer0Kerbal's Notes\n(Kollege Ruled)"
 NOTES_TESTED_VERSION = "0.17.0.0"
 NOTES_MOD_DIRECTORIES = ("Notes", "notes")
 KSP_PREREQUISITES = (
@@ -2930,7 +2931,7 @@ class App:
             ),
             ("__system_heat", "System Heat thermal backend"),
             ("__krpc_configuration", "kRPC server configuration"),
-            ("__notes", NOTES_MOD_NAME),
+            ("__notes", NOTES_MOD_DISPLAY_NAME),
         ]
         compatibility_labels = build_paired_status_grid(
             prerequisites,
