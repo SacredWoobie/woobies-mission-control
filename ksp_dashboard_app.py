@@ -323,6 +323,9 @@ KRPC_SERVICE_ATTRIBUTES = (
     ("vessel_damage", "VesselDamage"),
 )
 SYSTEM_HEAT_MOD_PATH = Path("SystemHeat") / "Plugin" / "SystemHeat.dll"
+NOTES_MOD_NAME = "zer0Kerbal's Notes (Kollege Ruled)"
+NOTES_TESTED_VERSION = "0.17.0.0"
+NOTES_MOD_DIRECTORIES = ("Notes", "notes")
 KSP_PREREQUISITES = (
     {
         "key": "krpc",
@@ -1111,6 +1114,43 @@ def system_heat_mod_inventory(ksp_root_value):
     else:
         status = "stock_fallback"
     return {"status": status, "target": target}
+
+
+def notes_mod_inventory(ksp_root_value):
+    """Report the installed Notes release used by the read-only integration."""
+    if isinstance(ksp_root_value, os.PathLike):
+        ksp_root_value = os.fspath(ksp_root_value)
+    root = resolve_ksp_root(ksp_root_value)
+    if root is None:
+        return {
+            "status": "unconfigured",
+            "target": None,
+            "installed_version": None,
+        }
+
+    for directory_name in NOTES_MOD_DIRECTORIES:
+        mod_root = root / "GameData" / directory_name
+        target = mod_root / "Plugins" / "Notes.dll"
+        if not target.is_file():
+            continue
+        installed_version = read_avc_version(mod_root / "Notes.version")
+        if installed_version is None:
+            status = "unknown_version"
+        elif versions_equivalent(installed_version, NOTES_TESTED_VERSION):
+            status = "current"
+        else:
+            status = "untested"
+        return {
+            "status": status,
+            "target": target,
+            "installed_version": installed_version,
+        }
+
+    return {
+        "status": "missing",
+        "target": root / "GameData" / "Notes" / "Plugins" / "Notes.dll",
+        "installed_version": None,
+    }
 
 
 def _parse_config_nodes(text):
@@ -2890,7 +2930,7 @@ class App:
             ),
             ("__system_heat", "System Heat thermal backend"),
             ("__krpc_configuration", "kRPC server configuration"),
-            ("__notes", "Notes mod"),
+            ("__notes", NOTES_MOD_NAME),
         ]
         compatibility_labels = build_paired_status_grid(
             prerequisites,
@@ -3478,19 +3518,23 @@ class App:
             heat_text, heat_color = "Not installed - stock heat (W)", THEME["cyan"]
         self.system_heat_mod_status.config(text=heat_text, foreground=heat_color)
 
-        if root is None:
+        notes = notes_mod_inventory(self.ksp_root_var.get())
+        notes_status = notes["status"]
+        notes_version = notes["installed_version"]
+        if notes_status == "unconfigured":
             notes_text, notes_color = "KSP folder required", THEME["slate_dim"]
             notes_resolved = False
+        elif notes_status == "current":
+            notes_text, notes_color = f"{NOTES_TESTED_VERSION} tested", THEME["green"]
+            notes_resolved = True
+        elif notes_status == "untested":
+            notes_text, notes_color = f"{notes_version} - untested", THEME["amber"]
+            notes_resolved = True
+        elif notes_status == "unknown_version":
+            notes_text, notes_color = "Installed - version unknown", THEME["amber"]
+            notes_resolved = True
         else:
-            notes_variants = (
-                root / "GameData" / "Notes" / "Plugins" / "PluginData" / "notes",
-                root / "GameData" / "notes" / "Plugins" / "PluginData" / "notes",
-            )
-            notes_installed = any(path.is_dir() for path in notes_variants)
-            if notes_installed:
-                notes_text, notes_color = "Detected", THEME["green"]
-            else:
-                notes_text, notes_color = "Not detected - optional", THEME["cyan"]
+            notes_text, notes_color = "Not detected - optional", THEME["cyan"]
             notes_resolved = True
         self.notes_mod_status.config(text=notes_text, foreground=notes_color)
 

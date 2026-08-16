@@ -9,6 +9,9 @@ All notable public changes will be recorded here.
   rows, a compact live-kRPC card, and a larger resizable Mission Log. The log
   now supports source and warning filters, warning counts, copy, clear, and a
   follow-tail toggle while retaining every existing launcher action.
+- Clarified the optional Notes compatibility entry as zer0Kerbal's Notes
+  (Kollege Ruled) and now reports whether its detected version matches the
+  tested v0.17.0.0 release.
 - Added opt-in trusted-LAN dashboard access while preserving the launcher's
   loopback dashboard. The launcher discovers active private IPv4 interfaces,
   lets the user select one and copy its URL, and requires a detailed warning

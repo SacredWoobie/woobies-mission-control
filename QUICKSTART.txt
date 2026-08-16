@@ -135,12 +135,13 @@ from http://127.0.0.1:8090/. Node.js and Vite are not required.
    confirmation. Mission Control never executes the node, warps, steers,
    stages, or changes throttle.
 
-   OPTIONAL NOTES INTEGRATION: When the Notes mod is detected at the selected
-   KSP location, a Notes button appears in the dashboard during flight and
-   opens the active vessel's ship log in a right-side drawer. Select any saved
-   note and choose Pin to flight to show it in a scrollable final flight panel.
-   Use A- and A+ in either Notes view to adjust text size; click the size value
-   to return to the default.
+   OPTIONAL NOTES INTEGRATION: The launcher checks for zer0Kerbal's Notes
+   (Kollege Ruled) v0.17.0.0, the release tested with Mission Control. When the
+   mod is detected at the selected KSP location, a Notes button appears in the
+   dashboard during flight and opens the active vessel's ship log in a
+   right-side drawer. Select any saved note and choose Pin to flight to show it
+   in a scrollable final flight panel. Use A- and A+ in either Notes view to
+   adjust text size; click the size value to return to the default.
 
    SETTINGS RAIL: The Settings rail groups browser-local Preferences, known
    Features & Mods, curated external Help links, and About information.

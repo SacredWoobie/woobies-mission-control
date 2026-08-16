@@ -113,7 +113,8 @@ does not execute nodes, warp, steer, stage, or change throttle.
 - Space Center and Tracking Station views with guarded switching to a selected
   vessel.
 - VAB/SPH craft totals and atmospheric or vacuum stage simulation.
-- Optional Notes, Kerbal Alarm Clock, RemoteTech, System Heat, and ESP32
+- Optional zer0Kerbal's Notes (Kollege Ruled), Kerbal Alarm Clock, RemoteTech,
+  System Heat, and ESP32
   integrations without making them requirements for the rest of the dashboard.
 
 ## Settings, Help, and About
